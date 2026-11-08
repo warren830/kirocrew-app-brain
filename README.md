@@ -81,6 +81,9 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
   on its way to the page goes through Kiro Crew's scrubber; materials stay in the intake store (never in a repo).
 - The brain-kit checkout and the app directory run inside the gateway: in production they must not be writable by
   the agents' OS user.
+- On a person's machine the `brain-dev` agent runs as that person and can read their GitLab token file anyway: the
+  app's answer route adds no power it lacks, and it only answers clarify questions (never a Lean approval). The real
+  gates stay where brain-kit puts them: the bridge's checks, the signer, CI and GitLab approvals.
 
 ## Install (a person's machine)
 
