@@ -1,87 +1,159 @@
-# aidlc-team: the Kiro Crew app
+# Brain 交付: brain-kit on Kiro Crew
 
-The app turns a one-sentence requirement into a run of an agent team defined by a team file. Every role is a
-Kiro Crew chat session running as a Kiro Crew member, working in its own git worktree and branch. The app
-dispatches the roles by their dependencies, merges their work, runs the checks itself, sends failures back to
-the role that owns them, stops at human gates, deploys on the local machine, and draws all of it on a live
-board. A finished run can be replayed and signed off.
+A Kiro Crew app for [brain-kit](../brain-kit): claim a requirement, take its documents through the five gates,
+develop it with AI-DLC Lean in a `brain-dev` session, hand it over to the team runner, follow its questions (D-n on
+the GitLab MR), and keep the team's in-repo Brain. On the team runner the same app hosts brain-kit's bridge loop and
+runnerd, and dispatches the runs into `brain-run` sessions.
 
-The page has three views that share one app bar: the **CTO view** (CTO 视图, all deliveries), **delivery
-detail** (交付详情, one delivery) and the **team board** (团队看板, how the team delivered it).
+**Started from the aws-samples app.** This app was started from the sample app
+`samples/agent-team-on-kiro-crew/app` of
+[sample-ai-for-software-engineering-on-aws](https://github.com/aws-samples/sample-ai-for-software-engineering-on-aws)
+(commit `8674f15`), MIT No Attribution, Copyright Amazon.com, Inc. or its affiliates (see `LICENSE`). The first
+commit of this repo is that copy, unchanged.
 
-## How a run goes
+| Kept from the sample | Dropped (it stays in the sample) |
+| --- | --- |
+| `backend/core/gateway.py` (Kiro Crew HTTP API with the app secret, loopback only), `sessions.py` (chat slots in sidebar folders, project dir, `trust` per slot, idle detection, resend on start errors, credits), `httpkit.py` (owner-only routes), `store.py` (append-only log, now the app's own events), the bootstrap in `backend/routes.py` / `hooks.py`, `scripts/dev-install.sh`, `scripts/kcapi.sh`, the test fakes (`tests/http_fakes.py`, the fake gateway), and the UI shell: AppBar, URL navigation, SDK stubs, polling rules, preview build | The agent-team engine: team files, roles, packs, starters, the taoyuan demo, the CTO history, the team board, checks/deploy/site |
 
-| Step | What happens | Code |
+Added to the session runner: `strict_agent` (a session boots exactly the template `brain-dev` / `brain-run`, or is
+not opened: Crew's default agent would run without Lean's hooks), exact slot names (the bridge names runner slots
+after the run id), deliver-once sends (no resend, no nudge), per-slot credits over the whole transcript, and the
+bridge's KiroCrew surface (`adapter_create / set_project / send / slot / stop`).
+
+## Views (UI text is Chinese)
+
+| View | What it shows | Where it comes from |
 | --- | --- | --- |
-| 1 Requirement | The team is chosen by the words in the requirement: every team file with a `scope` and without `"routable": false` matches when one of its `keywords` occurs; the lowest `priority` wins; with no match the `fallback` team runs. The start form may pick the run's model from the models Kiro Crew offers (`GET /models`); every role then uses it, a role with its own `model` included. One run at a time | `routing.route`, `service.create_run`, `service.models` |
-| 2 Team | The team file is validated (dependency order, keys, gates, paths inside the app). The task template, the company standards that match, the roster and the knowledge source are read. An optional role whose member is missing sits the run out | `team.check_team`, `standards.py`, `team.leave_out_unhired` |
-| 3 Repository | `~/workplace/aidlc-team/runs/<run>/repo` starts from the team's `starter`, its `source` or `demo/target-template`; the requirement goes into the README; the `spec_pack` is overlaid, including its `tests/enterprise/` checks | `team._setup`, `gitwork.create_repo` |
-| 4 Tick | Every 2 seconds the sessions are polled and each live run advances one step | `service.pulse`, `team.TeamRun.tick` |
-| 5 Start | A role starts when everything it depends on is merged and, where there is a human gate, approved. A deploy role waits for all checks to pass; a read-only reviewer waits for every writing role upstream. A writing role gets a worktree `wt/<role>` on branch `team/<run>/<role>` | `team._ready`, `team._start` |
-| 6 Task | The task template filled in with the role, its branch, the paths it may write, upstream outputs, matching standards, the role's `brief`, the approved work split, and the person's notes and decisions at the gates. A fix round continues the role's own session | `team._work_task`, `team._launch` |
-| 7 Merge | Uncommitted changes inside the write scope are committed for the role; changes outside it are recorded as violations; the branch is merged into the run branch, and a conflict goes back to the role. A human gate then stops the run | `team._integrate`, `gitwork.merge` |
-| 8 Checks | The app runs `node --test` file by file on the run branch and assigns failures to roles by `test_owners` | `checks.run_tests`, `team._test_and_bounce` |
-| 9 Review | The read-only reviewer answers `DONE: 可以交付` (deliverable) or `DONE: 要改：…` (changes needed) with the roles to send back to | `team._review_done` |
-| 10 Gates | Approve: later roles start with the note and the per-question decisions, which are also written to `docs/aidlc/decisions.md` on the run branch. Discuss: the role answers in its own session and may revise its documents while the gate stays open. Send back: the role reworks with the note; the person may note the risk the send-back keeps from going live (`{what, amount}` in yuan, on the run's `risks`) | `team.TeamRun.gate` |
-| 11 Deploy | The deploy role writes `deploy/local.json` (port, health path); the app starts the site with `HOST=127.0.0.1`, waits for the health check, and stops a site that listens beyond loopback (checked with `lsof`) | `service._deploy`, `site.Site` |
-| 12 End | `done` when every role merged, `failed` when a role failed. Only a delivered run can be signed off; signing merges the run branch into the run repository's `main` | `team._settle`, `service.signoff` |
+| **交付总览** | Every requirement: claimed, local, handed over, running on the runner, parked with D-n, waiting acceptance, merged; owner, Lean stage n/11, what it waits on (with the exact approval line), credits, overlap warnings; Eval numbers and the low-score queue (复看队列); the decision funnel | git refs (`claim/*`, run branches, the default branch), worktree files, run.json, park.json, the Lean ledger; `brainkit.evaluate` when present; the bridge ledger in team mode; the MR via GitLab (person's token) |
+| **需求详情** | Lean's 11 stages and approvals, Session notes, decisions with their Brain citations, parked questions and answers (MR link), the run trace timeline, the sessions this app opened with their credits, Brain usage | `brainkit.trace.build` (else the Lean ledger), decisions.md, `sessions.slot_stats` |
+| **开需求** | The form: repo, title, slug, key, expected paths; the five gates (consent, classification incl. 不确定, business keep/mask, exclude globs); 先检查 shows brain-kit's dry-run findings verbatim; 开工 runs `brain start` and opens a `brain-dev` session in the run's own worktree | `brainkit.intake.package.build(dry_run=True)`, `bin/brain start` |
+| **Brain** | Entries by file and section with type, sources, usage counts and withdraw candidates; lint; reflect preview, apply on a new branch, apply and open the MR | `brainkit.entries`, `usage`, `brainlint`, `reflect`; `bin/brain reflect --apply [--push]` |
+| **待办** | Lean approvals pending (the line the person types in that session), D-n questions on the runner (link to the MR), the person's own clarify questions (answer here), acceptance, refused hand-overs, Kiro Crew problems | as above |
+| **运行机** (team mode) | The bridge ledger, runs, signature requests waiting for the signer and the ones it refused | the hosted bridge, the signer spool |
+| **设置** | brain-kit checkout, repos, work root, team mode; Kiro Crew checks with their fixes | `settings.json` in the app's data dir |
+
+The app never sends a Lean approval line: it shows it, copies it, and opens the session; the person types it. On the
+team runner's dashboard no question is answered (answers are made on GitLab, where the person is identified). On a
+person's machine, a clarify question of their own run may be answered in the app: into the local session (a local
+run), or as their own MR comment `answer D-n X` with their own token (a handed-over run; the bridge checks it as any
+other). A question that carries a Lean request is never answerable in the app.
+
+## How it works
+
+- **brain-kit is a library**, imported from the configured checkout under a private package name
+  (`_brainapp_brainkit`, nothing on `sys.path`); it is never edited. Optional modules (`trace`, `evaluate`, `golden`,
+  `intents`) are guarded: a missing one turns its feature off and the page says so. Wishes for brain-kit:
+  `BRAINKIT_REQUESTS.md`.
+- **Each requirement gets its own worktree** under `~/workplace/brain-app/<repo>/<slug>` (`git worktree add
+  --detach`, then `brain start` in it), so several requirements can be open on one machine and each `brain-dev`
+  session has its own project directory. Kiro Crew lets agents work under `~/workplace` / `~/workspace` only.
+- **Lean is read, never run**: stages and pending approvals come from `aidlc-docs/audit/*.jsonl` and the files
+  (`lean status` would rewrite aidlc-state.md, and the project's `.kiro/aidlc-lean/` is agent-writable).
+- **Startup checks** (and fixes on click): `~/.kiro/agents/brain-dev.json` carries Lean's three hooks
+  (SessionStart, UserPromptSubmit, PreToolUse via `.kiro/brain/lean-hook.py`), the engine `agent.acp_backend` is
+  `kas`, every repo has `.kiro/brain/lean-hook.py`. The fixes install brain-kit's `crew/brain-dev.json` (an existing
+  different file is kept as `.bak-<time>`) and run `kirocrew config set agent.acp_backend kas`.
+- **Team mode** hosts `brainkit.bridge.handoff.Bridge` (poll → dispatch → watch → collect → reconcile) and
+  `brainkit.bridge.runnerd.once` as a background task (`on_startup` / `on_shutdown`), on one worker thread (the
+  bridge's sqlite ledger is per thread). Sessions go through `team/crewadapter.py` (brain-kit's KiroCrew surface:
+  `create_slot`, `set_project`, `send`, `slot`, `stop`) into the app's session runner, not brain-kit's HTTP client.
+
+## Security
+
+The app runs as the same OS user as the agent sessions, and agents have a shell. So:
+
+- **Signing is not the app's.** The bridge's private key stays with `signer/brain_signer.py`, a small separate
+  process (another OS user in production, `brainbridge`). The app writes signature requests into
+  `<spool>/requests/`; the signer checks each one again against GitLab with brain-kit's own code and its own
+  identities, ledger and token (hand-over: `Bridge.verify` + every voucher field; answer: the question posted by the
+  bridge account, the first valid `answer D-n …` by an allowed person, no conflict, park.json unchanged, one answer
+  per question) and answers in `signed/` or `refused/`. The app accepts a signature only if the signed voucher is
+  exactly the one it asked for and verifies against `allowed_signers`. In the app's private brain-kit copy,
+  `sign.sign` is replaced by this spool client; nothing else is patched. A signer that does not answer leaves the
+  hand-over to the next round; a refusal rejects the hand-over on the MR (or marks the answer `refused`) with the
+  reasons. Team mode refuses to start when this OS user can read `signing_key` (setting `dev_same_user` allows it for
+  a local trial, shown as a warning).
+- **No listening sockets**: routes only under `/api/apps/brain` on the loopback gateway; every route but `/health`
+  is the dashboard owner's only (an app token, this app's included, is refused). Outbound only: the loopback gateway,
+  GitLab (`brainkit.rest`), git.
+- **No secrets out**: the GitLab token is read like `brainkit.rest.read_token` (`$GITLAB_TOKEN`, else
+  `~/.brain/gitlab-token`, refused when others can read it) and never logged, stored or returned; agent-written text
+  on its way to the page goes through Kiro Crew's scrubber; materials stay in the intake store (never in a repo).
+- The brain-kit checkout and the app directory run inside the gateway: in production they must not be writable by
+  the agents' OS user.
+
+## Install (a person's machine)
+
+1. **brain-kit** checkout, and in each project `brain install <repo> --prefix PAY` (commit `.kiro/`, `.brain/`,
+   `aidlc-docs/`, `brain/`, `AGENTS.md`). On this machine: `git config brain.user <gitlab user>`, the GitLab token in
+   `~/.brain/gitlab-token` (`chmod 600`), `git config brain.intake <brain-intake clone>` (see brain-kit's
+   `docs/安装和使用.md`).
+2. **Trust the app yourself**: Kiro Crew settings → trusted apps → add `brain` (`agent.apps_trusted`). Kiro Crew
+   refuses to enable an untrusted third-party app; the install script does not trust it for you.
+3. **Install**: `scripts/dev-install.sh --consent-session-approval` (builds the UI with node 22+, installs or updates
+   the app, enables it; the flag gives your consent to `permissions.sessionApproval`, which lets the app set the
+   sessions it opens to trust; without it, click Enable in the dashboard and grant it there). Re-run after changes:
+   it disables, updates and enables (backend hooks are re-imported on enable only).
+4. **In the app → 设置**: the brain-kit checkout (`$BRAINKIT_HOME` or a usual place is found by itself), the project
+   repos, the work root. Then fix what the Kiro Crew check lists (brain-dev with Lean's hooks; engine `kas`; a new
+   session is needed for a new brain-dev spec, and a Kiro Crew restart may be needed for the engine).
+
+## Install (the team runner)
+
+1. OS users as in brain-kit: `brainbot` (Kiro Crew with this app, runnerd), `brainbridge` (the signer), group
+   `brainspool`. `~/.kiro/agents/brain-run.json` for `brainbot` (brain-kit `remote/agents/brain-run.json`).
+2. **The app's bridge.json** (brain-kit's format, `examples/bridge.json`): `projects`, `gitlab` (base, token for an
+   account with Reporter rights: it comments and labels, it must not be able to merge or push), `identities`
+   (readable by the app, writable only by `brainbridge`), `ledger`, `spool_dir` (runnerd's spool), `vouchers_dir`
+   (an app-local copy; brain-intake is written by the signer only), `runner_runs_root`, `kirocrew.agent: brain-run`,
+   `pseudonym_salt`. No `signing_key` (if present it is ignored; readable, team mode does not start).
+   `publish_vouchers` is forced off.
+3. **runnerd.json** (brain-kit's format) with the same `spool_dir`; `allowed_signers` = the bridge's public key.
+4. **The signer**: `signer/signer.example.json` → `/etc/brain-kit/signer.json` (same `pseudonym_salt`;
+   `bridge_users` = the GitLab account of the app's token; its own identities copy, GitLab token, ledger, the signing
+   key), `signer/brain-signer.service` as `brainbridge`. Spool permissions: `requests/` writable by `brainbot`,
+   `signed/` and `refused/` by `brainbridge` only. A run that will never finish is closed on the signer with
+   `brain_signer.py --config … close RUN-…`.
+5. **In the app → 设置 → 运行机模式**: bridge.json, runnerd.json, the signer spool, allowed_signers; turn it on.
 
 ## Code map
 
 | Path | What it is |
 | --- | --- |
-| `app.json` | Kiro Crew app manifest |
-| `backend/` | The orchestrator: `team/team.py` (one run's state machine and the tasks), `team/service.py` (all runs, the tick, gates, sign-off, deploy), `team/routing.py`, `team/standards.py`, `team/checks.py`, `team/gitwork.py`, `team/sessions.py`, `team/board.py`, `team/cto.py` |
-| `ui/src/` | The page: `main.tsx`, `AppBar.tsx`, `board/` (team board), `cto/` (CTO view and delivery detail) |
-| `ui/preview/` | A preview page on test data, without Kiro Crew |
-| `team/` | Team files `team*.json`, the roster, task templates |
-| `starters/` | Project templates of the example: `mall` (store promotion), `web` (internal web pages) |
-| `packs/` | Company checks in `tests/enterprise/`, reference implementations in `_reference/` for the checks' own tests, and the standards index `taoyuan/standards.json` |
-| `cto/history.json` | Synthetic history for the CTO view, made by `scripts/cto_history.py` |
-| `demo/target-template/` | The project the built-in team (`team/team.json`) starts from |
-| `scripts/dev-install.sh` | Installs or updates the app in the local Kiro Crew |
-| `tests/` | Backend tests with a fake session manager and real git and node |
+| `app.json` | The manifest: `brain`, page `/apps/brain`, `permissions.api` `/api/apps/brain` and `/api/chat` only, `sessionApproval` |
+| `backend/core/service.py`, `handlers.py` | The service object (settings, repos, sessions, team mode, every view) and the routes |
+| `backend/core/bk.py` | brain-kit, loaded from the configured checkout under a private name; guarded optional modules |
+| `backend/core/repo.py`, `lean_view.py` | Requirements found in a repo (claims, run branches, worktrees, main); Lean's stages, approvals, Session notes |
+| `backend/core/deliveries.py`, `detail.py`, `todo.py`, `mrinfo.py` | 交付总览, 需求详情, 待办, the MR on a person's machine |
+| `backend/core/intake.py`, `crewcheck.py`, `brainview.py` | 开需求, the Kiro Crew checks and fixes, Brain and reflect |
+| `backend/core/team/` | Team mode: the hosted bridge (`bridgehost.py`), the KiroCrew adapter, the spool signer client |
+| `backend/core/gateway.py`, `sessions.py`, `httpkit.py`, `store.py` | Kept from the sample (see above) |
+| `signer/` | The separate signer, its example config and systemd unit |
+| `ui/src/` | The page: `main.tsx`, `AppBar.tsx`, `nav.ts`, `views/*`, the contract `types.ts`; `ui/preview/` on the fixtures |
+| `tests/` | Backend tests: real brain-kit projects in temp dirs, the fake Kiro Crew gateway, a fake GitLab, the real signer |
 
-## Team file keys
+## Host APIs relied on (Kiro Crew 0.11.2)
 
-Team level:
-
-| Key | Meaning |
-| --- | --- |
-| `roles` | The roles; a role comes after the roles it depends on |
-| `scope`, `keywords`, `priority`, `fallback`, `routable` | Choosing the team by the words in the requirement |
-| `starter` / `source` / `needs_source` | Start from a project template / change an existing project / a project folder must be given |
-| `spec_pack` | Pack(s) overlaid on the run repository, with the company checks |
-| `standards`, `standards_always` | The company standards index; the standards that always apply |
-| `knowledge` `{source, data_dir}` | The Kiro Crew knowledge source name; where the data files are |
-| `roster`, `workspace` | The company's team shown on the board; the Kiro Crew workspace of the members |
-| `task_template` | Task template in `team/` |
-| `test_command`, `test_timeout_s`, `test_owners` | Command shown on the test wall; timeout per test file; who owns failures (globs) |
-| `delivery_defaults` | Default delivery labels (kind, size, business line) |
-| `defaults` | `model`, `max_fix_rounds` (2), `max_review_rounds` (0), `gate_discuss` (off), `max_discuss_rounds` (5) |
-
-Role level:
-
-| Key | Meaning |
-| --- | --- |
-| `key`, `title`, `icon`, `phase`, `stage` | Name and place on the board (`phase` is the AI-DLC phase) |
-| `member`, `aidlc_agent` | The Kiro Crew member the session runs as; the AI-DLC expert it stands for |
-| `depends_on`, `writable`, `outputs` | Whom it waits for; paths it may write (`!` excludes); outputs handed downstream |
-| `brief`, `mission`, `assignment` | The task; what the board shows it is doing |
-| `gate: "human"`, `gate_label`, `plan` | A human gate after this role; its button label; the work split file |
-| `gate_preset`, `gate_revise_preset`, `gate_revise_risk` | Notes the gate dialog can fill in for approving and for sending back, and the risk filled in with the send-back |
-| `questions` | File on the run branch with the questions the person decides at the gate: `{"questions": [{id, q, options: [{key, text}], recommend, why}]}` |
-| `delivery` | File on the run branch with the proposed delivery labels |
-| `optional` | Sits the run out when its member does not exist or the approved work split leaves it out |
-| `deploy` `{mode: local, port, health}` | Deploy on this machine |
-| `model` | The role's own model (a model picked in the start form replaces it for that run) |
+`POST /api/apps/brain/token` (app secret → 5-minute token); `GET/POST /api/chat/folders`, `PATCH
+/api/chat/folders/<id>`; `GET/POST /api/chat/slots` (`agent`, `agent_kind: template`, `model`, `memory_mode`,
+`folder_id`), `GET /api/chat/slots/<key>?limit=`, `POST /api/chat/slots/<key>/project`, `POST
+/api/chat/slots/<key>/stop`, `DELETE /api/chat/slots/<key>`; `POST /api/chat/mode` (`trust` for one slot,
+`permissions.sessionApproval`); `POST /api/chat?ws=1` (`meta.sendId`); assistant rows' `meta.turn_stats.credits`;
+the backend hooks (`routes`, `on_startup`, `on_shutdown`), `ctx.name / logger / data_dir / scrub`, KiroCrew's owner
+predicate; the UI host modules `@kirocrew/app-sdk` (`useAppApi`, `useNavigate`, `useNavBadge`) and its import map.
 
 ## Test
 
 ```bash
-python3 -m pytest -q                 # backend tests: Python 3.10+ and pytest
-(cd ui && npm ci && npm run check)   # UI: type check, component tests, build
+python3 -m pytest -q                     # backend (Python 3.9+, pytest, git, ssh-keygen, the brain-kit checkout)
+(cd ui && npm ci && npm run check)       # UI: type check, component tests, build
+(cd ui && npm run preview:build)         # ui/preview-dist/index.html: the page on the fixtures, no Kiro Crew
 ```
 
-Two timing-based UI tests can time out on a heavily loaded machine when test files run in parallel;
-`npx vitest run --no-file-parallelism` runs them one file at a time.
+`BRAIN_TEST_BRAINKIT` points the backend tests at a brain-kit checkout (default `~/warren_ws/brain-kit`).
+
+## Not verified on a live Kiro Crew yet
+
+Opening a `brain-dev` slot with `agent_kind: template` and a worktree under `~/workplace` as its project; that the
+template's hooks run in such a slot; `trust` for it; credits in `turn_stats`; the bridge's runner sessions; the
+`kirocrew config set` fix while the gateway runs; the page in the dashboard; the signer against a real GitLab.

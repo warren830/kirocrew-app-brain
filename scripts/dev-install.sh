@@ -1,24 +1,28 @@
 #!/usr/bin/env bash
-# Install or update aidlc-team into the LOCAL running KiroCrew gateway, grant narrow per-app trust, enable it,
-# and print hook health. Idempotent: re-run after every change.
+# Install or update the Brain app (`brain`) into the LOCAL running KiroCrew gateway, enable it, and print hook
+# health. Kept from the aidlc-team sample; idempotent: re-run after every change. Run it yourself: it acts as the
+# dashboard owner.
 #
-#   scripts/dev-install.sh             # check + build UI, install-or-update, trust, enable, health
+#   scripts/dev-install.sh             # check + build UI, install-or-update, enable, health
 #   scripts/dev-install.sh --no-test   # skip the UI type check and tests
 #   scripts/dev-install.sh --no-build  # skip the UI build
 #   scripts/dev-install.sh --dev       # also turn on dev mode
-#   scripts/dev-install.sh --consent-session-approval  # first enable after asking for sessionApproval
+#   scripts/dev-install.sh --consent-session-approval  # first enable: you consent to permissions.sessionApproval
 #
-# sessionApproval: app.json asks for `permissions.sessionApproval` so the app may set its OWN role
-# sessions to trust (POST /api/chat/mode with a slot). KiroCrew grants it only with the dashboard
-# owner's consent, normally in the enable dialog; the flag sends that consent as the owner instead.
-# Later disable/update/enable cycles keep it.
+# Trust: KiroCrew refuses to enable a third-party app the owner has not trusted. This script does NOT trust the app
+# for you: add `brain` to the trusted apps in KiroCrew's settings (agent.apps_trusted) yourself, then run it.
 #
-# Backend hooks are only re-imported on enable, so this always disables before updating, and it NEVER
-# uninstalls (an uninstall drops the app's trust grant).
+# sessionApproval: app.json asks for `permissions.sessionApproval` so the app may set the sessions IT opens to trust
+# (POST /api/chat/mode with a slot): brain-dev sessions (when you leave 「工具调用不用逐个批准」 on) and, on the team
+# runner, brain-run sessions. KiroCrew grants it only with the owner's consent, normally in the enable dialog; the
+# flag sends that consent as you. Later disable/update/enable cycles keep it.
+#
+# Backend hooks are only re-imported on enable, so this always disables before updating, and it NEVER uninstalls
+# (an uninstall drops the app's trust grant).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd -P)"  # physical path: KiroCrew records it as the install source
-APP="aidlc-team"
+APP="brain"
 KCAPI="$ROOT/scripts/kcapi.sh"
 # node's folder: $NODE_BIN, else the first node 22+ on PATH, Homebrew (Apple or Intel), or nvm (newest first)
 node_ok() { [ -x "$1/node" ] && [ "$("$1/node" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 22 ]; }
@@ -84,8 +88,7 @@ else
   "$KCAPI" POST "/api/apps/install" "{\"source\":\"${ROOT}\"}"
 fi
 
-echo "== trust (narrow, per-app)"
-"$KCAPI" POST "/api/security/trusted-apps/${APP}" '{}' || true
+echo "== trust: yours to give (KiroCrew settings → trusted apps → ${APP}); not done by this script"
 
 echo "== enable"
 if [ "$CONSENT" = 1 ]; then
@@ -107,6 +110,9 @@ if hooks:
     if "hooks_routes" in hooks:
         keep["hooks"]["routes"] = len(hooks["hooks_routes"])
 print(json.dumps(keep, ensure_ascii=False))
+if "trust" in raw.lower() and not d.get("ok"):
+    print("!! KiroCrew did not enable it: add brain to the trusted apps in the KiroCrew settings (agent.apps_trusted),"
+          " then run this script again")
 if "session_approval_consent_required" in raw:
     print("!! first enable needs owner consent for permissions.sessionApproval:"
           " click Enable on the app in the dashboard, or re-run with --consent-session-approval")

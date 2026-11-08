@@ -253,7 +253,8 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
 
 
 def counts(rows: list[dict[str, Any]]) -> dict[str, int]:
-    out: dict[str, int] = {}
+    """Every state, zeros included (the page draws a chip per state)."""
+    out: dict[str, int] = {k: 0 for k in STATE_LABEL}
     for r in rows:
         out[r["state"]] = out.get(r["state"], 0) + 1
     return out

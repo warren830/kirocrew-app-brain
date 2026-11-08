@@ -292,37 +292,64 @@
   "eval": {
     "available": true,
     "error": "",
-    "ref": "main@3f9c2a1b",
+    "ref": "main",
     "metrics": [
       {
-        "id": "hands_off",
-        "label": "交接后没人介入",
+        "id": "autonomy",
+        "label": "自主度",
         "value": [
           2,
           3
         ],
-        "rule": "交接之后除了必经审批没人介入，而且交付正确"
+        "rule": "交接之后，除了必经的审批（REQUIREMENTS / DESIGN / INCEPTION / PLAN / RELEASE、验收），没有人做过任何事，而且交付正确"
       },
       {
-        "id": "first_ci",
-        "label": "CI 一次过",
+        "id": "delivery",
+        "label": "交付正确率",
         "value": [
           3,
           4
         ],
-        "rule": "运行机第一次推送 CI 就是绿的"
+        "rule": "一次通过验收，合并后 14 天内没有回滚、修复提交或新缺陷认领"
       },
       {
-        "id": "asks_per_run",
-        "label": "每次运行问人几次",
-        "value": 1.5,
-        "rule": "运行机上发到 MR 的问题数 / 运行数"
+        "id": "judgment",
+        "label": "介入落在判断点",
+        "value": [
+          9,
+          11
+        ],
+        "rule": "判断点 = Lean 的审批口令和桥上的 park 问题"
       },
       {
-        "id": "escaped",
-        "label": "上线后缺陷",
+        "id": "repeat_rate",
+        "label": "重复纠正率",
+        "value": [
+          1,
+          6
+        ],
+        "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+      },
+      {
+        "id": "useful",
+        "label": "知识有用率",
+        "value": [
+          12,
+          37
+        ],
+        "rule": "被引用过的条目 ÷ 现有条目"
+      },
+      {
+        "id": "staleness",
+        "label": "过时与冲突",
+        "value": 2,
+        "rule": "过时引用 + 同名术语 + 本期覆盖或撤回"
+      },
+      {
+        "id": "credits_per_success",
+        "label": "每个正确交付的 credits",
         "value": null,
-        "rule": "合并后 30 天内为它开的 fix 需求"
+        "rule": "完成的 run 花的 credits 合计 ÷ 正确交付数；只用来诊断，不设上限"
       }
     ],
     "queue": [
@@ -330,8 +357,8 @@
         "key": "PAY-4",
         "intent": "261105-merchant-split",
         "reasons": [
-          "问了人 3 次",
-          "设计改了 2 轮"
+          "验收被驳回 1 次",
+          "判断点之外有人介入 2 次（push_after_handover）"
         ]
       }
     ]

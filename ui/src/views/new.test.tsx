@@ -153,7 +153,7 @@ describe('开需求', () => {
       [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了：~/.kiro/agents/brain-dev.json', rows: fx.crew().rows.map((r) => ({ ...r, level: 'OK' })) }),
     })
     const card = await screen.findByRole('region', { name: 'KiroCrew 的检查' })
-    expect(card).toHaveTextContent('brain-kit 0.4.1 装的')
+    expect(card).toHaveTextContent('和 brain-kit 带的版本不一样')
     expect(card).not.toHaveTextContent('KiroCrew 在跑') // OK rows are not listed here
     await user.click(within(card).getByRole('button', { name: '装上 brain-dev agent' }))
     await waitFor(() => expect(apiCalls.find((c) => c.path === `${API}/crew/fix`)?.body).toEqual({ what: 'agent' }))

@@ -2,8 +2,8 @@
 # Call the LOCAL KiroCrew gateway API as the dashboard owner.
 #
 #   scripts/kcapi.sh GET  /api/apps
-#   scripts/kcapi.sh POST /api/apps/aidlc-team/route '{"requirement":"双十一大促"}'
-#   scripts/kcapi.sh GET  /api/apps/aidlc-team/health
+#   scripts/kcapi.sh GET  /api/apps/brain/status
+#   scripts/kcapi.sh GET  /api/apps/brain/health
 #
 # Auth: `kirocrew token`, run with the gateway's OWN interpreter, mints a 5-minute link token signed with
 # ~/.kiro/crew/token_signing.key; the first request carrying `?token=` exchanges it for the HttpOnly session

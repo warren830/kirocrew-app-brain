@@ -42,6 +42,22 @@ def scope_of(rid: str, key: str) -> str:
     return "%s-%s" % (rid, key)
 
 
+SCRUB_KEYS = ("text", "why", "question", "label", "detail", "status", "next", "open_questions", "output", "reasons",
+              "findings", "blocking", "error", "session_error", "notes", "warnings", "problems")
+
+
+def scrub_tree(obj: Any, scrub: Callable[[str], str], key: str = "") -> Any:
+    """Agent- and tool-written text on its way to the page goes through the scrubber (KiroCrew's own when it has one):
+    decisions, Session notes, questions, timeline lines, command output. Ids, paths and numbers are left alone."""
+    if isinstance(obj, dict):
+        return {k: scrub_tree(v, scrub, k) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [scrub_tree(v, scrub, key) for v in obj]
+    if isinstance(obj, str) and key in SCRUB_KEYS and obj:
+        return scrub(obj)
+    return obj
+
+
 class Service:
     def __init__(self, ctx: Any, *, sessions: Any = None, transport: Any = None, now: Callable[[], float] = time.time,
                  signer_kick: Callable[[], Any] | None = None, sign_timeout: float = 30.0) -> None:
@@ -141,7 +157,7 @@ class Service:
         from .team.bridgehost import TeamRuntime
         loop = asyncio.get_running_loop()
         rt = TeamRuntime(team, loop, self.sessions, self.log, transport=self.transport, kick=self.signer_kick,
-                         sign_timeout=self.sign_timeout)
+                         sign_timeout=self.sign_timeout, scrub=self.scrub)
         await loop.run_in_executor(rt.executor, rt.start)
         self.team = rt
 
@@ -391,7 +407,7 @@ class Service:
         if which != "all" and not REPO_ID_RE.match(which or ""):
             raise AppError("repo 只能是 all、r1、r2 … 或 runner", "invalid_repo")
         snap = self._sessions_snapshot()
-        return await asyncio.to_thread(self._overview_sync, which, snap)
+        return scrub_tree(await asyncio.to_thread(self._overview_sync, which, snap), self.scrub)
 
     async def refresh(self, rid: str) -> dict[str, Any]:
         ok, text = await asyncio.to_thread(self._repo(rid).fetch)
@@ -533,7 +549,7 @@ class Service:
 
     async def requirement(self, rid: str, key: str) -> dict[str, Any]:
         snap = self._sessions_snapshot()
-        return await asyncio.to_thread(self._detail_sync, rid, key, snap)
+        return scrub_tree(await asyncio.to_thread(self._detail_sync, rid, key, snap), self.scrub)
 
     # ---- sessions and answers ------------------------------------------------------------------------- #
 
@@ -626,7 +642,7 @@ class Service:
 
     async def intake_check(self, body: dict[str, Any]) -> dict[str, Any]:
         repo = self._repo(str(body.get("repo") or ""))
-        return await asyncio.to_thread(intake.check, repo, body, self.me())
+        return scrub_tree(await asyncio.to_thread(intake.check, repo, body, self.me()), self.scrub)
 
     async def intake_start(self, body: dict[str, Any]) -> dict[str, Any]:
         repo = self._repo(str(body.get("repo") or ""))
@@ -634,6 +650,7 @@ class Service:
             out = await asyncio.to_thread(intake.start, repo, body, self.settings["work_root"])
         except intake.IntakeError as exc:
             raise AppError(str(exc), "invalid_intake")
+        out = scrub_tree(out, self.scrub)
         if not out["ok"]:
             return out
         scope = scope_of(repo.id, out["key"])
@@ -685,12 +702,12 @@ class Service:
     async def reflect_preview(self, rid: str, key: str) -> dict[str, Any]:
         repo = self._repo(rid)
         f = await asyncio.to_thread(self._facts, repo, key)
-        return await asyncio.to_thread(brainview.preview, repo, f, self._vouchers_dir(repo))
+        return scrub_tree(await asyncio.to_thread(brainview.preview, repo, f, self._vouchers_dir(repo)), self.scrub)
 
     async def reflect_apply(self, rid: str, key: str, push: bool) -> dict[str, Any]:
         repo = self._repo(rid)
         f = await asyncio.to_thread(self._facts, repo, key)
-        out = await asyncio.to_thread(brainview.apply, repo, f, push)
+        out = scrub_tree(await asyncio.to_thread(brainview.apply, repo, f, push), self.scrub)
         await asyncio.to_thread(self.store.append, scope_of(rid, key), "app",
                                 "brain reflect --apply%s：%s" % (" --push" if push else "", "成功" if out["ok"] else "失败"),
                                 out.get("branch"))
@@ -729,7 +746,7 @@ class Service:
 
     async def todo(self) -> dict[str, Any]:
         snap = self._sessions_snapshot()
-        return await asyncio.to_thread(self._todo_sync, snap)
+        return scrub_tree(await asyncio.to_thread(self._todo_sync, snap), self.scrub)
 
     # ---- status, settings ----------------------------------------------------------------------------- #
 

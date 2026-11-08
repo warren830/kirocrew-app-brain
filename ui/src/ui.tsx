@@ -207,6 +207,7 @@ export function AnswerForm({ question, repo, reqKey, onDone }: { question: Quest
   const submit = async () => {
     const body: AnswerBody = { choice: choice.trim() }
     if (note.trim()) body.note = note.trim()
+    if (question.id) body.id = question.id
     const r = await act.run(body)
     if (r) {
       setChoice('')

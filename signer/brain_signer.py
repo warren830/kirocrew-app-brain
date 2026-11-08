@@ -50,6 +50,7 @@ ANSWER_FIELDS = {"schema", "kind", "decision", "run_id", "project", "mr_iid", "s
                  "choice", "answerer", "issued_at", "issuer", "lean_request", "review_items", "rejected_items",
                  "voucher_id"}
 OPEN = ("spooled", "ready", "dispatched", "send_unknown", "reissue")
+RETRY_S = 10.0
 REQ_RE = re.compile(r"^[a-z]+-[A-Za-z0-9-]{1,80}-[0-9a-f]{12}\.json$")
 SIGNED_SCHEMA = """
 CREATE TABLE IF NOT EXISTS signed_answers (
@@ -89,6 +90,7 @@ class Signer:
         self.db.executescript(SIGNED_SCHEMA)
         self.projects = [p["project"] if isinstance(p, dict) else p for p in cfg.get("projects") or []]
         self.bridge_users = {u.lower() for u in cfg.get("bridge_users") or []}
+        self._failed = {}   # req id -> when a check could not be made (GitLab down): tried again after RETRY_S
 
     # ---------- the spool ----------
 
@@ -106,6 +108,8 @@ class Signer:
             if not REQ_RE.match(name) or any(os.path.exists(os.path.join(d[k], name)) for k in ("signed", "refused")):
                 continue
             rid = name[:-5]
+            if time.time() - self._failed.get(rid, 0) < RETRY_S:
+                continue
             try:
                 with open(os.path.join(d["requests"], name), encoding="utf-8") as f:
                     req = json.load(f)
@@ -116,10 +120,10 @@ class Signer:
             except Refuse as e:
                 self.write(os.path.join(d["refused"], name), {"req_id": rid, "reasons": e.reasons[:10]})
                 self.out("refused %s: %s" % (rid, "; ".join(e.reasons)))
-            except Exception as e:  # noqa: BLE001 - GitLab down etc.: refuse, the app shows why
-                self.write(os.path.join(d["refused"], name), {"req_id": rid, "reasons": [
-                    "签名服务查不了：%s" % str(e).split("\n", 1)[0][:300]]})
-                self.out("error on %s: %s" % (rid, e))
+            except Exception as e:  # noqa: BLE001 - GitLab down, SSO expired: no answer, so the app tries again
+                self._failed[rid] = time.time()
+                self.out("could not check %s (no answer written; the app retries): %s" % (rid, str(e).split("\n", 1)[0]))
+                continue
             else:
                 self.write(os.path.join(d["signed"], name), {"req_id": rid, "voucher": v, "sig": sig})
                 self.out("signed %s %s" % (v["kind"], v["voucher_id"]))

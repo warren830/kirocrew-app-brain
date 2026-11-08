@@ -336,7 +336,8 @@ export interface RequirementDetail {
 
 export interface OpenSessionBody { trust?: boolean; kickoff?: boolean }
 export interface OpenSessionResult { ok: boolean; slot: string; url: string }
-export interface AnswerBody { choice: string; note?: string }
+/** id: the question's D-<n> when it has one (an MR question); without it the open clarify question is meant. */
+export interface AnswerBody { choice: string; note?: string; id?: string }
 export interface AnswerResult { ok: boolean; via: 'session' | 'mr'; text: string }
 
 // ---------------------------------------------------------------- 开需求: /intake/next, /intake/check, /intake/start

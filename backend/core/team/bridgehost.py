@@ -93,8 +93,9 @@ class TeamRuntime:
     brain-kit's ledger is a sqlite connection, usable only in the thread that opened it."""
 
     def __init__(self, team: dict[str, Any], loop: Any, mgr: Any, log: Any, *, transport: Any = None,
-                 kick: Any = None, sign_timeout: float = 30.0) -> None:
+                 kick: Any = None, sign_timeout: float = 30.0, scrub: Any = None) -> None:
         self.team, self.loop, self.mgr, self.log = team, loop, mgr, log
+        self.scrub = scrub or (lambda s: s)
         self.transport, self.kick, self.sign_timeout = transport, kick, sign_timeout
         self.host: Any = None
         self.cfg: dict[str, Any] = {}
@@ -181,7 +182,7 @@ class TeamRuntime:
         self.host = None
 
     def _out(self, line: str) -> None:
-        text = str(line)[:500]
+        text = self.scrub(str(line)[:500])
         self.lines.append((time.time(), text))
         if self.log is not None:
             self.log.info("brain bridge: %s", text)

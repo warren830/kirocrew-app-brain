@@ -10,7 +10,7 @@
     },
     {
       "level": "WARN",
-      "text": "~/.kiro/agents/brain-dev.json 是 brain-kit 0.4.1 装的，现在是 0.4.3：重装一次"
+      "text": "brain-dev.json 和 brain-kit 带的版本不一样"
     }
   ],
   "fix": {

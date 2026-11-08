@@ -1,0 +1,25 @@
+# Runs as brainbridge: the only user that can read the bridge's signing key. Outbound only (GitLab, Jira, brain-intake
+# over git); listens on nothing. Spool layout (each side writes only its own directory):
+#   /srv/brain-signer/requests  brainbot:brainspool    2770   the Brain app (KiroCrew, brainbot) writes requests
+#   /srv/brain-signer/signed    brainbridge:brainspool 2750   this signer writes signed vouchers
+#   /srv/brain-signer/refused   brainbridge:brainspool 2750   ... and refusals with reasons
+# Nothing in a request is trusted: every hand-over and answer is checked again against GitLab before it is signed.
+[Unit]
+Description=brain-kit voucher signer (for the Brain KiroCrew app)
+After=network-online.target
+
+[Service]
+User=brainbridge
+Group=brainspool
+UMask=0027
+EnvironmentFile=/etc/brain-kit/signer.env
+ExecStart=/usr/bin/python3 -I /opt/kirocrew-app-brain/signer/brain_signer.py --config /etc/brain-kit/signer.json loop
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/brain-signer /srv/brain-intake /var/lib/brain-signer
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

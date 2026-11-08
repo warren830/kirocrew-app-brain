@@ -297,3 +297,62 @@ def test_a_tampered_signed_answer_is_not_accepted(world, tmp_path):
     with pytest.raises(signer.Unavailable):
         signer.sign(v)
     assert not os.listdir(spool / "requests")  # the app takes its requests back
+
+
+def test_the_signer_checks_every_request_on_its_own(world, tmp_path):
+    """Requests written straight into the spool (as an agent with the app's OS user could): a voucher with a field the
+    signer does not know, another project, a forged voucher id, or a hand-over GitLab does not back are refused; a
+    GitLab outage leaves the request unanswered (the app retries) instead of rejecting the hand-over."""
+    bs = load_signer()
+    from brainkit import sign
+    from brainkit.common import iso, utcnow
+    signer = world["signer"]
+    signer.once()  # opens its ledger
+    spool = tmp_path / "signer-spool"
+
+    def ask(v, fix_id=True):
+        if fix_id:
+            v = dict(v)
+            v.pop("voucher_id", None)
+            v["voucher_id"] = "V-" + sign.digest(v)[:10]
+        rid = "%s-%s-%s" % (v["kind"], v.get("run_id", "x"), sign.digest(v)[:12])
+        (spool / "requests").mkdir(parents=True, exist_ok=True)
+        (spool / "requests" / (rid + ".json")).write_text(json.dumps({"schema": 1, "req_id": rid, "voucher": v}))
+        signer.s._failed.clear()
+        signer.once()
+        for d in ("signed", "refused"):
+            p = spool / d / (rid + ".json")
+            if p.exists():
+                return d, json.loads(p.read_text())
+        return None, None
+
+    now = iso(utcnow())
+    base = {"schema": 1, "kind": "handoff", "run_id": "RUN-PAY-1-1", "project": P, "mr_iid": 5, "sha": world["gl"].head(),
+            "branch": BRANCH, "owner": "alice", "key": "PAY-1", "intent": "x", "brain_commit": "0" * 40, "materials": [],
+            "route": "recheck", "issued_at": now, "expires_at": now, "issuer": "brain-bridge"}
+    d, r = ask(dict(base, extra="1"))
+    assert d == "refused" and "不认识的字段" in r["reasons"][0]
+    d, r = ask(dict(base, project="other/repo"))
+    assert d == "refused" and "不归这个签名服务" in r["reasons"][0]
+    v = dict(base, voucher_id="V-0000000000")
+    d, r = ask(v, fix_id=False)
+    assert d == "refused" and "摘要" in r["reasons"][0]
+    d, r = ask(dict(base, expires_at="2026-11-08T23:59:59Z" if now < "2026-11-08T23:00:00Z" else iso(utcnow())))
+    assert d == "refused"  # an expiry outside the TTL, or GitLab's facts differ (intent "x"): never signed
+    world["gl"].state = "closed"
+    d, r = ask(dict(base, expires_at=now))
+    assert d == "refused" and any("不是打开的" in x or "有效期" in x for x in r["reasons"])
+    world["gl"].state = "opened"
+    working = signer.s.gl.transport
+
+    def down(*_a):
+        raise OSError("GitLab is down")
+
+    signer.s.gl.transport = down
+    from datetime import timedelta
+    t = utcnow()
+    d, r = ask(dict(base, issued_at=iso(t), expires_at=iso(t + timedelta(hours=1))))
+    assert d is None and r is None  # no answer: the app times out and asks again next round
+    signer.s.gl.transport = working
+    assert not list((tmp_path / "signer-vouchers").glob("*/*.json"))
+    _ = bs
