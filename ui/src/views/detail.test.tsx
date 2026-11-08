@@ -92,13 +92,24 @@ describe('需求详情', () => {
     noLineSent()
   })
 
-  test('a question answered on the MR says so in the form', async () => {
+  test('a question answered on the MR says so in the form, and the answer names its D-n', async () => {
     const d = fx.detail()
     d.questions[0].answer_via = 'mr'
-    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d })
+    d.questions[0].source = 'mr'
+    d.questions[0].id = 'D-7'
+    installFixtureRoutes({
+      [`GET ${API}/requirements/*`]: () => d,
+      [`POST ${API}/requirements/r1/PAY-3/answer`]: () => ({ ok: true, via: 'mr', text: '已经发在 MR 上' }),
+    })
     renderDetail()
     const [clarify] = await screen.findAllByTestId('question')
-    expect(within(clarify).getByRole('form')).toHaveTextContent('回答会以你的 GitLab 身份发在 MR 上')
+    const form = within(clarify).getByRole('form')
+    expect(form).toHaveTextContent('回答会以你的 GitLab 身份发在 MR 上')
+    fireEvent.click(within(form).getAllByRole('radio')[0])
+    fireEvent.click(within(form).getByRole('button', { name: '回答' }))
+    await screen.findByText('已经发在 MR 上')
+    const post = apiCalls.find((c) => c.method === 'POST' && c.path.endsWith('/answer'))
+    expect(post?.body).toEqual({ choice: 'A', id: 'D-7' })
   })
 
   test('the crumb goes back; a Brain cite opens the Brain view at that entry', async () => {
