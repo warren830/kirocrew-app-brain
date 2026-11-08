@@ -26,7 +26,7 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
                 "since": row.get("updated_at")}
         if team:
             for d in e.get("decisions") or []:
-                if d.get("state") not in ("open", "signing"):
+                if d.get("state") != "open":      # on the MR, waiting for a person (brain-kit's states)
                     continue
                 q = {"source": "bridge", "id": d["id"], "kind": d.get("kind") or "other", "kind_label": d.get("kind_label") or "",
                      "question": "", "options": [], "recommend": None, "lean_request": d.get("lean_request"), "refs": [],

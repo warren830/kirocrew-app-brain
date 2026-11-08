@@ -5,7 +5,7 @@
     "error": "",
     "last_loop_at": 1794146350,
     "loop_error": "",
-    "key_readable": true,
+    "same_user": true,
     "signer": {
       "pending": 1,
       "refused": 1

@@ -109,7 +109,8 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
                   park: Any) -> None:
     """Team mode: the ledger's run state and its open decisions."""
     st = run_row.get("state")
-    open_d = [d for d in decisions if d.get("state") in ("open", "signing")]
+    open_d = [d for d in decisions if d.get("state") == "open"]
+    posting = [d for d in decisions if d.get("state") == "posting"]     # brain-kit: not on the MR yet
 
     def put(state: str, who: str, text: str) -> None:
         row["state"], row["state_label"] = state, STATE_LABEL[state]
@@ -129,7 +130,7 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
         if d.get("kind") == "acceptance":
             return put("acceptance", "product", "等产品验收（%s，在 MR 上回答）" % d["id"])
         return put("parked", "people", "等回答 %s（%s，在 MR 上回答）" % (d["id"], KIND_LABEL.get(str(d.get("kind")), d.get("kind"))))
-    if park_waiting(park):
+    if posting or park_waiting(park):
         return put("parked", "bridge", "run 停下了：等桥把问题贴到 MR 上")
     return put("running", "runner", "运行机在跑")
 

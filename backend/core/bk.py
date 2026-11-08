@@ -8,6 +8,9 @@ Required modules (the app does nothing without them): common, config, claims, ru
 reflect, sign, cli, intake.package, bridge.handoff, bridge.decisions, bridge.runnerd, rest.
 Optional ones, added while this app was written, are guarded: trace, evaluate, golden, intents. A missing or broken
 optional module turns its feature off (``has()``), with the import error kept for the page.
+The public interfaces of brain-kit c9e59d1 are required too (NEEDS: the spool signer, the answer verifier, the
+question's first line, the agent-spec hook functions, GitLab's MR versions): an older checkout is refused with a clear
+error instead of half working.
 
 The checkout must not be writable by the agents' OS user in production: whatever is in it runs inside the gateway.
 """
@@ -29,6 +32,10 @@ REQUIRED = ("common", "config", "claims", "runrec", "lean", "entries", "brainlin
             "rest", "intake.package", "bridge.handoff", "bridge.decisions", "bridge.runnerd", "bridge.ledger")
 OPTIONAL = ("trace", "evaluate", "golden", "intents")
 CANDIDATES = ("~/brain-kit", "~/warren_ws/brain-kit", "~/workplace/brain-kit", "/opt/brain-kit")
+NEEDS = (("sign", "SpoolSigner"), ("sign", "SignerRefused"), ("sign", "signer_from_config"),
+         ("bridge.decisions", "check_answer"), ("bridge.decisions", "Q_HEAD_RE"), ("bridge.ledger", "Ledger"),
+         ("cli", "missing_lean_hooks"), ("cli", "add_lean_hooks"), ("cli", "runner_kit_problems"),
+         ("rest", "head_pushed_at"))
 
 _lock = threading.RLock()
 _state: dict[str, Any] = {"path": None, "mods": {}, "errors": {}, "error": "", "version": None}
@@ -80,6 +87,12 @@ def load(path: str) -> dict[str, Any]:
             unload()
             _state["path"] = path
             _state["error"] = "brain-kit 导入失败：%s: %s" % (type(exc).__name__, str(exc)[:300])
+            return info()
+        lacking = ["%s.%s" % (mod, attr) for mod, attr in NEEDS if not hasattr(mods[mod], attr)]
+        if lacking:
+            unload()
+            _state["path"] = path
+            _state["error"] = "brain-kit 太旧（没有 %s）：要 c9e59d1 或更新的版本" % "、".join(lacking)
             return info()
         for name in OPTIONAL:
             try:

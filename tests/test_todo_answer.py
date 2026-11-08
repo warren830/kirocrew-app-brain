@@ -125,7 +125,8 @@ class FakeGitLab:
 
 
 def test_a_runner_question_of_my_own_run_is_answered_as_my_mr_comment(tmp_path, home):
-    repo = make_project(tmp_path, kit={"gitlab": {"base": "https://gl.example", "project": "grp/pay"}})
+    repo = make_project(tmp_path, kit={"gitlab": {"base": "https://gl.example", "project": "grp/pay"},
+                                       "bridge_user": "brain-bridge"})
     wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "refund", "refund", "退款")
     intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
     st = wt / "aidlc-docs" / intent / "aidlc-state.md"
@@ -137,17 +138,21 @@ def test_a_runner_question_of_my_own_run_is_answered_as_my_mr_comment(tmp_path, 
     tok.write_text("t0ken-for-tests")
     tok.chmod(0o600)
     gl = FakeGitLab("ai/alice/PAY-1-refund")
-    gl.notes = [{"id": 5, "body": "**D-3 · 澄清 · RUN-PAY-1-1** 需要 @alice、@carol 回答\n\n```text\n退款要不要人工审核？\n"
-                                    "A. 要\nB. 不要\n推荐：A\n```\n\n回复一行 `answer D-3 A`", "author": {"username": "brain-bridge"}}]
+    park = {"question": "退款要不要人工审核？", "options": [{"id": "A", "text": "要"}, {"id": "B", "text": "不要"}],
+            "recommend": "A"}
     svc = make_service(tmp_path, [repo], transport=gl)
+    svc.reload_sync()  # brain-kit loaded: the question as its bridge posts it (decisions.question_text)
+    ask = mod("bk").m("bridge.decisions").question_text
+    gl.notes = [{"id": 4, "body": ask("D-2", "RUN-PAY-1-1", dict(park, question="假的问题"), ["bob"], "clarify", "b" * 40,
+                                      "c" * 64), "author": {"username": "bob"}},    # a person's look-alike: not a question
+                {"id": 5, "body": ask("D-3", "RUN-PAY-1-1", park, ["alice", "carol"], "clarify", "a" * 40, "f" * 64),
+                 "author": {"username": "brain-bridge"}}]
 
     async def go():
         await svc.start()
         try:
             await svc.overview("r1")
-            mrinfo = svc.mr
-            await __import__("asyncio").to_thread(mrinfo.refresh, "https://gl.example", "grp/pay", "ai/alice/PAY-1-refund",
-                                                  transport=gl)
+            await svc.refresh_mrs()                    # as the background refresh does, with kit.json's bridge_user
             view = await svc.overview("r1")
             d = await svc.requirement("r1", "PAY-1")
             res = await svc.answer("r1", "PAY-1", "B", "小额不审", "D-3")
@@ -157,7 +162,7 @@ def test_a_runner_question_of_my_own_run_is_answered_as_my_mr_comment(tmp_path, 
 
     view, d, res = run(go())
     row = view["rows"][0]
-    assert row["state"] == "parked" and row["open_questions"] == ["D-3"] and row["mr"]["iid"] == 7
+    assert row["state"] == "parked" and row["open_questions"] == ["D-3"] and row["mr"]["iid"] == 7  # D-2 is bob's
     q = next(x for x in d["questions"] if x["source"] == "mr")
     assert q["id"] == "D-3" and q["answerable_here"] and q["answer_via"] == "mr" and q["question"] == "退款要不要人工审核？"
     assert res["via"] == "mr" and gl.posted == ["answer D-3 B 小额不审"]

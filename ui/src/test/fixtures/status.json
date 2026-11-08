@@ -72,7 +72,7 @@
     "error": "",
     "last_loop_at": null,
     "loop_error": "",
-    "key_readable": false,
+    "same_user": false,
     "signer": {
       "pending": 0,
       "refused": 0

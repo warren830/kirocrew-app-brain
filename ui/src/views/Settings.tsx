@@ -10,9 +10,10 @@ import { ago, lines } from '../format'
 import type { Settings, Status } from '../types'
 import { CheckRows, Icon, LoadState } from '../ui'
 import type { ViewProps } from './props'
-import { KEY_READABLE } from './Team'
+import { SIGNER_SAME_USER } from './Team'
 
 export const SAME_USER_WARNING = '签名器和 app 用同一个系统用户，签名私钥这个用户就能读到，签名挡不住 app 自己：只适合本机试用，不能用在正式的运行机上。'
+const BRIDGE_HINT = 'bridge.json：带 "signer": {"type": "spool", "spool_dir", "allowed_signers"}，不写 signing_key'
 
 type Form = { brainkit: string; repos: string; work_root: string; team: Settings['team'] }
 const formOf = (s: Settings): Form => ({ brainkit: s.brainkit, repos: s.repos.join('\n'), work_root: s.work_root, team: { ...s.team } })
@@ -21,8 +22,6 @@ const settingsOf = (f: Form): Settings => ({ brainkit: f.brainkit.trim(), repos:
 const TEAM_FIELDS: [Exclude<keyof Settings['team'], 'enabled' | 'dev_same_user'>, string, string][] = [
   ['bridge_config', 'bridge 的配置', 'bridge.json'],
   ['runnerd_config', 'runnerd 的配置', 'runnerd.json'],
-  ['signer_spool', '签名请求放在哪', '签名器读这个目录'],
-  ['allowed_signers', 'allowed_signers 文件', '认得出哪些签名'],
 ]
 
 export function SettingsView({ status, setStatus, reloadStatus }: ViewProps) {
@@ -80,6 +79,7 @@ export function SettingsView({ status, setStatus, reloadStatus }: ViewProps) {
                 <div key={k} className="br-field">
                   <label htmlFor={`set-${k}`}>{label}</label>
                   <input id={`set-${k}`} type="text" className="br-mono" value={form.team[k]} placeholder={hint} onChange={(e) => editTeam({ [k]: e.target.value })} />
+                  {k === 'bridge_config' && <p className="br-hint">{BRIDGE_HINT}。签名服务的目录和公钥都写在这里面。</p>}
                 </div>
               ))}
               <label className="br-check">
@@ -164,7 +164,7 @@ function StatusCards({ status: s, onFixed }: { status: Status; onFixed: () => vo
           <h2>团队运行机</h2>
           <span className={`br-chip tone-${!s.team.enabled ? 'idle' : s.team.ok ? 'ok' : 'bad'}`}>{!s.team.enabled ? '没开' : s.team.ok ? '正常' : '有问题'}</span>
         </header>
-        {s.team.key_readable && <p className="br-warn-text" role="alert"><Icon name="TriangleAlert" size={13} /> {KEY_READABLE}</p>}
+        {s.team.same_user && <p className="br-warn-text" role="alert"><Icon name="TriangleAlert" size={13} /> {SIGNER_SAME_USER}</p>}
         {s.team.error && <p className="br-error">{s.team.error}</p>}
         {s.team.enabled && (
           <dl className="br-facts">

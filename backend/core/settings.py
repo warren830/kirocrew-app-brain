@@ -5,12 +5,13 @@
   work_root   where each requirement's worktree goes (KiroCrew lets agents work under ~/workplace or ~/workspace only)
   team        team mode (the team runner only): the bridge loop and runnerd run inside the app
     enabled          on / off
-    bridge_config    brain-kit's bridge.json (projects, gitlab, identities, ledger, spool_dir, vouchers_dir …);
-                     its signing_key is never read by this app: signing is the separate signer's (signer/)
+    bridge_config    brain-kit's bridge.json (projects, gitlab, identities, ledger, spool_dir, vouchers_dir …) with
+                     "signer": {"type": "spool", "spool_dir", "allowed_signers"} and no signing_key: the separate
+                     signer (signer/) holds the key; brain-kit's SpoolSigner talks to it and verifies every signature
     runnerd_config   brain-kit's runnerd.json (empty: runnerd runs elsewhere)
-    signer_spool     the folder the app and the signer exchange requests through (requests/, signed/, refused/)
-    allowed_signers  the bridge's public key (ssh-keygen allowed_signers): the app verifies every signature
-    dev_same_user    local trial only: the signer runs as the same OS user (the signing key is readable)
+    dev_same_user    local trial only: the signer runs as the same OS user (it could sign whatever the app asks)
+Settings of an older version (team.signer_spool, team.allowed_signers) are dropped on reading: they are in
+bridge.json's signer block now.
 """
 
 from __future__ import annotations
@@ -29,8 +30,7 @@ MAX_REPOS = 20
 
 def defaults() -> dict[str, Any]:
     return {"brainkit": bk.default_path(), "repos": [], "work_root": str(WORK_ROOT),
-            "team": {"enabled": False, "bridge_config": "", "runnerd_config": "", "signer_spool": "",
-                     "allowed_signers": "", "dev_same_user": False}}
+            "team": {"enabled": False, "bridge_config": "", "runnerd_config": "", "dev_same_user": False}}
 
 
 def load(path: Path) -> dict[str, Any]:
@@ -106,14 +106,12 @@ def check(data: Any) -> tuple[dict[str, Any], list[str]]:
             t = out["team"]
             t["enabled"] = team.get("enabled") is True
             t["dev_same_user"] = team.get("dev_same_user") is True
-            for k in ("bridge_config", "runnerd_config", "signer_spool", "allowed_signers"):
+            for k in ("bridge_config", "runnerd_config"):
                 p = _path(team.get(k, ""))
                 if p and not os.path.isabs(p):
                     probs.append("team.%s 要写绝对路径" % k)
                     continue
                 t[k] = p
-            if t["enabled"]:
-                for k in ("bridge_config", "signer_spool", "allowed_signers"):
-                    if not t[k]:
-                        probs.append("打开运行机模式要填 team.%s" % k)
+            if t["enabled"] and not t["bridge_config"]:
+                probs.append("打开运行机模式要填 team.bridge_config")
     return out, probs

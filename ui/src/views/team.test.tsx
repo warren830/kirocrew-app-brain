@@ -30,7 +30,7 @@ describe('运行机', () => {
     const signer = screen.getByRole('region', { name: '签名' })
     expect(signer).toHaveTextContent('SIG-0042')
     expect(signer).toHaveTextContent('MR 的作者 dave 不在 decision_roles.owner 里')
-    expect(screen.getByTestId('key-readable')).toHaveTextContent('签名私钥这个用户能读到：只适合本机试用')
+    expect(screen.getByTestId('signer-same-user')).toHaveTextContent('签名服务和 app 是同一个系统用户')
     expect(screen.getByRole('region', { name: '运行机状态' })).toHaveTextContent('等签名 1 · 拒签 1')
   })
 

@@ -60,13 +60,14 @@ def scrub_tree(obj: Any, scrub: Callable[[str], str], key: str = "") -> Any:
 
 class Service:
     def __init__(self, ctx: Any, *, sessions: Any = None, transport: Any = None, now: Callable[[], float] = time.time,
-                 signer_kick: Callable[[], Any] | None = None, sign_timeout: float = 30.0) -> None:
+                 signer_kick: Callable[[], Any] | None = None, sign_timeout: float | None = None) -> None:
         self.ctx = ctx
         self.name = getattr(ctx, "name", APP_NAME) or APP_NAME
         self.log = getattr(ctx, "logger", None) or logging.getLogger(APP_NAME)
         self.data_dir = Path(getattr(ctx, "data_dir", ".") or ".")
         self.now = now
         self.transport = transport  # GitLab / Jira transport (tests); None: brain-kit's own
+        # tests: run the signer while brain-kit's SpoolSigner waits, and wait less than bridge.json says
         self.signer_kick, self.sign_timeout = signer_kick, sign_timeout
         self.started = False
         self.settings = settings_mod.load(self.data_dir / "settings.json")
@@ -80,7 +81,7 @@ class Service:
         self.crew: dict[str, Any] = {"rows": [], "fix": {"agent": False, "engine": False}, "checked_at": None}
         self.team: Any = None
         self._tasks: list[asyncio.Task] = []
-        self._mr_wanted: dict[tuple, str] = {}
+        self._mr_wanted: dict[tuple, tuple[str, str]] = {}   # (base, project, branch) -> (scope, kit bridge_user)
         self._eval: dict[str, tuple] = {}
         self._eval_running: set[str] = set()
         self._trace: dict[tuple, tuple] = {}
@@ -162,7 +163,8 @@ class Service:
         self.team = rt
 
     async def _in_team(self, fn: Callable[[], Any]) -> Any:
-        """Run on the team runtime's own thread (brain-kit's ledger is a sqlite connection of that thread)."""
+        """Run on the team runtime's own worker: one round at a time, off the event loop and the default pool (a round
+        waits on GitLab, KiroCrew and the signer). The ledger itself may be read from any thread."""
         return await asyncio.get_running_loop().run_in_executor(self.team.executor, fn)
 
     async def _forever(self) -> None:
@@ -175,15 +177,21 @@ class Service:
                 self.log.exception("brain: polling the sessions failed")
             await asyncio.sleep(TICK_S)
 
+    async def refresh_mrs(self) -> None:
+        """The MRs of handed-over runs (person mode), each at most every mrinfo.TTL_S. Only the notes of the account
+        the repo's kit.json names as bridge_user are the bridge's (when it names one)."""
+        for (base, project, branch), (_, bridge_user) in list(self._mr_wanted.items()):
+            if self.mr.due(project, branch):
+                await asyncio.to_thread(self.mr.refresh, base, project, branch, transport=self.transport,
+                                        bridge_user=bridge_user or None)
+
     async def _slow(self) -> None:
         """MRs of handed-over runs (person mode), and the KiroCrew checks now and then."""
         last_crew = time.monotonic()
         while True:
             try:
                 await asyncio.sleep(MR_EVERY_S)
-                for (base, project, branch), _ in list(self._mr_wanted.items()):
-                    if self.mr.due(project, branch):
-                        await asyncio.to_thread(self.mr.refresh, base, project, branch, transport=self.transport)
+                await self.refresh_mrs()
                 if time.monotonic() - last_crew > CREW_EVERY_S:
                     last_crew = time.monotonic()
                     self.crew = await asyncio.to_thread(crewcheck.checks, [r.path for r in self.repos.values()])
@@ -263,7 +271,7 @@ class Service:
         run = f.get("run") or {}
         mr = None
         if run.get("handoff") and f.get("branch") and base and project:
-            self._mr_wanted[(base, project, f["branch"])] = scope
+            self._mr_wanted[(base, project, f["branch"])] = (scope, str(repo.cfg.get("bridge_user") or ""))
             mr = self.mr.get(project, f["branch"])
         bot = 0
         if run.get("handoff") and not mr:
@@ -335,10 +343,10 @@ class Service:
             for row, _, decs in self._team_rows(snap):
                 rows.append(row)
                 for d in decs:
-                    if d.get("state") == "invalid":
+                    if d.get("state") in ("invalid", "posting"):     # never on the MR (yet)
                         continue
                     q_counts["asked"] += 1
-                    q_counts["answered"] += d.get("state") in ("answered", "signing", "delivered", "delivery_unknown")
+                    q_counts["answered"] += d.get("state") in ("answered", "delivered", "delivery_unknown", "refused")
                     q_counts["delivered"] += d.get("state") == "delivered"
         overlaps = deliveries.overlaps(rows)
         view, funnel = self._eval_view(which, snap)
@@ -507,7 +515,7 @@ class Service:
                                  credits={"runs": {x: {"credits": snap["credits"].get(x)} for x in row["run_ids"]
                                                    if snap["credits"].get(x) is not None}} if c else None,
                                  ledger_path=self.team.cfg.get("ledger"), vouchers_dir=self.team.cfg.get("vouchers_dir"),
-                                 allowed_signers=self.settings["team"].get("allowed_signers") or None)
+                                 allowed_signers=self.team.allowed_signers or None)
         for rid in row["run_ids"]:
             tl["items"] += self.store.events(rid)
         tl["items"].sort(key=lambda x: (x["at"] or "", x["kind"]))
@@ -754,7 +762,7 @@ class Service:
         if self.team is None:
             on = bool(self.settings["team"].get("enabled"))
             return {"enabled": on, "ok": False, "error": "运行机模式没打开" if not on else "brain-kit 没装载",
-                    "last_loop_at": None, "loop_error": "", "key_readable": False, "signer": {"pending": 0, "refused": 0}}
+                    "last_loop_at": None, "loop_error": "", "same_user": False, "signer": {"pending": 0, "refused": 0}}
         return self.team.status()
 
     async def status(self) -> dict[str, Any]:

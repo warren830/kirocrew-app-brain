@@ -56,8 +56,10 @@ export const QUESTION_STATE: Record<string, { label: string; tone: Tone }> = {
   stale: { label: '过期', tone: 'warn' },
   invalid: { label: '无效', tone: 'bad' },
   closed: { label: '已关闭', tone: 'idle' },
-  signing: { label: '签名中', tone: 'hand' },
-  refused: { label: '被拒', tone: 'bad' },
+  posting: { label: '正在发到 MR', tone: 'wait' },
+  delivery_unknown: { label: '送没送到不清楚', tone: 'warn' },
+  void: { label: '作废', tone: 'bad' },
+  refused: { label: '签名服务拒签', tone: 'bad' },
 }
 
 export const questionMeta = (state: string) => QUESTION_STATE[state] ?? { label: state, tone: 'idle' as Tone }

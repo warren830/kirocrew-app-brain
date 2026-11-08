@@ -35,6 +35,16 @@ describe('设置', () => {
     expect(p.setStatus).toHaveBeenCalledWith(answered)
   })
 
+  test('team mode asks for bridge.json and runnerd.json only: the signer is named inside bridge.json, never a key', async () => {
+    installFixtureRoutes({})
+    render(<SettingsView {...props()} />)
+    await screen.findByLabelText('brain-kit 在哪')
+    const team = screen.getByText('团队模式').closest('fieldset') as HTMLElement
+    expect(within(team).getAllByRole('textbox').map((x) => x.id)).toEqual(['set-bridge_config', 'set-runnerd_config'])
+    expect(team).toHaveTextContent('"signer": {"type": "spool"')
+    expect(team).toHaveTextContent('不写 signing_key')
+  })
+
   test('the same-user trial shows its warning; a save that fails shows errorText', async () => {
     const user = userEvent.setup()
     installFixtureRoutes({ [`POST ${API}/settings`]: () => { throw apiError(400, 'bad_settings', 'work_root 必须在 ~/workplace 或 ~/workspace 下面') } })

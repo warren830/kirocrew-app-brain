@@ -11,7 +11,7 @@ import { ExtLink, Icon, LoadState, STATE_TONE } from '../ui'
 import type { ViewProps } from './props'
 
 export const TEAM_POLL_MS = 10_000
-export const KEY_READABLE = '签名私钥这个用户能读到：只适合本机试用'
+export const SIGNER_SAME_USER = '签名服务和 app 是同一个系统用户：它签不签都由 app 说了算，只适合本机试用'
 
 const LEDGER_NAME: Record<keyof TeamView['ledger'], string> = { runs: '运行', decisions: '问题', handoffs: '交接' }
 
@@ -39,7 +39,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
   const st: TeamStatus | undefined = data?.status ?? status?.team
   return (
     <main className="br-view" data-testid="team">
-      {st?.key_readable && <div className="br-banner" role="alert" data-testid="key-readable">{KEY_READABLE}</div>}
+      {st?.same_user && <div className="br-banner" role="alert" data-testid="signer-same-user">{SIGNER_SAME_USER}</div>}
       <LoadState loading={tv.loading} error={tv.error} has={!!data} />
       {st && (
         <section className="br-card" aria-label="运行机状态">

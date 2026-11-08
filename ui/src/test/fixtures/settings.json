@@ -9,8 +9,6 @@
     "enabled": false,
     "bridge_config": "/Users/alice/.brain/bridge.json",
     "runnerd_config": "/Users/alice/.brain/runnerd.json",
-    "signer_spool": "/Users/alice/.brain/signer-spool",
-    "allowed_signers": "/Users/alice/.brain/allowed_signers",
     "dev_same_user": false
   }
 }

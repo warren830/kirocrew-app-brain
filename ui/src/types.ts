@@ -139,8 +139,9 @@ export interface TeamStatus {
   error: string
   last_loop_at: number | null
   loop_error: string
-  /** the signing key is readable by this app's OS user (it must not be in production) */
-  key_readable: boolean
+  /** the signer runs as this app's OS user (the local trial, or its signed/ and refused/ are writable here): it would
+   * sign whatever the app asks, so it is no boundary (never on a real team runner) */
+  same_user: boolean
   signer: { pending: number; refused: number }
 }
 
@@ -155,10 +156,9 @@ export interface Settings {
   work_root: string
   team: {
     enabled: boolean
+    /** brain-kit's bridge.json, with "signer": {"type": "spool", "spool_dir", "allowed_signers"} and no signing_key */
     bridge_config: string
     runnerd_config: string
-    signer_spool: string
-    allowed_signers: string
     /** local trial only: the signer runs as the same OS user (shown as a warning) */
     dev_same_user: boolean
   }
@@ -260,7 +260,10 @@ export interface Question {
   recommend: string | null
   lean_request: string | null
   refs: string[]
-  state: string // waiting | open | answered | delivered | stale | invalid | closed | signing | refused
+  /** park.json: waiting | answered; on the MR / in brain-kit's ledger: posting | open | answered | delivered |
+   * delivery_unknown | refused (the signer would not sign it) | stale (a new push) | void (not bound to its push and
+   * park.json) | invalid | closed */
+  state: string
   answer: string | null
   answerer: string | null
   voucher_id: string | null
