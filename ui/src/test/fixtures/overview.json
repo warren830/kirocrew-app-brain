@@ -1,0 +1,356 @@
+{
+  "at": 1794146400,
+  "rows": [
+    {
+      "repo": "r1",
+      "key": "PAY-3",
+      "title": "退款单导出 CSV",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/PAY-3-refund-export",
+      "intent": "261107-refund-export",
+      "lean": {
+        "stage": "code-generation",
+        "stage_label": "代码生成",
+        "stage_n": 9,
+        "done": 8,
+        "total": 11
+      },
+      "waits": {
+        "who": "you",
+        "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
+        "line": "approve PLAN 5d1e7a90"
+      },
+      "credits": 12.4,
+      "updated_at": 1794146040,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [
+        "PAY-4"
+      ],
+      "open_questions": [],
+      "expected_paths": [
+        "src/refund/",
+        "src/export/csv.py"
+      ]
+    },
+    {
+      "repo": "r1",
+      "key": "PAY-4",
+      "title": "对账单按商户拆分",
+      "owner": "carol",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "branch",
+      "branch": "ai/carol/PAY-4-merchant-split",
+      "intent": "261105-merchant-split",
+      "lean": {
+        "stage": "application-design",
+        "stage_label": "应用设计",
+        "stage_n": 4,
+        "done": 3,
+        "total": 11
+      },
+      "waits": {
+        "who": "product",
+        "text": "停在 D-2：等产品在 MR 上回答",
+        "line": null
+      },
+      "credits": null,
+      "updated_at": 1794135600,
+      "mr": {
+        "iid": 41,
+        "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
+        "state": "opened"
+      },
+      "worktree": null,
+      "run_ids": [
+        "RUN-PAY-4-1"
+      ],
+      "sessions": 0,
+      "overlap": [
+        "PAY-3"
+      ],
+      "open_questions": [
+        "D-2"
+      ],
+      "expected_paths": [
+        "src/refund/ledger.py",
+        "src/statement/"
+      ]
+    },
+    {
+      "repo": "r1",
+      "key": "PAY-5",
+      "title": "退款回调失败重试",
+      "owner": "alice",
+      "source": "alert",
+      "state": "acceptance",
+      "state_label": "等验收",
+      "where": "branch",
+      "branch": "ai/alice/PAY-5-callback-retry",
+      "intent": "261103-callback-retry",
+      "lean": {
+        "stage": "release",
+        "stage_label": "发布",
+        "stage_n": 11,
+        "done": 10,
+        "total": 11
+      },
+      "waits": {
+        "who": "you",
+        "text": "等你验收：在 MR 上回答 D-3",
+        "line": null
+      },
+      "credits": 31.0,
+      "updated_at": 1794052800,
+      "mr": {
+        "iid": 44,
+        "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
+        "state": "opened"
+      },
+      "worktree": "/Users/alice/workplace/brain-app/PAY-5-callback-retry",
+      "run_ids": [
+        "RUN-PAY-5-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+        "D-3"
+      ],
+      "expected_paths": [
+        "src/callback/"
+      ]
+    },
+    {
+      "repo": "r1",
+      "key": "PAY-7",
+      "title": "退款原因下拉框",
+      "owner": "alice",
+      "source": "product",
+      "state": "rejected",
+      "state_label": "接手被拒",
+      "where": "branch",
+      "branch": "ai/alice/PAY-7-refund-reason",
+      "intent": "261106-refund-reason",
+      "lean": {
+        "stage": "build-and-test",
+        "stage_label": "构建和测试",
+        "stage_n": 10,
+        "done": 9,
+        "total": 11
+      },
+      "waits": {
+        "who": "you",
+        "text": "接手被拒：run.json 的 brain_commit 不在 main 上，先 rebase 到最新的 main 再交接",
+        "line": null
+      },
+      "credits": 18.2,
+      "updated_at": 1794128400,
+      "mr": {
+        "iid": 46,
+        "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/46",
+        "state": "opened"
+      },
+      "worktree": "/Users/alice/workplace/brain-app/PAY-7-refund-reason",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+        "web/refund/"
+      ]
+    },
+    {
+      "repo": "r1",
+      "key": "PAY-6",
+      "title": "商户结算周报",
+      "owner": "carol",
+      "source": "product",
+      "state": "claimed",
+      "state_label": "已认领",
+      "where": "claim",
+      "branch": null,
+      "intent": null,
+      "lean": {
+        "stage": null,
+        "stage_label": null,
+        "stage_n": null,
+        "done": 0,
+        "total": 11
+      },
+      "waits": {
+        "who": "people",
+        "text": "已认领，还没开工",
+        "line": null
+      },
+      "credits": null,
+      "updated_at": 1793973600,
+      "mr": null,
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": []
+    },
+    {
+      "repo": "r1",
+      "key": "PAY-2",
+      "title": "退款单号校验",
+      "owner": "alice",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/alice/PAY-2-refund-id",
+      "intent": "261101-refund-id",
+      "lean": {
+        "stage": "release",
+        "stage_label": "发布",
+        "stage_n": 11,
+        "done": 11,
+        "total": 11
+      },
+      "waits": {
+        "who": "nobody",
+        "text": "已合并",
+        "line": null
+      },
+      "credits": 22.7,
+      "updated_at": 1793800800,
+      "mr": {
+        "iid": 37,
+        "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/37",
+        "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+        "RUN-PAY-2-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+        "src/refund/id.py"
+      ]
+    }
+  ],
+  "overlaps": [
+    {
+      "keys": [
+        "PAY-3",
+        "PAY-4"
+      ],
+      "paths": [
+        "src/refund/"
+      ]
+    }
+  ],
+  "funnel": {
+    "source": "evaluate",
+    "total": 14,
+    "rows": [
+      {
+        "id": "person",
+        "label": "人",
+        "count": 4
+      },
+      {
+        "id": "check",
+        "label": "确定性检查",
+        "count": 5
+      },
+      {
+        "id": "brain",
+        "label": "Brain 条目（引用）",
+        "count": 3
+      },
+      {
+        "id": "agent",
+        "label": "agent 自己定（权限内）",
+        "count": 1
+      },
+      {
+        "id": "unknown",
+        "label": "看不出",
+        "count": 1
+      }
+    ],
+    "questions": {
+      "asked": 4,
+      "answered": 3,
+      "delivered": 2
+    }
+  },
+  "eval": {
+    "available": true,
+    "error": "",
+    "ref": "main@3f9c2a1b",
+    "metrics": [
+      {
+        "id": "hands_off",
+        "label": "交接后没人介入",
+        "value": [
+          2,
+          3
+        ],
+        "rule": "交接之后除了必经审批没人介入，而且交付正确"
+      },
+      {
+        "id": "first_ci",
+        "label": "CI 一次过",
+        "value": [
+          3,
+          4
+        ],
+        "rule": "运行机第一次推送 CI 就是绿的"
+      },
+      {
+        "id": "asks_per_run",
+        "label": "每次运行问人几次",
+        "value": 1.5,
+        "rule": "运行机上发到 MR 的问题数 / 运行数"
+      },
+      {
+        "id": "escaped",
+        "label": "上线后缺陷",
+        "value": null,
+        "rule": "合并后 30 天内为它开的 fix 需求"
+      }
+    ],
+    "queue": [
+      {
+        "key": "PAY-4",
+        "intent": "261105-merchant-split",
+        "reasons": [
+          "问了人 3 次",
+          "设计改了 2 轮"
+        ]
+      }
+    ]
+  },
+  "counts": {
+    "claimed": 1,
+    "local": 1,
+    "handed_over": 0,
+    "rejected": 1,
+    "running": 0,
+    "parked": 1,
+    "acceptance": 1,
+    "merged": 1,
+    "closed": 0
+  },
+  "errors": [
+    {
+      "repo": "r2",
+      "error": "不是 brain-kit 仓库：没有 .brain/kit.json（在仓库里跑 brain install）"
+    }
+  ]
+}

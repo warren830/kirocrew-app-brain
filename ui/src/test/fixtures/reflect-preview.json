@@ -1,0 +1,46 @@
+{
+  "repo": "r1",
+  "key": "PAY-5",
+  "source": "aidlc-docs/261103-callback-retry/decisions.md",
+  "ops": [
+    {
+      "kind": "new",
+      "target": null,
+      "file": "TECH",
+      "type": "pitfall",
+      "section": "回调",
+      "src": [
+        "D-4",
+        "RUN-PAY-5-1"
+      ],
+      "text": "支付网关的回调可能先于下单接口的响应到达：先查单再处理。"
+    },
+    {
+      "kind": "same",
+      "target": "T-PAY-2-1",
+      "file": "TECH",
+      "type": null,
+      "section": null,
+      "src": [
+        "RUN-PAY-5-1"
+      ],
+      "text": ""
+    }
+  ],
+  "gaps": [
+    {
+      "title": "人工队列的处理时限",
+      "kind": "missing-decision",
+      "what": "决策里说「进人工队列」，Brain 里没写多久必须处理"
+    }
+  ],
+  "notes": [
+    "T-PAY-2-1 只加来源，不改文字"
+  ],
+  "warnings": [
+    "T-12 被这次运行标成过时：考虑写一条 replaces"
+  ],
+  "problems": [],
+  "substantive": true,
+  "error": ""
+}

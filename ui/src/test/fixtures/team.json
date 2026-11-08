@@ -1,0 +1,71 @@
+{
+  "status": {
+    "enabled": true,
+    "ok": true,
+    "error": "",
+    "last_loop_at": 1794146350,
+    "loop_error": "",
+    "key_readable": true,
+    "signer": {
+      "pending": 1,
+      "refused": 1
+    }
+  },
+  "ledger": {
+    "runs": {
+      "running": 1,
+      "parked": 1,
+      "merged": 3
+    },
+    "decisions": {
+      "open": 1,
+      "answered": 4,
+      "delivered": 4
+    },
+    "handoffs": {
+      "accepted": 4,
+      "rejected": 1
+    }
+  },
+  "runs": [
+    {
+      "run_id": "RUN-PAY-4-1",
+      "req": "PAY-4",
+      "project": "shop/shop-pay",
+      "iid": 41,
+      "state": "parked",
+      "slot": "brain-run-PAY-4-1",
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
+      "updated": "2026-11-08T19:00:00+08:00"
+    },
+    {
+      "run_id": "RUN-PAY-5-1",
+      "req": "PAY-5",
+      "project": "shop/shop-pay",
+      "iid": 44,
+      "state": "acceptance",
+      "slot": null,
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
+      "updated": "2026-11-07T20:00:00+08:00"
+    }
+  ],
+  "signer": {
+    "pending": [
+      {
+        "req_id": "SIG-0042",
+        "kind": "answer",
+        "run_id": "RUN-PAY-4-1",
+        "since": "2026-11-08T21:58:00+08:00"
+      }
+    ],
+    "refused": [
+      {
+        "req_id": "SIG-0039",
+        "kind": "handoff",
+        "reasons": [
+          "MR 的作者 dave 不在 decision_roles.owner 里"
+        ]
+      }
+    ]
+  }
+}

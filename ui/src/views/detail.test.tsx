@@ -1,0 +1,170 @@
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { ItemEntry } from '../nav'
+import { apiCalls, apiError, navigations } from '../test/stubs/app-sdk'
+import { fx } from '../test/data'
+import { API, installFixtureRoutes } from '../test/routes'
+import { TYPE_IT_YOURSELF } from '../ui'
+import { DetailView } from './Detail'
+import type { ViewProps } from './props'
+
+const LINE = 'approve PLAN 5d1e7a90'
+
+function renderDetail(entry: ItemEntry = { repo: 'r1', key: 'PAY-3', from: 'overview' }, over: Partial<ViewProps> = {}) {
+  const go = vi.fn()
+  const onBack = vi.fn()
+  const reloadStatus = vi.fn()
+  render(<DetailView entry={entry} onBack={onBack} status={fx.status()} go={go} replace={vi.fn()} reloadStatus={reloadStatus} setStatus={vi.fn()} pollMs={60_000} {...over} />)
+  return { go, onBack, reloadStatus }
+}
+
+/** No request ever carries a Lean approval line (path or body). */
+const noLineSent = () => {
+  for (const c of apiCalls) expect(JSON.stringify(c)).not.toContain('approve PLAN')
+}
+
+const pendingApproval = async () => (await screen.findAllByTestId('approval')).find((a) => a.dataset.state === 'pending')!
+
+describe('需求详情', () => {
+  beforeEach(() => installFixtureRoutes())
+
+  test('header, Lean stages with per-unit chips, approvals and the timeline', async () => {
+    renderDetail()
+    const head = await screen.findByRole('region', { name: '需求' })
+    expect(head).toHaveTextContent('PAY-3')
+    expect(head).toHaveTextContent('退款单导出 CSV')
+    expect(head).toHaveTextContent('本地开发中')
+    expect(head).toHaveTextContent('ai/alice/PAY-3-refund-export')
+    expect(head).toHaveTextContent('/Users/alice/workplace/brain-app/PAY-3-refund-export')
+    expect(within(screen.getByTestId('detail-waits')).getByText(LINE)).toHaveClass('br-mono')
+    expect(screen.getAllByTestId('stage')).toHaveLength(11)
+    const lean = screen.getByRole('region', { name: 'Lean 进度' })
+    expect(within(lean).getByText('refund-api · 在做')).toBeInTheDocument()
+    expect(screen.getAllByTestId('approval').map((a) => a.dataset.state)).toEqual(['approved', 'approved', 'approved', 'pending'])
+    expect(screen.getAllByTestId('tl-item')).toHaveLength(7)
+    const tl = screen.getByRole('region', { name: '时间线' })
+    expect(tl).toHaveTextContent('来自 brain-kit trace')
+    expect(tl).toHaveTextContent('这些来源没读到：runnerd')
+    expect(screen.getByRole('region', { name: '会话记录' })).toHaveTextContent('refund-api 的代码计划写好了，等批准。')
+    expect(apiCalls[0]).toMatchObject({ method: 'GET', path: `${API}/requirements/r1/PAY-3` })
+  })
+
+  test('a pending approval shows its line: 复制 copies it, 打开会话 opens the session; nothing sends it', async () => {
+    renderDetail()
+    const pending = await pendingApproval()
+    const line = within(pending).getByTestId('type-line')
+    expect(within(line).getByText(LINE)).toBeInTheDocument()
+    expect(line).toHaveTextContent(TYPE_IT_YOURSELF)
+    fireEvent.click(within(line).getByRole('button', { name: '复制' }))
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(LINE))
+    expect(await within(line).findByText('已复制')).toBeInTheDocument()
+    fireEvent.click(within(line).getByRole('button', { name: '打开会话' }))
+    expect(navigations).toEqual(['/chat?sid=brain-PAY-3-7f3a'])
+    expect(window.location.search).toBe('?sid=brain-PAY-3-7f3a')
+    noLineSent()
+  })
+
+  test('the answer form is there only for a question that may be answered here; it posts the answer', async () => {
+    const user = userEvent.setup()
+    installFixtureRoutes({ [`POST ${API}/requirements/r1/PAY-3/answer`]: () => ({ ok: true, via: 'session', text: '已送进会话 brain-PAY-3-7f3a' }) })
+    const { reloadStatus } = renderDetail()
+    const qs = await screen.findAllByTestId('question')
+    expect(qs).toHaveLength(3)
+    expect(screen.getAllByRole('form')).toHaveLength(1)
+    const [clarify, plan, old] = qs
+    expect(within(plan).queryByRole('form')).toBeNull()
+    expect(plan).toHaveTextContent('这是 Lean 的审批请求')
+    expect(within(plan).queryByRole('button', { name: /批准|approve|reject|拒/ })).toBeNull()
+    expect(within(old).queryByRole('form')).toBeNull()
+    expect(old).toHaveTextContent('回答：A · alice')
+    const form = within(clarify).getByRole('form')
+    expect(form).toHaveTextContent('回答会送进你的本地会话')
+    const send = within(form).getByRole('button', { name: '回答' })
+    expect(send).toBeDisabled()
+    await user.click(within(form).getByRole('radio', { name: /商户所在地的时区/ }))
+    await user.type(within(form).getByLabelText('补一句（可不填）'), '文件头写时区')
+    await user.click(send)
+    expect(await within(clarify).findByText('已送进会话 brain-PAY-3-7f3a')).toBeInTheDocument()
+    const post = apiCalls.find((c) => c.method === 'POST')!
+    expect(post).toEqual({ method: 'POST', path: `${API}/requirements/r1/PAY-3/answer`, body: { choice: 'A', note: '文件头写时区' } })
+    expect(reloadStatus).toHaveBeenCalled()
+    noLineSent()
+  })
+
+  test('a question answered on the MR says so in the form', async () => {
+    const d = fx.detail()
+    d.questions[0].answer_via = 'mr'
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d })
+    renderDetail()
+    const [clarify] = await screen.findAllByTestId('question')
+    expect(within(clarify).getByRole('form')).toHaveTextContent('回答会以你的 GitLab 身份发在 MR 上')
+  })
+
+  test('the crumb goes back; a Brain cite opens the Brain view at that entry', async () => {
+    const { go, onBack } = renderDetail({ repo: 'r1', key: 'PAY-3', from: 'todo' })
+    const crumb = await screen.findByRole('navigation', { name: '位置' })
+    await screen.findByRole('region', { name: '决定' })
+    fireEvent.click(within(crumb).getByRole('button', { name: '待办' }))
+    fireEvent.click(within(crumb).getByRole('button', { name: '← 返回待办' }))
+    expect(onBack).toHaveBeenCalledTimes(2)
+    const decisions = screen.getByRole('region', { name: '决定' })
+    fireEvent.click(within(decisions).getByRole('button', { name: 'P-PAY-2-1' }))
+    expect(go).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', id: 'P-PAY-2-1', file: 'PRODUCT' })
+    const brain = screen.getByRole('region', { name: '用到的 Brain' })
+    fireEvent.click(within(brain).getAllByRole('button', { name: 'T-12' })[0])
+    expect(go).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', id: 'T-12', file: 'TECH' })
+    expect(within(brain).queryByRole('button', { name: 'T-PAY-9-1' })).toBeNull() // not in the Brain: plain text
+  })
+
+  test('the sessions list opens a session; with a live session there is no 开会话', async () => {
+    renderDetail()
+    const sessions = await screen.findByRole('region', { name: '会话' })
+    expect(sessions).toHaveTextContent('等批准')
+    expect(sessions).toHaveTextContent('brain-dev')
+    expect(screen.queryByRole('region', { name: '开会话' })).toBeNull()
+    fireEvent.click(within(sessions).getByRole('button', { name: '打开会话' }))
+    expect(navigations).toEqual(['/chat?sid=brain-PAY-3-7f3a'])
+  })
+
+  test('a local requirement without a live session offers 开会话 with trust and kickoff', async () => {
+    const user = userEvent.setup()
+    const d = fx.detail()
+    d.sessions = []
+    installFixtureRoutes({
+      [`GET ${API}/requirements/*`]: () => d,
+      [`POST ${API}/requirements/r1/PAY-3/session`]: () => ({ ok: true, slot: 'brain-PAY-3-9e1d', url: '/chat?sid=brain-PAY-3-9e1d' }),
+    })
+    const { reloadStatus } = renderDetail()
+    const card = await screen.findByRole('region', { name: '开会话' })
+    // no session to open: the pending line is still shown and copied, without 打开会话
+    expect(within(await pendingApproval()).queryByRole('button', { name: '打开会话' })).toBeNull()
+    expect(within(card).getByRole('checkbox', { name: '这个会话的工具调用不用逐个批准' })).toBeChecked()
+    await user.click(within(card).getByRole('checkbox', { name: /开场/ }))
+    await user.click(within(card).getByRole('button', { name: '开会话' }))
+    expect(await within(card).findByText('会话开好了。')).toBeInTheDocument()
+    expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/requirements/r1/PAY-3/session`, body: { trust: true, kickoff: false } })
+    expect(reloadStatus).toHaveBeenCalled()
+    await user.click(within(card).getByRole('button', { name: '打开会话' }))
+    expect(navigations).toEqual(['/chat?sid=brain-PAY-3-9e1d'])
+    noLineSent()
+  })
+
+  test('no 开会话 for a requirement that is not local', async () => {
+    const d = fx.detail()
+    d.sessions = []
+    d.row.state = 'parked'
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d })
+    renderDetail()
+    await screen.findByRole('region', { name: '需求' })
+    expect(screen.queryByRole('region', { name: '开会话' })).toBeNull()
+  })
+
+  test('an error answer shows errorText', async () => {
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => { throw apiError(404, 'not_found', '没有这个需求') } })
+    renderDetail({ repo: 'r1', key: 'PAY-99' })
+    expect(await screen.findByRole('alert')).toHaveTextContent('没有这个需求（404）')
+    expect(screen.queryByRole('region', { name: '需求' })).toBeNull()
+    expect(apiCalls[0].path).toBe(`${API}/requirements/r1/PAY-99`)
+  })
+})

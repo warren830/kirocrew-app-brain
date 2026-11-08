@@ -30,8 +30,14 @@ export const notifications: { message: string; type?: string }[] = []
 export const chatLaunches: { agent?: string; message?: string; slotKey?: string; autoSend?: boolean }[] = []
 let rawSupported = true
 let chatListFails = false
+let navigateHook: ((path: string) => boolean) | null = null
 
-/** Install handlers keyed `"GET /api/apps/aidlc-team/board"`. A `*` at the end matches a prefix (query strings included). */
+/** The preview's say over a navigation: return true to take it (the stub then leaves the URL alone). */
+export function setNavigateHook(hook: ((path: string) => boolean) | null): void {
+  navigateHook = hook
+}
+
+/** Install handlers keyed `"GET /api/apps/brain/status"`. A `*` at the end matches a prefix (query strings included). */
 export function setApiRoutes(table: Record<string, RouteHandler>): void {
   routes.clear()
   apiCalls.length = 0
@@ -58,6 +64,7 @@ export function resetStubs(): void {
   chatLaunches.length = 0
   rawSupported = true
   chatListFails = false
+  navigateHook = null
 }
 
 export class StubApiError extends Error {
@@ -115,6 +122,7 @@ export function useAppApi(): AppApi {
 export function useNavigate(): (path: string) => void {
   return (path) => {
     navigations.push(path)
+    if (navigateHook?.(path)) return
     window.history.pushState(null, '', path)
   }
 }
@@ -128,7 +136,7 @@ export function useNotify() {
 }
 
 export function useAppInfo() {
-  return { name: 'aidlc-team', version: '0.1.0', permissions: { api: ['/api/apps/aidlc-team'], events: [] } }
+  return { name: 'brain', version: '0.1.0', permissions: { api: ['/api/apps/brain'], events: [] } }
 }
 
 export function useTheme() {

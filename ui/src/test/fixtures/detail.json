@@ -1,0 +1,468 @@
+{
+  "row": {
+    "repo": "r1",
+    "key": "PAY-3",
+    "title": "退款单导出 CSV",
+    "owner": "alice",
+    "source": "product",
+    "state": "local",
+    "state_label": "本地开发中",
+    "where": "worktree",
+    "branch": "ai/alice/PAY-3-refund-export",
+    "intent": "261107-refund-export",
+    "lean": {
+      "stage": "code-generation",
+      "stage_label": "代码生成",
+      "stage_n": 9,
+      "done": 8,
+      "total": 11
+    },
+    "waits": {
+      "who": "you",
+      "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
+      "line": "approve PLAN 5d1e7a90"
+    },
+    "credits": 12.4,
+    "updated_at": 1794146040,
+    "mr": null,
+    "worktree": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
+    "run_ids": [],
+    "sessions": 1,
+    "overlap": [
+      "PAY-4"
+    ],
+    "open_questions": [],
+    "expected_paths": [
+      "src/refund/",
+      "src/export/csv.py"
+    ]
+  },
+  "where_label": "本机的工作目录",
+  "run": {
+    "owner": "alice",
+    "branch": "ai/alice/PAY-3-refund-export",
+    "intent": "261107-refund-export",
+    "brain_commit": "3f9c2a1b",
+    "origin": "product",
+    "created_at": "2026-11-07T16:00:00+08:00",
+    "materials": [
+      ".brain-materials/PKG-PAY-3-1"
+    ],
+    "handoff": null
+  },
+  "claim": {
+    "owner": "alice",
+    "title": "退款单导出 CSV",
+    "created_at": "2026-11-07T15:00:00+08:00",
+    "source": "product",
+    "closed": null
+  },
+  "lean": {
+    "stages": [
+      {
+        "id": "reverse-engineering",
+        "label": "逆向分析",
+        "n": 1,
+        "state": "skipped",
+        "units": [],
+        "note": "新功能，不用逆向",
+        "at": 1794038400
+      },
+      {
+        "id": "requirements",
+        "label": "需求分析",
+        "n": 2,
+        "state": "done",
+        "units": [],
+        "note": null,
+        "at": 1794049200
+      },
+      {
+        "id": "user-stories",
+        "label": "用户故事",
+        "n": 3,
+        "state": "skipped",
+        "units": [],
+        "note": "只有一个角色",
+        "at": 1794060000
+      },
+      {
+        "id": "application-design",
+        "label": "应用设计",
+        "n": 4,
+        "state": "done",
+        "units": [],
+        "note": null,
+        "at": 1794070800
+      },
+      {
+        "id": "units",
+        "label": "拆分单元",
+        "n": 5,
+        "state": "done",
+        "units": [],
+        "note": "两个单元：refund-export、refund-api",
+        "at": 1794081600
+      },
+      {
+        "id": "functional-design",
+        "label": "功能设计",
+        "n": 6,
+        "state": "done",
+        "units": [
+          {
+            "unit": "refund-export",
+            "state": "done"
+          },
+          {
+            "unit": "refund-api",
+            "state": "done"
+          }
+        ],
+        "note": null,
+        "at": 1794092400
+      },
+      {
+        "id": "nfr-design",
+        "label": "非功能设计",
+        "n": 7,
+        "state": "skipped",
+        "units": [
+          {
+            "unit": "refund-export",
+            "state": "skipped"
+          },
+          {
+            "unit": "refund-api",
+            "state": "skipped"
+          }
+        ],
+        "note": "沿用现有的限流和日志",
+        "at": 1794103200
+      },
+      {
+        "id": "infrastructure-design",
+        "label": "基础设施设计",
+        "n": 8,
+        "state": "skipped",
+        "units": [
+          {
+            "unit": "refund-export",
+            "state": "skipped"
+          },
+          {
+            "unit": "refund-api",
+            "state": "skipped"
+          }
+        ],
+        "note": "不加新资源",
+        "at": 1794114000
+      },
+      {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9,
+        "state": "started",
+        "units": [
+          {
+            "unit": "refund-export",
+            "state": "done"
+          },
+          {
+            "unit": "refund-api",
+            "state": "started"
+          }
+        ],
+        "note": null,
+        "at": 1794124800
+      },
+      {
+        "id": "build-and-test",
+        "label": "构建和测试",
+        "n": 10,
+        "state": "todo",
+        "units": [],
+        "note": null,
+        "at": null
+      },
+      {
+        "id": "release",
+        "label": "发布",
+        "n": 11,
+        "state": "todo",
+        "units": [],
+        "note": null,
+        "at": null
+      }
+    ],
+    "approvals": [
+      {
+        "kind": "REQUIREMENTS",
+        "state": "approved",
+        "sha8": "8cf2cbce",
+        "at": 1794045600,
+        "line": null,
+        "path": "aidlc-docs/261107-refund-export/inception/requirements/requirements.md"
+      },
+      {
+        "kind": "DESIGN",
+        "state": "approved",
+        "sha8": "c41d09e2",
+        "at": 1794060000,
+        "line": null,
+        "path": "aidlc-docs/261107-refund-export/inception/application-design/application-design.md"
+      },
+      {
+        "kind": "PLAN",
+        "state": "approved",
+        "sha8": "0b7e33aa",
+        "at": 1794074400,
+        "line": null,
+        "path": "aidlc-docs/261107-refund-export/construction/plans/refund-export-code-generation-plan.md"
+      },
+      {
+        "kind": "PLAN",
+        "state": "pending",
+        "sha8": "5d1e7a90",
+        "at": null,
+        "line": "approve PLAN 5d1e7a90",
+        "path": "aidlc-docs/261107-refund-export/construction/plans/refund-api-code-generation-plan.md"
+      }
+    ],
+    "status": "refund-export 的代码写完了，单测全过。refund-api 的代码计划写好了，等批准。",
+    "next": [
+      "批准后按计划生成 refund-api 的代码",
+      "跑 build-and-test，补导出大文件的测试"
+    ],
+    "open_questions": [
+      "导出文件里的时间用哪个时区（等回答）"
+    ]
+  },
+  "decisions": [
+    {
+      "id": "D-1",
+      "date": "2026-11-07",
+      "stage": "requirements",
+      "text": "导出只给有退款权限的运营看",
+      "why": "退款单里有收款人姓名",
+      "who": "product",
+      "by": "person",
+      "cites": [
+        "P-PAY-2-1"
+      ],
+      "vouchers": [],
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L8"
+    },
+    {
+      "id": "D-2",
+      "date": "2026-11-07",
+      "stage": "application-design",
+      "text": "大文件分批写，一批 5000 行",
+      "why": "TECH 里记过一次导出把内存打满",
+      "who": null,
+      "by": "agent",
+      "cites": [
+        "T-PAY-2-1",
+        "T-12"
+      ],
+      "vouchers": [],
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L9"
+    },
+    {
+      "id": "D-3",
+      "date": "2026-11-08",
+      "stage": "code-generation",
+      "text": "金额列带币种，单独一列 currency",
+      "why": "回答了澄清问题",
+      "who": "alice",
+      "by": "person",
+      "cites": [],
+      "vouchers": [
+        "V-1a2b3c4d5e"
+      ],
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L10"
+    }
+  ],
+  "questions": [
+    {
+      "source": "park",
+      "id": null,
+      "kind": "clarify",
+      "kind_label": "澄清",
+      "question": "导出文件里的时间用商户所在地的时区，还是 UTC？",
+      "options": [
+        {
+          "id": "A",
+          "text": "商户所在地的时区（文件头写明时区）"
+        },
+        {
+          "id": "B",
+          "text": "一律 UTC"
+        }
+      ],
+      "recommend": "A",
+      "lean_request": null,
+      "refs": [
+        "D01#S004"
+      ],
+      "state": "waiting",
+      "answer": null,
+      "answerer": null,
+      "voucher_id": null,
+      "mr_url": null,
+      "at": 1794145200,
+      "answerable_here": true,
+      "answer_via": "session"
+    },
+    {
+      "source": "park",
+      "id": null,
+      "kind": "plan",
+      "kind_label": "计划",
+      "question": "批准 refund-api 的代码计划",
+      "options": [],
+      "recommend": null,
+      "lean_request": "PLAN 5d1e7a90",
+      "refs": [
+        "aidlc-docs/261107-refund-export/construction/plans/refund-api-code-generation-plan.md"
+      ],
+      "state": "waiting",
+      "answer": null,
+      "answerer": null,
+      "voucher_id": null,
+      "mr_url": null,
+      "at": 1794146040,
+      "answerable_here": false,
+      "answer_via": null
+    },
+    {
+      "source": "park",
+      "id": null,
+      "kind": "clarify",
+      "kind_label": "澄清",
+      "question": "金额列要不要带币种？",
+      "options": [
+        {
+          "id": "A",
+          "text": "带，单独一列 currency"
+        },
+        {
+          "id": "B",
+          "text": "不带"
+        }
+      ],
+      "recommend": "A",
+      "lean_request": null,
+      "refs": [],
+      "state": "delivered",
+      "answer": "A",
+      "answerer": "alice",
+      "voucher_id": null,
+      "mr_url": null,
+      "at": 1794049200,
+      "answerable_here": false,
+      "answer_via": "session"
+    }
+  ],
+  "timeline": {
+    "source": "trace",
+    "items": [
+      {
+        "at": "2026-11-07T15:00:00+08:00",
+        "kind": "app",
+        "label": "认领",
+        "detail": "claim/PAY-3 推到 origin",
+        "who": "alice",
+        "src": "claim.json"
+      },
+      {
+        "at": "2026-11-07T16:00:00+08:00",
+        "kind": "session",
+        "label": "开了 brain-dev 会话",
+        "detail": "brain-PAY-3-7f3a",
+        "who": "alice",
+        "src": "app"
+      },
+      {
+        "at": "2026-11-07T18:00:00+08:00",
+        "kind": "approval",
+        "label": "批准 REQUIREMENTS",
+        "detail": "8cf2cbce",
+        "who": "alice",
+        "src": "aidlc-state.md"
+      },
+      {
+        "at": "2026-11-07T19:00:00+08:00",
+        "kind": "question",
+        "label": "澄清：金额列要不要带币种？",
+        "detail": "回答 A",
+        "who": "alice",
+        "src": "park.json"
+      },
+      {
+        "at": "2026-11-07T22:00:00+08:00",
+        "kind": "approval",
+        "label": "批准 DESIGN",
+        "detail": "c41d09e2",
+        "who": "alice",
+        "src": "aidlc-state.md"
+      },
+      {
+        "at": "2026-11-08T15:00:00+08:00",
+        "kind": "commit",
+        "label": "refund-export：分批写 CSV",
+        "detail": "a91c2f0",
+        "who": "brain-dev",
+        "src": "git"
+      },
+      {
+        "at": "2026-11-08T21:54:00+08:00",
+        "kind": "stage",
+        "label": "代码生成：refund-api 的计划写好了",
+        "detail": null,
+        "who": "brain-dev",
+        "src": "lean events"
+      }
+    ],
+    "missing": [
+      "runnerd"
+    ],
+    "error": ""
+  },
+  "sessions": [
+    {
+      "slot": "brain-PAY-3-7f3a",
+      "title": "PAY-3 退款单导出 CSV",
+      "agent": "brain-dev",
+      "kind": "local",
+      "credits": 12.4,
+      "turns": 23,
+      "busy": false,
+      "awaiting": true,
+      "last_activity": 1794146040,
+      "opened_at": 1794038400,
+      "project": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
+      "url": "/chat?sid=brain-PAY-3-7f3a",
+      "error": null
+    }
+  ],
+  "credits": {
+    "total": 12.4,
+    "note": "只算这个 app 开的会话；KiroCrew 只报 credits"
+  },
+  "brain": {
+    "loaded": 14,
+    "cited": [
+      "P-PAY-2-1",
+      "T-PAY-2-1",
+      "T-12"
+    ],
+    "stale": [
+      "T-12"
+    ],
+    "unknown": [
+      "T-PAY-9-1"
+    ],
+    "proposals": 1
+  }
+}

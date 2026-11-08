@@ -1,145 +1,115 @@
 /**
- * The app's three views and the ways into them, as the page URL carries them (a link can open any of them, and the
- * browser's back and forward step between them: a move to another view is a history entry, a change inside a view —
- * a filter, the run picked — replaces the current one):
+ * The app's views and the ways into them, as the page URL carries them. A link can open any of them; a move to
+ * another view is a history entry (the host's router), a change inside a view (a filter) replaces the current one.
  *
- *   /apps/aidlc-team                         CTO 视图 (the default): every delivery of the company
- *     ?line=0..4&kind=app|feat|fix&size=S|M|L&week=<YYYY-MM-DD>&real=1&defect=1   …its filters (业务线, 类型, 规模, 一周, 只看实测, 有上线后缺陷)
- *     ?hl=<run | TY-1234>                    …that delivery picked out (its ledger row or its kanban card)
- *     ?at=more|fast|cheap|steady|weekly|flow|ledger …scrolled to that part
- *   ?view=item&run=<id>                      交付详情 of a run of this app (实测, or still going)
- *   ?view=item&issue=TY-1234                 交付详情 of a delivery of the simulated history
- *     &at=<seconds>                          …the segment of its 价值流 at that moment picked out
- *     &from=cto|board                        …opened from that view: the way back is beside its actions
- *   ?view=board                              团队看板 (the newest active run, else the newest)
- *   ?view=board&run=<id>                     that run
- *     &phase=<ideation|inception|…>          …its AI-DLC phase picked out (a finished run: its replay paused where it began)
- *     &gate=<role> / &role=<role>            …the team graph focused on that role (its gate)
- *     &at=<seconds>                          …a finished run's replay, paused that many seconds after its start
- *     &replay=<speed>                        …its replay, playing at that speed
- *     &focus=signoff|tests|cost|lanes        …its 签字单, its 测试墙, its counters, its lanes (each member's use)
- *     &from=cto|item                         …opened from that view: the board says where it is and the way back
- *     &pick=latest                           …the newest 实测 stands in (no run of this app was where the link points)
- *   ?view=board&new=promo                    the 新需求 form (the 双十一 · 家电大促 scenario is its first)
+ *   /apps/brain                                   交付总览 (the default)
+ *     ?view=overview&repo=<id>&state=<ReqState>   …filtered to one repo / one state
+ *   ?view=item&repo=<id>&key=<KEY>                需求详情
+ *     &from=overview|todo|brain                   …opened from that view: the crumb says the way back
+ *   ?view=new&repo=<id>                           开需求
+ *   ?view=brain&repo=<id>&file=<FILE>&id=<entry>&reflect=<KEY>   Brain: that file, that entry picked out, that
+ *                                                 requirement picked in the reflect card
+ *   ?view=todo                                    待办
+ *   ?view=team                                    运行机 (team mode only)
+ *   ?view=settings                                设置
+ *
+ * Anything that does not match its pattern is left out (never put into a request or the page as it came).
  */
+import { STATE_LABEL, type ReqState } from './types'
 
-export type BoardFocus = 'signoff' | 'tests' | 'cost' | 'lanes'
-export type BoardEntry = {
-  run?: string; gate?: string; role?: string; phase?: string; at?: number; replay?: number; focus?: BoardFocus; new?: 'promo'
-  from?: 'cto' | 'item'; pick?: 'latest'
-}
-export type ItemEntry = { run?: string; issue?: string; at?: number; from?: 'cto' | 'board' }
-export type CtoAnchor = 'more' | 'fast' | 'cheap' | 'steady' | 'weekly' | 'flow' | 'ledger'
-/** the CTO view's filters, as the URL carries them (absent: not filtered) */
-export type CtoFilters = { line?: number; type?: 'app' | 'feat' | 'fix'; size?: 'S' | 'M' | 'L'; week?: string; real?: boolean; defects?: boolean } // type: the URL's kind=; defects: defect=1
-export type CtoEntry = CtoFilters & { hl?: string; at?: CtoAnchor }
-export type View = ({ kind: 'cto' } & CtoEntry) | ({ kind: 'item' } & ItemEntry) | ({ kind: 'board' } & BoardEntry)
+export type ViewKind = 'overview' | 'item' | 'new' | 'brain' | 'todo' | 'team' | 'settings'
+export type ItemFrom = 'overview' | 'todo' | 'brain'
+export type BrainFile = 'PRODUCT' | 'TECH' | 'IMPROVEMENT' | 'PROJECT'
+export const BRAIN_FILES: readonly BrainFile[] = ['PRODUCT', 'TECH', 'IMPROVEMENT', 'PROJECT']
 
-const RID = /^r[0-9a-z]{4,12}$/
-const ROLE = /^[a-z][a-z0-9-]{0,23}$/
-const ISSUE = /^TY-\d{4}$/
-const DAY = /^\d{4}-\d{2}-\d{2}$/
-export const PHASE_KEYS = ['ideation', 'inception', 'construction', 'review', 'operation'] as const
-const FOCUS: readonly string[] = ['signoff', 'tests', 'cost', 'lanes']
-const ANCHORS: readonly string[] = ['more', 'fast', 'cheap', 'steady', 'weekly', 'flow', 'ledger']
-const seconds = (x: string | null) => {
-  const n = Number(x ?? 'x')
-  return x !== null && x !== '' && Number.isFinite(n) && n >= 0 ? Math.round(n) : undefined
+export type OverviewEntry = { repo?: string; state?: ReqState }
+export type ItemEntry = { repo: string; key: string; from?: ItemFrom }
+export type NewEntry = { repo?: string }
+export type BrainEntryRef = { repo?: string; file?: BrainFile; id?: string; reflect?: string }
+
+export type View =
+  | ({ kind: 'overview' } & OverviewEntry)
+  | ({ kind: 'item' } & ItemEntry)
+  | ({ kind: 'new' } & NewEntry)
+  | ({ kind: 'brain' } & BrainEntryRef)
+  | { kind: 'todo' }
+  | { kind: 'team' }
+  | { kind: 'settings' }
+
+export const REPO_RE = /^(r[1-9][0-9]{0,2}|runner)$/
+export const KEY_RE = /^[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}$/
+/** <side letter>-<KEY>-<n>, or a legacy <letter>-<n> */
+export const ENTRY_RE = /^[A-Z]-(?:[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,3}|[0-9]{1,5})$/
+const STATES = Object.keys(STATE_LABEL) as ReqState[]
+const FROM: readonly string[] = ['overview', 'todo', 'brain']
+
+const repoOf = (q: URLSearchParams) => {
+  const r = q.get('repo') ?? ''
+  return REPO_RE.test(r) ? { repo: r } : {}
 }
 
 export function parseView(search: string): View {
   const q = new URLSearchParams(search)
-  const run = q.get('run') ?? ''
-  if (q.get('view') === 'item') {
-    const at = seconds(q.get('at'))
-    const from = q.get('from')
-    const tail = { ...(at !== undefined ? { at } : {}), ...(from === 'cto' || from === 'board' ? { from: from as 'cto' | 'board' } : {}) }
-    if (RID.test(run)) return { kind: 'item', run, ...tail }
-    const issue = q.get('issue') ?? ''
-    return ISSUE.test(issue) ? { kind: 'item', issue, ...tail } : { kind: 'cto' }
+  const view = q.get('view')
+  if (view === 'item') {
+    const repo = q.get('repo') ?? ''
+    const key = q.get('key') ?? ''
+    if (!REPO_RE.test(repo) || !KEY_RE.test(key)) return { kind: 'overview' }
+    const from = q.get('from') ?? ''
+    return { kind: 'item', repo, key, ...(FROM.includes(from) ? { from: from as ItemFrom } : {}) }
   }
-  if (q.get('view') !== 'board') {
-    const v: View = { kind: 'cto', ...parseFilters(q) }
-    const hl = q.get('hl') ?? ''
-    if (RID.test(hl) || ISSUE.test(hl)) v.hl = hl
-    const at = q.get('at') ?? ''
-    if (ANCHORS.includes(at)) v.at = at as CtoAnchor
+  if (view === 'new') return { kind: 'new', ...repoOf(q) }
+  if (view === 'brain') {
+    const v: View = { kind: 'brain', ...repoOf(q) }
+    const file = q.get('file') ?? ''
+    if ((BRAIN_FILES as readonly string[]).includes(file)) v.file = file as BrainFile
+    const id = q.get('id') ?? ''
+    if (ENTRY_RE.test(id)) v.id = id
+    const reflect = q.get('reflect') ?? ''
+    if (KEY_RE.test(reflect)) v.reflect = reflect
     return v
   }
-  const v: View = { kind: 'board' }
-  if (RID.test(run)) v.run = run
-  if (v.run) {
-    for (const k of ['gate', 'role'] as const) {
-      const x = q.get(k) ?? ''
-      if (ROLE.test(x)) v[k] = x
-    }
-    const phase = q.get('phase') ?? ''
-    if ((PHASE_KEYS as readonly string[]).includes(phase)) v.phase = phase
-    const at = seconds(q.get('at'))
-    if (at !== undefined) v.at = at
-    const replay = Number(q.get('replay'))
-    if ([10, 30, 60, 120].includes(replay)) v.replay = replay
-    const focus = q.get('focus') ?? ''
-    if (FOCUS.includes(focus)) v.focus = focus as BoardFocus
-    const from = q.get('from')
-    if (from === 'cto' || from === 'item') v.from = from
-    if (q.get('pick') === 'latest') v.pick = 'latest'
-  }
-  if (q.get('new') === 'promo') v.new = 'promo'
+  if (view === 'todo' || view === 'team' || view === 'settings') return { kind: view }
+  const v: View = { kind: 'overview', ...repoOf(q) }
+  const state = q.get('state') ?? ''
+  if ((STATES as string[]).includes(state)) v.state = state as ReqState
   return v
-}
-
-function parseFilters(q: URLSearchParams): CtoFilters {
-  const f: CtoFilters = {}
-  const line = Number(q.get('line') ?? 'x')
-  if (Number.isInteger(line) && line >= 0 && line < 20) f.line = line
-  const type = q.get('kind')
-  if (type === 'app' || type === 'feat' || type === 'fix') f.type = type
-  const size = q.get('size')
-  if (size === 'S' || size === 'M' || size === 'L') f.size = size
-  const week = q.get('week') ?? ''
-  if (DAY.test(week)) f.week = week
-  if (q.get('real') === '1') f.real = true
-  if (q.get('defect') === '1') f.defects = true
-  return f
-}
-
-/** Only the filters of a CTO view entry (what coming back to the CTO view restores). */
-export function filtersOf(e: CtoEntry): CtoFilters {
-  const { line, type, size, week, real, defects } = e
-  return Object.fromEntries(Object.entries({ line, type, size, week, real, defects }).filter(([, x]) => x !== undefined && x !== false)) as CtoFilters
 }
 
 export function searchOf(v: View): string {
   const q = new URLSearchParams()
-  if (v.kind === 'cto') {
-    const f = filtersOf(v)
-    if (f.line !== undefined) q.set('line', String(f.line))
-    if (f.type) q.set('kind', f.type)
-    if (f.size) q.set('size', f.size)
-    if (f.week) q.set('week', f.week)
-    if (f.real) q.set('real', '1')
-    if (f.defects) q.set('defect', '1')
-    if (v.hl) q.set('hl', v.hl)
-    if (v.at) q.set('at', v.at)
-  } else if (v.kind === 'item') {
-    q.set('view', 'item')
-    if (v.run) q.set('run', v.run)
-    else if (v.issue) q.set('issue', v.issue)
-    if (v.at !== undefined) q.set('at', String(v.at))
-    if (v.from) q.set('from', v.from)
-  } else {
-    q.set('view', 'board')
-    for (const k of ['run', 'phase', 'gate', 'role', 'at', 'replay', 'focus', 'from', 'pick', 'new'] as const) {
-      const x = v[k]
-      if (x !== undefined) q.set(k, String(x))
-    }
+  const put = (k: string, x: string | undefined) => void (x ? q.set(k, x) : undefined)
+  switch (v.kind) {
+    case 'overview':
+      if (v.repo || v.state) q.set('view', 'overview')
+      put('repo', v.repo)
+      put('state', v.state)
+      break
+    case 'item':
+      q.set('view', 'item')
+      put('repo', v.repo)
+      put('key', v.key)
+      put('from', v.from)
+      break
+    case 'new':
+      q.set('view', 'new')
+      put('repo', v.repo)
+      break
+    case 'brain':
+      q.set('view', 'brain')
+      put('repo', v.repo)
+      put('file', v.file)
+      put('id', v.id)
+      put('reflect', v.reflect)
+      break
+    default:
+      q.set('view', v.kind)
   }
   const s = q.toString()
   return s ? `?${s}` : ''
 }
 
-/** The 交付详情 a delivery of the CTO view opens: by its run when it has one, else by its Issue. */
-export function itemOf(x: { real?: string | null; issue?: string }): ItemEntry {
-  return x.real ? { run: x.real } : { issue: x.issue }
+/** The Brain file an entry id belongs to, by its side letter (P product, T tech, I improvement, J project). */
+export function fileOfEntry(id: string): BrainFile | undefined {
+  return ({ P: 'PRODUCT', T: 'TECH', I: 'IMPROVEMENT', J: 'PROJECT' } as Record<string, BrainFile>)[id.charAt(0)]
 }

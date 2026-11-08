@@ -1,0 +1,46 @@
+import { describe, expect, test } from 'vitest'
+import { fileOfEntry, parseView, searchOf, type View } from './nav'
+
+describe('nav: the URL of every view', () => {
+  test('each view survives a round trip through its search string', () => {
+    const views: View[] = [
+      { kind: 'overview' },
+      { kind: 'overview', repo: 'r1', state: 'parked' },
+      { kind: 'item', repo: 'r1', key: 'PAY-3' },
+      { kind: 'item', repo: 'runner', key: 'PAY-4', from: 'todo' },
+      { kind: 'new', repo: 'r2' },
+      { kind: 'new' },
+      { kind: 'brain', repo: 'r1', file: 'TECH', id: 'T-PAY-2-1', reflect: 'PAY-5' },
+      { kind: 'brain', id: 'P-7' },
+      { kind: 'todo' },
+      { kind: 'team' },
+      { kind: 'settings' },
+    ]
+    for (const v of views) expect(parseView(searchOf(v))).toEqual(v)
+  })
+
+  test('the default view has a clean URL; filters and entries are spelled out', () => {
+    expect(searchOf({ kind: 'overview' })).toBe('')
+    expect(parseView('')).toEqual({ kind: 'overview' })
+    expect(searchOf({ kind: 'overview', state: 'local' })).toBe('?view=overview&state=local')
+    expect(searchOf({ kind: 'item', repo: 'r1', key: 'PAY-3', from: 'brain' })).toBe('?view=item&repo=r1&key=PAY-3&from=brain')
+    expect(searchOf({ kind: 'brain', repo: 'r1', id: 'T-12' })).toBe('?view=brain&repo=r1&id=T-12')
+  })
+
+  test('anything that does not match its pattern is left out', () => {
+    expect(parseView('?view=item&repo=r1&key=../etc')).toEqual({ kind: 'overview' })
+    expect(parseView('?view=item&repo=x1&key=PAY-3')).toEqual({ kind: 'overview' })
+    expect(parseView('?view=item&repo=r1&key=PAY-3&from=evil')).toEqual({ kind: 'item', repo: 'r1', key: 'PAY-3' })
+    expect(parseView('?view=overview&repo=all&state=nope')).toEqual({ kind: 'overview' })
+    expect(parseView('?view=brain&repo=r1&file=SECRETS&id=<b>&reflect=pay-3')).toEqual({ kind: 'brain', repo: 'r1' })
+    expect(parseView('?view=nothing')).toEqual({ kind: 'overview' })
+  })
+
+  test('an entry id says its Brain file by its side letter', () => {
+    expect(fileOfEntry('P-PAY-2-1')).toBe('PRODUCT')
+    expect(fileOfEntry('T-12')).toBe('TECH')
+    expect(fileOfEntry('I-PAY-2-1')).toBe('IMPROVEMENT')
+    expect(fileOfEntry('J-3')).toBe('PROJECT')
+    expect(fileOfEntry('X-1')).toBeUndefined()
+  })
+})

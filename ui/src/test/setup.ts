@@ -31,7 +31,7 @@ beforeEach(() => {
   })
   document.documentElement.dataset.mode = 'dark'
   document.documentElement.dataset.theme = 'kiro-dark'
-  window.history.replaceState(null, '', '/apps/aidlc-team')
+  window.history.replaceState(null, '', '/apps/brain')
   resetStubs()
   localStorage.clear()
 })

@@ -1,49 +1,47 @@
 /**
- * The app bar the three views share: the app's name, the views as tabs — CTO 视图 (every delivery), 交付详情 (the one
- * in hand), 团队看板 (how its run went) — and 投影. It stays where it is when the view changes, and 投影 belongs to the
- * app, not to a view: full screen goes on, the person moves between views, it stays on. Each view's own controls
- * (下载 on the CTO view; the run, 回放, 新需求 … on the board) sit in the row below.
+ * The bar every view shares: the app's name, the views as tabs (待办 with its count, 运行机 only in team mode) and
+ * 设置 at the right. It stays where it is when the view changes. 需求详情 opens the requirement in hand (the last one
+ * opened); without one it is off.
  */
+import type { ViewKind } from './nav'
+import { Icon } from './ui'
 
-export type ViewKind = 'cto' | 'item' | 'board'
-
-export const APP_CSS = `
-.kt-app { display: flex; flex-direction: column; min-height: 100%; color: var(--text); font-family: var(--font-body, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif); }
-.kt-appbar { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; padding: 10px 20px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
-.kt-appbar h1 { margin: 0; font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: .04em; white-space: nowrap; }
-.kt-tabs { display: flex; gap: 4px; align-self: stretch; }
-.kt-tabs button { appearance: none; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text); font: inherit; font-weight: 650;
-  padding: 8px 12px 9px; margin-bottom: -1px; cursor: pointer; white-space: nowrap; }
-.kt-tabs button:hover { color: var(--text-strong); }
-.kt-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--text-strong); }
-.kt-tabs button:focus-visible, .kt-appbar .kt-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.kt-appbar-grow { flex: 1; }
-.kt-appbar .kt-btn { padding: 5px 12px; margin: 4px 0 6px; }
-.kt-app.is-projection { position: fixed; inset: 0; z-index: 2147483000; height: 100vh; background: var(--bg); }
-.kt-app.is-projection > .kt-appbar { flex: none; padding: 8px 26px 0; }
-.kt-app.is-projection > .kt-root.is-projection { position: relative; inset: auto; z-index: auto; flex: 1 1 auto; min-height: 0; height: auto; }
-`
-
-const TABS: [ViewKind, string, string][] = [
-  ['cto', 'CTO 视图', '全部交付：结果与需求流动'],
-  ['item', '交付详情', '一项交付：周期、时间花在哪、成本、质量、价值流、人的决定'],
-  ['board', '团队看板', '多 agent 团队怎么交付：角色、关卡、检查、签字'],
+const TABS: [Exclude<ViewKind, 'settings'>, string, string][] = [
+  ['overview', '交付总览', '每个需求现在在哪、等谁'],
+  ['item', '需求详情', '一个需求：Lean 进度、决定、问题、时间线、会话'],
+  ['new', '开需求', '认领一个需求，文档过五关，开工'],
+  ['brain', 'Brain', '仓库里的共享知识：条目、检查、用处、回收'],
+  ['todo', '待办', '等你做的事'],
+  ['team', '运行机', '团队运行机：交接、运行、签名'],
 ]
 
-export function AppBar({ view, projection, onView, onProjection, item }: { view: ViewKind; projection: boolean; onView: (v: ViewKind) => void; onProjection: () => void; item?: string }) {
+export function AppBar({ view, onView, item, todo, team }: {
+  view: ViewKind
+  onView: (v: ViewKind) => void
+  /** the requirement in hand (KEY), what 需求详情 opens */
+  item?: string
+  /** status.counts.todo */
+  todo: number
+  /** team mode: the 运行机 tab */
+  team: boolean
+}) {
   return (
-    <header className="kt-appbar" data-testid="kt-appbar">
-      <h1>AI-DLC 多 Agent 团队</h1>
-      <div className="kt-tabs" role="tablist" aria-label="视图">
-        {TABS.map(([k, name, hint]) => (
-          <button type="button" role="tab" key={k} aria-selected={view === k} title={k === 'item' && item ? `${hint}（${item}）` : hint} onClick={() => view !== k && onView(k)}>
+    <header className="br-bar" data-testid="br-appbar">
+      <h1>Brain</h1>
+      <div className="br-tabs" role="tablist" aria-label="视图">
+        {TABS.filter(([k]) => k !== 'team' || team).map(([k, name, hint]) => (
+          <button type="button" role="tab" key={k} aria-selected={view === k} disabled={k === 'item' && !item && view !== 'item'}
+            title={k === 'item' ? (item ? `${hint}（${item}）` : '先在交付总览里点一个需求') : hint}
+            aria-label={k === 'todo' && todo > 0 ? `待办 ${todo}` : undefined}
+            onClick={() => view !== k && onView(k)}>
             {name}
+            {k === 'todo' && todo > 0 && <span className="br-count" aria-hidden="true">{todo}</span>}
           </button>
         ))}
       </div>
-      <span className="kt-appbar-grow" />
-      <button type="button" className={`kt-btn${projection ? ' is-on' : ''}`} onClick={onProjection} title={projection ? '退出投影（Esc）' : '全屏、大字；切换视图时保持投影'}>
-        {projection ? '退出投影' : '投影'}
+      <span className="br-grow" />
+      <button type="button" className="br-btn" aria-pressed={view === 'settings'} onClick={() => view !== 'settings' && onView('settings')} title="brain-kit、仓库、团队模式">
+        <Icon name="Settings" size={14} />设置
       </button>
     </header>
   )

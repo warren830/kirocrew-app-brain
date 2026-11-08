@@ -1,425 +1,518 @@
 /**
- * The board contract: what `GET /api/apps/aidlc-team/board?run=<id>` returns. The backend (backend/team/board.py)
- * builds exactly this; the page renders only this. Times are epoch seconds. Keep both sides in step.
+ * The backend contract of the Brain app: every route under /api/apps/brain and the JSON it answers.
+ * The backend (backend/core/*.py) produces exactly these shapes; tests/test_contract.py checks the
+ * fixtures in src/test/fixtures/*.json against the backend's own output keys.
+ *
+ * Words: a requirement (需求) has a key like PAY-3. It is claimed (claim/<KEY> branch), developed
+ * locally with AI-DLC Lean in a brain-dev session (run branch ai/<owner>/<KEY>-<slug>), handed over
+ * to the team runner (bridge + runnerd + a brain-run session), may park on a question (D-<n> on the
+ * GitLab MR), waits for acceptance, and is merged. The Brain is brain/PRODUCT.md, TECH.md,
+ * IMPROVEMENT.md, PROJECT.md on the default branch.
+ *
+ * Times are epoch seconds (number) unless the field says ISO. Missing facts are null, never guessed.
+ * No route ever returns a token, a secret or a signing key path's content.
  */
 
-export type RunStatus = 'starting' | 'running' | 'fixing' | 'reviewing' | 'gating' | 'done' | 'failed' | 'stopped' // gating: a person's gate waits
+export const BASE = '/api/apps/brain'
 
-export type LaneStatus =
-  | 'waiting' // dependencies not done yet
-  | 'queued' // its session is opened, Kiro Crew has not started the turn yet: see agent.queued_reason
-  | 'running'
-  | 'stalled' // KiroCrew flags it stalled
-  | 'awaiting_approval' // a tool call waits for the person
-  | 'done' // the agent finished, not merged yet
-  | 'merged' // its branch is merged into the run branch
-  | 'fixing' // sent back with failing tests, a fix attempt is running
-  | 'failed'
-  | 'skipped' // the ownership file gave it nothing: this project does not need it
+// ---------------------------------------------------------------- shared
 
-export type Board = {
-  at: number
-  runs: RunCard[] // newest first
-  run: RunDetail | null // the selected run (?run=), else the newest active one, else the newest
+export type Level = 'OK' | 'WARN' | 'FAIL'
+export interface CheckRow { level: Level; text: string }
+
+/** Where a requirement is now. */
+export type ReqState =
+  | 'claimed' // 已认领：only claim/<KEY>, no run yet
+  | 'local' // 本地开发中：run branch on this machine, not handed over
+  | 'handed_over' // 已交接：run.json has a hand-over, the bridge has not taken it yet
+  | 'rejected' // 接手被拒：the bridge refused the hand-over (reason in waits.text)
+  | 'running' // 运行机在跑
+  | 'parked' // 停下等回答：park.json waiting / an open D-<n>
+  | 'acceptance' // 等验收：parked on an acceptance question (Lean RELEASE)
+  | 'merged' // 已合并：run.json is on the default branch
+  | 'closed' // 已关闭：the claim was closed (duplicate, dropped)
+
+export const STATE_LABEL: Record<ReqState, string> = {
+  claimed: '已认领',
+  local: '本地开发中',
+  handed_over: '已交接',
+  rejected: '接手被拒',
+  running: '运行机在跑',
+  parked: '停下等回答',
+  acceptance: '等验收',
+  merged: '已合并',
+  closed: '已关闭',
 }
 
-export type RunCard = {
-  id: string
-  title: string
-  status: RunStatus
-  started_at: number
-  ended_at: number | null
-  roles_done: number
-  roles_total: number
-  tests: { passed: number; failed: number; total: number }
-  imported?: boolean // recorded on another Mac and imported here (POST /runs/import): look and replay only
-  name: string // the 交付名 (its 交付标签's name): what the run is called in the list
-  issue: string // its Issue number, TY-3456
-}
+/** Who the requirement waits on right now. */
+export type WaitWho = 'you' | 'agent' | 'runner' | 'bridge' | 'product' | 'builder' | 'people' | 'nobody'
 
-export type RunDetail = {
-  id: string
-  title: string // first line of the requirement
-  status: RunStatus
-  repo: string // the run's repository
-  folder: string // the run branch checked out on this Mac: the whole project as merged so far
-  base: string // the requirement commit every role branched from (short sha)
-  branch: string // the run branch roles are merged into
-  started_at: number
-  ended_at: number | null
-  wall_s: number // real elapsed time
-  serial_s: number // sum of every role's own working time: what one agent doing it all would roughly take
-  credits: number | null // total for the run when KiroCrew reports it, else null
-  roles: Lane[] // team order
-  edges: [string, string][] // dependency: [upstream role, downstream role]
-  tests: TestWall
-  merges: Merge[] // oldest first (the conveyor)
-  events: TeamEvent[] // latest 200, oldest first
-  team: { name: string; orchestrator: string } // the team file's name; what orchestrates it (the deterministic engine)
-  ownership: Ownership | null // who writes where, once the ownership file is read
-  review_rounds: number // times a 要改 review sent work back
-  gate_notes: Record<string, string> // what a person said when approving a gate, by role
-  gate_discuss: boolean // the team offers 讨论 at its gates
-  standards: Standard[] // 命中规范: the company standards and data the requirement touches, by keywords
-  roster?: RosterPerson[] | null // the company's whole team this run drew from, as it was when the run began (null: older runs)
-  imported?: { from: string; exported_at?: number } | null // 导入: recorded on another Mac; its code and sessions stayed there
-  knowledge: { source: KnowledgeSource | null; hits: KnowledgeHit[] } // the team's knowledge source and what roles looked up
-  crew_members: string[] | null // the team's members on Kiro Crew's 「代理」 page now (its workspace's), null while not read yet
-  signoff: SignOff | null // 签字放行: the person who took responsibility for the release, once they did
-  risks: Risk[] // 拦下的风险: what people who sent work back at a gate noted it kept from going live
-  requirement: string // the requirement as the person wrote it
-  plan_skip: Record<string, string> // the optional members the planner's 分工提案 leaves out this run, with why (applied once a person approves)
-  overruled: { role: string; note: string; review: string } | null // a person approved a gate over a review that still said 要改, and why
-  sign_block: string // why this run cannot be signed off ('' when it can: it finished and what it deploys went out)
-  delivery: Delivery // 交付标签: what the CTO view counts this run as, once a person signs it off
-  issue: Issue // the requirement as the organisation tracks it
-  pr: PullRequest | null // the run branch into main: open once the run delivered, merged when a person signs it off
-}
-
-/** The run's Issue: its number, 需求 or 缺陷, who raised it and when (the run's start, unless its record says). */
-export type Issue = { id: string; kind: '需求' | '缺陷'; reporter: string; created_at: number }
-
-/** The run's pull request: its run branch into main, merged when a person signs it off (签字放行). */
-export type PullRequest = {
-  number: number
-  head: string // team/<run>/run
-  base: 'main'
-  state: 'open' | 'merged' | 'signed' // signed: a person signed it off, but it was not merged on this computer (an imported run)
-  opened_at: number // when the run delivered
-  merged_at: number | null
-  merged_by: string | null
-  sha: string // main's commit after the merge; '' when it was not merged on this computer (an imported run)
-  files: number
-  added: number
-  removed: number
-  checks: string // the machine checks, 26/26
-  review: string // the independent review's conclusion
-}
-
-/** 交付标签: proposed by the run's first gated role, confirmed (or changed) by the person at that gate; the team file's defaults until then. */
-export type Delivery = {
-  name: string // 双十一家电大促活动页
-  kind: '新应用' | '新功能' | '修复'
-  size: '小' | '中' | '大'
-  line: '电商' | '移动应用' | '客户关系管理' | '供应链' | '内部系统' // 业务线
-  why: string // the proposer's one-line reason, '' when none
-  confirmed: boolean // a person confirmed them at the gate
-}
-
-/** A person's signature on a finished run: what the machine checks said when they signed. */
-/** 拦下的风险: noted by the person who sent work back at a gate (amount in yuan, or none). */
-export type Risk = { what: string; amount: number | null; gate: string; role: string | null; at: number }
-
-export type SignOff = { by: string; note: string; at: number; tests: string }
-
-/** One company standard (or knowledge-base data set) a requirement touches, and why. */
-export type Standard = {
-  id: string // 'RULE' | 'PII' | 'DATA-EMP' ...
-  title: string // 年会抽奖规则
-  kind: 'standard' | 'data'
-  owner: string // who sets it: 人力资源部
-  doc: string // its document in the knowledge source
-  rules: string[] // RULE-1 ...
-  why: string // 命中「抽奖」
-}
-
-/** A knowledge source of Kiro Crew (「知识库 → 来源」). */
-export type KnowledgeSource = {
-  name: string
-  present: boolean | null // null: not read yet
-  items: number | null
-  status: string // Crew's sync state
-  files_total: number | null
-  files_done: number | null
-  path: string
-}
-
-/** A role looking something up: a 查知识库 call (kind search) or a read of a knowledge-base data file (kind data). */
-export type KnowledgeHit = { role: string; at: number; kind: 'search' | 'data'; text: string }
-
-export type Ownership = { roles?: Record<string, string[]>; test_areas?: Record<string, string>; error?: string }
-
-export type Lane = {
-  key: string // 'pm' | 'architect' | ...
-  title: string // 产品经理 ...
-  emoji: string
-  model: string
-  status: LaneStatus
-  depends_on: string[]
-  writable: string[]
-  attempt: number // 1, then +1 per fix round
-  agent: AgentLive | null // the current (or last) KiroCrew sub-agent of this role
-  worktree: string | null
-  branch: string | null
-  files: FileChange[] // vs the run base, biggest first, at most 12
-  lines: { added: number; removed: number }
-  commits: { sha: string; subject: string; at: number }[] // newest last, at most 8
-  violations: string[] // paths it changed outside its writable globs
-  owns_tests: string[] // test case ids attributed to this role
-  started_at: number | null
-  done_at: number | null
-  active_s: number // its own working time so far
-  credits: number | null // all finished attempts of this role
-  summary: string | null // the agent's `DONE: ...` line
-  phase: string // AI-DLC phase: 'ideation' | 'inception' | 'construction' | 'review' | 'operation' | ''
-  stage: string // e.g. '2.1 逆向工程'
-  mission: string // one line: what it is for
-  aidlc_agent: string // the official AI-DLC agent definition it uses, e.g. 'aidlc-architect-agent'
-  gate: 'pending' | 'discussing' | 'approved' | null // a person's gate after this role (null: none, or not reached; discussing: it is answering the person's 讨论)
-  gate_label: string // what the person approves, e.g. '范围'
-  gate_preset: string // the team file's preset note for approving that gate (填入预设意见), '' when none
-  gate_revise_preset: string // …and for sending it back (a review gate: says whom, 打回：前端开发 #2)
-  gate_revise_risk: { what: string; amount: number | null } | null // …and the risk that send-back keeps from going live
-  kinds: string[] // every attempt's kind, oldest first: 'work' | 'fix' | 'conflict' | 'review' | 'revise' | 'discuss'
-  session: string | null // the Kiro Crew chat session it works in, null before it opened
-  deployed: { url: string; at: number } | null // 部署执行: where the app started the service a deploy role configured
-  icon: string // which drawing stands for it ('frontend', 'tester' ...): the team file's, else its key
-  assignment: string // what the orchestrator assigned this member in this run (the team plan), e.g. '抽奖接口和开奖记录'
-  doing: string // what it is on right now: the assignment, or what it was sent back for ('修 RULE-2'、'解决合入冲突')
-  member: string // the Kiro Crew member it is (「代理」), '' when the team does not name one
-  member_kind: string | null // how its session was booted: 'member' | 'template' | 'default'; null before one opened
-  optional: boolean // a post that may sit a run out: its member not on Crew's 「代理」 page (未入职), or the approved plan leaves it out
-  overrule: boolean // its gate waits for a person over a review that still says 要改 with its rounds used up
-  awaiting_member: string | null // ready to start, but its Crew member is not on 「代理」: held until a person adds it
-  delivery_gate: boolean // this role proposes the 交付标签: its gate is where a person confirms them
-  questions: GateQuestion[] // 要人决定的: what the role asks the person to decide at its gate, answered one by one
-  answers: GateAnswer[] // what the person decided, once they approved its gate
-  talk: TalkLine[] // 讨论 at its gate: the person's words and the role's answers, oldest first
-  can_discuss: boolean // its gate offers 讨论 (the team allows it, and its rounds are not used up)
-}
-
-/** A question a gated role puts to the person (its questions file): options A/B…, its recommendation and why. */
-export type GateQuestion = { id: string; q: string; options: { key: string; text: string }[]; recommend: string; why: string }
-
-/** The person's answer: an option's key, or 'other' with their own words (text); differs: not what the role recommended. */
-export type GateAnswer = { id: string; choice: string; option: string; text: string; differs: boolean }
-
-/** One turn of a 讨论 at a gate: the person ('person') or the role ('agent'); changed: it changed its documents in that turn. */
-export type TalkLine = { who: 'person' | 'agent'; text: string; at: number; changed: boolean | null }
-
-/** What a person does at a gate: 批准, 讨论 (it answers; the gate stays), or 退回. */
-export type GateDecision = 'approve' | 'discuss' | 'revise'
-
-export type AgentLive = {
-  id: string
-  turns: number
-  tool_count: number
-  last_tool: string // e.g. "Running: node --test tests/" / "Editing backend/server.js"
-  last_activity: number | null
-  started: number
-  elapsed_s: number
-  queued_reason: string | null
-  error: string | null
-  recent_tools: ToolCall[] // newest last, at most 8: from KiroCrew's live tool-call log
-  text_tail: string | null // the last ~300 characters the agent wrote (its live output), or null
-  credits: number | null // known once this attempt has finished
-}
-
-export type ToolCall = { at: number; tool: string; kind: string | null; detail: string | null }
-
-export type FileChange = { path: string; added: number; removed: number; status: 'A' | 'M' | 'D' }
-
-export type TestCase = {
-  id: string // stable: file + name
-  ac: string | null // 'AC-3' parsed from the test name, if any
-  name: string
-  file: string
-  status: 'pass' | 'fail' | 'skip'
-  owner: string | null // the role that must make it pass (team.json test_owners)
-  ms: number | null
-  message: string | null // first line of the failure
-}
-
-export type TestWall = {
-  at: number | null // when the run branch was last tested, null if never
-  command: string
-  cases: TestCase[]
-  passed: number
-  failed: number
-  total: number
-  history: { at: number; passed: number; failed: number }[] // one point per test run
-}
-
-export type Merge = {
-  role: string
-  sha: string
-  at: number
-  status: 'merged' | 'conflict'
-  files: number
-  note: string | null // conflict paths, or null
-}
-
-export type TeamEventKind =
-  | 'run' // run started / finished / stopped
-  | 'handoff' // an upstream role's output unblocked a downstream role (from -> to)
-  | 'spawned' // a role's agent was started
-  | 'tool' // a role's agent made a tool call (last_tool changed)
-  | 'committed'
-  | 'merged' // role branch merged into the run branch (from role -> to 'run')
-  | 'conflict'
-  | 'tests' // the run branch was tested: text says 7/12
-  | 'bounce' // failing tests sent back to their owner (from 'tests' -> to role)
-  | 'violation' // a role changed files outside its area
-  | 'done' // a role's agent finished
-  | 'failed'
-  | 'review'
-  | 'ownership' // the orchestrator read who writes where
-  | 'skipped' // a role this project does not need
-  | 'gate' // a role's output waits for a person (from role -> to 'person')
-  | 'approved' // the person approved it (from 'person' -> to role)
-  | 'deployed' // 部署执行: the app started the deploy role's service on this Mac and it answered
-  | 'standards' // 命中规范: the company standards and data the requirement touches
-  | 'signoff' // 签字放行: a person signed for the release
-  | 'plan' // 分工提案: the gated role proposed who does what; it holds once a person approves the gate
-  | 'member' // a required role is held for its Crew member (and starts once a person adds it)
-  | 'talk' // 讨论 at a gate: the person said something (person -> role), or the role answered (role -> person)
-
-export type TeamEvent = {
-  seq: number // increasing per run
-  at: number
-  kind: TeamEventKind
-  role: string | null
-  text: string // one line, Chinese, ready to show
-  from: string | null // for particles: a role key, 'tests' or 'run'
-  to: string | null
-  data: EventData | null // structured facts behind the text; prefer these over parsing `text`
-}
-
-export type EventData = {
-  carry?: string // handoff: what is handed over (验收标准、接口契约 …)
-  cases?: string[] // bounce: the failing cases sent back (AC ids or test names)
-  passed?: number // tests
-  total?: number // tests
-  paths?: string[] // conflict / violation: the files involved
-}
-
-/**
- * The 产出 view: `GET /runs/<id>/roles/<role>` — what one role produced. Role `run` is the whole product (the run
- * branch against the requirement commit), with no attempts.
- */
-export type RoleOutput = {
-  run: string
-  role: string // a role key, or 'run'
-  title: string
-  emoji: string
-  status: string // the lane's status (LaneStatus); for 'run' the run's (RunStatus)
-  branch: string | null // the branch holding its deliverable
-  folder: string | null // where that is checked out on this Mac: its worktree; for 'run' the run branch's
-  base: string | null // what it is compared against (short sha)
-  head: string | null // the branch head (short sha)
-  writable: string[]
-  files: OutputFile[] // committed on its branch since it started, by path
-  attempts: OutputAttempt[] // oldest first
-  ended: boolean // the run has ended
-}
-
-export type OutputFile = {
-  path: string
-  added: number
-  removed: number
-  status: 'A' | 'M' | 'D'
-  output: boolean // one of the outputs team.json promises for this role
-  owner: string | null // the role whose area it is in
-}
-
-export type OutputAttempt = {
-  n: number
-  kind: 'work' | 'fix' | 'conflict' | 'review' | 'revise' // review: a 要改 review sent it back; revise: a person or the ownership check did
-  label: string // '修 AC-19' …, '' for the first one
-  agent: string | null
-  started: number | null
-  ended: number | null
-  credits: number | null
-  error: string | null
-  summary: string | null // its DONE line
-  reply: string | null // its whole last reply (markdown)
-  task: string // what the app told it
-  calls: ToolCall[] // every tool call, oldest first
-  live: boolean // still working
-}
-
-/** `GET /runs/<id>/roles/<role>/file?path=&view=content|diff` */
-export type FileView = {
-  path: string
-  view: 'content' | 'diff'
-  lang: string // 'markdown', 'javascript' … or 'diff'
-  binary: boolean
-  size: number
-  truncated: boolean // only the first 300 KB are sent
+export interface Waits {
+  who: WaitWho
+  /** one short Chinese sentence, e.g. 「等你批准需求（在会话里自己打一行）」 */
   text: string
+  /** the exact Lean approval line the person must type themselves in the session, when that is what it waits on */
+  line: string | null
 }
 
-/** `GET|POST /runs/<id>/site`, `POST /runs/<id>/site/stop`: the finished product on a local port. */
-export type SiteStatus = {
-  run: string
-  state: 'off' | 'running' | 'failed'
-  url: string | null
-  port: number | null
-  entry: string | null
-  started_at: number | null
-  expires_at: number | null // it stops by itself then
-  error: string | null
-  log: string[] // the server's last output lines
+export interface LeanSummary {
+  /** the stage being worked on (Lean stage id) or null when nothing started */
+  stage: string | null
+  /** its Chinese label, e.g. 需求分析 */
+  stage_label: string | null
+  /** 1..11, the stage's place in Lean's order */
+  stage_n: number | null
+  /** stages done or skipped / 11 */
+  done: number
+  total: number
 }
 
-/** POST /route: 组队 — the team the orchestrator picks for a requirement by keywords, and why (no run started). */
-export type RouteRole = {
-  key: string
-  title: string // the team member: 前端开发 #1
-  phase: string
-  stage: string
-  aidlc_agent: string
-  member: string // the Kiro Crew member it boots ('' when the team names none)
-  icon: string
-  assignment: string // what the orchestrator will assign it
-  gate: boolean
-  optional?: boolean // sits the run out when its member is not on Crew's 「代理」 page when the run is handed over
-  on_crew?: boolean | null // is the member on Crew's 「代理」 page now (null: not read; absent: no member named)
-}
+export interface MrRef { iid: number; url: string | null; state: string | null }
 
-/** One post on the company's team (team/roster-*.json): who could take part in a run. */
-export interface RosterPerson {
+/** One row of 交付总览; also the header of 需求详情. */
+export interface Requirement {
+  /** repo id from /status (r1, r2 …); team-mode rows use 'runner' */
+  repo: string
   key: string
   title: string
-  member: string
-  icon: string
+  owner: string | null
+  /** where the requirement came from (brainkit.intents): product, debt, alert, schedule, eval-gap, gap */
+  source: string
+  state: ReqState
+  state_label: string
+  /** where the facts were read: this machine's worktree, a branch ref, the default branch, the runner workspace */
+  where: 'worktree' | 'branch' | 'main' | 'runner' | 'claim'
+  branch: string | null
+  intent: string | null
+  lean: LeanSummary
+  waits: Waits
+  /** credits of the Kiro Crew sessions this app opened for it (null: none known). KiroCrew reports credits only. */
+  credits: number | null
+  /** latest activity we know of (commit, Lean event, session) */
+  updated_at: number | null
+  mr: MrRef | null
+  /** this machine's working directory for it (the run's worktree), if any */
+  worktree: string | null
+  /** the team runner's run ids (RUN-PAY-3-1 …) */
+  run_ids: string[]
+  sessions: number
+  /** other open requirements whose expected paths overlap this one's */
+  overlap: string[]
+  /** open D-<n> questions */
+  open_questions: string[]
+  /** expected paths from run.json (overlap warnings come from these) */
+  expected_paths: string[]
 }
 
-export type RouteTeam = {
-  file: string
-  name: string
-  scope: string // the official AI-DLC scope it follows: 'mvp' | 'bugfix' | 'feature' …
-  keywords: string[]
-  priority: number
-  fallback: boolean
-  official_stages: number | null // how many stages the official scope runs
-  needs_source: boolean
-  starter: string | null
-  source: string | null // the customer repository the team works on by default (no directory to type in)
-  roles: RouteRole[]
-  agents: string[] // the official AI-DLC agents its roles are
-  stages: string[] // the official stages its roles cover that its scope has, e.g. '2.8 接口约定'
-  extra_stages: string[] // stages it adds beyond its official scope (the shop adds 4.1 / 4.3 deployment to mvp)
-  extra_note: string // why
-  people?: RosterPerson[] | null
-}
+// ---------------------------------------------------------------- GET /status
 
-/** A model Kiro Crew offers (GET /models): the start form's 模型. */
-export interface ModelChoice {
+export interface RepoInfo {
   id: string
+  path: string
   name: string
-  description: string
-  rate: number | null
+  ok: boolean
+  error: string
+  kit: { tracker: string; req_prefix: string; default_branch: string; gitlab_base: string; gitlab_project: string } | null
 }
 
-export type RoutePick = {
-  team: RouteTeam | null
-  matched: string[]
-  why: string
-  others: { file: string; name: string; scope: string; matched: string[] }[]
-  roster: string[] // the 14 official AI-DLC agents, then the company's own its teams use
-  teams: { file: string; name: string; scope: string; keywords: string[] }[]
-  crew?: { members: string[] | null; error: string } // what Kiro Crew has (「代理」), as the app last read it
-  standards?: Standard[] // 命中规范 for this requirement, with the picked team
-  knowledge?: KnowledgeSource | null // the picked team's knowledge source
+export interface Status {
+  app: { name: string; version: string; team: boolean }
+  brainkit: {
+    path: string
+    ok: boolean
+    version: string | null
+    error: string
+    /** optional brain-kit modules: true when importable */
+    modules: { trace: boolean; evaluate: boolean; golden: boolean; intents: boolean }
+  }
+  repos: RepoInfo[]
+  crew: { rows: CheckRow[]; fix: { agent: boolean; engine: boolean }; checked_at: number | null }
+  /** who this machine says the person is: git config brain.user, or that a GitLab token is present (never the token) */
+  me: { user: string | null; token: boolean; how: string }
+  team: TeamStatus
+  counts: { todo: number }
 }
+
+export interface TeamStatus {
+  enabled: boolean
+  ok: boolean
+  error: string
+  last_loop_at: number | null
+  loop_error: string
+  /** the signing key is readable by this app's OS user (it must not be in production) */
+  key_readable: boolean
+  signer: { pending: number; refused: number }
+}
+
+// ---------------------------------------------------------------- GET/POST /settings
+
+export interface Settings {
+  /** brain-kit checkout this app imports (read-only to the app) */
+  brainkit: string
+  /** project repos (brain-kit installed) shown on this machine */
+  repos: string[]
+  /** where the app puts each requirement's worktree (under ~/workplace or ~/workspace) */
+  work_root: string
+  team: {
+    enabled: boolean
+    bridge_config: string
+    runnerd_config: string
+    signer_spool: string
+    allowed_signers: string
+    /** local trial only: the signer runs as the same OS user (shown as a warning) */
+    dev_same_user: boolean
+  }
+}
+
+// ---------------------------------------------------------------- GET /overview?repo=<id>|all
+
+export interface Overlap { keys: string[]; paths: string[] }
+
+export interface EvalMetric {
+  id: string
+  label: string
+  /** [numerator, denominator] for a rate, a number, or null when not measured yet */
+  value: [number, number] | number | null
+  /** e.g. 「交接之后除了必经审批没人介入，而且交付正确」 */
+  rule: string
+}
+
+export interface EvalView {
+  /** brainkit.evaluate is importable and ran */
+  available: boolean
+  error: string
+  ref: string | null
+  metrics: EvalMetric[]
+  /** 复看队列 (low-score queue): runs that need a human look */
+  queue: { key: string; intent: string | null; reasons: string[] }[]
+}
+
+/** 决策漏斗: who settled each decision. */
+export interface Funnel {
+  source: 'evaluate' | 'app'
+  total: number
+  /** label → count, in order: 人, 确定性检查, Brain 条目（引用）, agent 自己定（权限内）, 看不出 */
+  rows: { id: string; label: string; count: number }[]
+  /** questions asked of people / answered / delivered back to the run */
+  questions: { asked: number; answered: number; delivered: number }
+}
+
+export interface Overview {
+  at: number
+  rows: Requirement[]
+  overlaps: Overlap[]
+  funnel: Funnel
+  eval: EvalView
+  /** state → count */
+  counts: Partial<Record<ReqState, number>>
+  errors: { repo: string; error: string }[]
+}
+
+// ---------------------------------------------------------------- GET /requirements/{repo}/{key}
+
+export type StageState = 'done' | 'skipped' | 'started' | 'todo'
+export interface Stage {
+  id: string
+  label: string
+  n: number
+  state: StageState
+  /** per-unit stages: each unit's state */
+  units: { unit: string; state: StageState }[]
+  note: string | null
+  at: number | null
+}
+
+export type ApprovalState = 'approved' | 'pending' | 'rejected' | 'stale' | 'refused'
+export interface Approval {
+  kind: string // REQUIREMENTS | DESIGN | INCEPTION | PLAN | RELEASE
+  state: ApprovalState
+  sha8: string | null
+  at: number | null
+  /** pending only: the exact line the person types themselves in the session's chat */
+  line: string | null
+  path: string | null
+}
+
+export interface Decision {
+  id: string
+  date: string | null
+  stage: string | null
+  text: string
+  why: string | null
+  /** what the Who cell says, shown only when it is a role, username or pseudonym */
+  who: string | null
+  by: 'person' | 'agent' | 'check' | 'bridge' | null
+  /** Brain entry ids it cites (open them in the Brain view) */
+  cites: string[]
+  vouchers: string[]
+  src: string
+}
+
+export interface QuestionOption { id: string; text: string }
+export interface Question {
+  source: 'park' | 'bridge' | 'mr'
+  /** D-<n> once the bridge posted it */
+  id: string | null
+  kind: string
+  kind_label: string
+  question: string
+  options: QuestionOption[]
+  recommend: string | null
+  lean_request: string | null
+  refs: string[]
+  state: string // waiting | open | answered | delivered | stale | invalid | closed | signing | refused
+  answer: string | null
+  answerer: string | null
+  voucher_id: string | null
+  mr_url: string | null
+  at: number | null
+  /** the person may answer it right here (their own local run, a clarify question, not a Lean approval) */
+  answerable_here: boolean
+  /** how an answer here travels: into the local session, or as the person's own comment on the MR */
+  answer_via: 'session' | 'mr' | null
+}
+
+export type TimelineKind =
+  | 'stage' | 'approval' | 'human' | 'commit' | 'handover' | 'question' | 'decision' | 'blocked' | 'verify'
+  | 'merge' | 'session' | 'app'
+export interface TimelineItem {
+  /** ISO time or null when the source has none */
+  at: string | null
+  kind: TimelineKind
+  label: string
+  detail: string | null
+  who: string | null
+  src: string | null
+}
+
+export interface SessionRow {
+  slot: string
+  title: string
+  agent: string
+  kind: 'local' | 'runner'
+  credits: number | null
+  turns: number
+  busy: boolean
+  awaiting: boolean
+  last_activity: number | null
+  opened_at: number | null
+  project: string | null
+  /** open it in Kiro Crew: navigate to this path */
+  url: string
+  error: string | null
+}
+
+export interface RequirementDetail {
+  row: Requirement
+  where_label: string
+  run: {
+    owner: string | null
+    branch: string | null
+    intent: string | null
+    brain_commit: string | null
+    origin: string | null
+    created_at: string | null
+    materials: string[]
+    handoff: { requested_at: string | null; by: string | null } | null
+  } | null
+  claim: { owner: string | null; title: string; created_at: string | null; source: string; closed: string | null } | null
+  lean: {
+    stages: Stage[]
+    approvals: Approval[]
+    /** aidlc-state.md Session notes */
+    status: string | null
+    next: string[]
+    open_questions: string[]
+  }
+  decisions: Decision[]
+  questions: Question[]
+  timeline: { source: 'trace' | 'app'; items: TimelineItem[]; missing: string[]; error: string }
+  sessions: SessionRow[]
+  credits: { total: number | null; note: string }
+  brain: { loaded: number | null; cited: string[]; stale: string[]; unknown: string[]; proposals: number | null }
+}
+
+// ---------------------------------------------------------------- POST /requirements/{repo}/{key}/session, /answer
+
+export interface OpenSessionBody { trust?: boolean; kickoff?: boolean }
+export interface OpenSessionResult { ok: boolean; slot: string; url: string }
+export interface AnswerBody { choice: string; note?: string }
+export interface AnswerResult { ok: boolean; via: 'session' | 'mr'; text: string }
+
+// ---------------------------------------------------------------- 开需求: /intake/next, /intake/check, /intake/start
+
+export type Classification = 'public' | 'internal' | 'confidential' | 'secret' | 'unsure'
+export const CLASS_LABEL: Record<Classification, string> = {
+  public: '公开',
+  internal: '内部',
+  confidential: '机密',
+  secret: '绝密',
+  unsure: '不确定（按机密处理）',
+}
+
+export interface IntakeNext { repo: string; key: string | null; tracker: string; prefix: string; error: string }
+
+export interface IntakeBody {
+  repo: string
+  /** tracker none: empty = the next free key; tracker jira: required */
+  key?: string
+  slug: string
+  title: string
+  /** paths on this machine: files or folders (a Feishu / Lark export folder works) */
+  docs: string[]
+  /** gate 1: I am the author or have the author's consent */
+  consent: boolean
+  /** gate 2 */
+  classification: Classification | ''
+  /** gate 3: amounts / company names / contract numbers: keep as they are or mask */
+  business: 'keep' | 'mask' | ''
+  /** leave out files matching these globs */
+  exclude: string[]
+}
+
+export interface IntakeCheck {
+  ok: boolean
+  key: string | null
+  package: string | null
+  /** effective classification after the file markers */
+  classification: string | null
+  segments: number
+  sources: number
+  /** brain-kit's findings, verbatim, one line each */
+  findings: string[]
+  /** gates that would stop the start, verbatim */
+  blocking: string[]
+  refused: { id: string; name: string; reason: string }[]
+  /** a hard stop before any finding (no consent, nothing to take in …), verbatim */
+  error: string
+}
+
+export interface StartBody extends IntakeBody {
+  /** modules expected to change (run.json expected_paths; overlap warnings) */
+  paths: string[]
+  open_session: boolean
+  trust: boolean
+}
+
+export interface StartResult {
+  ok: boolean
+  key: string | null
+  branch: string | null
+  intent: string | null
+  worktree: string | null
+  /** `brain start`'s output, verbatim */
+  output: string
+  slot: string | null
+  url: string | null
+  session_error: string
+}
+
+// ---------------------------------------------------------------- GET /crew, POST /crew/fix
+
+export interface CrewChecks { rows: CheckRow[]; fix: { agent: boolean; engine: boolean }; checked_at: number | null }
+export interface CrewFixBody { what: 'agent' | 'engine' }
+export interface CrewFixResult { ok: boolean; text: string; rows: CheckRow[] }
+
+// ---------------------------------------------------------------- GET /brain?repo=<id>
+
+export interface BrainEntry {
+  id: string
+  type: string
+  side: string
+  rel: string
+  repeats: number
+  src: string[]
+  text: string
+  /** how often runs cite it (brainkit.usage) */
+  cites: number
+  runs: number
+  loaded_by: number
+  /** loaded by enough runs and never cited: a withdraw candidate */
+  candidate: boolean
+}
+
+export interface BrainSection { title: string; entries: BrainEntry[] }
+export interface BrainFileView { key: string; letter: string; side: string; types: string[]; count: number; sections: BrainSection[] }
+
+export interface BrainView {
+  repo: string
+  ref: string
+  files: BrainFileView[]
+  lint: { errors: string[]; warnings: string[] }
+  usage: {
+    useful: [number, number]
+    repeat_rate: [number, number]
+    archived: number
+    purged: number
+    runs: { intent: string; key: string; loaded: number | null; cited: string[]; stale: string[]; unknown: string[] }[]
+    never_cited: string[]
+    repeats_any: [string, number][]
+  }
+  /** requirements whose run can be reflected (they have a decisions.md) */
+  reflect: { key: string; title: string; state: ReqState }[]
+  error: string
+}
+
+export interface ReflectOp { kind: string; target: string | null; file: string | null; type: string | null; section: string | null; src: string[]; text: string }
+export interface ReflectPreview {
+  repo: string
+  key: string
+  source: string
+  ops: ReflectOp[]
+  gaps: { title: string; kind: string; what: string }[]
+  notes: string[]
+  warnings: string[]
+  problems: string[]
+  /** at least one op that is more than sources added: --apply would open a branch */
+  substantive: boolean
+  error: string
+}
+export interface ReflectApplyBody { repo: string; key: string; push: boolean }
+export interface ReflectApplyResult { ok: boolean; output: string; branch: string | null }
+
+// ---------------------------------------------------------------- GET /todo
+
+export type TodoKind = 'lean_approval' | 'question' | 'clarify' | 'acceptance' | 'handoff_rejected' | 'crew'
+export interface TodoItem {
+  kind: TodoKind
+  repo: string
+  key: string
+  title: string
+  /** what to do, one sentence */
+  text: string
+  /** lean_approval: the exact line the person types themselves in that session (the app never sends it) */
+  line: string | null
+  approval: string | null
+  /** question / acceptance on the team runner: answered on GitLab (link) */
+  mr_url: string | null
+  question: Question | null
+  /** the brain-dev session to open, for lean_approval / clarify */
+  session: { slot: string; title: string; url: string } | null
+  since: number | null
+}
+export interface Todo { items: TodoItem[]; team: boolean }
+
+// ---------------------------------------------------------------- team mode: GET /team, POST /team/loop
+
+export interface TeamRun {
+  run_id: string
+  req: string
+  project: string
+  iid: number
+  state: string
+  slot: string | null
+  mr_url: string | null
+  updated: string | null
+}
+export interface TeamView {
+  status: TeamStatus
+  ledger: { runs: Record<string, number>; decisions: Record<string, number>; handoffs: Record<string, number> }
+  runs: TeamRun[]
+  /** signature requests waiting for the signer, and ones it refused (with its reasons) */
+  signer: { pending: { req_id: string; kind: string; run_id: string; since: string | null }[]; refused: { req_id: string; kind: string; reasons: string[] }[] }
+}
+export interface TeamLoopResult { ok: boolean; summary: Record<string, number>; error: string }
+
+// ---------------------------------------------------------------- POST /refresh {repo}
+
+export interface RefreshResult { ok: boolean; text: string }

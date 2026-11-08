@@ -1,5 +1,0 @@
-node_modules/
-.DS_Store
-.kiro/settings/
-.kiro/agents/
-server/data/runtime/

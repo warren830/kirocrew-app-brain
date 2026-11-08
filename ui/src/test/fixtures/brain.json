@@ -1,0 +1,270 @@
+{
+  "repo": "r1",
+  "ref": "main@3f9c2a1b",
+  "files": [
+    {
+      "key": "PRODUCT",
+      "letter": "P",
+      "side": "product",
+      "types": [
+        "principle",
+        "decision",
+        "model",
+        "correction"
+      ],
+      "count": 2,
+      "sections": [
+        {
+          "title": "退款",
+          "entries": [
+            {
+              "id": "P-PAY-2-1",
+              "type": "decision",
+              "side": "product",
+              "rel": "new",
+              "repeats": 0,
+              "src": [
+                "D-1",
+                "RUN-PAY-2-1"
+              ],
+              "text": "退款单只给有退款权限的运营看：里面有收款人姓名。",
+              "cites": 3,
+              "runs": 2,
+              "loaded_by": 5,
+              "candidate": false
+            },
+            {
+              "id": "P-7",
+              "type": "principle",
+              "side": "product",
+              "rel": "same",
+              "repeats": 0,
+              "src": [
+                "PAY-1"
+              ],
+              "text": "对商户的金额一律到分，不四舍五入到元。",
+              "cites": 0,
+              "runs": 0,
+              "loaded_by": 6,
+              "candidate": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "TECH",
+      "letter": "T",
+      "side": "builder",
+      "types": [
+        "principle",
+        "decision",
+        "model",
+        "guideline",
+        "pitfall",
+        "correction"
+      ],
+      "count": 3,
+      "sections": [
+        {
+          "title": "退款",
+          "entries": [
+            {
+              "id": "T-PAY-2-1",
+              "type": "pitfall",
+              "side": "builder",
+              "rel": "repeats",
+              "repeats": 2,
+              "src": [
+                "D01#S030",
+                "V-1a2b3c4d5e"
+              ],
+              "text": "退款单号是 RF + 9 位；样例文件里的 7 位是旧格式。\n校验时两种都认，生成只用新格式。",
+              "cites": 4,
+              "runs": 3,
+              "loaded_by": 6,
+              "candidate": false
+            },
+            {
+              "id": "T-12",
+              "type": "guideline",
+              "side": "builder",
+              "rel": "new",
+              "repeats": 0,
+              "src": [
+                "PAY-1"
+              ],
+              "text": "导出大文件分批写，一批不超过 5000 行。",
+              "cites": 1,
+              "runs": 1,
+              "loaded_by": 6,
+              "candidate": false
+            }
+          ]
+        },
+        {
+          "title": "回调",
+          "entries": [
+            {
+              "id": "T-PAY-5-1",
+              "type": "decision",
+              "side": "builder",
+              "rel": "new",
+              "repeats": 0,
+              "src": [
+                "D-2",
+                "RUN-PAY-5-1"
+              ],
+              "text": "退款回调失败后按 1、5、30 分钟重试三次，之后进人工队列。",
+              "cites": 1,
+              "runs": 1,
+              "loaded_by": 2,
+              "candidate": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "IMPROVEMENT",
+      "letter": "I",
+      "side": "builder",
+      "types": [
+        "pitfall",
+        "process",
+        "guideline",
+        "decision"
+      ],
+      "count": 1,
+      "sections": [
+        {
+          "title": "流程",
+          "entries": [
+            {
+              "id": "I-PAY-2-1",
+              "type": "process",
+              "side": "builder",
+              "rel": "new",
+              "repeats": 1,
+              "src": [
+                "RUN-PAY-2-1"
+              ],
+              "text": "交接前先 rebase 到最新的 main：bridge 只收 brain_commit 在 main 上的运行。",
+              "cites": 2,
+              "runs": 2,
+              "loaded_by": 4,
+              "candidate": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "PROJECT",
+      "letter": "J",
+      "side": "shared",
+      "types": [
+        "decision",
+        "process"
+      ],
+      "count": 1,
+      "sections": [
+        {
+          "title": "约定",
+          "entries": [
+            {
+              "id": "J-3",
+              "type": "process",
+              "side": "shared",
+              "rel": "new",
+              "repeats": 0,
+              "src": [
+                "PAY-1"
+              ],
+              "text": "需求文档一律走开需求的五关，原件不进任何仓库。",
+              "cites": 0,
+              "runs": 0,
+              "loaded_by": 6,
+              "candidate": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "lint": {
+    "errors": [
+      "TECH.md: T-PAY-5-1 的 src 里有一项不是引用：「见群聊」"
+    ],
+    "warnings": [
+      "PRODUCT.md: P-7 被 6 次运行加载，一次也没被引用"
+    ]
+  },
+  "usage": {
+    "useful": [
+      5,
+      8
+    ],
+    "repeat_rate": [
+      1,
+      6
+    ],
+    "archived": 3,
+    "purged": 1,
+    "runs": [
+      {
+        "intent": "261107-refund-export",
+        "key": "PAY-3",
+        "loaded": 14,
+        "cited": [
+          "P-PAY-2-1",
+          "T-PAY-2-1",
+          "T-12"
+        ],
+        "stale": [
+          "T-12"
+        ],
+        "unknown": [
+          "T-PAY-9-1"
+        ]
+      },
+      {
+        "intent": "261103-callback-retry",
+        "key": "PAY-5",
+        "loaded": 12,
+        "cited": [
+          "T-PAY-2-1"
+        ],
+        "stale": [],
+        "unknown": []
+      }
+    ],
+    "never_cited": [
+      "P-7",
+      "J-3"
+    ],
+    "repeats_any": [
+      [
+        "T-PAY-2-1",
+        2
+      ],
+      [
+        "I-PAY-2-1",
+        1
+      ]
+    ]
+  },
+  "reflect": [
+    {
+      "key": "PAY-2",
+      "title": "退款单号校验",
+      "state": "merged"
+    },
+    {
+      "key": "PAY-5",
+      "title": "退款回调失败重试",
+      "state": "acceptance"
+    }
+  ],
+  "error": ""
+}

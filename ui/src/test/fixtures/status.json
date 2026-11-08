@@ -1,0 +1,84 @@
+{
+  "app": {
+    "name": "brain",
+    "version": "0.1.0",
+    "team": false
+  },
+  "brainkit": {
+    "path": "/Users/alice/src/brain-kit",
+    "ok": true,
+    "version": "0.4.3",
+    "error": "",
+    "modules": {
+      "trace": true,
+      "evaluate": true,
+      "golden": false,
+      "intents": true
+    }
+  },
+  "repos": [
+    {
+      "id": "r1",
+      "path": "/Users/alice/workplace/shop-pay",
+      "name": "shop-pay",
+      "ok": true,
+      "error": "",
+      "kit": {
+        "tracker": "none",
+        "req_prefix": "PAY",
+        "default_branch": "main",
+        "gitlab_base": "https://gitlab.example.com",
+        "gitlab_project": "shop/shop-pay"
+      }
+    },
+    {
+      "id": "r2",
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web",
+      "ok": false,
+      "error": "不是 brain-kit 仓库：没有 .brain/kit.json（在仓库里跑 brain install）",
+      "kit": null
+    }
+  ],
+  "crew": {
+    "rows": [
+      {
+        "level": "OK",
+        "text": "KiroCrew 在跑：0.9.2"
+      },
+      {
+        "level": "OK",
+        "text": "agent 引擎是 kas（Lean 的 hook 只在 kas 上生效）"
+      },
+      {
+        "level": "WARN",
+        "text": "~/.kiro/agents/brain-dev.json 是 brain-kit 0.4.1 装的，现在是 0.4.3：重装一次"
+      }
+    ],
+    "fix": {
+      "agent": true,
+      "engine": false
+    },
+    "checked_at": 1794146360
+  },
+  "me": {
+    "user": "alice",
+    "token": true,
+    "how": "git config brain.user；GitLab token 已配置（不显示）"
+  },
+  "team": {
+    "enabled": false,
+    "ok": false,
+    "error": "",
+    "last_loop_at": null,
+    "loop_error": "",
+    "key_readable": false,
+    "signer": {
+      "pending": 0,
+      "refused": 0
+    }
+  },
+  "counts": {
+    "todo": 6
+  }
+}
