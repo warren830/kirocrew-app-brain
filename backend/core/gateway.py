@@ -55,7 +55,7 @@ class Gateway:
         self._clock = clock
         self._token: str | None = None
         self._token_at = 0.0
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None  # made on the loop (Python 3.9 binds a Lock at creation)
         self._session: Any = None
 
     def _now(self) -> float:
@@ -76,6 +76,8 @@ class Gateway:
     async def _token_now(self) -> str:
         if self._token and self._now() - self._token_at < TOKEN_MAX_AGE:
             return self._token
+        if self._lock is None:
+            self._lock = asyncio.Lock()
         async with self._lock:
             if self._token and self._now() - self._token_at < TOKEN_MAX_AGE:
                 return self._token

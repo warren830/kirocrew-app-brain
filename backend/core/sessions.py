@@ -1,25 +1,23 @@
-"""Role agents as Kiro Crew chat sessions: every role of a run gets one session, in a folder of the run under
-「AI-DLC 团队」 in the dashboard's sidebar. A person can open any of them, read every step and type into it; the app
-still dispatches, merges, tests and sends work back. This is the only way the app runs agents: it talks to Kiro Crew
-through its HTTP API (``gateway.py``) and never reaches into the Crew process.
+"""Agents as Kiro Crew chat sessions, opened by this app through Kiro Crew's HTTP API (``gateway.py``); the app never
+reaches into the Crew process. Kept from the aidlc-team sample (its session runner was proven live on Kiro Crew 0.11.2)
+and extended for brain-kit:
 
-``SessionManager`` is the agent manager the sequencer and the board use (``spawn_session``, ``get``, ``all_agents``,
-``cancel``, ``continue_conversation_async``, ``recent``, ``history``, ``credits_of`` …); its ``SessionInfo`` objects
-carry what ``agent_fields`` below reads. Tests pass a fake with the same surface.
+- a requirement's ``brain-dev`` session on this machine sits in a folder of the requirement under 「Brain 需求」, with
+  the requirement's worktree as its project directory; a team-runner ``brain-run`` session (dispatched by the bridge
+  through ``KiroCrewAdapter`` in team/crewadapter.py) sits under 「Brain 运行机」 and keeps the slot name the bridge
+  chose (the run id);
+- *strict_agent*: the session boots exactly that template of ~/.kiro/agents (brain-dev / brain-run carry Lean's hooks)
+  or is not opened at all: Crew's default agent would run without the hooks;
+- *resend* / *nudge*: a bridge message is delivered once (no automatic resend), and a brain session is never told to
+  "carry on" by the app (the sample's team-engine nudge text means nothing to it);
+- per-slot stats (``slot_stats``): credits summed over the whole transcript (people type into a brain-dev session
+  directly, not only the turns the app sent), turns, busy, awaiting approval.
 
-A role may name the Crew member it is (``member``, e.g. ``aidlc-product-agent`` of the 「代理」 page): its session boots
-that member's template (prompt, tools, model): the template ``<member>-template`` itself where scripts/install-example.sh
-wrote one (Kiro Crew 0.11), else the member (Kiro Crew 0.8 and 0.9, where the template had the member's name). A member
-that is not there (deleted, not added yet) falls back to the template file of the same name, else to Crew's default
-agent; ``agent_kind`` says which it got.
-
-What a session takes (checked by ``scripts/probe-sessions.py``): ``POST /api/chat/slots`` in the run's folder, then
-its project directory set to the role's worktree (the agent's cwd), then ``trust`` for that one slot (the app holds
-``permissions.sessionApproval``, granted by the owner), then the task sent as one message. A turn is over when the
-slot is idle twice in a row and the transcript has the reply. A turn KiroCrew could not start (an ``error`` row,
-e.g. ``memory_unavailable`` from a race at turn start) is sent again, at most twice.
-
-State lives in ``sessions.json`` in the app's data dir, so a backend reload keeps every role's session.
+``SessionManager`` keeps the sample's surface (``spawn_session``, ``get``, ``all_agents``, ``cancel``,
+``continue_conversation_async``, ``recent``, ``history``, ``credits_of`` …). What a session takes:
+``POST /api/chat/slots`` in its folder, then its project directory, then ``trust`` for that one slot (the app holds
+``permissions.sessionApproval``, granted by the owner), then the first message. A turn is over when the slot is idle
+twice in a row and the transcript has the reply. State lives in ``sessions.json`` in the app's data dir.
 """
 
 from __future__ import annotations
@@ -37,7 +35,7 @@ from typing import Any, Callable
 from .gateway import GatewayError
 
 PREFIX = "s-"
-ROOT_FOLDER = "AI-DLC 团队"
+ROOT_FOLDER = "Brain 需求"  # the default root folder (constants.LOCAL_FOLDER)
 IDLE_POLLS = 2          # idle this many polls in a row (after the reply is in) = the turn is over
 MISSING_POLLS = 3       # gone from this many listings in a row = closed or deleted by someone
 RESENDS = 2             # a turn KiroCrew refused to start is sent again at most this often
@@ -49,10 +47,14 @@ NUDGES = 4              # a turn cut short (a transient model error, or stuck) i
 TRANSIENT = re.compile(r"transient|5\d\d|runtime failed|timed? ?out|overloaded|rate.?limit|throttl|temporarily|unavailable",
                        re.I)
 HISTORY = 400
+STATS_EVERY = 5         # a tracked slot's whole transcript (credits, turns) is read every this many polls
+STATS_LIMIT = 1000      # rows read for a slot's stats
 _FIELDS = ("id", "task", "parent_session_key", "slot", "title", "folder", "cwd", "model", "conv_root", "send_ids",
            "requested", "started", "sent_at", "done", "queued", "queued_reason", "result", "streaming_text", "error",
            "user_stopped", "turns", "tool_count", "last_tool", "last_activity", "stalled", "credits", "calls",
-           "resends", "seen_busy", "idle", "missing", "sig", "agent", "agent_kind", "nudges")
+           "resends", "seen_busy", "idle", "missing", "sig", "agent", "agent_kind", "nudges", "root_folder",
+           "project_dir", "slot_name", "first_send_id", "strict_agent", "resend_ok", "nudge_ok", "trust_ok", "kind",
+           "key", "memory_mode")
 KNOWLEDGE_TOOL = "local_knowledge_search"  # kirocrew-core's knowledge search: shown as 查知识库
 
 
@@ -161,6 +163,17 @@ class SessionInfo:
         self.agent = ""        # the Crew member asked for
         self.agent_kind = ""   # what the session got: member, template, or "" (Crew's default agent)
         self.nudges = 0        # times a cut-short turn was continued
+        self.root_folder = ROOT_FOLDER  # the sidebar folder its requirement's folder goes under
+        self.project_dir: str | None = None  # the folder's project directory (default: the session's cwd)
+        self.slot_name = ""    # an exact slot name (the bridge names runner slots after the run id)
+        self.first_send_id = ""  # the first message's sendId (the bridge uses the voucher id)
+        self.strict_agent = False  # boot exactly this template of ~/.kiro/agents, or fail
+        self.resend_ok = True  # a turn Kiro Crew refused to start may be sent again
+        self.nudge_ok = True   # a cut-short turn may be told to carry on (the sample's team engine only)
+        self.trust_ok = True   # set the slot to trust (permissions.sessionApproval)
+        self.kind = ""         # local | runner (brain sessions)
+        self.key = ""          # the requirement key or run id it belongs to
+        self.memory_mode = "incognito"
         for k, v in kw.items():
             setattr(self, k, v)
 
@@ -218,10 +231,12 @@ class SessionManager:
                  scrub: Callable[[str], str] = lambda s: s) -> None:
         self.gw, self.app, self.state_file, self.log, self.now, self.scrub = gw, app, Path(state_file), log, now, scrub
         self._infos: dict[str, SessionInfo] = {}
-        self._folders: dict[str, dict[str, Any]] = {}  # parent → {"id", "name"}
-        self._folder_lock = asyncio.Lock()
+        self._folders: dict[str, dict[str, Any]] = {}  # parent → {"id", "name", "root"}
+        self._stats: dict[str, dict[str, Any]] = {}    # slot → what slot_stats() answers
+        self._folder_lock: asyncio.Lock | None = None  # made on the loop (Python 3.9 binds a Lock at creation)
         self._tasks: set[asyncio.Task[Any]] = set()
         self._dirty = False
+        self._polls = 0
         self.max_concurrent = 16
 
     # ---- persistence ----------------------------------------------------------------------------------- #
@@ -238,11 +253,14 @@ class SessionManager:
                     info.done, info.error = True, "app 重启时这个会话还没开好"
                 self._infos[info.id] = info
         self._folders = {k: v for k, v in (data.get("folders") or {}).items() if isinstance(v, dict)}
+        self._stats = {k: v for k, v in (data.get("stats") or {}).items() if isinstance(v, dict)}
 
     def _save_now(self) -> None:
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         keep = sorted(self._infos.values(), key=lambda i: i.requested)[-400:]
-        text = json.dumps({"infos": [i.to_dict() for i in keep], "folders": self._folders}, ensure_ascii=False)
+        slots = {i.slot for i in keep if i.slot}
+        text = json.dumps({"infos": [i.to_dict() for i in keep], "folders": self._folders,
+                           "stats": {k: v for k, v in self._stats.items() if k in slots}}, ensure_ascii=False)
         fd, tmp = tempfile.mkstemp(dir=self.state_file.parent, prefix=".sessions.")
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(text)
@@ -255,7 +273,7 @@ class SessionManager:
             self._dirty = False
             await asyncio.to_thread(self._save_now)
 
-    # ---- the agent manager surface the sequencer and the board use ------------------------------------- #
+    # ---- the agent manager surface ----------------------------------------------------------------------- #
 
     def get(self, agent_id: str) -> SessionInfo | None:
         return self._infos.get(agent_id)
@@ -273,33 +291,46 @@ class SessionManager:
         return sum(1 for i in self._infos.values() if not i.done and i.queued)
 
     def spawn_session(self, task: str, *, parent_session_key: str, cwd: str, model: str | None = None, title: str = "",
-                      folder: str = "", agent: str = "", **_: Any) -> SessionInfo:
-        """A new session for a role (synchronous: it is opened in the background, on the next poll)."""
-        info = SessionInfo(id=PREFIX + secrets.token_hex(5), task=task, parent_session_key=parent_session_key, cwd=cwd,
-                           model=model or "", title=title or "agent", folder=folder or parent_session_key,
-                           requested=self.now(), agent=agent or "")
-        info.conv_root = info.id
-        self._infos[info.id] = info
-        self._dirty = True
+                      folder: str = "", agent: str = "", **opts: Any) -> SessionInfo:
+        """A new session (synchronous: it is opened in the background, on the next poll). *opts*: SessionInfo fields
+        (root_folder, project_dir, strict_agent, resend_ok, nudge_ok, trust_ok, kind, key …)."""
+        info = self._new_info(task, parent_session_key, cwd, model, title, folder, agent, opts)
         self._background(self._open(info))
         return info
 
+    async def open_session(self, task: str, *, parent_session_key: str, cwd: str, model: str | None = None,
+                           title: str = "", folder: str = "", agent: str = "", **opts: Any) -> SessionInfo:
+        """Like spawn_session, but opened now: the answer has the slot key (or the error)."""
+        info = self._new_info(task, parent_session_key, cwd, model, title, folder, agent, opts)
+        await self._open(info)
+        return info
+
+    def _new_info(self, task: str, parent: str, cwd: str, model: str | None, title: str, folder: str, agent: str,
+                  opts: dict[str, Any]) -> SessionInfo:
+        known = set(_FIELDS)
+        info = SessionInfo(id=PREFIX + secrets.token_hex(5), task=task, parent_session_key=parent, cwd=cwd,
+                           model=model or "", title=title or "agent", folder=folder or parent,
+                           requested=self.now(), agent=agent or "", **{k: v for k, v in opts.items() if k in known})
+        info.conv_root = info.id
+        self._infos[info.id] = info
+        self._dirty = True
+        return info
+
     async def continue_conversation_async(self, conv_id: str, task: str, *, parent_session_key: str, **_: Any) -> SessionInfo:
-        """The next turn in the session of *conv_id* (a fix or review round keeps the role's whole conversation)."""
+        """The next turn in the session of *conv_id* (a later message keeps the session's whole conversation)."""
         root = self._infos.get(conv_id)
         info = SessionInfo(id=PREFIX + secrets.token_hex(5), task=task, parent_session_key=parent_session_key,
                            requested=self.now(), conv_root=conv_id)
         self._infos[info.id] = info
         self._dirty = True
         if root is None or not root.slot:
-            info.done, info.error = True, "conversation_gone: 找不到这个角色的会话"
+            info.done, info.error = True, "conversation_gone: 找不到这个会话"
             return info
         busy = [i for i in self._infos.values() if i.slot == root.slot and not i.done and i is not info]
         if busy:
             info.done, info.error = True, "conversation_busy: 这个会话还有一轮没结束"
             return info
-        info.slot, info.title, info.folder, info.cwd, info.model = root.slot, root.title, root.folder, root.cwd, root.model
-        info.agent, info.agent_kind = root.agent, root.agent_kind
+        self._inherit(info, root)
         try:
             await self._send(info)
         except Exception as exc:  # noqa: BLE001
@@ -307,6 +338,13 @@ class SessionManager:
             return info
         info.queued, info.queued_reason, info.started = False, None, self.now()
         return info
+
+    @staticmethod
+    def _inherit(info: SessionInfo, root: SessionInfo) -> None:
+        info.slot, info.title, info.folder, info.cwd, info.model = root.slot, root.title, root.folder, root.cwd, root.model
+        info.agent, info.agent_kind = root.agent, root.agent_kind
+        info.resend_ok, info.nudge_ok, info.kind, info.key = root.resend_ok, root.nudge_ok, root.kind, root.key
+        info.root_folder, info.strict_agent = root.root_folder, root.strict_agent
 
     async def cancel(self, agent_id: str) -> bool:
         info = self._infos.get(agent_id)
@@ -316,7 +354,7 @@ class SessionManager:
             try:
                 await self.gw.stop(info.slot)
             except Exception as exc:  # noqa: BLE001
-                self.log.info("aidlc-team: stopping session %s: %s", info.slot, exc)
+                self.log.info(self.app + ": stopping session %s: %s", info.slot, exc)
         info.done, info.user_stopped = True, True
         self._dirty = True
         return True
@@ -324,7 +362,7 @@ class SessionManager:
     async def cancel_for_parent(self, parent: str) -> None:
         await asyncio.gather(*(self.cancel(i.id) for i in list(self._infos.values()) if i.parent_session_key == parent))
 
-    # ---- what the board and the sequencer read beyond SubagentInfo -------------------------------------- #
+    # ---- what the views read --------------------------------------------------------------------------- #
 
     def credits_of(self, agent_id: str) -> float | None:
         info = self._infos.get(agent_id)
@@ -345,6 +383,33 @@ class SessionManager:
     def folder_of(self, parent: str) -> dict[str, Any] | None:
         return self._folders.get(parent)
 
+    def roots(self, *, key: str | None = None, kind: str | None = None) -> list[SessionInfo]:
+        """The sessions this app opened (their first info), newest last; of one requirement / run, of one kind."""
+        out = [i for i in self._infos.values() if i.conv_root == i.id and (key is None or i.key == key)
+               and (kind is None or i.kind == kind)]
+        return sorted(out, key=lambda i: i.requested)
+
+    def slot_stats(self, slot: str | None) -> dict[str, Any] | None:
+        """{credits, turns, busy, awaiting, last_activity, missing, error} of a slot this app opened (None: unknown)."""
+        return dict(self._stats[slot]) if slot and slot in self._stats else None
+
+    def credits_by_key(self) -> dict[str, float]:
+        """Credits per requirement key / run id over every slot this app opened for it (each slot counted once)."""
+        out: dict[str, float] = {}
+        seen: set[str] = set()
+        for i in self._infos.values():
+            if not i.key or not i.slot or i.slot in seen:
+                continue
+            seen.add(i.slot)
+            st = self._stats.get(i.slot) or {}
+            c = st.get("credits")
+            if c is None:
+                c = sum(float(x.credits) for x in self._infos.values() if x.slot == i.slot and x.credits is not None) \
+                    if any(x.credits is not None for x in self._infos.values() if x.slot == i.slot) else None
+            if c is not None:
+                out[i.key] = round(out.get(i.key, 0.0) + float(c), 3)
+        return out
+
     # ---- opening, sending, watching -------------------------------------------------------------------- #
 
     def _background(self, coro: Any) -> None:
@@ -353,49 +418,78 @@ class SessionManager:
         task.add_done_callback(self._tasks.discard)
 
     async def _folder_for(self, info: SessionInfo) -> str:
+        if self._folder_lock is None:
+            self._folder_lock = asyncio.Lock()
         async with self._folder_lock:
             have = self._folders.get(info.parent_session_key)
             if have and have.get("id"):
                 return str(have["id"])
+            root_name = info.root_folder or ROOT_FOLDER
             folders = await self.gw.folders()
-            root = next((f for f in folders if f.get("name") == ROOT_FOLDER and not f.get("parent_id")
+            root = next((f for f in folders if f.get("name") == root_name and not f.get("parent_id")
                          and f.get("owner_app") in (self.app, None, "")), None)
             if root is None:
-                root = await self.gw.create_folder(ROOT_FOLDER)
-            run_dir = str(Path(info.cwd).parents[1]) if info.cwd and len(Path(info.cwd).parents) > 1 else None
+                root = await self.gw.create_folder(root_name)
+            if info.project_dir is not None:
+                project_dir = info.project_dir or None
+            else:  # the sample's layout: <run>/wt/<role> → the run's folder
+                run_dir = str(Path(info.cwd).parents[1]) if info.cwd and len(Path(info.cwd).parents) > 1 else None
+                project_dir = run_dir
             sub = await self.gw.create_folder(info.folder[:60], parent_id=str(root.get("id") or ""),
-                                              project_dir=run_dir if run_dir and Path(run_dir).is_dir() else None)
+                                              project_dir=project_dir if project_dir and Path(project_dir).is_dir() else None)
             self._folders[info.parent_session_key] = {"id": str(sub.get("id") or ""), "name": info.folder[:60],
-                                                      "root": str(root.get("id") or "")}
+                                                      "root": str(root.get("id") or ""), "root_name": root_name}
             self._dirty = True
             return self._folders[info.parent_session_key]["id"]
 
     async def _open(self, info: SessionInfo) -> None:
         try:
             folder_id = await self._folder_for(info)
-            n = sum(1 for i in self._infos.values() if i.parent_session_key == info.parent_session_key and i.slot) + 1
-            name = f"{self.app}-{_slug(info.parent_session_key.split(':')[-1])}-{n}-{secrets.token_hex(2)}"
+            if info.slot_name:
+                name = info.slot_name
+            else:
+                n = sum(1 for i in self._infos.values() if i.parent_session_key == info.parent_session_key and i.slot) + 1
+                name = f"{self.app}-{_slug(info.parent_session_key.split(':')[-1])}-{n}-{secrets.token_hex(2)}"
             row = await self._create(info, name, folder_id)
             key = str(row.get("key") or row.get("name") or "")
             if not key:
                 raise GatewayError(0, "创建会话没有返回 key", "no_key")
             info.slot = key
-            await self.gw.set_project(key, info.cwd)
-            await self.gw.trust(key)
-            await self._send(info)
-            info.queued, info.queued_reason, info.started = False, None, self.now()
+            self._stats.setdefault(key, {"credits": None, "turns": 0, "busy": False, "awaiting": False,
+                                         "last_activity": None, "missing": False, "error": None,
+                                         "opened_at": self.now()})
+            if info.cwd:
+                await self.gw.set_project(key, info.cwd)
+            if info.trust_ok:
+                await self.gw.trust(key)
+            if info.task:
+                await self._send(info)
+                info.queued, info.queued_reason, info.started = False, None, self.now()
+            else:  # opened without a first message: nothing to wait for
+                info.queued, info.queued_reason, info.started, info.done = False, None, self.now(), True
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
             info.done, info.error = True, f"开 Crew 会话失败：{exc}"[:300]
-            self.log.warning("aidlc-team: opening a session for %s failed: %s", info.title, exc)
+            self.log.warning(self.app + ": opening a session for %s failed: %s", info.title, exc)
         self._dirty = True
 
     async def _create(self, info: SessionInfo, name: str, folder_id: str) -> dict[str, Any]:
-        """The slot, booting the role's member template ``<member>-template`` (on Kiro Crew 0.11 a member that has its
-        own crewmate file runs its chat on Crew's conductor, which advertises no mode of the member's name, so the session
-        boots the template itself); else the Crew member (0.8 and 0.9, where the template has the member's name); else
-        its template file of the same name; else Crew's default agent."""
+        """The slot. *strict_agent*: exactly the template ``info.agent`` of ~/.kiro/agents, or an error (a brain
+        session must not fall back to an agent without Lean's hooks). Otherwise the sample's order: the member template
+        ``<member>-template``, the Crew member, its template file of the same name, Crew's default agent."""
+        if info.strict_agent:
+            try:
+                row = await self.gw.create_slot(name=name, title=info.title, folder_id=folder_id, model=info.model,
+                                                memory_mode=info.memory_mode or "incognito", agent=info.agent,
+                                                agent_kind="template")
+            except GatewayError as exc:
+                if exc.status in (400, 404, 409):
+                    raise GatewayError(exc.status, f"Kiro Crew 里没有 agent {info.agent}（~/.kiro/agents/{info.agent}.json）",
+                                       exc.code or "agent_choice_unavailable", exc.path) from None
+                raise
+            info.agent_kind = "template"
+            return row
         tries = ([("template", info.agent + TEMPLATE_SUFFIX), ("member", info.agent), ("template", info.agent)]
                  if info.agent else []) + [("", "")]
         for kind, agent in tries:
@@ -404,7 +498,7 @@ class SessionManager:
                                                 agent=agent, agent_kind=kind)
             except GatewayError as exc:
                 if kind and exc.status in (400, 404, 409):
-                    self.log.info("aidlc-team: %s as a %s is not there (%s), trying the next", agent, kind, exc.code)
+                    self.log.info(self.app + ": %s as a %s is not there (%s), trying the next", agent, kind, exc.code)
                     continue
                 raise
             info.agent_kind = kind
@@ -412,7 +506,6 @@ class SessionManager:
         raise GatewayError(409, f"开不了 {info.agent} 的会话", "agent_choice_unavailable")  # pragma: no cover
 
     def knowledge_hits(self, agent_id: str | None) -> list[dict[str, Any]]:
-        """What the role's session asked the knowledge base (查知识库 calls), oldest first."""
         info = self._infos.get(agent_id or "")
         return [c for c in (info.calls if info is not None else []) if c.get("tool") == "查知识库"]
 
@@ -421,7 +514,7 @@ class SessionManager:
         return {"name": info.agent, "kind": info.agent_kind} if info is not None and info.agent else None
 
     async def _send(self, info: SessionInfo) -> None:
-        sid = f"{info.id}-{len(info.send_ids)}"
+        sid = info.first_send_id if info.first_send_id and not info.send_ids else f"{info.id}-{len(info.send_ids)}"
         info.send_ids.append(sid)
         info.sent_at, info.idle, info.seen_busy, info.sig = self.now(), 0, False, ""
         info.last_activity = info.sent_at
@@ -429,8 +522,7 @@ class SessionManager:
         await self.gw.send(str(info.slot), info.task, sid)
 
     async def _nudge(self, info: SessionInfo, why: str) -> None:
-        """The turn was cut short (the model backend failed mid-way, or it hung): the same session is told to carry on;
-        what it did so far is in its worktree. Counted against NUDGES."""
+        """The sample's team engine only (``nudge_ok``): a cut-short turn is told to carry on."""
         info.nudges += 1
         sid = f"{info.id}-{len(info.send_ids)}"
         info.send_ids.append(sid)
@@ -438,22 +530,53 @@ class SessionManager:
         info.last_activity = info.sent_at
         info.last_tool = f"中断了（{why}），编排器让它接着做（第 {info.nudges} 次）"
         self._dirty = True
-        self.log.info("aidlc-team: session %s was cut short (%s), continuing (%d)", info.slot, why, info.nudges)
+        self.log.info(self.app + ": session %s was cut short (%s), continuing (%d)", info.slot, why, info.nudges)
         await self.gw.send(str(info.slot), "（编排器）你上一轮被中断了：" + why + "。你已经做的改动都在工作目录里：先 `git status`、"
                            "`git log --oneline -3` 看一眼做到哪了，再接着把原来的任务做完；做完照原来的要求提交，最后一条回复的第一行写 `DONE: ` 加一句话总结。", sid)
 
     async def poll(self) -> None:
-        """One look at every live session: a single listing, then the transcript of each one that is live."""
+        """One look: a single listing, then the transcript of each live turn; every STATS_EVERY polls also the whole
+        transcript of every slot this app opened (credits, turns)."""
+        self._polls += 1
         live = [i for i in self._infos.values() if not i.done and i.slot and not i.queued]
-        if live:
+        tracked = [k for k, st in self._stats.items() if not st.get("missing")]
+        deep = bool(tracked) and self._polls % STATS_EVERY == 1
+        if live or deep:
             try:
                 rows = {str(r.get("key") or ""): r for r in await self.gw.slots()}
             except Exception as exc:  # noqa: BLE001
-                self.log.info("aidlc-team: listing sessions failed: %s", exc)
+                self.log.info(self.app + ": listing sessions failed: %s", exc)
                 rows = None
             if rows is not None:
                 await asyncio.gather(*(self._update(i, rows.get(str(i.slot))) for i in live), return_exceptions=True)
+                if deep:
+                    await asyncio.gather(*(self._stat(k, rows.get(k)) for k in tracked), return_exceptions=True)
         await self.save()
+
+    async def _stat(self, slot: str, row: dict[str, Any] | None) -> None:
+        st = self._stats.setdefault(slot, {})
+        if row is None:
+            st["misses"] = int(st.get("misses") or 0) + 1
+            if st["misses"] >= MISSING_POLLS:
+                st["missing"], st["busy"] = True, False
+            self._dirty = True
+            return
+        st["misses"] = 0
+        st["busy"] = bool(row.get("running") or row.get("pending_approval") or int(row.get("queue_depth") or 0))
+        st["awaiting"] = bool(row.get("pending_approval"))
+        try:
+            msgs = await self.gw.messages(slot, limit=STATS_LIMIT)
+        except Exception as exc:  # noqa: BLE001
+            st["error"] = f"{exc}"[:200]
+            self._dirty = True
+            return
+        replies = [m for m in msgs if m.get("role") == "assistant" and str(m.get("content") or "").strip()]
+        spent = [((m.get("meta") or {}).get("turn_stats") or {}).get("credits") for m in replies]
+        vals = [float(v) for v in spent if isinstance(v, (int, float)) and not isinstance(v, bool)]
+        stamps = [_epoch(m.get("ts")) for m in msgs if m.get("ts")]
+        st.update(credits=round(sum(vals), 3) if vals else st.get("credits"), turns=len(replies),
+                  last_activity=max(stamps) if stamps else st.get("last_activity"), error=None)
+        self._dirty = True
 
     async def _update(self, info: SessionInfo, row: dict[str, Any] | None) -> None:
         now = self.now()
@@ -469,7 +592,7 @@ class SessionManager:
         try:
             msgs = await self.gw.messages(str(info.slot), limit=300)
         except Exception as exc:  # noqa: BLE001
-            self.log.info("aidlc-team: reading session %s failed: %s", info.slot, exc)
+            self.log.info(self.app + ": reading session %s failed: %s", info.slot, exc)
             return
         mine = None
         for idx in range(len(msgs) - 1, -1, -1):
@@ -493,26 +616,28 @@ class SessionManager:
         info.stalled = busy and now - float(info.last_activity or now) > STALL_S
         self._dirty = True
         quiet = now - float(info.last_activity or now)
-        if busy and quiet > STUCK_S and info.nudges < NUDGES:  # hung: stop the turn, then let it carry on
+        if info.nudge_ok and busy and quiet > STUCK_S and info.nudges < NUDGES:  # hung: stop the turn, then carry on
             try:
                 await self.gw.stop(str(info.slot))
             except Exception as exc:  # noqa: BLE001
-                self.log.info("aidlc-team: stopping stuck session %s: %s", info.slot, exc)
+                self.log.info(self.app + ": stopping stuck session %s: %s", info.slot, exc)
             await self._nudge(info, f"{int(quiet)} 秒没有任何动静")
             return
         last = after[-1] if after else None
-        if (not busy and last is not None and last.get("role") == "error" and (calls or replies) and info.nudges < NUDGES
+        if (info.nudge_ok and not busy and last is not None and last.get("role") == "error" and (calls or replies)
+                and info.nudges < NUDGES
                 and TRANSIENT.search(f"{last.get('content') or ''} {(last.get('meta') or {}).get('code') or ''}")):
-            await self._nudge(info, "模型后端临时出错")  # mid-way: the first-turn refusal below sends the task again
+            await self._nudge(info, "模型后端临时出错")
             return
         if errors and not replies and not calls and not busy:
-            if info.resends < RESENDS:  # KiroCrew did not start the turn (memory_unavailable at turn start and the like)
+            if info.resend_ok and info.resends < RESENDS:  # Kiro Crew did not start the turn (memory_unavailable …)
                 info.resends += 1
-                self.log.info("aidlc-team: session %s refused the turn (%s), sending again", info.slot,
+                self.log.info(self.app + ": session %s refused the turn (%s), sending again", info.slot,
                               ((errors[-1].get("meta") or {}).get("code") or "error"))
                 await self._send(info)
                 return
-        if not after and not busy and now - float(info.sent_at or now) > NO_START_S and info.resends < RESENDS:
+        if (not after and not busy and now - float(info.sent_at or now) > NO_START_S and info.resend_ok
+                and info.resends < RESENDS):
             info.resends += 1
             await self._send(info)
             return
@@ -531,13 +656,75 @@ class SessionManager:
             info.error = "这一轮结束了，但没有回复"
         info.done = True
 
-    # ---- cleaning up the demo sessions ----------------------------------------------------------------- #
+    # ---- the bridge's KiroCrew surface (team/crewadapter.py calls these on the event loop) ----------------- #
+
+    def by_slot(self, slot: str) -> SessionInfo | None:
+        """The first info of the session in *slot*."""
+        hits = [i for i in self._infos.values() if i.slot == slot and i.conv_root == i.id]
+        return min(hits, key=lambda i: i.requested) if hits else None
+
+    async def adapter_create(self, name: str, *, agent: str, model: str, memory_mode: str, title: str, folder: str,
+                             parent: str, key: str, root_folder: str) -> dict[str, Any]:
+        """Create the slot *name* (exactly) booting the template *agent*, in *folder* under *root_folder*; no message
+        yet (the bridge sets the project, then sends). Raises GatewayError."""
+        if self.by_slot(name) is not None:
+            raise GatewayError(409, f"会话 {name} 已经开过了", "slot_exists")
+        info = self._new_info("", parent, "", model, title, folder, agent,
+                              {"slot_name": name, "strict_agent": True, "resend_ok": False, "nudge_ok": False,
+                               "trust_ok": False, "kind": "runner", "key": key, "root_folder": root_folder,
+                               "project_dir": "", "memory_mode": memory_mode or "incognito"})
+        await self._open(info)
+        if info.error:
+            self._infos.pop(info.id, None)
+            raise GatewayError(0, info.error, "open_failed")
+        return {"key": info.slot}
+
+    async def adapter_set_project(self, name: str, path: str) -> dict[str, Any]:
+        """The project directory, then trust for this one slot: nobody is at the runner to approve tool calls."""
+        info = self.by_slot(name)
+        await self.gw.set_project(name, path)
+        await self.gw.trust(name)
+        if info is not None:
+            info.cwd = path
+            self._dirty = True
+        return {"ok": True}
+
+    async def adapter_send(self, name: str, message: str, send_id: str) -> dict[str, Any]:
+        """One message, delivered once (no automatic resend): a new turn of the slot, its sendId the bridge's."""
+        root = self.by_slot(name)
+        info = SessionInfo(id=PREFIX + secrets.token_hex(5), task=message, parent_session_key=root.parent_session_key
+                           if root else f"{self.app}:{name}", requested=self.now(),
+                           conv_root=root.id if root else None, first_send_id=send_id)
+        if root is not None:
+            self._inherit(info, root)
+        else:
+            info.slot, info.resend_ok, info.nudge_ok, info.kind = name, False, False, "runner"
+        info.resend_ok, info.nudge_ok = False, False
+        self._infos[info.id] = info
+        self._dirty = True
+        await self._send(info)
+        info.queued, info.queued_reason, info.started = False, None, self.now()
+        return {"ok": True}
+
+    async def adapter_stop(self, name: str) -> dict[str, Any]:
+        await self.gw.stop(name)
+        for i in self._infos.values():
+            if i.slot == name and not i.done:
+                i.done, i.user_stopped = True, True
+        self._dirty = True
+        return {"ok": True}
+
+    async def adapter_slot(self, name: str) -> dict[str, Any]:
+        return {"key": name, "messages": await self.gw.messages(name, limit=STATS_LIMIT)}
+
+    # ---- cleaning up ----------------------------------------------------------------------------------- #
 
     async def cleanup(self, keep_parents: set[str]) -> dict[str, int]:
-        """Delete every session this app opened, except those of *keep_parents* (runs still going), and hide the run
-        folders they leave empty under 「AI-DLC 团队」: KiroCrew lets only a person delete a folder."""
+        """Delete every session this app opened, except those of *keep_parents*, and hide the folders they leave empty
+        under this app's root folders: Kiro Crew lets only a person delete a folder."""
         keep_slots = {i.slot for i in self._infos.values() if i.parent_session_key in keep_parents and i.slot}
         keep_folders = {str(v.get("id")) for k, v in self._folders.items() if k in keep_parents}
+        roots = {v.get("root_name") or ROOT_FOLDER for v in self._folders.values()} | {ROOT_FOLDER}
         slots = [r for r in await self.gw.slots() if r.get("app") == self.app and str(r.get("key")) not in keep_slots]
         deleted = 0
         for r in slots:
@@ -545,9 +732,9 @@ class SessionManager:
                 await self.gw.delete_slot(str(r.get("key")))
                 deleted += 1
             except Exception as exc:  # noqa: BLE001
-                self.log.info("aidlc-team: deleting session %s: %s", r.get("key"), exc)
+                self.log.info(self.app + ": deleting session %s: %s", r.get("key"), exc)
         folders = await self.gw.folders()
-        root_ids = {str(f.get("id")) for f in folders if f.get("name") == ROOT_FOLDER and not f.get("parent_id")}
+        root_ids = {str(f.get("id")) for f in folders if f.get("name") in roots and not f.get("parent_id")}
         gone = 0
         for f in folders:
             fid = str(f.get("id"))
@@ -557,13 +744,14 @@ class SessionManager:
                     await self.gw.hide_folder(fid)
                     gone += 1
                 except Exception as exc:  # noqa: BLE001
-                    self.log.info("aidlc-team: hiding folder %s: %s", fid, exc)
+                    self.log.info(self.app + ": hiding folder %s: %s", fid, exc)
         for parent in [k for k in self._folders if k not in keep_parents]:
             self._folders.pop(parent, None)
         for info in self._infos.values():
             if info.parent_session_key not in keep_parents and info.slot:
                 if not info.done:
                     info.done, info.user_stopped = True, True
+                self._stats.pop(info.slot, None)
                 info.slot = None
         self._dirty = True
         await self.save()

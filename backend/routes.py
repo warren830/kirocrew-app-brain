@@ -1,7 +1,7 @@
-"""aidlc-team: in-gateway route entry point (``backend.hooks.routes = backend.routes:register_routes``).
+"""brain: in-gateway route entry point (``backend.hooks.routes = backend.routes:register_routes``).
 
 KiroCrew loads this file by path and calls ``register_routes(ctx) -> list[AppRoute]``. The app's code lives in
-``backend/team/`` and is imported through a private namespace package, so its relative imports resolve the same
+``backend/core/`` and is imported through a private namespace package, so its relative imports resolve the same
 way in the gateway and in tests. The bootstrap block is duplicated verbatim in ``backend/hooks.py`` (the host loads
 the two files as unrelated modules).
 """
@@ -18,7 +18,7 @@ from types import ModuleType
 # --- bootstrap (verbatim in backend/hooks.py) ------------------------------- #
 
 _BACKEND_DIR = Path(__file__).resolve().parent
-_NS = "_aidlcteam_backend"
+_NS = "_brainapp_backend"
 _REQUIRED = ("service", "handlers")
 
 
@@ -30,7 +30,7 @@ def teardown_namespace() -> None:
 
 
 def bootstrap() -> dict[str, ModuleType]:
-    """Import ``team.service`` and ``team.handlers`` through the private namespace."""
+    """Import ``core.service`` and ``core.handlers`` through the private namespace."""
     for final in (False, True):
         root = sys.modules.get(_NS)
         if root is not None and list(getattr(root, "__path__", ())) != [str(_BACKEND_DIR)]:
@@ -42,7 +42,7 @@ def bootstrap() -> dict[str, ModuleType]:
             root.__path__ = [str(_BACKEND_DIR)]  # type: ignore[attr-defined]
             sys.modules[_NS] = root
         try:
-            mods = {name: importlib.import_module(f"{_NS}.team.{name}") for name in _REQUIRED}
+            mods = {name: importlib.import_module(f"{_NS}.core.{name}") for name in _REQUIRED}
         except BaseException:
             teardown_namespace()
             raise
@@ -50,7 +50,7 @@ def bootstrap() -> dict[str, ModuleType]:
             return mods
         teardown_namespace()
         if final:
-            raise ImportError(f"{_NS}.team imported incompletely")
+            raise ImportError(f"{_NS}.core imported incompletely")
     raise AssertionError("unreachable")  # pragma: no cover
 
 
@@ -66,5 +66,5 @@ def register_routes(ctx):  # noqa: ANN001, ANN201 - host contract
 
     svc = service.get_or_build(ctx)
     routes = handlers.build_routes(svc, AppRoute)
-    ctx.logger.info("aidlc-team: %d routes registered", len(routes))
+    ctx.logger.info("brain: %d routes registered", len(routes))
     return routes

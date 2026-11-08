@@ -1,14 +1,13 @@
-"""HTTP routes, served under ``/api/apps/aidlc-team/``. All but ``/health`` are for the dashboard owner only:
-they start agents and spend credits."""
+"""HTTP routes, served under ``/api/apps/brain/`` on the loopback gateway. All but ``/health`` are for the dashboard
+owner only (``Kit.guarded``: a signed-in owner request, never an app token): they open sessions, spend credits, run
+git and brain-kit on this machine. No route returns a token, a secret or a key."""
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
-import re
-
-from .constants import MODEL_RE
-
+from .constants import KEY_RE, REPO_ID_RE
 from .httpkit import AppError, Kit
 
 try:  # always there in the gateway; plain pytest passes a fake web module
@@ -16,7 +15,19 @@ try:  # always there in the gateway; plain pytest passes a fake web module
 except ImportError:  # pragma: no cover
     _web = None
 
-MAX_REQUIREMENT = 8000
+
+def _rid(request: Any) -> str:
+    rid = str(request.match_info.get("repo", ""))
+    if not REPO_ID_RE.match(rid):
+        raise AppError("没有这个仓库", "no_repo", 404)
+    return rid
+
+
+def _key(request: Any) -> str:
+    key = str(request.match_info.get("key", ""))
+    if not KEY_RE.match(key):
+        raise AppError("需求号不对", "invalid_key")
+    return key
 
 
 def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = None) -> list[Any]:
@@ -28,143 +39,108 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
     async def health(request: Any, ctx: Any) -> Any:
         return kit.json({"ok": True, "started": svc.started})
 
-    async def board(request: Any) -> Any:
-        return kit.json(svc.board(request.query.get("run") or None))
+    async def status(request: Any) -> Any:
+        return kit.json(await svc.status())
 
-    async def runs(request: Any) -> Any:
-        return kit.json({"runs": svc.cards()})
+    async def get_settings(request: Any) -> Any:
+        return kit.json(svc.settings_view())
 
-    async def create_run(request: Any) -> Any:
+    async def post_settings(request: Any) -> Any:
+        return kit.json(await svc.save_settings(await kit.body(request)))
+
+    async def refresh(request: Any) -> Any:
         body = await kit.body(request)
-        requirement = body.get("requirement")
-        if requirement is not None and not isinstance(requirement, str):
-            raise AppError("requirement 必须是字符串", "invalid_requirement")
-        requirement = (requirement or "").strip()
-        if len(requirement) > MAX_REQUIREMENT:
-            raise AppError(f"需求太长了（最多 {MAX_REQUIREMENT} 字）", "requirement_too_long")
-        model = body.get("model")
-        if model is not None and (not isinstance(model, str) or not MODEL_RE.match(model)):
-            raise AppError("model 不是合法的模型名", "invalid_model")
-        source = body.get("source")
-        if source is not None and (not isinstance(source, str) or not source.startswith(("/", "~"))):
-            raise AppError("source 必须是项目目录的绝对路径", "invalid_source")
-        team_name = body.get("team")
-        if team_name == "auto":  # 组队: the orchestrator picks the team by the requirement's keywords
-            team_name = ((svc.route(requirement).get("team") or {}).get("file")) or None
-        if team_name is not None and (not isinstance(team_name, str) or not re.fullmatch(r"team-[\w-]+\.json", team_name)):
-            raise AppError("team 必须是 team/ 下的 team-*.json，或者 auto", "invalid_team")
-        return kit.json({"run": await svc.create_run(requirement, model or None, source or None, team_name or None)})
+        rid = str(body.get("repo") or "")
+        if not REPO_ID_RE.match(rid):
+            raise AppError("repo 要写仓库号（r1 …）", "invalid_repo")
+        return kit.json(await svc.refresh(rid))
 
-    async def route(request: Any) -> Any:
+    async def overview(request: Any) -> Any:
+        return kit.json(await svc.overview(str(request.query.get("repo") or "all")))
+
+    async def requirement(request: Any) -> Any:
+        return kit.json(await svc.requirement(_rid(request), _key(request)))
+
+    async def open_session(request: Any) -> Any:
         body = await kit.body(request)
-        requirement = body.get("requirement")
-        if requirement is not None and not isinstance(requirement, str):
-            raise AppError("requirement 必须是字符串", "invalid_requirement")
-        return kit.json(svc.route((requirement or "")[:MAX_REQUIREMENT]))
+        return kit.json(await svc.open_session(_rid(request), _key(request), trust=body.get("trust", True) is not False,
+                                               kickoff=body.get("kickoff", True) is not False))
 
-    async def models(request: Any) -> Any:
-        return kit.json(await svc.models())
-
-    async def cleanup_sessions(request: Any) -> Any:
-        return kit.json(await svc.cleanup_sessions())
-
-    async def stop_run(request: Any) -> Any:
-        return kit.json(await svc.stop_run(str(request.match_info.get("rid", ""))))
-
-    async def retry(request: Any) -> Any:
+    async def answer(request: Any) -> Any:
         body = await kit.body(request)
+        did = body.get("id")
+        if did is not None and (not isinstance(did, str) or not re.fullmatch(r"D-[1-9][0-9]{0,6}", did)):
+            raise AppError("id 是问题号 D-<n>", "invalid_id")
         note = body.get("note")
         if note is not None and not isinstance(note, str):
-            raise AppError("note 必须是文字", "invalid_note")
-        return kit.json(await svc.retry(str(request.match_info.get("rid", "")), body.get("roles"), (note or "").strip()[:4000]))
+            raise AppError("note 是一句话", "invalid_note")
+        return kit.json(await svc.answer(_rid(request), _key(request), body.get("choice"), note, did))
 
-    async def events(request: Any) -> Any:
-        return kit.json(await svc.events(str(request.match_info.get("rid", ""))))
+    async def intake_next(request: Any) -> Any:
+        rid = str(request.query.get("repo") or "")
+        if not REPO_ID_RE.match(rid):
+            raise AppError("repo 要写仓库号（r1 …）", "invalid_repo")
+        return kit.json(await svc.intake_next(rid))
 
-    async def gate(request: Any) -> Any:
+    async def intake_check(request: Any) -> Any:
+        return kit.json(await svc.intake_check(await kit.body(request)))
+
+    async def intake_start(request: Any) -> Any:
+        return kit.json(await svc.intake_start(await kit.body(request)))
+
+    async def crew(request: Any) -> Any:
+        return kit.json(await svc.crew_checks())
+
+    async def crew_fix(request: Any) -> Any:
+        return kit.json(await svc.crew_fix((await kit.body(request)).get("what")))
+
+    async def brain(request: Any) -> Any:
+        rid = str(request.query.get("repo") or "")
+        if not REPO_ID_RE.match(rid):
+            raise AppError("repo 要写仓库号（r1 …）", "invalid_repo")
+        return kit.json(await svc.brain(rid))
+
+    def _rk(body: dict[str, Any]) -> tuple[str, str]:
+        rid, key = str(body.get("repo") or ""), str(body.get("key") or "")
+        if not REPO_ID_RE.match(rid) or not KEY_RE.match(key):
+            raise AppError("要写 repo（r1 …）和需求号 key", "invalid_body")
+        return rid, key
+
+    async def reflect_preview(request: Any) -> Any:
+        return kit.json(await svc.reflect_preview(*_rk(await kit.body(request))))
+
+    async def reflect_apply(request: Any) -> Any:
         body = await kit.body(request)
-        role, decision, note = body.get("role"), body.get("decision"), body.get("note")
-        if not isinstance(role, str) or decision not in ("approve", "revise", "discuss") or (note is not None and not isinstance(note, str)):
-            raise AppError("要写明 role、decision（approve、revise 或 discuss），note 是文字", "invalid_gate")
-        delivery, answers = body.get("delivery"), body.get("answers")
-        if delivery is not None and not isinstance(delivery, dict):
-            raise AppError("delivery 是交付标签 {name, kind, size, line}", "invalid_gate")
-        if answers is not None and not (isinstance(answers, dict) and all(isinstance(v, dict) for v in answers.values())):
-            raise AppError("answers 是每个问题的选择 {id: {choice, text}}", "invalid_gate")
-        risk = body.get("risk")
-        if risk is not None and not isinstance(risk, dict):
-            raise AppError("risk 是拦下的风险 {what, amount}（amount 以元计）", "invalid_gate")
-        return kit.json(await svc.gate(str(request.match_info.get("rid", "")), role, decision, (note or "").strip()[:4000],
-                                       delivery, answers, risk))
+        return kit.json(await svc.reflect_apply(*_rk(body), push=body.get("push") is True))
 
-    async def cto(request: Any) -> Any:
-        return kit.json(await svc.cto())
+    async def todo(request: Any) -> Any:
+        return kit.json(await svc.todo())
 
-    async def cto_offline(request: Any) -> Any:
-        return kit.json(await svc.cto_offline())
+    async def team(request: Any) -> Any:
+        return kit.json(await svc.team_view())
 
-    async def cto_flow(request: Any) -> Any:
-        return kit.json(await svc.cto_flow(str(request.query.get("run") or "")))  # a run it does not have: 404
-
-    async def signoff(request: Any) -> Any:
-        body = await kit.body(request)
-        by, note = body.get("by"), body.get("note")
-        if not isinstance(by, str) or not by.strip() or (note is not None and not isinstance(note, str)):
-            raise AppError("要写明谁签字（by），note 是文字", "invalid_signoff")
-        return kit.json(await svc.signoff(str(request.match_info.get("rid", "")), by.strip()[:60], (note or "").strip()[:2000]))
-
-    async def import_run(request: Any) -> Any:
-        body = await kit.body(request)
-        return kit.json(await svc.import_run(body.get("run"), body.get("events"), replace=body.get("replace") is True))
-
-    async def hide_run(request: Any) -> Any:
-        return kit.json(await svc.hide_run(str(request.match_info.get("rid", ""))))
-
-    async def open_folder(request: Any) -> Any:
-        body = await kit.body(request)
-        return kit.json(await svc.open_folder(str(request.match_info.get("rid", "")), body.get("role"), body.get("app") or "finder"))
-
-    def rid_role(request: Any) -> tuple[str, str]:
-        return str(request.match_info.get("rid", "")), str(request.match_info.get("role", ""))
-
-    async def role_output(request: Any) -> Any:
-        return kit.json(await svc.role_output(*rid_role(request)))
-
-    async def file_view(request: Any) -> Any:
-        rid, role = rid_role(request)
-        return kit.json(await svc.file_view(rid, role, request.query.get("path"), request.query.get("view") or "content"))
-
-    async def site_status(request: Any) -> Any:
-        return kit.json(svc.site_status(str(request.match_info.get("rid", ""))))
-
-    async def start_site(request: Any) -> Any:
-        return kit.json(await svc.start_site(str(request.match_info.get("rid", ""))))
-
-    async def stop_site(request: Any) -> Any:
-        return kit.json(await svc.stop_site(str(request.match_info.get("rid", ""))))
+    async def team_loop(request: Any) -> Any:
+        return kit.json(await svc.team_loop())
 
     return [
         AppRoute("GET", "/health", health),
-        AppRoute("GET", "/board", kit.guarded(board)),
-        AppRoute("GET", "/cto", kit.guarded(cto)),
-        AppRoute("GET", "/cto/offline", kit.guarded(cto_offline)),
-        AppRoute("GET", "/cto/flow", kit.guarded(cto_flow)),
-        AppRoute("GET", "/runs", kit.guarded(runs)),
-        AppRoute("POST", "/runs", kit.guarded(create_run)),
-        AppRoute("POST", "/route", kit.guarded(route)),
-        AppRoute("GET", "/models", kit.guarded(models)),
-        AppRoute("POST", "/sessions/cleanup", kit.guarded(cleanup_sessions)),
-        AppRoute("POST", "/runs/import", kit.guarded(import_run)),
-        AppRoute("POST", "/runs/{rid}/stop", kit.guarded(stop_run)),
-        AppRoute("POST", "/runs/{rid}/retry", kit.guarded(retry)),
-        AppRoute("POST", "/runs/{rid}/gate", kit.guarded(gate)),
-        AppRoute("POST", "/runs/{rid}/signoff", kit.guarded(signoff)),
-        AppRoute("POST", "/runs/{rid}/hide", kit.guarded(hide_run)),
-        AppRoute("GET", "/runs/{rid}/events", kit.guarded(events)),
-        AppRoute("POST", "/runs/{rid}/open", kit.guarded(open_folder)),
-        AppRoute("GET", "/runs/{rid}/roles/{role}", kit.guarded(role_output)),
-        AppRoute("GET", "/runs/{rid}/roles/{role}/file", kit.guarded(file_view)),
-        AppRoute("GET", "/runs/{rid}/site", kit.guarded(site_status)),
-        AppRoute("POST", "/runs/{rid}/site", kit.guarded(start_site)),
-        AppRoute("POST", "/runs/{rid}/site/stop", kit.guarded(stop_site)),
+        AppRoute("GET", "/status", kit.guarded(status)),
+        AppRoute("GET", "/settings", kit.guarded(get_settings)),
+        AppRoute("POST", "/settings", kit.guarded(post_settings)),
+        AppRoute("POST", "/refresh", kit.guarded(refresh)),
+        AppRoute("GET", "/overview", kit.guarded(overview)),
+        AppRoute("GET", "/requirements/{repo}/{key}", kit.guarded(requirement)),
+        AppRoute("POST", "/requirements/{repo}/{key}/session", kit.guarded(open_session)),
+        AppRoute("POST", "/requirements/{repo}/{key}/answer", kit.guarded(answer)),
+        AppRoute("GET", "/intake/next", kit.guarded(intake_next)),
+        AppRoute("POST", "/intake/check", kit.guarded(intake_check)),
+        AppRoute("POST", "/intake/start", kit.guarded(intake_start)),
+        AppRoute("GET", "/crew", kit.guarded(crew)),
+        AppRoute("POST", "/crew/fix", kit.guarded(crew_fix)),
+        AppRoute("GET", "/brain", kit.guarded(brain)),
+        AppRoute("POST", "/brain/reflect/preview", kit.guarded(reflect_preview)),
+        AppRoute("POST", "/brain/reflect/apply", kit.guarded(reflect_apply)),
+        AppRoute("GET", "/todo", kit.guarded(todo)),
+        AppRoute("GET", "/team", kit.guarded(team)),
+        AppRoute("POST", "/team/loop", kit.guarded(team_loop)),
     ]

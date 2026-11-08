@@ -1,4 +1,4 @@
-"""aidlc-team: lifecycle hooks (``on_startup`` / ``on_shutdown``).
+"""brain: lifecycle hooks (``on_startup`` / ``on_shutdown``).
 
 ``on_startup`` gets the same ctx as the routes; ``on_shutdown`` gets a fresh one, so the service is looked up by
 app name. Shutdown drops the synthetic modules so the next enable re-reads the code from disk.
@@ -16,7 +16,7 @@ from types import ModuleType
 # --- bootstrap (verbatim in backend/hooks.py) ------------------------------- #
 
 _BACKEND_DIR = Path(__file__).resolve().parent
-_NS = "_aidlcteam_backend"
+_NS = "_brainapp_backend"
 _REQUIRED = ("service", "handlers")
 
 
@@ -28,7 +28,7 @@ def teardown_namespace() -> None:
 
 
 def bootstrap() -> dict[str, ModuleType]:
-    """Import ``team.service`` and ``team.handlers`` through the private namespace."""
+    """Import ``core.service`` and ``core.handlers`` through the private namespace."""
     for final in (False, True):
         root = sys.modules.get(_NS)
         if root is not None and list(getattr(root, "__path__", ())) != [str(_BACKEND_DIR)]:
@@ -40,7 +40,7 @@ def bootstrap() -> dict[str, ModuleType]:
             root.__path__ = [str(_BACKEND_DIR)]  # type: ignore[attr-defined]
             sys.modules[_NS] = root
         try:
-            mods = {name: importlib.import_module(f"{_NS}.team.{name}") for name in _REQUIRED}
+            mods = {name: importlib.import_module(f"{_NS}.core.{name}") for name in _REQUIRED}
         except BaseException:
             teardown_namespace()
             raise
@@ -48,7 +48,7 @@ def bootstrap() -> dict[str, ModuleType]:
             return mods
         teardown_namespace()
         if final:
-            raise ImportError(f"{_NS}.team imported incompletely")
+            raise ImportError(f"{_NS}.core imported incompletely")
     raise AssertionError("unreachable")  # pragma: no cover
 
 
@@ -64,7 +64,7 @@ async def on_startup(ctx) -> None:  # noqa: ANN001 - host contract
 
 
 async def on_shutdown(ctx) -> None:  # noqa: ANN001 - host contract
-    name = getattr(ctx, "name", "aidlc-team")
+    name = getattr(ctx, "name", "brain")
     try:
         svc = service.discard(name)
         if svc is not None:

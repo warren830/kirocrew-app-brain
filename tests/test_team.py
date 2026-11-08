@@ -1,0 +1,299 @@
+"""Team mode, offline end to end: a labelled MR is checked by brain-kit's bridge inside the app, the contract is signed
+by the separate signer (signer/brain_signer.py, its own brain-kit, its own identities and ledger) through the spool,
+runnerd (in the app) builds the workspace, the run is dispatched into a brain-run session through the app's session
+runner, a parked question goes on the MR as D-1, the owner's answer is re-checked and signed by the signer and sent to
+the session once. A tampered answerer list in the app does not get an answer signed. The app never reads the key.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+from urllib.parse import parse_qsl, unquote, urlsplit
+
+import pytest
+
+from appkit import BRAINKIT, ROOT, mod, sh
+from brainfix import FakeGateway, brain, make_project, make_service, needs_brainkit, run, start_in_worktree
+
+pytestmark = [needs_brainkit, pytest.mark.skipif(subprocess.run(["which", "ssh-keygen"], capture_output=True).returncode,
+                                                 reason="ssh-keygen not found")]
+P = "grp/repo"
+BRANCH = "ai/alice/PAY-1-refund"
+
+
+class GitLab:
+    """GitLab REST v4 for one project, served from a bare repo; notes and labels in memory. Authors come from the
+    token (the bridge's, the signer's, or a person's)."""
+
+    def __init__(self, bare):
+        self.bare = str(bare)
+        self.labels = ["ai-handoff"]
+        self.state = "opened"
+        self.notes = []
+        self.events = [{"id": 101, "action": "add", "label": {"name": "ai-handoff"}, "user": {"username": "alice"}}]
+        self.who = {"bridge-tok": "brain-bridge", "signer-tok": "brain-signer"}
+
+    def head(self):
+        return subprocess.run(["git", "-C", self.bare, "rev-parse", "refs/heads/" + BRANCH], capture_output=True,
+                              text=True).stdout.strip()
+
+    def mr(self):
+        return {"iid": 5, "source_branch": BRANCH, "target_branch": "main", "sha": self.head(), "state": self.state,
+                "source_project_id": 7, "target_project_id": 7, "labels": list(self.labels),
+                "web_url": "https://gl.example/grp/repo/-/merge_requests/5"}
+
+    def note(self, author, body):
+        n = {"id": 1000 + len(self.notes), "body": body, "author": {"username": author}, "system": False,
+             "created_at": "2026-11-08T12:00:%02dZ" % (len(self.notes) % 60)}
+        self.notes.append(n)
+        return n
+
+    def __call__(self, method, url, headers, body):
+        u = urlsplit(url)
+        path, q = unquote(u.path), dict(parse_qsl(u.query))
+        data = json.loads(body.decode()) if body else None
+        pre = "/api/v4/projects/" + P
+        ok = lambda o, s=200: (s, json.dumps(o).encode())  # noqa: E731
+        if path == pre:
+            return ok({"default_branch": "main"})
+        if path == pre + "/merge_requests" and method == "GET":
+            want = q.get("labels")
+            return ok([self.mr()] if self.state == "opened" and (not want or want in self.labels) else [])
+        if path == pre + "/merge_requests/5" and method == "GET":
+            return ok(self.mr())
+        if path == pre + "/merge_requests/5" and method == "PUT":
+            for l in (data.get("remove_labels") or "").split(","):
+                if l in self.labels:
+                    self.labels.remove(l)
+            for l in (data.get("add_labels") or "").split(","):
+                if l and l not in self.labels:
+                    self.labels.append(l)
+            return ok(self.mr())
+        if path == pre + "/merge_requests/5/resource_label_events":
+            return ok(self.events if int(q.get("page", 1)) == 1 else [])
+        if path == pre + "/merge_requests/5/notes" and method == "GET":
+            return ok(self.notes if int(q.get("page", 1)) == 1 else [])
+        if path == pre + "/merge_requests/5/notes" and method == "POST":
+            return ok(self.note(self.who.get(headers.get("PRIVATE-TOKEN"), "someone"), data["body"]), 201)
+        m = re.match(re.escape(pre) + r"/repository/files/(.+)/raw$", path)
+        if m:
+            p = subprocess.run(["git", "-C", self.bare, "show", "%s:%s" % (q.get("ref"), m.group(1))], capture_output=True)
+            return (200, p.stdout) if p.returncode == 0 else ok({"message": "404"}, 404)
+        m = re.match(re.escape(pre) + r"/repository/commits/(.+)$", path)
+        if m:
+            e = subprocess.run(["git", "-C", self.bare, "cat-file", "-e", m.group(1) + "^{commit}"]).returncode
+            return ok({"id": m.group(1)}) if e == 0 else ok({}, 404)
+        return ok({"message": "404 (fake)"}, 404)
+
+
+def load_signer():
+    sys.path.insert(0, str(ROOT / "signer"))
+    import brain_signer
+    brain_signer.load_brainkit(str(BRAINKIT))
+    return brain_signer
+
+
+@pytest.fixture
+def world(tmp_path, home, monkeypatch):
+    kit = {"gitlab": {"base": "https://gl.example", "project": P}, "bot_users": ["brain-bot"],
+           "bot_emails": ["brain-bot@noreply.invalid"]}
+    repo = make_project(tmp_path, name="repo", origin=True, kit=kit)
+    sh("git", "-C", repo, "push", "-q", "origin", "main")
+    wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "repo" / "refund", "refund", "退款")
+    intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
+    st = wt / "aidlc-docs" / intent / "aidlc-state.md"
+    st.write_text(st.read_text().replace("Status: Inception: starting", "Status: Construction step 2 of 4"))
+    sh("git", "-C", wt, "commit", "-qam", "notes")
+    brain(wt, "handoff", "--no-label")
+    bare = tmp_path / "repo-origin.git"
+    gl = GitLab(bare)
+    key = tmp_path / "keys" / "bridge_ed25519"
+    key.parent.mkdir()
+    sh("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", key, "-C", "brain-bridge")
+    allowed = tmp_path / "keys" / "allowed_signers"
+    allowed.write_text('brain-bridge namespaces="brain-voucher" %s\n' % (str(key) + ".pub" and
+                                                                        (key.parent / "bridge_ed25519.pub").read_text().strip()))
+    ids = {"users": {"alice": {}, "carol": {}}, "roles": {"product": ["carol"], "builder": ["dave"]}}
+    app_ids, signer_ids = tmp_path / "app-identities.json", tmp_path / "signer-identities.json"
+    app_ids.write_text(json.dumps(ids))
+    signer_ids.write_text(json.dumps(ids))
+    spool, sspool, runs_root = tmp_path / "spool", tmp_path / "signer-spool", tmp_path / "runs"
+    runs_root.mkdir()
+    bridge_cfg = tmp_path / "bridge.json"
+    bridge_cfg.write_text(json.dumps({
+        "projects": [P], "gitlab": {"base": "https://gl.example", "token_env": "TEST_BRIDGE_TOKEN"},
+        "identities": str(app_ids), "signing_key": str(key), "vouchers_dir": str(tmp_path / "app-vouchers"),
+        "spool_dir": str(spool), "ledger": str(tmp_path / "ledger.sqlite"), "runner_runs_root": str(runs_root),
+        "kirocrew": {"agent": "brain-run", "memory_mode": "incognito"}, "pseudonym_salt": "s", "interval": 60}))
+    runnerd_cfg = tmp_path / "runnerd.json"
+    runnerd_cfg.write_text(json.dumps({"spool_dir": str(spool), "cache_dir": str(tmp_path / "cache"),
+                                       "runs_root": str(runs_root), "allowed_signers": str(allowed), "clone_url": str(bare)}))
+    monkeypatch.setenv("TEST_BRIDGE_TOKEN", "bridge-tok")
+    monkeypatch.setenv("TEST_SIGNER_TOKEN", "signer-tok")
+    bs = load_signer()
+    rest = __import__("brainkit.rest", fromlist=["GitLab"])
+
+    class LazySigner:
+        """The signer process, run here when the app writes a request (in the app's bridge thread: the signer's
+        sqlite ledger is opened on first use in that thread, as its own process would)."""
+        s = None
+
+        def once(self):
+            if self.s is None:
+                self.s = bs.Signer({"spool": str(sspool), "signing_key": str(key), "projects": [P],
+                                    "identities": str(signer_ids), "vouchers_dir": str(tmp_path / "signer-vouchers"),
+                                    "publish_vouchers": False, "ledger": str(tmp_path / "signer.sqlite"),
+                                    "pseudonym_salt": "s", "bridge_users": ["brain-bridge"], "contract_ttl_hours": 72},
+                                   rest.GitLab("https://gl.example", "signer-tok", gl), None, out=lambda *_: None)
+            return self.s.once()
+
+    signer = LazySigner()
+    team = {"enabled": True, "bridge_config": str(bridge_cfg), "runnerd_config": str(runnerd_cfg),
+            "signer_spool": str(sspool), "allowed_signers": str(allowed), "dev_same_user": True}
+    return {"repo": repo, "gl": gl, "signer": signer, "team": team, "runs_root": runs_root, "app_ids": app_ids,
+            "tmp": tmp_path, "key": key}
+
+
+def answer_note(gl, author, line):
+    return gl.note(author, line)
+
+
+def push_park(path, park):
+    (path / "runs" / "PAY-1" / "park.json").write_text(json.dumps(park, ensure_ascii=False))
+    sh("git", "-C", path, "add", "-A")
+    sh("git", "-C", path, "-c", "user.email=brain-bot@noreply.invalid", "-c", "user.name=bot", "commit", "-qm", "park")
+    sh("git", "-C", path, "push", "-q", "origin", "HEAD:" + BRANCH)
+
+
+PARK = {"schema": 1, "status": "waiting", "kind": "clarify", "ask": "owner", "question": "退款要不要人工审核？",
+        "options": [{"id": "A", "text": "要"}, {"id": "B", "text": "不要"}], "recommend": "A"}
+
+
+def test_hand_over_dispatch_question_and_answer_through_the_separate_signer(world, tmp_path):
+    gw = FakeGateway()
+    svc = make_service(tmp_path / "app", [], gw=gw, team=world["team"], transport=world["gl"],
+                       kick=lambda: world["signer"].once())
+
+    async def go():
+        await svc.start()
+        try:
+            assert svc.team is not None and svc.team.host is not None, svc.team.error
+            first = await svc.team_loop()
+            ws = world["runs_root"] / "RUN-PAY-1-1"
+            assert ws.is_dir()
+            push_park(ws, PARK)
+            second = await svc.team_loop()  # watch posts D-1
+            answer_note(world["gl"], "alice", "answer D-1 B 小额不审")
+            third = await svc.team_loop()  # collect: checked, signed by the signer, sent once
+            view = await svc.team_view()
+            overview = await svc.overview("runner")
+            todo = await svc.todo()
+            return first, second, third, view, overview, todo
+        finally:
+            await svc.stop()
+
+    first, second, third, view, overview, todo = run(go())
+    assert first["ok"], first
+    gl = world["gl"]
+    bodies = [n["body"] for n in gl.notes]
+    assert any(b.startswith("AI 已接手：RUN-PAY-1-1") for b in bodies) and "ai-running" in gl.labels
+    # the slot the bridge named, booting brain-run, in the runner folder, the workspace as its project, trusted
+    assert "run-pay-1-1" in gw.slot_rows and ("agent", "brain-run", "template") in gw.calls
+    assert gw.slot_rows["run-pay-1-1"]["project"] == str(world["runs_root"] / "RUN-PAY-1-1")
+    assert gw.slot_rows["run-pay-1-1"]["trust"] and [c[1] for c in gw.calls if c[0] == "folder"][0] == "Brain 运行机"
+    msgs = gw.msgs["run-pay-1-1"]
+    assert msgs[0]["content"].startswith("接手合同 V-") and msgs[0]["meta"]["sendId"].startswith("V-")
+    q = next(n for n in gl.notes if n["body"].startswith("**D-1 · 澄清 · RUN-PAY-1-1**"))
+    assert q["author"]["username"] == "brain-bridge"
+    assert msgs[-1]["content"].startswith("决策 D-1 已答") and "：B。" in msgs[-1]["content"]
+    assert not any(re.search(r"(?m)^approve ", m["content"]) for m in msgs)
+    assert [m["meta"]["sendId"] for m in msgs if m["role"] == "user"].count(msgs[-1]["meta"]["sendId"]) == 1
+    assert any(b.startswith("D-1 已收到 @alice 的回答：B") for b in bodies + [n["body"] for n in gl.notes])
+    # the signer signed both and keeps its own copies; the app verified both against the public key
+    sv = sorted(os.listdir(tmp_path / "signer-vouchers" / "RUN-PAY-1-1"))
+    assert len(sv) == 2 and sorted(os.listdir(tmp_path / "app-vouchers" / "RUN-PAY-1-1")) == sv
+    assert view["ledger"]["runs"] == {"dispatched": 1} and view["ledger"]["decisions"] == {"delivered": 1}
+    assert view["signer"]["refused"] == [] and view["status"]["key_readable"] is True
+    row = overview["rows"][0]
+    assert row["repo"] == "runner" and row["key"] == "PAY-1" and row["run_ids"] == ["RUN-PAY-1-1"]
+    assert row["mr"]["url"] == "https://gl.example/grp/repo/-/merge_requests/5"
+    assert todo["team"] is True
+
+
+def test_the_signer_refuses_what_the_app_was_tricked_into(world, tmp_path):
+    """The app's answerer list was changed (an agent with a shell can do that: same OS user). The signer checks with
+    its own list: no answer voucher, nothing sent, the MR says so."""
+    gw = FakeGateway()
+    svc = make_service(tmp_path / "app", [], gw=gw, team=world["team"], transport=world["gl"],
+                       kick=lambda: world["signer"].once())
+    ids = json.loads(world["app_ids"].read_text())
+
+    async def go():
+        await svc.start()
+        try:
+            await svc.team_loop()
+            ws = world["runs_root"] / "RUN-PAY-1-1"
+            push_park(ws, PARK)
+            await svc.team_loop()
+            ids["roles"]["product"].append("mallory")
+            world["app_ids"].write_text(json.dumps(ids))
+            svc.team.host.roles = ids["roles"]  # (the bridge reads identities once; a restart would read the change)
+            answer_note(world["gl"], "mallory", "answer D-1 A")
+            await svc.team_loop()
+            return await svc.team_view()
+        finally:
+            await svc.stop()
+
+    view = run(go())
+    assert view["ledger"]["decisions"] == {"refused": 1}
+    assert view["signer"]["refused"] and any("有效回答" in r for x in view["signer"]["refused"] for r in x["reasons"])
+    msgs = gw.msgs["run-pay-1-1"]
+    assert not any(m["content"].startswith("决策 D-1") for m in msgs)
+    assert any(n["body"].startswith("D-1 的回答没有送回 run：签名服务不签") for n in world["gl"].notes)
+
+
+def test_team_mode_refuses_to_start_when_this_user_can_read_the_signing_key(world, tmp_path):
+    team = dict(world["team"], dev_same_user=False)
+    svc = make_service(tmp_path / "app", [], team=team, transport=world["gl"])
+
+    async def go():
+        await svc.start()
+        try:
+            return await svc.status(), await svc.team_view()
+        finally:
+            await svc.stop()
+
+    status, view = run(go())
+    assert status["team"]["ok"] is False and "签名私钥" in status["team"]["error"]
+    assert view["status"]["error"] == status["team"]["error"]
+    assert not os.path.exists(tmp_path / "spool" / "requests")  # nothing was checked or signed
+
+
+def test_a_tampered_signed_answer_is_not_accepted(world, tmp_path):
+    """The spool's signed/ answer must be exactly the voucher asked for, and verify against allowed_signers."""
+    common = mod("bk")
+    svc = make_service(tmp_path / "app", [], team=world["team"], transport=world["gl"])
+    svc.reload_sync()
+    sp = mod("team.spoolsigner")
+    sign = common.m("sign")
+    spool = tmp_path / "sp"
+    signer = sp.SpoolSigner(str(spool), world["team"]["allowed_signers"], brain_error=common.brain_error(),
+                            verify=sign.verify, digest=sign.digest, timeout=0.2, poll_s=0.05)
+    v = {"schema": 1, "kind": "answer", "run_id": "RUN-PAY-1-1", "choice": "A"}
+    rid = signer.req_id(v)
+    good = sign.sign(v, str(world["key"]))
+    (spool / "signed").mkdir(parents=True)
+    (spool / "signed" / (rid + ".json")).write_text(json.dumps({"req_id": rid, "voucher": dict(v, choice="B"), "sig": good}))
+    with pytest.raises(signer.Refused, match="不一样"):
+        signer.sign(v)
+    (spool / "signed" / (rid + ".json")).write_text(json.dumps({"req_id": rid, "voucher": v, "sig": "bad"}))
+    with pytest.raises(signer.Refused, match="验不过"):
+        signer.sign(v)
+    (spool / "signed" / (rid + ".json")).write_text(json.dumps({"req_id": rid, "voucher": v, "sig": good}))
+    assert signer.sign(v) == good
+    os.unlink(spool / "signed" / (rid + ".json"))
+    with pytest.raises(signer.Unavailable):
+        signer.sign(v)
+    assert not os.listdir(spool / "requests")  # the app takes its requests back

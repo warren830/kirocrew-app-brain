@@ -1,10 +1,10 @@
 {
-  "name": "aidlc-team",
-  "version": "0.9.0",
-  "displayName": "AI-DLC 多 Agent 团队",
-  "description": "A team of AI-DLC expert agents on Kiro Crew: from a one-sentence requirement through human gates, company checks and an independent review to a local deployment, with a live team board and a CTO view.",
-  "author": "aws-samples",
-  "minKiroCrewVersion": "0.8.0",
+  "name": "brain",
+  "version": "0.1.0",
+  "displayName": "Brain 交付",
+  "description": "brain-kit on Kiro Crew: claim a requirement, take its documents through the five gates, develop it with AI-DLC Lean in a brain-dev session, hand it to the team runner, follow its questions and the shared in-repo Brain.",
+  "author": "ychchen",
+  "minKiroCrewVersion": "0.11.0",
   "backend": {
     "hooks": {
       "routes": "backend.routes:register_routes",
@@ -16,9 +16,9 @@
     "entry": "dist/index.mjs",
     "pages": [
       {
-        "route": "/apps/aidlc-team",
-        "label": "AI-DLC 多 Agent 团队",
-        "icon": "Users"
+        "route": "/apps/brain",
+        "label": "Brain 交付",
+        "icon": "Brain"
       }
     ],
     "sidebar": {
@@ -27,11 +27,8 @@
   },
   "permissions": {
     "api": [
-      "/api/apps/aidlc-team",
-      "/api/chat",
-      "/api/models",
-      "/api/agents",
-      "/api/knowledge"
+      "/api/apps/brain",
+      "/api/chat"
     ],
     "storage": true,
     "sessionApproval": true

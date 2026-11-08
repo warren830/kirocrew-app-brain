@@ -1,30 +1,36 @@
 """Names and paths shared by every module."""
 
-import glob as _glob
 import os as _os
 import re as _re
 import shutil as _shutil
-import subprocess as _subprocess
 from pathlib import Path as _Path
 
-APP_NAME = "aidlc-team"
-TAG_PREFIX = "[aidlc-team "  # first line of every task this app spawns: [aidlc-team run=… role=… branch=… worktree=…]
+APP_NAME = "brain"
+VERSION = "0.1.0"
 
-# KiroCrew only lets a sub-agent work under ~/workspace(s) or ~/workplace(s) (spawn refuses any other cwd), so every
-# run's repository and worktrees live here.
-WORK_ROOT = _Path.home() / "workplace" / "aidlc-team"
+# Sidebar folders of the sessions this app opens (apart from aidlc-team's 「AI-DLC 团队」, so both apps can be installed).
+LOCAL_FOLDER = "Brain 需求"        # brain-dev sessions on this machine, one subfolder per requirement
+RUNNER_FOLDER = "Brain 运行机"     # brain-run sessions the team runner dispatches, one subfolder per run
+
+LOCAL_AGENT = "brain-dev"          # ~/.kiro/agents/brain-dev.json (brain crew-agent), carries Lean's three hooks
+RUNNER_AGENT = "brain-run"         # ~/.kiro/agents/brain-run.json on the team runner
+
+# KiroCrew lets an agent work only under ~/workspace(s) or ~/workplace(s): every requirement's worktree lives here.
+WORK_ROOT = _Path.home() / "workplace" / "brain-app"
 
 APP_ROOT = _Path(__file__).resolve().parents[2]  # the app's folder: the installed copy or the dev checkout
-TEAM_FILE = APP_ROOT / "team" / "team.json"
-TEAM_DIR = APP_ROOT / "team"  # other team files (team-*.json) a run may name
-TASK_TEMPLATE_FILE = APP_ROOT / "team" / "task_template.md"
-TARGET_TEMPLATE = APP_ROOT / "demo" / "target-template"
 
-TICK_S = 2.0  # every active run is moved forward this often
-EVENTS_KEPT = 200  # the board shows the latest events
+TICK_S = 2.0            # sessions are polled this often
+TEAM_INTERVAL_S = 60.0  # the bridge loop's default interval (bridge.json "interval" wins)
+CACHE_S = 4.0           # a repo scan is reused for this long
+
+KEY_RE = _re.compile(r"^[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}$")
+SLUG_RE = _re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+RUN_ID_RE = _re.compile(r"^RUN-[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,5}$")
+REPO_ID_RE = _re.compile(r"^(r[1-9][0-9]{0,2}|runner)$")
 
 
-def _binary(env: str, preferred: tuple[str, ...], name: str) -> str:
+def _binary(env: str, preferred: tuple, name: str) -> str:
     """An executable: ``$env``, else the first of *preferred* that exists, else *name* on PATH or the usual places."""
     if _os.environ.get(env):
         return _os.environ[env]
@@ -35,30 +41,20 @@ def _binary(env: str, preferred: tuple[str, ...], name: str) -> str:
     return _shutil.which(name, path=path) or name
 
 
-def _node() -> str:
-    """The test runner's node: ``$KIROCREW_TEAM_NODE``, else the first candidate that is node 22 or newer (the test
-    run passes ``--test-force-exit``, which an older node rejects: every file would read "跑不起来")."""
-    if _os.environ.get("KIROCREW_TEAM_NODE"):
-        return _os.environ["KIROCREW_TEAM_NODE"]
-    nvm = sorted(_glob.glob(_os.path.expanduser("~/.nvm/versions/node/v*/bin/node")),
-                 key=lambda p: [int(x) for x in p.split("/v")[-1].split("/")[0].split(".") if x.isdigit()], reverse=True)
-    found = [p for p in ("/opt/homebrew/bin/node", _shutil.which("node") or "", "/usr/local/bin/node",
-                         _os.path.expanduser("~/.local/bin/node"), *nvm)  # ~/.local/bin: not on the gateway's PATH
-             if p and _os.access(p, _os.X_OK)]
-    for path in found:
-        try:
-            out = _subprocess.run([path, "--version"], capture_output=True, text=True, timeout=5).stdout
-        except (OSError, _subprocess.SubprocessError):
-            continue
-        if out.startswith("v") and out[1:].split(".")[0].isdigit() and int(out[1:].split(".")[0]) >= 22:
-            return path
-    return found[0] if found else "node"
-
-
-NODE_BIN = _node()
-MODEL_RE = _re.compile(r"^[a-z0-9][a-z0-9.\-]{1,63}$")  # a model id POST /runs takes (Kiro Crew's ids: kimi-k3, claude-sonnet-5.5)
-MODELS_TTL_S = 60.0  # the start form's model list is read from Kiro Crew at most this often
 # The real git before macOS's /usr/bin/git, an xcrun shim that costs ~30 ms per call.
-GIT_BIN = _binary("KIROCREW_TEAM_GIT", ("/opt/homebrew/bin/git", "/usr/local/bin/git",
-                                         "/Library/Developer/CommandLineTools/usr/bin/git",
-                                         "/Applications/Xcode.app/Contents/Developer/usr/bin/git"), "git")
+GIT_BIN = _binary("BRAIN_APP_GIT", ("/opt/homebrew/bin/git", "/usr/local/bin/git",
+                                    "/Library/Developer/CommandLineTools/usr/bin/git",
+                                    "/Applications/Xcode.app/Contents/Developer/usr/bin/git"), "git")
+# python3 for brain-kit's CLI: the system one (brain-kit is stdlib-only, 3.8+), not the gateway's bundled interpreter.
+PYTHON_BIN = _binary("BRAIN_APP_PYTHON", ("/usr/bin/python3", "/opt/homebrew/bin/python3", "/usr/local/bin/python3"),
+                     "python3")
+
+
+def kirocrew_bin() -> str:
+    """The kirocrew CLI (``~/.local/bin`` is not on the gateway's PATH); "" when there is none."""
+    if _os.environ.get("BRAIN_APP_KIROCREW"):
+        return _os.environ["BRAIN_APP_KIROCREW"]
+    for p in (_os.path.expanduser("~/.local/bin/kirocrew"), "/opt/homebrew/bin/kirocrew", "/usr/local/bin/kirocrew"):
+        if _os.access(p, _os.X_OK):
+            return p
+    return _shutil.which("kirocrew") or ""

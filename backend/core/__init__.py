@@ -1,1 +1,1 @@
-"""aidlc-team: a team of role agents on KiroCrew's own sub-agents, and a live board of what they do."""
+"""brain: brain-kit on Kiro Crew. Requirements, their brain-dev / brain-run sessions, the hand-over, the Brain."""

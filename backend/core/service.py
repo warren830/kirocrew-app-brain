@@ -1,77 +1,76 @@
-"""The app's single service object per enable: the runs, the background loop that moves them, and the role sessions.
-Built by ``register_routes`` (no I/O), started by ``on_startup``, stopped by ``on_shutdown``."""
+"""The app's single service object per enable: settings, brain-kit, the repos, the sessions, team mode, and every
+view the routes answer. Built by ``register_routes`` (no I/O), started by ``on_startup``, stopped by ``on_shutdown``.
+
+Repo reads, brain-kit calls and git run in worker threads (``asyncio.to_thread``); the session manager is only touched
+on the event loop (a snapshot of it goes into the thread).
+"""
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
+import os
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any, Callable
 
-from . import board, checks, cto as cto_mod, outputs, routing
-from . import standards as standards_mod
-from . import store as store_mod
-from .constants import (APP_NAME, APP_ROOT, MODEL_RE, MODELS_TTL_S, TARGET_TEMPLATE, TASK_TEMPLATE_FILE, TEAM_DIR,
-                        TEAM_FILE, TICK_S, WORK_ROOT)
-from .gateway import Gateway, GatewayError
-from .sessions import SessionManager
+from . import bk, brainview, crewcheck, deliveries, detail, intake, lean_view, mrinfo, settings as settings_mod
+from . import todo as todo_mod
+from .constants import APP_NAME, APP_ROOT, KEY_RE, LOCAL_AGENT, LOCAL_FOLDER, REPO_ID_RE, TICK_S, VERSION
+from .gateway import Gateway
 from .httpkit import AppError
-from .store import RID_RE, Store
-from . import team as team_mod
-from .team import Deps, TeamRun, load_team, new_rid, new_state
-from . import site as site_mod
-from .site import Site
+from .repo import Repo, Source, read_facts
+from .sessions import SessionManager
+from .store import Store
 
 _REGISTRY: dict[str, "Service"] = {}
 _SECRETS = re.compile(r"(?i)((?:password|passwd|secret|token|api[_-]?key|authorization)\s*[=:]\s*|bearer\s+)\S+"
-                      r"|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}")
+                      r"|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|glpat-[A-Za-z0-9_-]{16,}")
+EVAL_TTL_S = 120.0
+MR_EVERY_S = 30.0
+CREW_EVERY_S = 300.0
+TRACE_TTL_S = 15.0
 
 
 def basic_scrub(text: str) -> str:
     return _SECRETS.sub(lambda m: (m.group(1) or "") + "[已隐去]", text)
 
 
+def scope_of(rid: str, key: str) -> str:
+    return "%s-%s" % (rid, key)
+
+
 class Service:
-    def __init__(self, ctx: Any, *, manager: Any = None, work_root: Path | None = None, template: Path | None = None,
-                 run_tests: Callable[..., Any] | None = None, tick_s: float = TICK_S,
-                 now: Callable[[], float] = time.time, opener: Callable[[list[str]], Any] | None = None,
-                 sessions: Any = None) -> None:
-        """*manager*: the agent manager the runs use (a fake in tests); by default the role sessions."""
+    def __init__(self, ctx: Any, *, sessions: Any = None, transport: Any = None, now: Callable[[], float] = time.time,
+                 signer_kick: Callable[[], Any] | None = None, sign_timeout: float = 30.0) -> None:
         self.ctx = ctx
         self.name = getattr(ctx, "name", APP_NAME) or APP_NAME
         self.log = getattr(ctx, "logger", None) or logging.getLogger(APP_NAME)
         self.data_dir = Path(getattr(ctx, "data_dir", ".") or ".")
+        self.now = now
+        self.transport = transport  # GitLab / Jira transport (tests); None: brain-kit's own
+        self.signer_kick, self.sign_timeout = signer_kick, sign_timeout
         self.started = False
-        self.runs: dict[str, TeamRun] = {}
-        self.work_root = Path(work_root) if work_root else WORK_ROOT
-        self.tick_s = tick_s
-        self.site = Site(scrub=self.scrub, state_file=self.data_dir / "site.json")
-        self._opener = opener or _open_on_this_mac
-        # every role's agent is a Kiro Crew chat session, opened through the gateway's chat API
+        self.settings = settings_mod.load(self.data_dir / "settings.json")
         self.sessions = sessions or SessionManager(Gateway(self.name, APP_ROOT / ".app_secret"), app=self.name,
                                                    state_file=self.data_dir / "sessions.json", log=self.log,
                                                    scrub=self.scrub)
-        self._agents = manager if manager is not None else self.sessions
-        self._deps = Deps(store=Store(self.data_dir / "runs"), manager=self.manager,
-                          run_tests=run_tests or checks.run_tests, template=Path(template or TARGET_TEMPLATE),
-                          scrub=self.scrub, now=now, log=self.log, deploy=self._deploy, members=self.member_names)
-        self._loop: asyncio.Task[None] | None = None
-        self._ticks: dict[str, asyncio.Task[None]] = {}
-        self._failures: dict[str, int] = {}
-        self._creating = asyncio.Lock()
-        # what Kiro Crew has around the team: its members (「代理」) and knowledge sources (「知识库 → 来源」), read
-        # every CREW_REFRESH_S by the pulse; None while never read (or the app may not read them)
-        self.crew: dict[str, Any] = {"at": float("-inf"), "members": None, "knowledge": None, "error": ""}
-        self._live_runs: set[str] = set()  # the runs seen going last pulse: one that has ended since keeps its roster
-        self._events_cache: dict[str, tuple[int, list[dict[str, Any]]]] = {}  # rid → (seq, every event): the CTO view
-        self._models: tuple[float, list[dict[str, Any]]] | None = None  # (read at, the models): the start form's list
+        self.store = Store(self.data_dir / "events")
+        self.mr = mrinfo.MrCache()
+        self.repos: dict[str, Repo] = {}
+        self.repo_errors: dict[str, tuple[str, str]] = {}
+        self.crew: dict[str, Any] = {"rows": [], "fix": {"agent": False, "engine": False}, "checked_at": None}
+        self.team: Any = None
+        self._tasks: list[asyncio.Task] = []
+        self._mr_wanted: dict[tuple, str] = {}
+        self._eval: dict[str, tuple] = {}
+        self._eval_running: set[str] = set()
+        self._trace: dict[tuple, tuple] = {}
+        self._me: str | None = None
 
-    def manager(self) -> Any:
-        """The agent manager the runs, the board and 产出 use: the role sessions."""
-        return self._agents
+    # ---- lifecycle ------------------------------------------------------------------------------------ #
 
     def scrub(self, text: str) -> str:
         """KiroCrew's own outbound redaction (``ctx.scrub``) when there is one, else a few obvious patterns."""
@@ -89,485 +88,748 @@ class Service:
         if self.started:
             return
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        for state, events in await asyncio.to_thread(self._deps.store.load_all):
-            try:
-                self.runs[state["id"]] = TeamRun(state, self._deps, events)
-            except Exception:  # noqa: BLE001
-                self.log.exception("aidlc-team: run %s cannot be loaded", state.get("id"))
-        for run in self.runs.values():  # signed off before the signature merged the PR (0.6.0): it does now, once
-            sig = run.s.get("signoff")
-            if isinstance(sig, dict) and "merged" not in sig and not run.s.get("imported"):
-                sig["merged"] = await run.merge_pr()
-                await run.save()
         await asyncio.to_thread(self.sessions.load)
+        await asyncio.to_thread(self.reload_sync)
+        await self._start_team()
         self.started = True
-        self._redeploy_task = asyncio.create_task(self._redeploy_latest())
-        self._loop = asyncio.create_task(self._forever())
-        self.log.info("aidlc-team: started, %d runs, data in %s", len(self.runs), self.data_dir)
+        loop = asyncio.get_running_loop()
+        self._tasks = [loop.create_task(self._forever()), loop.create_task(self._slow())]
+        if self.team is not None:
+            self._tasks.append(loop.create_task(self._team_forever()))
+        self.log.info("brain: started, brain-kit %s, %d repos, team %s", bk.info().get("version"), len(self.repos),
+                      "on" if self.team is not None else "off")
 
     async def stop(self) -> None:
         self.started = False
-        tasks = [t for t in (self._loop, *self._ticks.values()) if t is not None]
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        self._loop, self._ticks = None, {}
-        await self.site.stop()
-        await self.sessions.gw.close() if hasattr(self.sessions.gw, "close") else None
+        for t in self._tasks:
+            t.cancel()
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks = []
+        if self.team is not None:
+            await asyncio.to_thread(self.team.stop)
+            self.team = None
+        if hasattr(self.sessions.gw, "close"):
+            await self.sessions.gw.close()
+        bk.unload()
+
+    def reload_sync(self) -> None:
+        """brain-kit from settings.brainkit, then the repos (their kit.json through brain-kit)."""
+        bk.load(self.settings["brainkit"])
+        self.repos, self.repo_errors = {}, {}
+        for i, path in enumerate(self.settings["repos"], 1):
+            rid = "r%d" % i
+            try:
+                if not bk.ok():
+                    raise RuntimeError("brain-kit 没装载")
+                if not os.path.isdir(path):
+                    raise RuntimeError("找不到这个目录")
+                cfg = bk.m("config").load(path)
+                self.repos[rid] = Repo(rid, path, cfg)
+            except Exception as exc:  # noqa: BLE001
+                self.repo_errors[rid] = (path, str(exc).split("\n", 1)[0][:300])
+        self._eval.clear()
+        self._trace.clear()
+        self.crew = crewcheck.checks([r.path for r in self.repos.values()])
+
+    async def _start_team(self) -> None:
+        team = self.settings["team"]
+        if self.team is not None:
+            await asyncio.to_thread(self.team.stop)
+            self.team = None
+        if not team.get("enabled") or not bk.ok():
+            return
+        from .team.bridgehost import TeamRuntime
+        loop = asyncio.get_running_loop()
+        rt = TeamRuntime(team, loop, self.sessions, self.log, transport=self.transport, kick=self.signer_kick,
+                         sign_timeout=self.sign_timeout)
+        await loop.run_in_executor(rt.executor, rt.start)
+        self.team = rt
+
+    async def _in_team(self, fn: Callable[[], Any]) -> Any:
+        """Run on the team runtime's own thread (brain-kit's ledger is a sqlite connection of that thread)."""
+        return await asyncio.get_running_loop().run_in_executor(self.team.executor, fn)
 
     async def _forever(self) -> None:
         while True:
             try:
-                await self.pulse()
+                await self.sessions.poll()
             except asyncio.CancelledError:
                 raise
             except Exception:  # noqa: BLE001
-                self.log.exception("aidlc-team: background pulse failed")
-            await asyncio.sleep(self.tick_s)
+                self.log.exception("brain: polling the sessions failed")
+            await asyncio.sleep(TICK_S)
 
-    async def pulse(self) -> None:
-        """One beat: what the role sessions did, then a tick for every active run that is not ticking already."""
-        try:
-            await self.sessions.poll()
-        except Exception:  # noqa: BLE001
-            self.log.exception("aidlc-team: polling the role sessions failed")
-        if time.monotonic() - self.crew["at"] >= CREW_REFRESH_S:
-            await self.refresh_crew()
-        for rid in list(self._live_runs):
-            run = self.runs.get(rid)
-            if run is not None and run.ended:
-                await self.freeze_roster(run)
-        self._live_runs = {rid for rid, run in self.runs.items() if not run.ended}
-        for rid, run in list(self.runs.items()):
-            if not run.ended and rid not in self._ticks:
-                self._ticks[rid] = asyncio.create_task(self._tick(run))
-
-    async def _tick(self, run: TeamRun) -> None:
-        try:
-            await run.tick()
-            self._failures.pop(run.rid, None)
-        except asyncio.CancelledError:
-            raise
-        except Exception:  # noqa: BLE001
-            n = self._failures[run.rid] = self._failures.get(run.rid, 0) + 1
-            if n in (1, 5) or n % 50 == 0:
-                self.log.exception("aidlc-team: tick of %s failed (%d in a row)", run.rid, n)
-        finally:
-            if self._ticks.get(run.rid) is asyncio.current_task():
-                self._ticks.pop(run.rid, None)
-
-    async def refresh_crew(self) -> None:
-        """The members and knowledge sources Kiro Crew has now (the app reads them; it never changes them)."""
-        self.crew["at"] = time.monotonic()
-        errors = []
-        for key, call in (("members", self.sessions.gw.members), ("knowledge", self.sessions.gw.knowledge_sources)):
+    async def _slow(self) -> None:
+        """MRs of handed-over runs (person mode), and the KiroCrew checks now and then."""
+        last_crew = time.monotonic()
+        while True:
             try:
-                self.crew[key] = await call()
-            except (GatewayError, AttributeError) as exc:
-                errors.append(f"{key}: {exc}"[:160])
-        self.crew["error"] = "；".join(errors)
+                await asyncio.sleep(MR_EVERY_S)
+                for (base, project, branch), _ in list(self._mr_wanted.items()):
+                    if self.mr.due(project, branch):
+                        await asyncio.to_thread(self.mr.refresh, base, project, branch, transport=self.transport)
+                if time.monotonic() - last_crew > CREW_EVERY_S:
+                    last_crew = time.monotonic()
+                    self.crew = await asyncio.to_thread(crewcheck.checks, [r.path for r in self.repos.values()])
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001
+                self.log.exception("brain: background refresh failed")
 
-    async def models(self) -> dict[str, Any]:
-        """开工 form's 模型: the models Kiro Crew offers (id, name, what it is, credit rate), read at most every
-        MODELS_TTL_S; an empty list (and why) when Kiro Crew does not answer, and the form offers the team's own then."""
-        if self._models is not None and time.monotonic() - self._models[0] < MODELS_TTL_S:
-            return {"models": self._models[1]}
+    async def _team_forever(self) -> None:
+        while True:
+            try:
+                if self.team is not None and self.team.host is not None:
+                    await self._in_team(self.team.loop_once)
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001
+                self.log.exception("brain: the bridge loop failed")
+            await asyncio.sleep(self.team.interval() if self.team is not None else 60)
+
+    # ---- small helpers -------------------------------------------------------------------------------- #
+
+    def _repo(self, rid: str) -> Repo:
+        if not REPO_ID_RE.match(rid or "") or rid not in self.repos:
+            raise AppError("没有这个仓库", "no_repo", 404)
+        return self.repos[rid]
+
+    def me(self) -> str | None:
+        """Who this machine says the person is: $BRAIN_USER, else git config brain.user of a repo (never a token)."""
+        who = os.environ.get("BRAIN_USER", "").strip().lower()
+        if not who:
+            for r in self.repos.values():
+                who = r.git.out("config", "brain.user").strip().lower()
+                if who:
+                    break
+        return who or None
+
+    def _sessions_snapshot(self) -> dict[str, Any]:
+        """{scope: [session rows]} and credits per scope, read on the event loop."""
+        by: dict[str, list[dict[str, Any]]] = {}
+        for info in self.sessions.roots():
+            if not info.key or not info.slot:
+                continue
+            st = self.sessions.slot_stats(info.slot) or {}
+            by.setdefault(info.key, []).append({
+                "slot": info.slot, "title": info.title, "agent": info.agent, "kind": info.kind or "local",
+                "credits": st.get("credits") if st.get("credits") is not None else info.credits,
+                "turns": int(st.get("turns") or info.turns or 0), "busy": bool(st.get("busy")),
+                "awaiting": bool(st.get("awaiting")), "last_activity": st.get("last_activity") or info.last_activity,
+                "opened_at": st.get("opened_at") or info.started, "project": info.cwd or None,
+                "url": "/chat?sid=%s" % info.slot, "error": info.error, "missing": bool(st.get("missing")),
+                "id": info.id})
+        return {"by": by, "credits": self.sessions.credits_by_key()}
+
+    @staticmethod
+    def _live(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+        live = [r for r in rows if not r.get("missing") and r["kind"] == "local"]
+        return live[-1] if live else None
+
+    def _gitlab_of(self, repo: Repo) -> tuple[str, str]:
+        g = repo.cfg.get("gitlab") or {}
+        return str(g.get("base") or ""), str(g.get("project") or "")
+
+    def _token_present(self) -> bool:
         try:
-            rows = await self.sessions.gw.models()
-        except (GatewayError, AttributeError) as exc:
-            return {"models": [], "error": f"{exc}"[:160]}
+            return bool(bk.m("rest").read_token())
+        except Exception:  # noqa: BLE001 - a token file others can read is refused, as brain-kit does
+            return False
+
+    # ---- 交付总览 ------------------------------------------------------------------------------------- #
+
+    def _row(self, repo: Repo, f: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
+        row = deliveries.base_row(repo.id, f)
+        scope = scope_of(repo.id, f["key"])
+        sess = snap["by"].get(scope, [])
+        live = self._live(sess)
+        base, project = self._gitlab_of(repo)
+        run = f.get("run") or {}
+        mr = None
+        if run.get("handoff") and f.get("branch") and base and project:
+            self._mr_wanted[(base, project, f["branch"])] = scope
+            mr = self.mr.get(project, f["branch"])
+        bot = 0
+        if run.get("handoff") and not mr:
+            bot = repo.bot_commits_since((run.get("handoff") or {}).get("local_head"), f.get("origin_sha"))
+        deliveries.classify(row, f, mr=mr, slot=live, cfg=repo.cfg, bot_commits=bot)
+        row["credits"] = snap["credits"].get(scope)
+        row["sessions"] = len(sess)
+        row["updated_at"] = deliveries.updated_at(f, live)
+        if mr:
+            row["mr"] = {"iid": mr["iid"], "url": mr.get("url") or mrinfo.mr_url(base, project, mr["iid"]),
+                         "state": mr.get("state")}
+            row["open_questions"] = [q["id"] for q in mr.get("questions") or [] if q.get("state") == "open"]
+            row["run_ids"] = sorted({q["run_id"] for q in mr.get("questions") or [] if q.get("run_id")})
+        return row
+
+    def _team_rows(self, snap: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]]:
+        """(row, facts, decisions) per requirement the team runner has (its latest run)."""
+        if self.team is None or self.team.host is None:
+            return []
+        led = self.team.ledger()
+        latest: dict[str, dict[str, Any]] = {}
+        all_ids: dict[str, list[str]] = {}
+        for r in led["runs"]:
+            all_ids.setdefault(r["req"], []).append(r["run_id"])
+            latest[r["req"]] = r
         out = []
-        for r in rows:
-            mid = str(r.get("model_id") or r.get("id") or "")
-            if MODEL_RE.match(mid):
-                rate = r.get("rate_multiplier")
-                out.append({"id": mid, "name": str(r.get("model_name") or r.get("name") or mid),
-                            "description": str(r.get("description") or "")[:300],
-                            "rate": rate if isinstance(rate, (int, float)) and not isinstance(rate, bool) else None})
-        self._models = (time.monotonic(), out)
-        return {"models": out}
-
-    async def freeze_roster(self, run: TeamRun) -> None:
-        """A run that just ended keeps the team's members as they were then (Crew's 「代理」 page, its workspace): looking
-        back at it later shows that team, not whoever joined since. Runs that ended before this never got one."""
-        ws = run.team.get("workspace")
-        names = self.member_names(ws) if ws else None
-        if names is None or "crew_members" in run.s:
-            return
-        run.s["crew_members"] = sorted(names)
-        await run.save()
-
-    def member_names(self, workspace: str | None = None) -> set[str] | None:
-        """The Crew members' names (those of *workspace* only, when given: the team's own 「代理」)."""
-        rows = self.crew.get("members")
-        if rows is None:
-            return None
-        return {str(r.get("name")) for r in rows if not workspace or r.get("workspace") == workspace}
-
-    def knowledge_id(self, name: str) -> str:
-        """The id of the knowledge source called *name* ("" when Crew has none, or the app has not read them yet)."""
-        row = next((r for r in self.crew.get("knowledge") or [] if name and r.get("name") == name), None)
-        return str(row.get("id") or "") if row else ""
-
-    def knowledge_view(self, name: str) -> dict[str, Any] | None:
-        """One knowledge source as the page shows it: how many documents are in, and whether it is still indexing."""
-        rows = self.crew.get("knowledge")
-        if not name or rows is None:
-            return None
-        return board.source_row(name, next((r for r in rows if r.get("name") == name), {}))
-
-    async def create_run(self, requirement: str, model: str | None = None, source: str | None = None,
-                         team_name: str | None = None) -> str:
-        """One run at a time: every run spends real credits. *model* (optional, picked in the start form) is the model
-        of every role of this run, a role the team file gives a model of its own included. *source* (optional) is an existing project the team
-        takes over instead of the demo template; *team_name* (optional) is a ``team-*.json`` under team/."""
-        if not self.started:
-            raise AppError("app 还没启动好，稍后再试", "not_started", 503)
-        async with self._creating:
-            active = [r.rid for r in self.runs.values() if not r.ended]
-            if active:
-                raise AppError(f"已经有一个运行在跑（{active[0]}），先停掉它", "run_active", 409)
-            src = Path(source).expanduser() if source else None
-            if src is not None and not src.is_dir():
-                raise AppError(f"接手的项目目录不存在：{source}", "bad_source")
-            team_file = TEAM_DIR / team_name if team_name else TEAM_FILE
-            try:
-                team = await asyncio.to_thread(load_team, team_file)
-                tmpl_name = team.get("task_template")  # a team file may bring its own task template (team/ 下的 .md)
-                if tmpl_name is not None and (not isinstance(tmpl_name, str) or not re.fullmatch(r"[\w-]+\.md", tmpl_name)):
-                    raise ValueError(f"task_template 必须是 team/ 下的 .md 文件名：{tmpl_name}")
-                tmpl_file = TEAM_DIR / tmpl_name if tmpl_name else TASK_TEMPLATE_FILE
-                template = await asyncio.to_thread(tmpl_file.read_text, encoding="utf-8")
-            except (OSError, ValueError) as exc:
-                raise AppError(f"读不了团队配置：{exc}", "bad_team", 500)
-            if src is None and isinstance(team.get("source"), str):  # the team works on the customer's own repository
-                src = Path(team["source"]).expanduser()
-                if not src.is_dir():
-                    raise AppError(f"这个团队要改的项目不在这台电脑上：{team['source']}", "bad_source")
-            if team.get("needs_source") and src is None:
-                raise AppError("这个团队要在一个已有的项目上做事：先指定项目目录（source）", "needs_source")
-            if model:
-                team = {**team, "defaults": {**team.get("defaults", {}), "model": model},
-                        "roles": [{**r, "model": model} if r.get("model") else r for r in team["roles"]]}
-            rid = new_rid(self.runs)
-            state = new_state(rid, requirement, team, template, self.work_root, self._deps.template, self._deps.now(),
-                              source=src)
-            state["standards"] = standards_mod.match(requirement, team)
-            state["roster"] = routing.roster_of(team)  # the whole team as it was when this run began
-            kb_id = self.knowledge_id(str((team.get("knowledge") or {}).get("source") or ""))
-            if kb_id:  # the roles search this company's source only (two companies' 《品牌规范》 would both answer)
-                state["knowledge_source_id"] = kb_id
-            run = TeamRun(state, self._deps)
-            run.emit("run", f"运行开始：{state['title']}")
-            if team.get("workspace") and any(r.get("optional") for r in team["roles"]):
-                await self.refresh_crew()  # 在职 is who is on 「代理」 now: a member added a moment ago counts
-                run.leave_out_unhired(self.member_names(team["workspace"]))
-            if state["standards"]:
-                run.emit("standards", "适用公司规范：" + "、".join(f"《{x['title']}》" for x in state["standards"] if x["kind"] != "data")
-                         + ("；用到的数据：" + "、".join(f"《{x['title']}》" for x in state["standards"] if x["kind"] == "data")
-                            if any(x["kind"] == "data" for x in state["standards"]) else ""))
-            await run.save()
-            self.runs[rid] = run
-            task = self._ticks[rid] = asyncio.create_task(self._tick(run))
-        await asyncio.shield(task)  # the repository is set up and the first role started before the answer
-        return rid
-
-    async def stop_run(self, rid: str) -> dict[str, Any]:
-        run = self.runs.get(rid) if RID_RE.match(rid or "") else None
-        if run is None:
-            raise AppError("没有这个运行", "not_found", 404)
-        if not await run.stop():
-            raise AppError(f"运行已经结束了（{run.s['status']}）", "run_ended", 409)
-        return {"ok": True, "run": rid, "status": run.s["status"]}
-
-    def _run(self, rid: str) -> TeamRun:
-        run = self.runs.get(rid) if RID_RE.match(rid or "") else None
-        if run is None:
-            raise AppError("没有这个运行", "not_found", 404)
-        return run
-
-    async def retry(self, rid: str, roles: Any = None, note: str = "") -> dict[str, Any]:
-        """重试: the failed roles of *rid* (all of them, or those named) get another round; an ended run carries on."""
-        run = self._run(rid)
-        self._not_imported(run, "重试")
-        if roles is not None and (not isinstance(roles, list) or not all(isinstance(r, str) for r in roles)):
-            raise AppError("roles 必须是角色名的列表", "invalid_roles")
-        async with self._creating:
-            active = [r.rid for r in self.runs.values() if not r.ended and r.rid != run.rid]
-            if active:
-                raise AppError(f"已经有一个运行在跑（{active[0]}），一次只跑一个", "run_active", 409)
-            picked = await run.retry(roles or None, note=note)
-        if not picked:
-            raise AppError("没有失败的角色可以重试", "nothing_to_retry", 409)
-        return {"ok": True, "run": run.rid, "roles": picked, "status": run.s["status"]}
-
-    async def gate(self, rid: str, role: str, decision: str, note: str = "", delivery: Any = None,
-                   answers: Any = None, risk: Any = None) -> dict[str, Any]:
-        """A person at a gate: approve, send the role back with what to change, or 讨论 (it answers; the gate stays).
-        *delivery*: the 交付标签 they confirm; *answers*: their choice for each question the role put to them; *risk*:
-        with 退回, what the send-back kept from going live (``{what, amount}``)."""
-        run = self._run(rid)
-        spec = run.roles.get(role) or {}
-        pending = bool(spec) and run.lane(role).get("gate") == "pending"
-        if decision == "discuss" and pending and not note.strip():
-            raise AppError("讨论要写下你想问的或想商量的", "no_message")
-        if decision == "discuss" and pending and not run.discuss_allowed(role):
-            raise AppError("这个关卡不能讨论（团队没有打开，或讨论的轮数用完了）", "no_discuss", 409)
-        if decision == "approve" and pending and run.lane(role).get("overrule") and not note.strip():
-            raise AppError("审查还说要改：推翻审查结论放行要写理由（会记在签字单上）", "no_reason")
-        if (decision == "revise" and pending and not spec.get("writable")
-                and not team_mod.review_targets(note, run.team["roles"])
-                and not team_mod.review_targets(run.overrule_review(role), run.team["roles"])):
-            raise AppError("退回要写明打回给谁，比如「打回：前端开发 #2」", "no_target")
-        if not await run.gate(role, decision, note, delivery, answers, risk if decision == "revise" else None):
-            raise AppError("这个角色现在没有在等人批准", "not_gated", 409)
-        return {"ok": True, "run": run.rid, "role": role, "decision": decision, "status": run.s["status"]}
-
-    async def signoff(self, rid: str, by: str, note: str = "") -> dict[str, Any]:
-        """签字放行: a person takes responsibility for releasing what the team delivered (a finished run only: the
-        machine checks and the independent review are in, the person signs for the release)."""
-        run = self._run(rid)
-        if not run.ended:
-            raise AppError("运行结束以后才能签字", "run_active", 409)
-        if run.sign_block():
-            raise AppError(run.sign_block(), "not_signable", 409)
-        if run.s.get("signoff"):
-            raise AppError(f"已经由 {run.s['signoff']['by']} 签过了", "signed", 409)
-        t = run.s["tests"]
-        run.s["signoff"] = {"by": by, "note": note, "at": self._deps.now(), "tests": f"{t['passed']}/{t['total']}"}
-        pr = run.pr() or {}
-        run.s["signoff"]["merged"] = await run.merge_pr()
-        merged = f"PR #{pr.get('number')} 合入 main（{run.s['signoff']['merged']}）" if run.s["signoff"]["merged"] else ""
-        run.emit("signoff", f"{by} 签字放行" + (f"：{note}" if note else "") + (f"；{merged}" if merged else ""), role=None)
-        await run.save()
-        return {"ok": True, "run": run.rid, "signoff": run.s["signoff"]}
-
-    async def import_run(self, state: Any, events: Any, replace: bool = False) -> dict[str, Any]:
-        """导入: a finished run recorded on another Mac (its run.json and events.jsonl), to look at and replay here. Its record only:
-        the code and the Kiro Crew sessions stayed there, so it cannot be retried, opened in a folder or run as a site.
-        *replace*: a run imported before is replaced by this record (a run of this Mac never is)."""
-        if not isinstance(state, dict) or not isinstance(events, list) or not all(isinstance(e, dict) for e in events):
-            raise AppError("导入的内容要有 run（运行记录）和 events（事件列表）", "invalid_import")
-        rid = str(state.get("id") or "")
-        if not RID_RE.match(rid):
-            raise AppError(f"运行编号不对：{rid!r}", "invalid_import")
-        if state.get("status") not in team_mod.ENDED:
-            raise AppError("只能导入已经结束的运行", "invalid_import")
-        if not isinstance(state.get("lanes"), dict) or not isinstance(state.get("team"), dict):
-            raise AppError("运行记录不完整（缺 lanes 或 team）", "invalid_import")
-        if rid in self.runs and not (replace and self.runs[rid].s.get("imported")):
-            raise AppError(f"已经有这次运行了：{rid}", "exists", 409)
-        state = {**state, "imported": dict(state.get("imported") or {"from": "另一台 Mac"}), "hidden": False}
-        events = sorted(events, key=lambda e: int(e.get("seq") or 0))
-        if events:
-            state["seq"] = max(int(state.get("seq") or 0), int(events[-1].get("seq") or 0))
-        lines = [json.dumps(e, ensure_ascii=False) + "\n" for e in events]
-        if rid in self.runs:  # replacing an imported run: its events are written again from the start (write appends)
-            await asyncio.to_thread((self.data_dir / "runs" / rid / "events.jsonl").unlink, missing_ok=True)
-        await asyncio.to_thread(self._deps.store.write, rid, json.dumps(state, ensure_ascii=False), lines)
-        try:
-            self.runs[rid] = TeamRun(state, self._deps, events[-200:])
-        except Exception as exc:  # noqa: BLE001
-            raise AppError(f"运行记录读不了：{exc}", "invalid_import") from exc
-        self._events_cache.pop(rid, None)
-        return {"ok": True, "run": rid, "title": state.get("title"), "events": len(events)}
-
-    def _not_imported(self, run: TeamRun, what: str) -> None:
-        if run.s.get("imported"):
-            raise AppError(f"这是从别的 Mac 导入的运行，只带运行记录，不能{what}", "imported", 409)
-
-    async def hide_run(self, rid: str) -> dict[str, Any]:
-        """从列表里删除: a finished run leaves the page's list; its record, code and sessions stay on disk."""
-        run = self._run(rid)
-        if not run.ended:
-            raise AppError("运行还在进行，先停止再删除", "run_active", 409)
-        run.s["hidden"] = True
-        await run.save()
-        return {"ok": True, "run": run.rid}
-
-    def folder(self, rid: str, role: str | None = None) -> Path:
-        """Where a run's code is: the run branch's worktree (everything merged), or one role's own worktree."""
-        run = self._run(rid)
-        self._not_imported(run, "打开文件夹（代码在原来那台 Mac 上）")
-        if role in (None, "", "run"):
-            path = run.s.get("run_wt")
-        elif role in run.roles:
-            path = run.lane(role).get("worktree")
-        else:
-            raise AppError("没有这个角色", "not_found", 404)
-        if not path or not Path(path).is_dir():
-            raise AppError("这个文件夹还没建出来", "no_folder", 404)
-        return Path(path)
-
-    async def open_folder(self, rid: str, role: Any = None, app: Any = "finder") -> dict[str, Any]:
-        """Open the folder on this Mac: in Finder, or in the Kiro IDE. Only a run's own folders, never a path from
-        the request."""
-        if role is not None and not isinstance(role, str):
-            raise AppError("role 必须是角色名", "invalid_role")
-        if app not in ("finder", "kiro"):
-            raise AppError("app 只能是 finder 或 kiro", "invalid_app")
-        path = self.folder(rid, role)
-        cmd = ["/usr/bin/open", str(path)] if app == "finder" else ["/usr/bin/open", "-a", "Kiro", str(path)]
-        rc = await self._opener(cmd)
-        if rc not in (0, None):
-            raise AppError("打不开：" + ("没装 Kiro" if app == "kiro" else "open 命令失败"), "open_failed", 502)
-        return {"ok": True, "path": str(path), "app": app}
-
-    async def events(self, rid: str) -> dict[str, Any]:
-        """Every event of a run, for the replay (the board carries only the latest ones)."""
-        run = self._run(rid)
-        evs = await asyncio.to_thread(store_mod.all_events, self.data_dir / "runs" / run.rid / "events.jsonl")
-        return {"run": run.rid, "events": [{**e, "text": self.scrub(str(e.get("text", "")))} for e in evs]}
-
-    async def role_output(self, rid: str, role: str) -> dict[str, Any]:
-        return await outputs.role_output(self._run(rid), role, mgr=self.manager(), scrub=self.scrub)
-
-    async def file_view(self, rid: str, role: str, path: Any, view: str) -> dict[str, Any]:
-        run = self._run(rid)
-        self._not_imported(run, "看文件内容（代码在原来那台 Mac 上）")
-        return await outputs.file_view(run, role, path, view)
-
-    def site_status(self, rid: str) -> dict[str, Any]:
-        return self.site.status(self._run(rid).rid)
-
-    async def start_site(self, rid: str) -> dict[str, Any]:
-        run = self._run(rid)
-        self._not_imported(run, "打开网站（代码在原来那台 Mac 上）")
-        if not run.ended:
-            raise AppError("运行结束以后才能打开网站：运行中 app 要在这个目录里合并和跑测试", "run_active", 409)
-        if not run.s.get("base"):
-            raise AppError("这个运行还没有代码", "no_code", 409)
-        return await self.site.start(run.rid, Path(run.s["run_wt"]))
-
-    async def stop_site(self, rid: str) -> dict[str, Any]:
-        run = self._run(rid)
-        if self.site.rid == run.rid:
-            await self.site.stop()
-        return self.site.status(run.rid)
-
-    async def _redeploy_latest(self) -> None:
-        """The app stopping stops the site it started: when it starts again, the newest run deployed within its time
-        is deployed again the same way, so the demo's last step still opens."""
-        try:
-            done = [r for r in self.runs.values() if r.ended and not r.s.get("imported") and not r.s.get("hidden")
-                    and any(r.lane(k).get("deployed") for k in r.order)]
-            if not done:
-                return
-            run = max(done, key=lambda r: float(r.s.get("ended_at") or 0))
-            key = next(k for k in run.order if run.lane(k).get("deployed"))
-            spec = run.roles[key].get("deploy") or {}
-            if time.time() - float(run.lane(key)["deployed"].get("at") or 0) > float(spec.get("ttl_min") or 120) * 60:
-                return
-            res = await self._deploy(run.rid, Path(run.s["run_wt"]), spec)
-            self.log.info("aidlc-team: redeployed %s after a restart: %s", run.rid, res.get("url") or res.get("error"))
-        except Exception:  # noqa: BLE001
-            self.log.exception("aidlc-team: redeploying after a restart failed")
-
-    async def _deploy(self, rid: str, wt: Path, spec: dict[str, Any]) -> dict[str, Any]:
-        """部署执行 for a deploy role: the port and health path from the role's ``deploy/local.json`` (else the team's
-        defaults), the service started on 127.0.0.1 from the run worktree, healthy only when the path answers 200."""
-        cfg: dict[str, Any] = {}
-        path = wt / "deploy" / "local.json"
-        if path.is_file():
-            try:
-                cfg = json.loads(await asyncio.to_thread(path.read_text, encoding="utf-8"))
-            except ValueError as exc:
-                return {"ok": False, "error": f"deploy/local.json 不是合法的 JSON：{exc}"}
-        elif spec.get("config_required", True):
-            return {"ok": False, "error": "没有 deploy/local.json（要写明 port 和 health）"}
-        port = cfg.get("port", spec.get("port", 8080))
-        health = cfg.get("health", spec.get("health", "/"))
-        if not isinstance(port, int) or not 1024 <= port <= 65535:
-            return {"ok": False, "error": f"deploy/local.json 的 port 要是 1024 到 65535 的整数：{port!r}"}
-        if not isinstance(health, str) or not health.startswith("/") or len(health) > 200:
-            return {"ok": False, "error": f"deploy/local.json 的 health 要是以 / 开头的路径：{health!r}"}
-        st = await self.site.start(rid, wt, port=port, ttl_s=float(spec.get("ttl_min") or 120) * 60)
-        if st["state"] != "running":
-            return {"ok": False, "error": st.get("error") or "服务没起来"}
-        code = await site_mod.http_status(int(st["port"]), health)
-        if code != 200:
-            await self.site.stop()
-            return {"ok": False, "error": f"健康检查 GET {health} 返回 {code or '没有应答'}，不是 200"}
-        note = "" if st["port"] == port else f"{port} 被占用，换成了 {st['port']}"
-        return {"ok": True, "url": st["url"], "note": note}
-
-
-    def cards(self) -> list[dict[str, Any]]:
-        return board.cards(self.runs)
-
-    def route(self, requirement: str) -> dict[str, Any]:
-        """组队预览: which team the orchestrator picks for *requirement*, and why (no run is started); with the
-        company standards it touches, which of its members Kiro Crew has, and its knowledge source."""
-        out = routing.route(requirement)
-        pick = out.get("team")
-        names = self.member_names()
-        out["crew"] = {"members": sorted(names) if names is not None else None, "error": self.crew.get("error") or ""}
-        if pick:
-            try:
-                full = load_team(TEAM_DIR / pick["file"])
-            except (OSError, ValueError):
-                full = {}
-            out["standards"] = standards_mod.match(requirement, full)
-            out["knowledge"] = self.knowledge_view(str((full.get("knowledge") or {}).get("source") or ""))
-            here = self.member_names(full["workspace"]) if full.get("workspace") else names  # as create_run looks
-            for r in pick["roles"]:
-                r["on_crew"] = None if here is None or not r.get("member") else r["member"] in here
+        for key, r in sorted(latest.items()):
+            facts = {"key": key, "claim": None, "where": "runner", "branch": None, "owner": r.get("owner"),
+                     "worktree": None, "stages": [], "events": [], "approvals": [], "run": None, "park": None}
+            path = r.get("path")
+            if path and os.path.isdir(path):
+                from .repo import Git
+                got = read_facts(Source(Git(path), path=path), key, "runs")
+                facts.update(got, worktree=path, stages=lean_view.stages(got["events"]))
+                facts["branch"] = (got["run"] or {}).get("branch")
+            row = deliveries.base_row("runner", facts)
+            row["where"] = "runner"
+            decs = [d for d in led["decisions"] if d["run_id"] in all_ids[key]]
+            deliveries.team_classify(row, r, decs, facts.get("park"))
+            if r.get("state") in ("merged", "closed"):
+                row["state"] = "merged" if r["state"] == "merged" else "closed"
+                row["state_label"] = deliveries.STATE_LABEL[row["state"]]
+            row["run_ids"] = all_ids[key]
+            row["credits"] = round(sum(snap["credits"].get(x, 0.0) for x in all_ids[key]), 3) or None
+            row["sessions"] = sum(len(snap["by"].get(x, [])) for x in all_ids[key])
+            row["mr"] = {"iid": int(r["iid"]), "url": self.team.mr_url(r["project"], r["iid"]), "state": None}
+            row["updated_at"] = lean_view.epoch(r.get("updated"))
+            out.append((row, facts, decs))
         return out
 
-    async def cleanup_sessions(self) -> dict[str, Any]:
-        """清理已结束的会话: delete the Kiro Crew sessions and folders this app opened, except those of a running run and of
-        a signed one (a run a person signed off is one to show again: its sessions stay openable)."""
-        keep = {r.parent for r in self.runs.values() if not r.ended or r.s.get("signoff")}
+    def _overview_sync(self, which: str, snap: dict[str, Any]) -> dict[str, Any]:
+        rows, errors, all_decisions, q_counts = [], [], [], {"asked": 0, "answered": 0, "delivered": 0}
+        for rid, repo in self.repos.items():
+            if which not in ("all", rid):
+                continue
+            try:
+                facts = repo.scan()
+            except Exception as exc:  # noqa: BLE001
+                errors.append({"repo": rid, "error": str(exc)[:300]})
+                continue
+            for f in facts:
+                row = self._row(repo, f, snap)
+                rows.append(row)
+                all_decisions += detail.decisions(f.get("decisions_text"), "decisions.md", repo.cfg.get("bot_users") or [])
+        for rid, (path, err) in self.repo_errors.items():
+            if which in ("all", rid):
+                errors.append({"repo": rid, "error": "%s：%s" % (path, err)})
+        if which in ("all", "runner"):
+            for row, _, decs in self._team_rows(snap):
+                rows.append(row)
+                for d in decs:
+                    if d.get("state") == "invalid":
+                        continue
+                    q_counts["asked"] += 1
+                    q_counts["answered"] += d.get("state") in ("answered", "signing", "delivered", "delivery_unknown")
+                    q_counts["delivered"] += d.get("state") == "delivered"
+        overlaps = deliveries.overlaps(rows)
+        view, funnel = self._eval_view(which, snap)
+        if funnel is None:
+            funnel = deliveries.funnel_app(all_decisions, q_counts)
+        else:
+            funnel["questions"] = q_counts
+        return {"at": self.now(), "rows": rows, "overlaps": overlaps, "funnel": funnel, "eval": view,
+                "counts": deliveries.counts(rows), "errors": errors}
+
+    def _eval_view(self, which: str, snap: dict[str, Any]) -> tuple[dict[str, Any], dict | None]:
+        """Eval from the cache (computed in the background, at most every EVAL_TTL_S per repo and main sha)."""
+        ids = [rid for rid in self.repos if which in ("all", rid)]
+        if not bk.has("evaluate"):
+            return deliveries.evaluate("", {}, None, None)
+        views, funnels, stale = [], [], []
+        for rid in ids:
+            repo = self.repos[rid]
+            sha = repo.git.out("rev-parse", "-q", "--verify", (repo.main_ref() or "HEAD") + "^{commit}")
+            got = self._eval.get(rid)
+            if not got or got[0] != sha or time.monotonic() - got[1] > EVAL_TTL_S:
+                stale.append((rid, sha))
+            if got:
+                views.append(got[2])
+                if got[3]:
+                    funnels.append(got[3])
+        for rid, sha in stale:
+            if rid not in self._eval_running:
+                self._eval_running.add(rid)
+                credits = {"runs": {k.split("-", 1)[1]: {"credits": v} for k, v in snap["credits"].items()
+                                    if k.startswith(rid + "-")}}
+                threading_start(self._eval_compute, rid, sha, credits)
+        if not views:
+            return {"available": False, "error": "正在算 Eval…" if ids else "没有仓库", "ref": None, "metrics": [],
+                    "queue": []}, None
+        if len(views) == 1:
+            return views[0], (dict(funnels[0]) if funnels else None)
+        merged = {"available": any(v["available"] for v in views), "error": "；".join(v["error"] for v in views if v["error"]),
+                  "ref": None, "metrics": [], "queue": [q for v in views for q in v["queue"]]}
+        for m in views[0]["metrics"]:
+            vals = [next((x["value"] for x in v["metrics"] if x["id"] == m["id"]), None) for v in views]
+            pairs = [x for x in vals if isinstance(x, list)]
+            merged["metrics"].append({**m, "value": [sum(p[0] for p in pairs), sum(p[1] for p in pairs)] if pairs else None})
+        funnel = None
+        if funnels:
+            funnel = dict(funnels[0])
+            funnel["rows"] = [{**r, "count": sum(next((x["count"] for x in f["rows"] if x["id"] == r["id"]), 0)
+                                                 for f in funnels)} for r in funnels[0]["rows"]]
+            funnel["total"] = sum(f["total"] for f in funnels)
+        return merged, funnel
+
+    def _eval_compute(self, rid: str, sha: str, credits: dict[str, Any]) -> None:
         try:
-            done = await self.sessions.cleanup(keep)
+            repo = self.repos.get(rid)
+            if repo is None:
+                return
+            view, funnel = deliveries.evaluate(repo.path, repo.cfg, repo.main_ref(), credits)
+            self._eval[rid] = (sha, time.monotonic(), view, funnel)
         except Exception as exc:  # noqa: BLE001
-            raise AppError(f"清理会话失败：{exc}"[:300], "cleanup_failed", 502)
-        return {"ok": True, **done, "kept_runs": sorted(r.rid for r in self.runs.values() if not r.ended or r.s.get("signoff"))}
+            self._eval[rid] = (sha, time.monotonic(), {"available": False, "error": "Eval 算不出来：%s" % str(exc)[:200],
+                                                        "ref": None, "metrics": [], "queue": []}, None)
+        finally:
+            self._eval_running.discard(rid)
 
-    def board(self, rid: str | None = None) -> dict[str, Any]:
-        return board.build(self.runs, rid, mgr=self.manager(), scrub=self.scrub, now=time.time(), crew=self)
+    async def overview(self, which: str = "all") -> dict[str, Any]:
+        if which != "all" and not REPO_ID_RE.match(which or ""):
+            raise AppError("repo 只能是 all、r1、r2 … 或 runner", "invalid_repo")
+        snap = self._sessions_snapshot()
+        return await asyncio.to_thread(self._overview_sync, which, snap)
 
-    def _all_events(self, run: TeamRun) -> list[dict[str, Any]]:
-        """Every event of *run* (read again only when it has new ones)."""
-        seq = int(run.s.get("seq") or 0)
-        got = self._events_cache.get(run.rid)
-        if got is None or got[0] != seq:
-            got = (seq, store_mod.all_events(self.data_dir / "runs" / run.rid / "events.jsonl"))
-            self._events_cache[run.rid] = got
-        return got[1]
+    async def refresh(self, rid: str) -> dict[str, Any]:
+        ok, text = await asyncio.to_thread(self._repo(rid).fetch)
+        return {"ok": ok, "text": text}
 
-    async def cto(self) -> dict[str, Any]:
-        """CTO 视图: the company's deliveries and what is in progress, with this app's runs in them (cto.py)."""
+    # ---- 需求详情 ------------------------------------------------------------------------------------- #
+
+    def _facts(self, repo: Repo, key: str) -> dict[str, Any]:
+        if not KEY_RE.match(key or ""):
+            raise AppError("需求号不对", "invalid_key")
+        f = next((x for x in repo.scan() if x["key"] == key), None)
+        if f is None:
+            raise AppError("这个仓库里没有 %s" % key, "not_found", 404)
+        return f
+
+    def _vouchers_dir(self, repo: Repo) -> str | None:
+        s = os.environ.get("BRAIN_INTAKE_DIR") or repo.git.out("config", "brain.intake") or "~/.brain/intake"
+        d = os.path.join(os.path.abspath(os.path.expanduser(s)), "vouchers")
+        return d if os.path.isdir(d) else None
+
+    def _detail_sync(self, rid: str, key: str, snap: dict[str, Any]) -> dict[str, Any]:
+        if rid == "runner":
+            return self._team_detail(key, snap)
+        repo = self._repo(rid)
+        f = self._facts(repo, key)
+        row = self._row(repo, f, snap)
+        scope = scope_of(rid, key)
+        run = f.get("run") or {}
+        me = self.me()
+        own = bool(me) and me == (f.get("owner") or "")
+        base, project = self._gitlab_of(repo)
+        mr = self.mr.get(project, f["branch"]) if (base and project and f.get("branch")) else None
+        can_post = own and bool(base and project) and self._token_present()
+        questions = []
+        pq = detail.park_question(f.get("park"), answerable=own and not run.get("handoff") and bool(
+            self._live(snap["by"].get(scope, []))), via="session")
+        if pq:
+            questions.append(pq)
+        questions += detail.mr_questions(mr, own=own, can_post=can_post)
+        tl = self._timeline(repo, f, snap, scope)
+        return {
+            "row": row, "where_label": self._where_label(f),
+            "run": {"owner": run.get("owner"), "branch": run.get("branch"), "intent": run.get("intent"),
+                    "brain_commit": run.get("brain_commit"), "origin": run.get("origin"),
+                    "created_at": run.get("created_at"),
+                    "materials": [str(m.get("package")) for m in run.get("materials") or [] if isinstance(m, dict)],
+                    "handoff": ({"requested_at": run["handoff"].get("requested_at"), "by": run["handoff"].get("by")}
+                                if isinstance(run.get("handoff"), dict) else None)} if f.get("run") else None,
+            "claim": self._claim_view(f.get("claim")),
+            "lean": {"stages": f.get("stages") or lean_view.stages([]),
+                     "approvals": [{k: a[k] for k in ("kind", "state", "sha8", "at", "line", "path")}
+                                   for a in f.get("approvals") or []],
+                     **lean_view.notes(f.get("state_text"))},
+            "decisions": detail.decisions(f.get("decisions_text"), "aidlc-docs/%s/decisions.md" % run.get("intent"),
+                                          repo.cfg.get("bot_users") or []),
+            "questions": questions,
+            "timeline": {k: tl[k] for k in ("source", "items", "missing", "error")},
+            "sessions": [{k: s[k] for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
+                                             "last_activity", "opened_at", "project", "url", "error")}
+                         for s in snap["by"].get(scope, [])],
+            "credits": {"total": snap["credits"].get(scope), "note": detail.NO_TOKENS},
+            "brain": detail.brain_block(tl.get("brain"), None, f.get("decisions_text")),
+        }
+
+    def _timeline(self, repo: Repo, f: dict[str, Any], snap: dict[str, Any], scope: str) -> dict[str, Any]:
+        sig = (scope, f.get("tip"), f.get("worktree"), len(f.get("events") or []), f.get("park_sha"))
+        got = self._trace.get(sig)
+        if got and time.monotonic() - got[0] < TRACE_TTL_S:
+            tl = dict(got[1])
+        else:
+            src_repo, ref = (f["worktree"], None) if f.get("worktree") else (repo.path, f.get("ref"))
+            c = snap["credits"].get(scope)
+            tl = detail.timeline(src_repo, repo.cfg, f["key"], ref=ref, events=f.get("events") or [],
+                                 credits={"runs": {f["key"]: {"credits": c}}} if c is not None else None,
+                                 vouchers_dir=self._vouchers_dir(repo))
+            self._trace = {k: v for k, v in self._trace.items() if time.monotonic() - v[0] < TRACE_TTL_S}
+            self._trace[sig] = (time.monotonic(), dict(tl))
+        tl["items"] = sorted(tl["items"] + self.store.events(scope), key=lambda x: (x["at"] or "", x["kind"]))
+        return tl
+
+    def _team_detail(self, key: str, snap: dict[str, Any]) -> dict[str, Any]:
+        hit = next(((r, f, d) for r, f, d in self._team_rows(snap) if r["key"] == key), None)
+        if hit is None:
+            raise AppError("运行机上没有 %s" % key, "not_found", 404)
+        row, f, decs = hit
+        run = f.get("run") or {}
+        path = f.get("worktree")
+        tl = {"source": "app", "items": lean_view.stage_events(f.get("events") or []), "missing": [], "error": "",
+              "brain": None}
+        if path:
+            try:
+                cfg = bk.m("config").load(path)
+            except Exception:  # noqa: BLE001
+                cfg = dict(bk.m("config").DEFAULTS)
+            c = sum(snap["credits"].get(x, 0.0) for x in row["run_ids"]) or None
+            tl = detail.timeline(path, cfg, key, ref=None, events=f.get("events") or [],
+                                 credits={"runs": {x: {"credits": snap["credits"].get(x)} for x in row["run_ids"]
+                                                   if snap["credits"].get(x) is not None}} if c else None,
+                                 ledger_path=self.team.cfg.get("ledger"), vouchers_dir=self.team.cfg.get("vouchers_dir"),
+                                 allowed_signers=self.settings["team"].get("allowed_signers") or None)
+        for rid in row["run_ids"]:
+            tl["items"] += self.store.events(rid)
+        tl["items"].sort(key=lambda x: (x["at"] or "", x["kind"]))
+        sess = [s for x in row["run_ids"] for s in snap["by"].get(x, [])]
+        return {
+            "row": row, "where_label": "运行机工作区 %s" % (path or "（还没建）"),
+            "run": {"owner": run.get("owner"), "branch": run.get("branch"), "intent": run.get("intent"),
+                    "brain_commit": run.get("brain_commit"), "origin": run.get("origin"), "created_at": run.get("created_at"),
+                    "materials": [str(m.get("package")) for m in run.get("materials") or [] if isinstance(m, dict)],
+                    "handoff": ({"requested_at": run["handoff"].get("requested_at"), "by": run["handoff"].get("by")}
+                                if isinstance(run.get("handoff"), dict) else None)} if run else None,
+            "claim": None,
+            "lean": {"stages": f.get("stages") or lean_view.stages([]),
+                     "approvals": [dict({k: a[k] for k in ("kind", "state", "sha8", "at", "path")}, line=None)
+                                   for a in f.get("approvals") or []],
+                     **lean_view.notes(f.get("state_text"))},
+            "decisions": detail.decisions(f.get("decisions_text"), "decisions.md", []),
+            "questions": detail.ledger_questions(decs, row["mr"]["url"] if row.get("mr") else None),
+            "timeline": {k: tl[k] for k in ("source", "items", "missing", "error")},
+            "sessions": [{k: s[k] for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
+                                             "last_activity", "opened_at", "project", "url", "error")} for s in sess],
+            "credits": {"total": row["credits"], "note": detail.NO_TOKENS},
+            "brain": detail.brain_block(tl.get("brain"), None, f.get("decisions_text")),
+        }
+
+    @staticmethod
+    def _claim_view(c: Any) -> dict[str, Any] | None:
+        if not isinstance(c, dict):
+            return None
+        closed = c.get("closed")
+        return {"owner": c.get("owner"), "title": str(c.get("title") or "")[:200], "created_at": c.get("created_at"),
+                "source": str(c.get("source") or "product"),
+                "closed": (str((closed or {}).get("reason") or "已关闭")[:200] if closed else None)}
+
+    @staticmethod
+    def _where_label(f: dict[str, Any]) -> str:
+        return {"worktree": "这台机器的工作区 %s" % f.get("worktree"), "branch": "分支 %s（没在这台机器上检出）" % (f.get("ref") or ""),
+                "main": "默认分支（已合并）", "claim": "只有认领（claim/%s）" % f["key"], "runner": "运行机"}.get(f.get("where"), "")
+
+    async def requirement(self, rid: str, key: str) -> dict[str, Any]:
+        snap = self._sessions_snapshot()
+        return await asyncio.to_thread(self._detail_sync, rid, key, snap)
+
+    # ---- sessions and answers ------------------------------------------------------------------------- #
+
+    async def open_session(self, rid: str, key: str, trust: bool = True, kickoff: bool = True) -> dict[str, Any]:
+        repo = self._repo(rid)
+        f = await asyncio.to_thread(self._facts, repo, key)
+        run = f.get("run") or {}
+        if not run or run.get("handoff") or f.get("merged"):
+            raise AppError("只有本地开发中的需求能在这里开 brain-dev 会话", "not_local", 409)
+        if not f.get("worktree"):
+            raise AppError("这台机器上没有检出 %s 的分支：先 git worktree add 或在开需求里开工" % f.get("branch"), "no_worktree", 409)
+        return await self._open_local(repo, key, f["branch"], f["worktree"], run, trust=trust, kickoff=kickoff)
+
+    async def _open_local(self, repo: Repo, key: str, branch: str, wt: str, run: dict[str, Any], *, trust: bool,
+                          kickoff: bool) -> dict[str, Any]:
+        self.crew = await asyncio.to_thread(crewcheck.checks, [r.path for r in self.repos.values()])
+        if not crewcheck.agent_ok(self.crew["rows"]):
+            raise AppError("brain-dev 还没带上 Lean 的 hook：先在设置里修好（KiroCrew 检查）", "agent_not_ready", 409)
+        scope = scope_of(repo.id, key)
+        live = [i for i in self.sessions.roots(key=scope, kind="local") if i.slot and not
+                (self.sessions.slot_stats(i.slot) or {}).get("missing")]
+        if live:
+            return {"ok": True, "slot": live[-1].slot, "url": "/chat?sid=%s" % live[-1].slot}
+        task = intake.kickoff(key, branch, run.get("intent"),
+                              [str(m.get("package")) for m in run.get("materials") or [] if isinstance(m, dict)]) \
+            if kickoff else ""
+        slug = branch.rsplit("/", 1)[-1][len(key) + 1:] or key.lower()
+        info = await self.sessions.open_session(
+            task, parent_session_key="%s:%s" % (self.name, scope), cwd=wt, title="%s · 本地开发" % key,
+            folder="%s · %s" % (key, slug), agent=LOCAL_AGENT, root_folder=LOCAL_FOLDER, project_dir=wt,
+            strict_agent=True, resend_ok=True, nudge_ok=False, trust_ok=bool(trust), kind="local", key=scope)
+        if info.error or not info.slot:
+            raise AppError(info.error or "会话没开成", "session_failed", 502)
+        await asyncio.to_thread(self.store.append, scope, "app", "开了 brain-dev 会话",
+                                "%s%s" % (info.slot, "，信任这个会话" if trust else ""))
+        await self.sessions.save()
+        return {"ok": True, "slot": info.slot, "url": "/chat?sid=%s" % info.slot}
+
+    async def answer(self, rid: str, key: str, choice: Any, note: Any, did: Any = None) -> dict[str, Any]:
+        """A clarify question of the person's own run: into its local session, or as their own MR comment. Never a Lean
+        approval: a question with a lean_request is not answerable here."""
+        if not isinstance(choice, str) or not re.fullmatch(r"[A-H]", choice.strip().upper()):
+            raise AppError("回答选一个选项（A–H）", "invalid_choice")
+        choice = choice.strip().upper()
+        note = " ".join(str(note or "").split())[:300]
+        repo = self._repo(rid)
+        f = await asyncio.to_thread(self._facts, repo, key)
+        me = self.me()
+        if not me or me != f.get("owner"):
+            raise AppError("只有需求负责人本人能在这里回答（git config brain.user）", "not_owner", 403)
+        run = f.get("run") or {}
+        scope = scope_of(rid, key)
+        park = f.get("park")
+        if not run.get("handoff"):
+            if not deliveries.park_waiting(park) or park.get("kind") != "clarify" or park.get("lean_request"):
+                raise AppError("这个需求没有等你回答的澄清问题", "no_question", 409)
+            if choice not in {str(o.get("id")) for o in park.get("options") or [] if isinstance(o, dict)}:
+                raise AppError("没有选项 %s" % choice, "invalid_choice")
+            live = [i for i in self.sessions.roots(key=scope, kind="local") if i.slot]
+            if not live:
+                raise AppError("先开这个需求的 brain-dev 会话", "no_session", 409)
+            text = local_answer(choice, note)
+            turn = await self.sessions.continue_conversation_async(live[-1].id, text,
+                                                                   parent_session_key=live[-1].parent_session_key)
+            if turn.error:
+                raise AppError(turn.error, "send_failed", 502)
+            await asyncio.to_thread(self.store.append, scope, "app", "在 app 里回答了澄清问题：%s" % choice, None)
+            return {"ok": True, "via": "session", "text": "回答已送进会话"}
+        base, project = self._gitlab_of(repo)
+        mr = self.mr.get(project, f.get("branch") or "") if base and project else None
+        open_q = [q for q in (mr or {}).get("questions") or [] if q.get("state") == "open" and q.get("kind") == "clarify"
+                  and not q.get("lean_request") and (not did or q.get("id") == did)]
+        if not mr or not open_q:
+            raise AppError("MR 上没有等你回答的澄清问题", "no_question", 409)
+        q = open_q[-1]
+        if q.get("options") and choice not in {o["id"] for o in q["options"]}:
+            raise AppError("没有选项 %s" % choice, "invalid_choice")
         try:
-            return await asyncio.to_thread(cto_mod.build, self.runs, self._deps.now(), events_of=self._all_events)
-        except (OSError, ValueError, KeyError) as exc:
-            raise AppError(f"CTO 视图的数据读不了：{exc}"[:300], "cto_data", 500)
+            await asyncio.to_thread(self.mr.post_answer, base, project, mr["iid"], q["id"], choice, note,
+                                    transport=self.transport)
+        except Exception as exc:  # noqa: BLE001
+            raise AppError("发不到 MR 上：%s" % str(exc).split("\n", 1)[0][:200], "post_failed", 502)
+        await asyncio.to_thread(self.store.append, scope, "app", "在 MR 上回答了 %s：%s" % (q["id"], choice), None)
+        return {"ok": True, "via": "mr", "text": "已经以你的 GitLab 身份发在 MR 上：桥核对后送回运行机"}
 
-    async def cto_flow(self, rid: str) -> dict[str, Any]:
-        """交付详情: the 价值流 of one run (cto.flow): its segments, moments and numbers."""
-        run = self._run(rid)
-        return await asyncio.to_thread(cto_mod.flow, run, self._all_events(run), self._deps.now())
+    # ---- 开需求 --------------------------------------------------------------------------------------- #
 
-    async def cto_offline(self) -> dict[str, Any]:
-        """离线版: the offline page with this moment's data, as {name, html} for the page to save."""
-        data = await self.cto()
-        stamp = time.strftime("%Y-%m-%d %H:%M", time.localtime(self._deps.now()))
+    async def intake_next(self, rid: str) -> dict[str, Any]:
+        return await asyncio.to_thread(intake.next_key, self._repo(rid))
+
+    async def intake_check(self, body: dict[str, Any]) -> dict[str, Any]:
+        repo = self._repo(str(body.get("repo") or ""))
+        return await asyncio.to_thread(intake.check, repo, body, self.me())
+
+    async def intake_start(self, body: dict[str, Any]) -> dict[str, Any]:
+        repo = self._repo(str(body.get("repo") or ""))
         try:
-            return await asyncio.to_thread(cto_mod.offline, data, generated=stamp)
-        except OSError as exc:
-            raise AppError(f"离线版的页面模板读不了：{exc}"[:300], "cto_offline", 500)
+            out = await asyncio.to_thread(intake.start, repo, body, self.settings["work_root"])
+        except intake.IntakeError as exc:
+            raise AppError(str(exc), "invalid_intake")
+        if not out["ok"]:
+            return out
+        scope = scope_of(repo.id, out["key"])
+        await asyncio.to_thread(self.store.append, scope, "app", "在 app 里开工",
+                                "工作区 %s，分支 %s" % (out["worktree"], out["branch"]))
+        if body.get("open_session", True):
+            f = await asyncio.to_thread(self._facts, repo, out["key"])
+            try:
+                got = await self._open_local(repo, out["key"], out["branch"], out["worktree"], f.get("run") or {},
+                                             trust=body.get("trust", True) is not False, kickoff=True)
+                out.update(slot=got["slot"], url=got["url"])
+            except AppError as exc:
+                out["session_error"] = str(exc)
+        return out
+
+    # ---- KiroCrew checks ------------------------------------------------------------------------------ #
+
+    async def crew_checks(self) -> dict[str, Any]:
+        self.crew = await asyncio.to_thread(crewcheck.checks, [r.path for r in self.repos.values()])
+        return self.crew
+
+    async def crew_fix(self, what: Any) -> dict[str, Any]:
+        if what not in ("agent", "engine"):
+            raise AppError("what 只能是 agent 或 engine", "invalid_fix")
+        try:
+            text = await asyncio.to_thread(crewcheck.fix_agent if what == "agent" else crewcheck.fix_engine)
+            ok = True
+        except Exception as exc:  # noqa: BLE001
+            text, ok = str(exc)[:300], False
+        self.crew = await asyncio.to_thread(crewcheck.checks, [r.path for r in self.repos.values()])
+        return {"ok": ok, "text": text, "rows": self.crew["rows"]}
+
+    # ---- Brain ---------------------------------------------------------------------------------------- #
+
+    def _reflectable(self, repo: Repo) -> list[dict[str, Any]]:
+        out = []
+        for f in repo.scan():
+            t = f.get("decisions_text") or ""
+            if "brain-proposal" in t or "brain-gap" in t:
+                row = deliveries.base_row(repo.id, f)
+                deliveries.classify(row, f, mr=None, slot=None, cfg=repo.cfg)
+                out.append({"key": f["key"], "title": row["title"], "state": row["state"]})
+        return out
+
+    async def brain(self, rid: str) -> dict[str, Any]:
+        repo = self._repo(rid)
+        return await asyncio.to_thread(lambda: brainview.view(repo, self._reflectable(repo)))
+
+    async def reflect_preview(self, rid: str, key: str) -> dict[str, Any]:
+        repo = self._repo(rid)
+        f = await asyncio.to_thread(self._facts, repo, key)
+        return await asyncio.to_thread(brainview.preview, repo, f, self._vouchers_dir(repo))
+
+    async def reflect_apply(self, rid: str, key: str, push: bool) -> dict[str, Any]:
+        repo = self._repo(rid)
+        f = await asyncio.to_thread(self._facts, repo, key)
+        out = await asyncio.to_thread(brainview.apply, repo, f, push)
+        await asyncio.to_thread(self.store.append, scope_of(rid, key), "app",
+                                "brain reflect --apply%s：%s" % (" --push" if push else "", "成功" if out["ok"] else "失败"),
+                                out.get("branch"))
+        return out
+
+    # ---- 待办 ----------------------------------------------------------------------------------------- #
+
+    def _todo_sync(self, snap: dict[str, Any]) -> dict[str, Any]:
+        entries = []
+        me = self.me()
+        token = self._token_present()
+        for rid, repo in self.repos.items():
+            try:
+                facts = repo.scan()
+            except Exception:  # noqa: BLE001
+                continue
+            base, project = self._gitlab_of(repo)
+            for f in facts:
+                row = self._row(repo, f, snap)
+                if row["state"] in ("merged", "closed"):
+                    continue
+                live = self._live(snap["by"].get(scope_of(rid, f["key"]), []))
+                own = bool(me) and me == f.get("owner")
+                entries.append({"row": row, "facts": f, "own": own, "has_session": bool(live),
+                                "can_post": own and bool(base and project) and token,
+                                "mr": self.mr.get(project, f.get("branch") or "") if base and project else None,
+                                "session": {"slot": live["slot"], "title": live["title"], "url": live["url"]} if live else None})
+        out = todo_mod.build(entries, team=False, crew_rows=self.crew["rows"])
+        if self.team is not None and self.team.host is not None:
+            team_entries = [{"row": row, "decisions": decs, "mr_url": (row.get("mr") or {}).get("url")}
+                            for row, _, decs in self._team_rows(snap)]
+            t = todo_mod.build(team_entries, team=True, crew_rows=[])
+            out["items"] += t["items"]
+            out["team"] = True
+        return out
+
+    async def todo(self) -> dict[str, Any]:
+        snap = self._sessions_snapshot()
+        return await asyncio.to_thread(self._todo_sync, snap)
+
+    # ---- status, settings ----------------------------------------------------------------------------- #
+
+    def _team_status(self) -> dict[str, Any]:
+        if self.team is None:
+            on = bool(self.settings["team"].get("enabled"))
+            return {"enabled": on, "ok": False, "error": "运行机模式没打开" if not on else "brain-kit 没装载",
+                    "last_loop_at": None, "loop_error": "", "key_readable": False, "signer": {"pending": 0, "refused": 0}}
+        return self.team.status()
+
+    async def status(self) -> dict[str, Any]:
+        info = bk.info()
+        repos = []
+        for i, path in enumerate(self.settings["repos"], 1):
+            rid = "r%d" % i
+            r = self.repos.get(rid)
+            if r is not None:
+                g = r.cfg.get("gitlab") or {}
+                repos.append({"id": rid, "path": r.path, "name": r.name, "ok": True, "error": "",
+                              "kit": {"tracker": r.cfg["tracker"], "req_prefix": r.cfg["req_prefix"],
+                                      "default_branch": r.cfg["default_branch"], "gitlab_base": str(g.get("base") or ""),
+                                      "gitlab_project": str(g.get("project") or "")}})
+            else:
+                p, err = self.repo_errors.get(rid, (path, "没装载"))
+                repos.append({"id": rid, "path": p, "name": os.path.basename(p), "ok": False, "error": err, "kit": None})
+        todo = await self.todo()
+        token = await asyncio.to_thread(self._token_present)
+        me = await asyncio.to_thread(self.me)
+        return {"app": {"name": self.name, "version": VERSION, "team": self.team is not None},
+                "brainkit": {"path": info["path"], "ok": info["ok"], "version": info["version"], "error": info["error"],
+                             "modules": info["modules"]},
+                "repos": repos, "crew": self.crew,
+                "me": {"user": me, "token": token,
+                       "how": "GitLab token（%s）" % ("有" if token else "没有") + ("；git config brain.user = %s" % me if me else "")},
+                "team": self._team_status(), "counts": {"todo": len(todo["items"])}}
+
+    def settings_view(self) -> dict[str, Any]:
+        return {**self.settings, "team": dict(self.settings["team"])}
+
+    async def save_settings(self, body: Any) -> dict[str, Any]:
+        clean, probs = settings_mod.check(body)
+        if probs:
+            raise AppError("；".join(probs), "invalid_settings")
+        await asyncio.to_thread(settings_mod.save, self.data_dir / "settings.json", clean)
+        self.settings = clean
+        if self.team is not None:
+            await asyncio.to_thread(self.team.stop)
+            self.team = None
+        await asyncio.to_thread(bk.unload)
+        await asyncio.to_thread(self.reload_sync)
+        if self.started:
+            await self._start_team()
+            if self.team is not None and not any(getattr(t, "_brain_team", False) for t in self._tasks if not t.done()):
+                t = asyncio.get_running_loop().create_task(self._team_forever())
+                t._brain_team = True  # type: ignore[attr-defined]
+                self._tasks.append(t)
+        return {"ok": True, "settings": self.settings_view(), "status": await self.status()}
+
+    # ---- team mode ------------------------------------------------------------------------------------ #
+
+    async def team_view(self) -> dict[str, Any]:
+        if self.team is None:
+            return {"status": self._team_status(), "ledger": {"runs": {}, "decisions": {}, "handoffs": {}}, "runs": [],
+                    "signer": {"pending": [], "refused": []}}
+        led = await asyncio.to_thread(self.team.ledger)
+        return {"status": self.team.status(), "ledger": self.team.counts(led),
+                "runs": [{"run_id": r["run_id"], "req": r["req"], "project": r["project"], "iid": int(r["iid"]),
+                          "state": r["state"], "slot": r.get("slot"), "mr_url": self.team.mr_url(r["project"], r["iid"]),
+                          "updated": r.get("updated")} for r in led["runs"]],
+                "signer": await asyncio.to_thread(self.team.signer_view)}
+
+    async def team_loop(self) -> dict[str, Any]:
+        if self.team is None or self.team.host is None:
+            raise AppError((self.team.error if self.team else "") or "运行机模式没打开", "team_off", 409)
+        try:
+            summary = await self._in_team(self.team.loop_once)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "summary": {}, "error": str(exc)[:300]}
+        return {"ok": not self.team.loop_error, "summary": summary, "error": self.team.loop_error}
 
 
-CREW_REFRESH_S = 5.0
-
-
-async def _open_on_this_mac(cmd: list[str]) -> int | None:
-    proc = await asyncio.create_subprocess_exec(*cmd, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL,
-                                                stderr=asyncio.subprocess.DEVNULL)
+def local_answer(choice: str, note: str) -> str:
+    """The person's answer to their local agent's clarify question: the choice and a neutralized one-line note (a line
+    that reads like an approval or an instruction is quoted, as brain-kit's bridge does)."""
+    n = note
     try:
-        return await asyncio.wait_for(proc.wait(), 10)
-    except asyncio.TimeoutError:
-        return None
+        neutral = bk.m("bridge.decisions")._neutral_note
+        n = neutral(note)
+    except Exception:  # noqa: BLE001
+        if re.match(r"(?i)^\s*(approve|approved|批准|同意|reject|驳回)\b", n):
+            n = "> " + n
+    lines = ["（本地）澄清问题已答：%s。" % choice]
+    if n:
+        lines.append("说明：%s" % n)
+    lines.append("把 park.json 的 status 改成 answered，按这个回答继续。")
+    return "\n".join(lines)
+
+
+def threading_start(fn: Callable[..., Any], *args: Any) -> None:
+    threading.Thread(target=fn, args=args, daemon=True, name="brain-eval").start()
 
 
 def get_or_build(ctx: Any) -> Service:
@@ -587,3 +849,4 @@ def current(name: str = APP_NAME) -> Service | None:
 
 def discard(name: str = APP_NAME) -> Service | None:
     return _REGISTRY.pop(name, None)
+

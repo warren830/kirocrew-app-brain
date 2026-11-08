@@ -1,89 +1,17 @@
-"""The session runner: a role's agent is a Kiro Crew chat session the app opens, sends to, watches and cleans up."""
+"""The session runner (kept from the aidlc-team sample): a session the app opens, sends to, watches and cleans up."""
 
 import asyncio
 import itertools
 import logging
 
-from teamkit import mod
+from appkit import FakeGateway, GatewayError, mod
 
-sessions, routing, gateway_mod = mod("sessions"), mod("routing"), mod("gateway")
-GatewayError = gateway_mod.GatewayError
-
-
-class FakeGateway:
-    """The chat API the runner calls, in memory: a turn starts busy and ends with the scripted rows."""
-
-    def __init__(self) -> None:
-        self.folder_rows, self.slot_rows, self.msgs = [], {}, {}
-        self.calls, self.script = [], []
-        self.ids = itertools.count(1)
-
-    async def folders(self):
-        return list(self.folder_rows)
-
-    async def create_folder(self, name, parent_id=None, project_dir=None):
-        f = {"id": f"f{next(self.ids)}", "name": name, "parent_id": parent_id, "owner_app": "aidlc-team"}
-        self.folder_rows.append(f)
-        self.calls.append(("folder", name, parent_id))
-        return f
-
-    async def hide_folder(self, fid):
-        for f in self.folder_rows:
-            if f["id"] == fid:
-                f["hidden"] = True
-        self.calls.append(("hide_folder", fid))
-
-    async def slots(self):
-        return list(self.slot_rows.values())
-
-    absent = ()  # Crew members that are not there (a slot asking for one as a member gets 409)
-    templates = None  # the template files of ~/.kiro/agents (None: any template asked for is there)
-
-    async def create_slot(self, name, title, folder_id, model="", memory_mode="incognito", agent="", agent_kind=""):
-        if agent and agent_kind == "member" and agent in self.absent:
-            raise GatewayError(409, "no such member", "agent_choice_unavailable")
-        if agent and agent_kind == "template" and self.templates is not None and agent not in self.templates:
-            raise GatewayError(409, "no such template", "agent_choice_unavailable")
-        self.calls.append(("agent", agent, agent_kind))
-        self.slot_rows[name] = {"key": name, "title": title, "folder_id": folder_id, "app": "aidlc-team", "running": False}
-        self.msgs[name] = []
-        self.calls.append(("slot", name, title, model))
-        return {"key": name}
-
-    async def set_project(self, key, project):
-        self.slot_rows[key]["project"] = project
-
-    async def trust(self, key):
-        self.slot_rows[key]["trust"] = True
-
-    async def send(self, key, message, send_id):
-        self.calls.append(("send", key, send_id))
-        self.msgs[key].append({"role": "user", "content": message, "meta": {"sendId": send_id}})
-        rows = self.script.pop(0) if self.script else [{"role": "assistant", "content": "DONE: 好了", "meta": {}}]
-        self.slot_rows[key]["running"] = True
-        self.slot_rows[key]["_pending"] = rows
-        return {"ok": True}
-
-    def finish(self, key):
-        row = self.slot_rows[key]
-        self.msgs[key].extend(row.pop("_pending", []))
-        row["running"] = False
-
-    async def messages(self, key, limit=120):
-        return list(self.msgs[key])[-limit:]
-
-    async def stop(self, key):
-        self.calls.append(("stop", key))
-        self.slot_rows[key]["running"] = False
-
-    async def delete_slot(self, key):
-        self.slot_rows.pop(key, None)
-        self.calls.append(("delete_slot", key))
+sessions = mod("sessions")
 
 
 def make(tmp_path, gw=None):
     gw = gw or FakeGateway()
-    return gw, sessions.SessionManager(gw, app="aidlc-team", state_file=tmp_path / "sessions.json",
+    return gw, sessions.SessionManager(gw, app="brain", state_file=tmp_path / "sessions.json",
                                        log=logging.getLogger("t"))
 
 
@@ -108,7 +36,7 @@ def test_a_role_session_is_opened_in_the_run_folder_sent_its_task_and_read_back(
         await asyncio.gather(*mgr._tasks)
         key = info.slot
         assert gw.slot_rows[key]["trust"] and gw.slot_rows[key]["project"].endswith("/wt/catalog")
-        assert [c[1] for c in gw.calls if c[0] == "folder"] == ["AI-DLC 团队", "网上小店 · r1"]
+        assert [c[1] for c in gw.calls if c[0] == "folder"] == [sessions.ROOT_FOLDER, "网上小店 · r1"]
         await settle(mgr, gw, key)
         f = sessions.agent_fields(mgr.get(info.id))
         assert f["done"] and f["outcome"] == "completed" and "DONE: 商品列表页写完" in f["result"]
@@ -216,21 +144,11 @@ def test_state_survives_a_reload_and_cleanup_keeps_a_running_run(tmp_path):
     asyncio.run(go())
 
 
-def test_the_orchestrator_picks_the_team_by_keywords_and_says_why():
-    pick = routing.route("双十一官方商城大促：挑 20 款家电打折加满减")
-    assert pick["team"]["file"] == "team-taoyuan-promo.json" and pick["matched"] == ["双十一", "大促", "满减", "官方商城"]
-    assert "1.1 意图捕获" in pick["team"]["stages"]
-    fix = routing.route("大促活动页的到手价算错了，帮我修复")
-    assert fix["team"]["file"] == "team-bugfix.json" and [o["file"] for o in fix["others"]] == ["team-taoyuan-promo.json"]
-    assert routing.route("debug 一下这个 fixture")["team"]["file"] == "team-aidlc.json"  # word boundaries
-    assert routing.route("")["team"]["scope"] == "feature"
-
-
 def test_a_turn_cut_short_by_a_transient_model_error_or_a_hang_is_continued_in_the_same_session(tmp_path):
     async def go():
         clock = [1000.0]
         gw = FakeGateway()
-        mgr = sessions.SessionManager(gw, app="aidlc-team", state_file=tmp_path / "sessions.json",
+        mgr = sessions.SessionManager(gw, app="brain", state_file=tmp_path / "sessions.json",
                                       log=logging.getLogger("t"), now=lambda: clock[0])
         tool = {"role": "tool", "content": "🔧 cat a.js", "meta": {"tool_name": "shell", "input": '{"command": "cat a.js"}'}}
         gw.script = [[tool, {"role": "error", "content": "❌ The model backend hit a transient error (HTTP 5xx).", "meta": {}}],
@@ -256,5 +174,75 @@ def test_a_turn_cut_short_by_a_transient_model_error_or_a_hang_is_continued_in_t
         assert ("stop", hung.slot) in gw.calls and hung.nudges == 1 and not hung.done
         await settle(mgr, gw, hung.slot)
         assert hung.done and "DONE: 好了" in hung.result
+
+    asyncio.run(go())
+
+
+# ---- what the Brain app added ------------------------------------------------------------------------------ #
+
+def test_a_strict_session_boots_exactly_its_template_or_fails(tmp_path):
+    async def go():
+        gw, mgr = make(tmp_path)
+        gw.templates = set()
+        info = await mgr.open_session("开工", parent_session_key="brain:r1-PAY-1", cwd=str(tmp_path), title="PAY-1 · 本地开发",
+                                      folder="PAY-1 · refund", agent="brain-dev", strict_agent=True, root_folder="Brain 需求",
+                                      project_dir=str(tmp_path), kind="local", key="r1-PAY-1")
+        assert info.done and "brain-dev" in info.error and not gw.slot_rows
+        assert not [c for c in gw.calls if c[0] == "agent" and c[2] != "template"]  # no fallback to Crew's default
+        gw.templates = {"brain-dev"}
+        ok = await mgr.open_session("开工", parent_session_key="brain:r1-PAY-2", cwd=str(tmp_path), title="t",
+                                    folder="PAY-2 · x", agent="brain-dev", strict_agent=True, project_dir=str(tmp_path),
+                                    trust_ok=False, kind="local", key="r1-PAY-2")
+        assert ok.slot and ok.agent_kind == "template" and "trust" not in gw.slot_rows[ok.slot]
+        folder = next(f for f in gw.folder_rows if f["name"] == "PAY-2 · x")
+        assert folder["project_dir"] == str(tmp_path)
+
+    asyncio.run(go())
+
+
+def test_the_bridge_surface_keeps_its_slot_name_and_send_id_and_never_resends(tmp_path):
+    async def go():
+        gw, mgr = make(tmp_path)
+        await mgr.adapter_create("run-pay-1-1", agent="brain-run", model="claude-opus-5.5", memory_mode="incognito",
+                                 title="RUN-PAY-1-1 · 运行机", folder="RUN-PAY-1-1", parent="brain-run:RUN-PAY-1-1",
+                                 key="RUN-PAY-1-1", root_folder="Brain 运行机")
+        assert "run-pay-1-1" in gw.slot_rows and ("agent", "brain-run", "template") in gw.calls
+        await mgr.adapter_set_project("run-pay-1-1", str(tmp_path))
+        assert gw.slot_rows["run-pay-1-1"]["trust"] and gw.slot_rows["run-pay-1-1"]["project"] == str(tmp_path)
+        gw.script = [[{"role": "error", "content": "Execution memory is unavailable", "meta": {"code": "memory_unavailable"}}]]
+        await mgr.adapter_send("run-pay-1-1", "接手合同 V-0123456789", "V-0123456789")
+        assert ("send", "run-pay-1-1", "V-0123456789") in gw.calls
+        gw.finish("run-pay-1-1")
+        for _ in range(4):
+            await mgr.poll()
+        assert [c[0] for c in gw.calls].count("send") == 1  # deliver once: no automatic resend
+        try:
+            await mgr.adapter_create("run-pay-1-1", agent="brain-run", model="", memory_mode="incognito", title="t",
+                                     folder="f", parent="p", key="k", root_folder="Brain 运行机")
+            raise AssertionError("a second create must fail")
+        except GatewayError:
+            pass
+        await mgr.adapter_stop("run-pay-1-1")
+        assert ("stop", "run-pay-1-1") in gw.calls
+
+    asyncio.run(go())
+
+
+def test_slot_stats_sum_credits_over_the_whole_transcript(tmp_path):
+    async def go():
+        gw, mgr = make(tmp_path)
+        gw.templates = {"brain-dev"}
+        info = await mgr.open_session("开工", parent_session_key="brain:r1-PAY-1", cwd=str(tmp_path), title="t",
+                                      folder="PAY-1 · x", agent="brain-dev", strict_agent=True, nudge_ok=False,
+                                      kind="local", key="r1-PAY-1")
+        gw.finish(info.slot)
+        gw.msgs[info.slot] += [{"role": "user", "content": "我自己打的", "meta": {}},
+                               {"role": "assistant", "content": "a", "meta": {"turn_stats": {"credits": 2.5}}, "ts": "2026-11-08T10:05:00Z"},
+                               {"role": "assistant", "content": "b", "meta": {"turn_stats": {"credits": 1.0}}}]
+        for _ in range(sessions.STATS_EVERY + 1):
+            await mgr.poll()
+        st = mgr.slot_stats(info.slot)
+        assert st["credits"] == 3.5 and st["turns"] == 3 and st["busy"] is False
+        assert mgr.credits_by_key() == {"r1-PAY-1": 3.5}
 
     asyncio.run(go())
