@@ -141,7 +141,7 @@
       "repo": "",
       "key": "",
       "title": "KiroCrew",
-      "text": "brain-dev agent 是旧版本装的：去设置里点「装上 brain-dev agent」重装",
+      "text": "brain-dev.json 缺 Lean 的 hook：调用工具前（preToolUse）。修复只补上缺的，别的 hook 和设置都不动",
       "line": null,
       "approval": null,
       "mr_url": null,

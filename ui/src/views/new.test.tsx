@@ -153,9 +153,9 @@ describe('开需求', () => {
       [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了：~/.kiro/agents/brain-dev.json', rows: fx.crew().rows.map((r) => ({ ...r, level: 'OK' })) }),
     })
     const card = await screen.findByRole('region', { name: 'KiroCrew 的检查' })
-    expect(card).toHaveTextContent('和 brain-kit 带的版本不一样')
+    expect(card).toHaveTextContent('缺 Lean 的 hook：调用工具前（preToolUse）')
     expect(card).not.toHaveTextContent('KiroCrew 在跑') // OK rows are not listed here
-    await user.click(within(card).getByRole('button', { name: '装上 brain-dev agent' }))
+    await user.click(within(card).getByRole('button', { name: '装上或补全 brain-dev 的 Lean hook' }))
     await waitFor(() => expect(apiCalls.find((c) => c.path === `${API}/crew/fix`)?.body).toEqual({ what: 'agent' }))
     expect(await screen.findByText('KiroCrew 的检查都过了。')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'KiroCrew 的检查' })).toBeNull()

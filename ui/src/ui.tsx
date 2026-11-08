@@ -142,7 +142,7 @@ export function TypeLine({ line, sessionUrl }: { line: string; sessionUrl?: stri
   )
 }
 
-const FIX_LABEL: Record<CrewFixBody['what'], string> = { agent: '装上 brain-dev agent', engine: '把引擎换成 kas' }
+const FIX_LABEL: Record<CrewFixBody['what'], string> = { agent: '装上或补全 brain-dev 的 Lean hook', engine: '把引擎换成 kas' }
 
 /**
  * KiroCrew's check rows (level + text) and, when the backend can fix them, the fix buttons (POST /crew/fix).

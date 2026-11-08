@@ -40,7 +40,7 @@ describe('待办', () => {
     expect(go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-4', from: 'todo' })
     const crew = group('KiroCrew 的问题')
     expect(within(crew).queryByRole('button', { name: /^PAY-/ })).toBeNull()
-    expect(crew).toHaveTextContent('brain-dev agent 是旧版本装的')
+    expect(crew).toHaveTextContent('brain-dev.json 缺 Lean 的 hook')
   })
 
   test('team mode says answers are given on GitLab', async () => {
@@ -97,7 +97,7 @@ describe('待办', () => {
     await screen.findByRole('region', { name: 'KiroCrew 的问题' })
     const crew = group('KiroCrew 的问题')
     expect(within(crew).queryByRole('button', { name: '把引擎换成 kas' })).toBeNull()
-    fireEvent.click(within(crew).getByRole('button', { name: '装上 brain-dev agent' }))
+    fireEvent.click(within(crew).getByRole('button', { name: '装上或补全 brain-dev 的 Lean hook' }))
     expect(await within(crew).findByText('已重装 brain-dev agent')).toBeInTheDocument()
     expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/crew/fix`, body: { what: 'agent' } })
     expect(reloadStatus).toHaveBeenCalled()

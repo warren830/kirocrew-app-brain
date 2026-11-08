@@ -9,8 +9,8 @@
       "text": "agent 引擎是 kas（Lean 的 hook 只在 kas 上生效）"
     },
     {
-      "level": "WARN",
-      "text": "brain-dev.json 和 brain-kit 带的版本不一样"
+      "level": "FAIL",
+      "text": "brain-dev.json 缺 Lean 的 hook：调用工具前（preToolUse）。修复只补上缺的，别的 hook 和设置都不动"
     }
   ],
   "fix": {

@@ -106,7 +106,7 @@ describe('the app: one bar over the views', () => {
     const crew = screen.getByTestId('br-crew-fail')
     expect(crew).toHaveTextContent('找不到 brain-dev agent')
     expect(crew).not.toHaveTextContent('KiroCrew 在跑') // only the failing rows
-    await user.click(within(crew).getByRole('button', { name: '装上 brain-dev agent' }))
+    await user.click(within(crew).getByRole('button', { name: '装上或补全 brain-dev 的 Lean hook' }))
     expect(await within(crew).findByText('装好了')).toBeInTheDocument()
     expect(apiCalls.some((c) => c.method === 'POST' && c.path === `${API}/crew/fix`)).toBe(true)
     await user.click(within(nokit).getByRole('button', { name: '去设置' }))
