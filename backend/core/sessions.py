@@ -679,26 +679,28 @@ class SessionManager:
             raise GatewayError(0, info.error, "open_failed")
         return {"key": info.slot}
 
+    def _runner_slot(self, name: str) -> SessionInfo:
+        info = self.by_slot(name)
+        if info is None or info.kind != "runner":
+            raise GatewayError(409, "会话 %s 不是桥开的" % name, "not_a_runner_slot")
+        return info
+
     async def adapter_set_project(self, name: str, path: str) -> dict[str, Any]:
         """The project directory, then trust for this one slot: nobody is at the runner to approve tool calls."""
-        info = self.by_slot(name)
+        info = self._runner_slot(name)
         await self.gw.set_project(name, path)
         await self.gw.trust(name)
-        if info is not None:
-            info.cwd = path
-            self._dirty = True
+        info.cwd = path
+        self._dirty = True
         return {"ok": True}
 
     async def adapter_send(self, name: str, message: str, send_id: str) -> dict[str, Any]:
-        """One message, delivered once (no automatic resend): a new turn of the slot, its sendId the bridge's."""
-        root = self.by_slot(name)
-        info = SessionInfo(id=PREFIX + secrets.token_hex(5), task=message, parent_session_key=root.parent_session_key
-                           if root else f"{self.app}:{name}", requested=self.now(),
-                           conv_root=root.id if root else None, first_send_id=send_id)
-        if root is not None:
-            self._inherit(info, root)
-        else:
-            info.slot, info.resend_ok, info.nudge_ok, info.kind = name, False, False, "runner"
+        """One message, delivered once (no automatic resend): a new turn of the slot, its sendId the bridge's. Only a
+        runner slot opened through adapter_create."""
+        root = self._runner_slot(name)
+        info = SessionInfo(id=PREFIX + secrets.token_hex(5), task=message, parent_session_key=root.parent_session_key,
+                           requested=self.now(), conv_root=root.id, first_send_id=send_id)
+        self._inherit(info, root)
         info.resend_ok, info.nudge_ok = False, False
         self._infos[info.id] = info
         self._dirty = True
@@ -707,6 +709,7 @@ class SessionManager:
         return {"ok": True}
 
     async def adapter_stop(self, name: str) -> dict[str, Any]:
+        self._runner_slot(name)
         await self.gw.stop(name)
         for i in self._infos.values():
             if i.slot == name and not i.done:
@@ -715,6 +718,7 @@ class SessionManager:
         return {"ok": True}
 
     async def adapter_slot(self, name: str) -> dict[str, Any]:
+        self._runner_slot(name)
         return {"key": name, "messages": await self.gw.messages(name, limit=STATS_LIMIT)}
 
     # ---- cleaning up ----------------------------------------------------------------------------------- #

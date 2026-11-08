@@ -123,6 +123,12 @@ class TeamRuntime:
                                         "「签名服务和 app 同一个用户」" % key)
             if not os.path.isfile(self.team["allowed_signers"]):
                 raise common.BrainError("找不到 allowed_signers：%s" % self.team["allowed_signers"])
+            if not self.team.get("dev_same_user"):
+                owned = [p for p in (self.team["bridge_config"], self.team.get("runnerd_config") or "",
+                                     self.team["allowed_signers"], cfg.get("identities") or "") if p and not foreign(p)]
+                if owned:
+                    raise common.BrainError("这些配置这个 app 的系统用户能改：%s。agent 和 app 是同一个用户，配置要归别的用户"
+                                            "（root 或 brainbridge）所有、对 app 只读" % "、".join(os.path.basename(p) for p in owned))
             rcfg = None
             if self.team.get("runnerd_config"):
                 rcfg = common.load_json(self.team["runnerd_config"])
@@ -276,6 +282,19 @@ class TeamRuntime:
             return max(5.0, float((self.cfg or {}).get("interval") or 60))
         except (TypeError, ValueError):
             return 60.0
+
+
+def foreign(path: str) -> bool:
+    """*path* and its folder are owned by another OS user and this one cannot write them (the agents run as this
+    user: a config they can change is no check at all)."""
+    try:
+        for p in (path, os.path.dirname(os.path.abspath(path))):
+            st = os.stat(p)
+            if st.st_uid == os.getuid() or os.access(p, os.W_OK):
+                return False
+    except OSError:
+        return False
+    return True
 
 
 def run_paths(row: dict[str, Any]) -> list[str]:

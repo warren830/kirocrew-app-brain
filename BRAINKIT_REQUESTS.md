@@ -23,41 +23,56 @@ or work around a constraint. Each item says what the app does today and what wou
 5. **Bridge comment author.** The signer must know which GitLab account posts the bridge's questions
    (`bridge_users` in its config). Wanted: `bridge_users` in `.brain/kit.json`, read from the default branch by both.
 
+6. **Bind a hand-over to the labelled commit.** `Bridge.verify` accepts the MR head as long as the last label event is
+   the owner's add, even when the head was pushed after the label (the runner's key, or anyone with push rights to
+   `ai/*`, can push in between). The signer adds the check (label `created_at` ≥ the MR version of that sha); it
+   belongs in `verify`.
+7. **Bind an answer to its question and its push.** The question note carries neither the sha nor the park hash, and
+   `collect()` trusts the ledger's `note_id` / `sha` / `park_hash`. The signer rebuilds `question_text` and compares,
+   checks that the question was posted after the push, and never re-binds a D-n. Wanted in brain-kit: the sha and
+   park hash in the question's first line, and these checks in the shared answer verifier (item 2). Best of all,
+   questions posted by the signer's own account.
+8. **CI's DESIGN check** (`ci.py`) accepts any `approve DESIGN …` voucher whose sha is an ancestor of HEAD: an old
+   design approval also covers later risky changes. It should require the approval to cover the current risk paths'
+   diff, or a sha after the last change to them.
+9. **`GitLab.mr_notes` stops silently at 20 pages**: a flood of notes can hide a later conflicting answer. It should
+   raise, as `label_events` does (the signer pages itself and refuses).
+
 ## Should-have (the app copies a small flow)
 
-6. **Lean read API.** The app reads pending approvals from the audit ledger itself (`backend/core/lean_view.py`:
+10. **Lean read API.** The app reads pending approvals from the audit ledger itself (`backend/core/lean_view.py`:
    APPROVAL_REQUESTED not answered by a later APPROVED/REJECTED covering one of its files, file hash still equal,
    PLAN checkboxes normalised) because `lean status` rewrites aidlc-state.md and the project's Lean copy is
    agent-writable. Wanted: `brainkit.lean.approvals(read, intent) -> [{kind, unit, state, sha8, line}]` and
    `stages(...)`, pure functions over the ledger records.
-7. **Reflect preview as one function.** The app repeats cmd_reflect's planning half (main_cfg, source_text, parse,
+11. **Reflect preview as one function.** The app repeats cmd_reflect's planning half (main_cfg, source_text, parse,
    parse_gaps, open_branches, plan, plan_gaps, rejected_without_correction). Wanted: `reflect.preview(repo, cfg, key,
    ref=None, vouchers_dir=None) -> {ops, gaps, notes, warnings, problems, substantive}`.
-8. **Structured crew checks.** `cli.crew_checks` returns `[]` when `kirocrew` is not on PATH (the gateway's PATH has
+12. **Structured crew checks.** `cli.crew_checks` returns `[]` when `kirocrew` is not on PATH (the gateway's PATH has
    no `~/.local/bin`) and English text. Wanted: `crew_checks(repo, kirocrew_bin=None)` with ids
    (`agent_missing`, `agent_no_hooks`, `agent_drift`, `adapter_missing`, `engine_not_kas`) so hosts can localise;
    `cmd_crew_agent --force` keeping a backup of a different file (the app does this itself).
-9. **`brain start` for a worktree, with JSON out.** The app runs `git worktree add --detach` and then `brain start`
+13. **`brain start` for a worktree, with JSON out.** The app runs `git worktree add --detach` and then `brain start`
    in it, then reads the branch and run.json back. Wanted: `brain start --worktree DIR` (or documented support) and
    `--json` (key, branch, intent, package) instead of parsing stdout.
-10. **Intake dry run before a key exists.** `intake.build(..., dry_run=True)` needs a key; the app passes the next
+14. **Intake dry run before a key exists.** `intake.build(..., dry_run=True)` needs a key; the app passes the next
     free key it computes from the claim refs it has. Wanted: `key=None` for a dry run.
-11. **Public names for what the app calls**: `cli._store` (the intake store), `decisions._neutral_note` (the app
+15. **Public names for what the app calls**: `cli._store` (the intake store), `decisions._neutral_note` (the app
     neutralises a local answer's note the same way), `trace.build(_usage=)` (pass usage once for many keys).
 
 ## Nice-to-have
 
-12. **A machine-readable marker in the bridge's MR comments** (e.g. `<!-- brain-decision {"id": "D-5", "run":
+16. **A machine-readable marker in the bridge's MR comments** (e.g. `<!-- brain-decision {"id": "D-5", "run":
     "RUN-PAY-3-1", "kind": "clarify", "state": "open"} -->`). On a person's machine the app parses the visible text
     (`**D-5 · 澄清 · RUN-…**`, `D-5 已收到 @x 的回答：A …`, `D-5 作废`, `AI 接手被拒`) to show D-n questions.
-13. **`evaluate.collect` contract and cost.** The app maps `autonomy`, `delivery`, `judgment` (`value` pairs),
+17. **`evaluate.collect` contract and cost.** The app maps `autonomy`, `delivery`, `judgment` (`value` pairs),
     `repeat_rate`, `useful`, `staleness.total`, `cost.per_success`, `funnel.counts`, `review_queue` and calls it only
     with the keyword arguments its signature has. Wanted: a documented, stable shape (ideally `metrics: [{id, label,
     value, rule}]`) and a way to reuse traces between calls (it builds one trace per run, many git calls).
-14. **`golden.run(jobs, runner)`**: document the runner callback (sync or async, what it returns, how an oracle
+18. **`golden.run(jobs, runner)`**: document the runner callback (sync or async, what it returns, how an oracle
     answer is marked) so the app can dispatch golden jobs as Kiro Crew sessions (not done yet).
-15. **Decision states.** The app's ledger has `refused` (the signer would not sign the answer) next to brain-kit's
+19. **Decision states.** The app's ledger has `refused` (the signer would not sign the answer) next to brain-kit's
     `open / answered / delivered / delivery_unknown / stale / invalid / closed`; reconcile now writes `merged` and
     `closed` for runs. `report()`, `trace` and `evaluate` could name them.
-16. **Kit and identities caching.** `Bridge.kit()` and the identities are read once per process; a change on main
+20. **Kit and identities caching.** `Bridge.kit()` and the identities are read once per process; a change on main
     needs a restart of the app's bridge and the signer. A TTL would be enough.

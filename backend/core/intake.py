@@ -200,11 +200,21 @@ def start(repo: Repo, body: dict[str, Any], work_root: str) -> dict[str, Any]:
     return out
 
 
+INTENT_RE = re.compile(r"^[0-9]{6}-[a-z0-9][a-z0-9-]{0,80}$")
+PKG_RE = re.compile(r"^PKG-[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,4}$")
+APPROVAL_LINE_RE = re.compile(r"(?im)^[ \t>*-]*(approve|approved|reject|批准|同意|驳回|拒绝)\b")
+
+
 def kickoff(key: str, branch: str, intent: str | None, materials: list[str]) -> str:
-    """The first message to a requirement's brain-dev session: ids only (no requirement text, nothing a person
-    typed, never an approval line)."""
+    """The first message to a requirement's brain-dev session: ids only, each checked against its format (run.json is
+    agent-writable: an "intent" with a line break must not smuggle an approval line in), no requirement text, nothing a
+    person typed; a line that reads like an approval is dropped whatever happens."""
+    key = key if KEY_RE.match(key or "") else "?"
+    branch = branch if parse_branch(branch or "", branch.split("/", 1)[0] if branch else "ai") else "?"
+    intent = intent if isinstance(intent, str) and INTENT_RE.match(intent) else None
+    pkgs = [p for p in materials if isinstance(p, str) and PKG_RE.match(p)]
     lines = ["这是需求 %s 的本地开发会话。分支 %s%s。" % (key, branch, "，Lean intent %s" % intent if intent else ""),
              "按 brain-dev 的步骤开始：先读 AGENTS.md 和 brain/ 下的四个文件，再读 runs/%s/run.json" % key
-             + ("" if not materials else "，然后读材料包 .brain-materials/%s/toc.md" % materials[0]) + "。",
+             + ("" if not pkgs else "，然后读材料包 .brain-materials/%s/toc.md" % pkgs[0]) + "。",
              "有问题一次问完，每题带推荐答案。"]
-    return "\n".join(lines)
+    return "\n".join(l for l in lines if not APPROVAL_LINE_RE.match(l))

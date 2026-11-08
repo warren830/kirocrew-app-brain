@@ -65,9 +65,13 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
 - **Signing is not the app's.** The bridge's private key stays with `signer/brain_signer.py`, a small separate
   process (another OS user in production, `brainbridge`). The app writes signature requests into
   `<spool>/requests/`; the signer checks each one again against GitLab with brain-kit's own code and its own
-  identities, ledger and token (hand-over: `Bridge.verify` + every voucher field; answer: the question posted by the
-  bridge account, the first valid `answer D-n …` by an allowed person, no conflict, park.json unchanged, one answer
-  per question) and answers in `signed/` or `refused/`. The app accepts a signature only if the signed voucher is
+  identities, ledger and token, and answers in `signed/` or `refused/`. Hand-over: `Bridge.verify`, every voucher
+  field, and the owner's label added after the voucher's commit was pushed (GitLab's MR versions; brain-kit's own
+  check only looks at the last label event). Answer: exactly one note of the bridge account opens that D-n, its text
+  is the question brain-kit's `question_text` makes of park.json at that commit, it was posted after the commit was
+  pushed, the first valid `answer D-n …` after it is by an allowed person (never the bridge account), no conflict,
+  one answer per question, and a D-n is never bound to a second question. Exact field types; a request must be a
+  small regular file (no symlink or FIFO). The app accepts a signature only if the signed voucher is
   exactly the one it asked for and verifies against `allowed_signers`. In the app's private brain-kit copy,
   `sign.sign` is replaced by this spool client; nothing else is patched. A signer that does not answer leaves the
   hand-over to the next round; a refusal rejects the hand-over on the MR (or marks the answer `refused`) with the
@@ -80,7 +84,13 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
   `~/.brain/gitlab-token`, refused when others can read it) and never logged, stored or returned; agent-written text
   on its way to the page goes through Kiro Crew's scrubber; materials stay in the intake store (never in a repo).
 - The brain-kit checkout and the app directory run inside the gateway: in production they must not be writable by
-  the agents' OS user.
+  the agents' OS user. Team mode refuses to start unless bridge.json, runnerd.json, allowed_signers and the
+  identities file are owned by another user and read-only to the app (`dev_same_user` skips this for a local trial).
+- **What is a boundary and what is a guardrail.** On the runner the agents can do whatever the app's OS user can:
+  rewrite the app's ledger, point a session at another slot, write signature requests. The app's own checks are
+  guardrails. The boundaries are the signer (it trusts nothing it is sent), runnerd and CI verifying signatures with
+  keys and configs the agents cannot change, the pre-receive hook and GitLab's approvals. Give the app's GitLab
+  account Reporter rights only (comment, label; no push, no merge).
 - On a person's machine the `brain-dev` agent runs as that person and can read their GitLab token file anyway: the
   app's answer route adds no power it lacks, and it only answers clarify questions (never a Lean approval). The real
   gates stay where brain-kit puts them: the bridge's checks, the signer, CI and GitLab approvals.
@@ -116,7 +126,8 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
    `bridge_users` = the GitLab account of the app's token; its own identities copy, GitLab token, ledger, the signing
    key), `signer/brain-signer.service` as `brainbridge`. Spool permissions: `requests/` writable by `brainbot`,
    `signed/` and `refused/` by `brainbridge` only. A run that will never finish is closed on the signer with
-   `brain_signer.py --config … close RUN-…`.
+   `brain_signer.py --config … close RUN-…`. The signer's brain-intake clone (`intake_dir`, it runs `git pull` there),
+   `/opt/brain-kit` and the signer's own folder must not be writable by `brainbot`: give runnerd its own intake clone.
 5. **In the app → 设置 → 运行机模式**: bridge.json, runnerd.json, the signer spool, allowed_signers; turn it on.
 
 ## Code map

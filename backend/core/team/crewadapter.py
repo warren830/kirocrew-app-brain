@@ -47,16 +47,26 @@ class KiroCrewAdapter:
                                                  parent="%s-run:%s" % (self.app, run_id), key=run_id,
                                                  root_folder=RUNNER_FOLDER))
 
+    def _ours(self, name: str) -> None:
+        """A run's slot name only; the session runner itself refuses a slot it did not open for the bridge (checked on
+        the event loop: the ledger's slot column is writable by the agents' OS user)."""
+        if not RUN_SLOT_RE.match(name or ""):
+            raise self.BrainError("slot name %r is not a run id" % name)
+
     def set_project(self, name: str, path: str) -> dict[str, Any]:
+        self._ours(name)
         return self._run(self.mgr.adapter_set_project(name, path))
 
     def send(self, name: str, message: str, send_id: str) -> dict[str, Any]:
         if not SEND_ID_RE.match(send_id or ""):
             raise self.BrainError("sendId must match [A-Za-z0-9_-]{1,128}")
+        self._ours(name)
         return self._run(self.mgr.adapter_send(name, message, send_id))
 
     def slot(self, name: str) -> dict[str, Any]:
+        self._ours(name)
         return self._run(self.mgr.adapter_slot(name))
 
     def stop(self, name: str) -> dict[str, Any]:
+        self._ours(name)
         return self._run(self.mgr.adapter_stop(name))

@@ -12,15 +12,20 @@ answers in ``<spool>/signed/`` or ``<spool>/refused/``. Nothing in a request is 
 hand-over contract  the MR is open and its head is the voucher's sha; ``Bridge.verify`` passes with this signer's own
                     identities, Jira, intake clone and the kit config from the default branch (branch name, label added by
                     the owner, the claim, run.json, the Lean note, the Brain commit, the materials' hashes, no other open
-                    run); every fact in the voucher equals what verify found; the run id fits the key; the expiry is
-                    within contract_ttl_hours.
+                    run); the owner added the label AFTER that sha was pushed (GitLab's MR versions: a push after the
+                    label is not handed over); every fact in the voucher equals what verify found; the run id fits the
+                    key; the expiry is within contract_ttl_hours.
 answer              the run's contract was signed here; the MR is open and still at the question's sha; park.json at that
-                    sha has the voucher's park_hash, is a valid waiting question of the voucher's kind (Lean request,
-                    review items); the bridge account posted the question; the first valid ``answer D-n …`` after it is by
-                    a person allowed for that kind (this signer's identities + decision_roles from main), has the
-                    voucher's choice, rejected items and pseudonym, and no other allowed person answered differently;
-                    one answer per question.
-both                only the fields this signer knows; voucher_id is the digest; issued within max_clock_skew_s.
+                    sha has the voucher's park_hash and is a valid waiting question of the voucher's kind (Lean request,
+                    review items); exactly one note of the bridge account opens this D-n for this run, its text is the
+                    question brain-kit's ``question_text`` makes of that park.json (who may answer by this signer's
+                    roles), and it was posted after the sha was pushed (an answer to an older push is void); the first
+                    valid ``answer D-n …`` after it is by a person allowed for that kind (this signer's identities +
+                    decision_roles from main, never the bridge account), has the voucher's choice, rejected items and
+                    pseudonym, and no other allowed person answered differently; one answer per question, and a D-n is
+                    never bound to a second question.
+both                only the fields this signer knows, with their exact types; voucher_id is the digest; issued within
+                    max_clock_skew_s. A request file must be a small regular file (no symlink, FIFO or device).
 
 What it signs is copied into vouchers_dir (brain-intake) and published there: the signer is that repo's only writer.
 
@@ -40,9 +45,11 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 HANDOFF_FIELDS = {"schema", "kind", "run_id", "project", "mr_iid", "sha", "branch", "owner", "key", "intent",
                   "brain_commit", "materials", "route", "issued_at", "expires_at", "issuer", "voucher_id"}
@@ -52,11 +59,59 @@ ANSWER_FIELDS = {"schema", "kind", "decision", "run_id", "project", "mr_iid", "s
 OPEN = ("spooled", "ready", "dispatched", "send_unknown", "reissue")
 RETRY_S = 10.0
 REQ_RE = re.compile(r"^[a-z]+-[A-Za-z0-9-]{1,80}-[0-9a-f]{12}\.json$")
+MAX_REQUEST = 64 * 1024
+MAX_NOTE_PAGES = 50
+Q_HEAD_RE = re.compile(r"^\*\*(D-[1-9][0-9]*) · [^·*\n]+ · (RUN-[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,5})\*\*")
 SIGNED_SCHEMA = """
 CREATE TABLE IF NOT EXISTS signed_answers (
   run_id TEXT NOT NULL, sha TEXT NOT NULL, park_hash TEXT NOT NULL, decision TEXT NOT NULL, voucher_id TEXT NOT NULL,
   choice TEXT NOT NULL, created TEXT NOT NULL, PRIMARY KEY (run_id, sha, park_hash));
+CREATE TABLE IF NOT EXISTS bound_decisions (
+  run_id TEXT NOT NULL, decision TEXT NOT NULL, sha TEXT NOT NULL, park_hash TEXT NOT NULL,
+  PRIMARY KEY (run_id, decision));
 """
+
+
+def is_int(x):
+    return type(x) is int
+
+
+def is_str(x, n=500):
+    return isinstance(x, str) and 0 < len(x) <= n and "\n" not in x and "\r" not in x
+
+
+def gl_time(s):
+    """GitLab's ISO times (2026-11-08T12:00:00.123Z, +08:00) as aware datetimes; None when unreadable."""
+    if not isinstance(s, str) or not s.strip():
+        return None
+    try:
+        dt = datetime.fromisoformat(s.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def read_request(path):
+    """A request file: a regular file of at most MAX_REQUEST bytes, opened without following a symlink or blocking
+    on a FIFO (anyone with the app's OS user can put anything into requests/). None when it is not one."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        fd = os.open(path, flags)
+    except OSError:
+        return None
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_REQUEST:
+            return None
+        data = os.read(fd, MAX_REQUEST + 1)
+    finally:
+        os.close(fd)
+    if len(data) > MAX_REQUEST:
+        return None
+    try:
+        return json.loads(data.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
 
 
 def load_brainkit(path):
@@ -110,11 +165,9 @@ class Signer:
             rid = name[:-5]
             if time.time() - self._failed.get(rid, 0) < RETRY_S:
                 continue
-            try:
-                with open(os.path.join(d["requests"], name), encoding="utf-8") as f:
-                    req = json.load(f)
-            except (OSError, ValueError):
-                continue  # half written, or the app took it back
+            req = read_request(os.path.join(d["requests"], name))
+            if req is None:
+                continue  # half written, taken back, or not a plain small file
             try:
                 v, sig = self.handle(rid, req)
             except Refuse as e:
@@ -160,8 +213,15 @@ class Signer:
                              self.sign.digest(v)[:12])
         if rid != want:
             raise Refuse("请求号和凭证对不上")
-        if v.get("schema") != 1 or v.get("issuer") != self.sign.PRINCIPAL:
+        if not is_int(v.get("schema")) or v["schema"] != 1 or v.get("issuer") != self.sign.PRINCIPAL:
             raise Refuse("凭证的 schema 或 issuer 不对")
+        if not is_int(v.get("mr_iid")) or v["mr_iid"] <= 0:
+            raise Refuse("mr_iid 要是正整数")
+        for k in ("run_id", "project", "sha", "issued_at"):
+            if not is_str(v.get(k), 200):
+                raise Refuse("%s 要是一行字" % k)
+        if not re.match(r"^[0-9a-f]{40}$", v["sha"]):
+            raise Refuse("sha 要是 40 位提交号")
         if v.get("project") not in self.projects:
             raise Refuse("项目 %s 不归这个签名服务" % v.get("project"))
         body = {k: x for k, x in v.items() if k != "voucher_id"}
@@ -194,6 +254,27 @@ class Signer:
             self.br.publish(v["run_id"], v["voucher_id"])
         return v, sig
 
+    def _pushed_at(self, project, iid, sha):
+        """When GitLab last saw *sha* become the MR's head (its newest MR version with that head commit)."""
+        rows = self.gl.call("GET", "/projects/%s/merge_requests/%d/versions" % (quote(str(project), safe=""), iid),
+                            {"per_page": 100}) or []
+        times = [gl_time(r.get("created_at")) for r in rows if isinstance(r, dict) and r.get("head_commit_sha") == sha]
+        times = [t for t in times if t is not None]
+        if not times:
+            raise Refuse("GitLab 上找不到 %s 这个提交的 MR 版本" % sha[:12])
+        return max(times)
+
+    def _notes(self, project, iid):
+        """Every note of the MR, oldest first; too many to read is a refusal (a flood must not hide an answer)."""
+        out = []
+        for page in range(1, MAX_NOTE_PAGES + 1):
+            rows = self.gl.call("GET", "/projects/%s/merge_requests/%d/notes" % (quote(str(project), safe=""), iid),
+                                {"sort": "asc", "order_by": "created_at", "per_page": 100, "page": page}) or []
+            out += [r for r in rows if isinstance(r, dict)]
+            if len(rows) < 100:
+                return sorted(out, key=lambda n: int(n.get("id", 0)) if is_int(n.get("id")) else 0)
+        raise Refuse("MR 的评论太多，读不完，不签")
+
     def _mr(self, v):
         mr = self.gl.mr(v["project"], int(v["mr_iid"]))
         if (mr or {}).get("state") != "opened":
@@ -213,8 +294,15 @@ class Signer:
         unknown = set(v) - HANDOFF_FIELDS
         if unknown:
             raise Refuse("凭证里有这个签名服务不认识的字段：%s" % ", ".join(sorted(unknown)))
-        key = str(v.get("key") or "")
-        if not re.match(r"^RUN-%s-[1-9][0-9]{0,5}$" % re.escape(key), str(v.get("run_id") or "")):
+        for k in ("branch", "owner", "key", "intent", "brain_commit", "route", "expires_at"):
+            if not is_str(v.get(k), 200):
+                raise Refuse("%s 要是一行字" % k)
+        if not isinstance(v.get("materials"), list) or not all(
+                isinstance(m, dict) and set(m) == {"package", "manifest_sha256"} and is_str(m["package"], 80)
+                and is_str(m["manifest_sha256"], 64) for m in v["materials"]):
+            raise Refuse("materials 的格式不对")
+        key = v["key"]
+        if not re.match(r"^RUN-%s-[1-9][0-9]{0,5}$" % re.escape(key), v["run_id"]):
             raise Refuse("run id %s 和需求 %s 对不上" % (v.get("run_id"), key))
         if v.get("route") != "recheck":
             raise Refuse("route 必须是 recheck")
@@ -246,11 +334,27 @@ class Signer:
             for k in ("branch", "owner", "key", "intent", "brain_commit", "materials"):
                 if f.get(k) != v.get(k):
                     raise Refuse("凭证的 %s 和 GitLab 上的不一样" % k)
-        except Refuse:
-            if reissue is not None:
+            self._label_after_push(v, kit)
+        except BaseException:
+            if reissue is not None:  # whatever went wrong, the earlier contract stays open (never "reissue")
                 self.br.ledger.set_run(v["run_id"], "reissue", reissue)
             raise
         self._facts = f
+
+    def _label_after_push(self, v, kit):
+        """The owner's hand-over label was added after the voucher's sha became the MR head: a commit pushed after
+        the label (by the runner's key, or anyone with push rights) was not handed over by the owner."""
+        label = kit["handoff_label"]
+        last = None
+        for ev in self.gl.label_events(v["project"], int(v["mr_iid"])):
+            if (ev.get("label") or {}).get("name") == label and ev.get("action") in ("add", "remove"):
+                last = ev
+        if not last or last.get("action") != "add" or \
+                ((last.get("user") or {}).get("username") or "").lower() != v["owner"]:
+            raise Refuse("标签 %s 不是分支主人最后加的" % label)
+        added = gl_time(last.get("created_at"))
+        if added is None or added < self._pushed_at(v["project"], int(v["mr_iid"]), v["sha"]):
+            raise Refuse("%s 是在打标签之后才推上来的：分支主人没有交接这个提交，请重新打一次标签" % v["sha"][:12])
 
     def record_handoff(self, v):
         f = getattr(self, "_facts", {}) or {}
@@ -265,7 +369,15 @@ class Signer:
         unknown = set(v) - ANSWER_FIELDS
         if unknown:
             raise Refuse("凭证里有这个签名服务不认识的字段：%s" % ", ".join(sorted(unknown)))
-        run = self.br.ledger.run(str(v.get("run_id") or ""))
+        for k in ("decision", "park_hash", "decision_kind", "choice", "answerer"):
+            if not is_str(v.get(k), 100):
+                raise Refuse("%s 要是一行字" % k)
+        for k in ("review_items", "rejected_items"):
+            if k in v and (not isinstance(v[k], list) or not v[k] or not all(is_str(x, 10) for x in v[k])):
+                raise Refuse("%s 要是非空的项号列表" % k)
+        if "lean_request" in v and not is_str(v["lean_request"], 100):
+            raise Refuse("lean_request 要是一行字")
+        run = self.br.ledger.run(v["run_id"])
         if run is None:
             raise Refuse("这个签名服务没签过 %s 的接手合同" % v.get("run_id"))
         if run["state"] not in OPEN:
@@ -301,18 +413,30 @@ class Signer:
                 raise Refuse("Lean 审批只能 approve 或 reject")
         elif choice not in {o.get("id") for o in park.get("options") or []}:
             raise Refuse("没有选项 %s" % choice)
-        notes = self.gl.mr_notes(v["project"], int(v["mr_iid"]))
-        did = str(v.get("decision") or "")
-        q = None
+        if not self.bridge_users:
+            raise Refuse("bridge_users 没配：不知道哪个 GitLab 账号是桥")
+        did = v["decision"]
+        bound = self.db.execute("SELECT * FROM bound_decisions WHERE run_id=? AND decision=?", (v["run_id"], did)).fetchone()
+        if bound is not None and (bound["sha"], bound["park_hash"]) != (v["sha"], v["park_hash"]):
+            raise Refuse("%s 已经是另一个问题（%s）的号了" % (did, bound["sha"][:12]))
+        notes = self._notes(v["project"], int(v["mr_iid"]))
+        allowed = self.br.allowed(kit, kind, run["owner"]) - self.bridge_users
+        want = self.br.question_text(did, {"run_id": v["run_id"]}, park, sorted(allowed), kind)
+        norm = lambda t: "\n".join(l.rstrip() for l in str(t or "").replace("\r\n", "\n").split("\n")).strip()  # noqa: E731
+        heads = []
         for n in notes:
-            author = ((n.get("author") or {}).get("username") or "").lower()
-            first = (n.get("body") or "").split("\n", 1)[0]
-            if first.startswith("**%s · " % did) and v["run_id"] in first and (author in self.bridge_users):
-                q = n
-                break
-        if q is None:
-            raise Refuse("MR 上找不到桥发的 %s（bridge_users 要写桥的 GitLab 账号）" % did)
-        allowed = self.br.allowed(kit, kind, run["owner"])
+            m = Q_HEAD_RE.match((n.get("body") or "").split("\n", 1)[0])
+            if m and m.group(1) == did and m.group(2) == v["run_id"]:
+                heads.append(n)
+        mine = [n for n in heads if ((n.get("author") or {}).get("username") or "").lower() in self.bridge_users]
+        if len(heads) != 1 or len(mine) != 1:
+            raise Refuse("MR 上应该正好有一条桥发的 %s（找到 %d 条，桥发的 %d 条）" % (did, len(heads), len(mine)))
+        q = mine[0]
+        if norm(q.get("body")) != norm(want):
+            raise Refuse("%s 在 MR 上的问题和 park.json 在 %s 上的不一样" % (did, v["sha"][:12]))
+        asked = gl_time(q.get("created_at"))
+        if asked is None or asked < self._pushed_at(v["project"], int(v["mr_iid"]), v["sha"]):
+            raise Refuse("%s 是在 %s 推上来之前问的：对这个提交它已经作废" % (did, v["sha"][:12]))
         valid = {}
         items_re = getattr(self.decisions, "ITEMS_RE", None)
         for n in notes:
@@ -353,6 +477,8 @@ class Signer:
                               (v["run_id"], v["sha"], v["park_hash"])).fetchone()
         if had is not None and (had["decision"], had["choice"]) != (did, choice):
             raise Refuse("这个问题已经签过一个回答（%s）" % had["voucher_id"])
+        self.db.execute("INSERT OR IGNORE INTO bound_decisions(run_id,decision,sha,park_hash) VALUES (?,?,?,?)",
+                        (v["run_id"], did, v["sha"], v["park_hash"]))
 
     def close(self, run_id):
         row = self.br.ledger.run(run_id)
