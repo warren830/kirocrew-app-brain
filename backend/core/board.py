@@ -50,11 +50,6 @@ FINAL = ("merged", "skipped", "failed")
 MAX_EVENTS = 400
 MAX_BELT = 80
 NOT_NEEDED = "这次不需要"
-# Lean's BLOCKED gates (aidlc_lean.py block()) and tools, in words
-BLOCK_GATE = {"records": "记录文件只能由 Lean 自己写", "protected": "受保护的文件", "danger": "危险命令", "intent": "还没选需求",
-              "contract": "别的团队的文件：要先开变更请求", "verify": "还没过自动检查", "requirements": "需求还没批",
-              "design": "设计还没批", "inception": "需求和设计还没批", "ideation": "构思还没批", "released": "已经发布了"}
-BLOCK_TOOL = {"fs_write": "写文件", "write": "写文件", "execute_bash": "跑命令", "shell": "跑命令", "bash": "跑命令"}
 # brainkit.trace's `missing` sources (trace.py): the ones a repo done only on this machine, or a requirement not handed
 # over yet, has nothing to read from are not missing
 MISSING = (("bridge ledger", "runner", "桥的账本：这台机器上读不到，交接以后桥的核对和转的问题看不全"),
@@ -279,8 +274,8 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
             else:
                 add(at, "refused", gates[0], gates[0], "批准的那一行没被接受（%s）" % name, gates=list(gates), lean=kind)
         elif ev == "BLOCKED":
-            what = "写 %s" % _clip(d.get("path"), 50) if d.get("path") else "一次%s" % BLOCK_TOOL.get(str(d.get("tool") or ""), "工具调用")
-            add(at, "blocked", s, s, "Lean 拦下了%s：%s" % (what, BLOCK_GATE.get(str(d.get("gate") or ""), "它的规则不让")),
+            what = "写 %s" % _clip(d.get("path"), 50) if d.get("path") else "一次%s" % lean_view.BLOCK_TOOL.get(str(d.get("tool") or ""), "工具调用")
+            add(at, "blocked", s, s, "Lean 拦下了%s：%s" % (what, lean_view.block_rule(d.get("gate"))),
                 detail=True)
         elif ev == "VERIFY":
             res = [r for r in d.get("results") or [] if isinstance(r, dict)] if isinstance(d.get("results"), list) else []
@@ -660,21 +655,25 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
             hand_at is not None and e["at"] > hand_at))]
         return ats[-1] if ats else None
 
-    for a in f.get("approvals") or []:
-        gates = GATES_OF.get(str(a.get("kind") or ""), ())
-        for g in gates:
+    # each kind's last word (one per PLAN unit), oldest first; one the events already folded past is not said again
+    # (an approved DESIGN under a later PLAN request), so a gate's history stays in time order with no repeats
+    for a in sorted(f.get("approvals") or [], key=lambda x: _first(x.get("at"), now)):
+        at = _first(a.get("at"), now)
+        for g in GATES_OF.get(str(a.get("kind") or ""), ()):
             if a.get("state") == "pending":
                 # a line to type only on this machine's own run: after the hand-over the runner's approvals are answered
                 # on the MR (the bridge brings the answer back), never typed here
                 A[g]["line"] = a.get("line") if hand_at is None else None
-                if A[g]["status"] != "awaiting_approval":
-                    fo.put(g, "awaiting_approval", "等%s批准%s" % (you if hand_at is None else "人在 MR 上",
-                                                              GATE_KIND_LABEL.get(a["kind"], "")), _first(a.get("at"), now),
-                           _who(you) if hand_at is None else "product" if a.get("kind") == "RELEASE" else "people")
+            if A[g]["since"] is not None and at < A[g]["since"]:
+                continue
+            if a.get("state") == "pending" and A[g]["status"] != "awaiting_approval":
+                fo.put(g, "awaiting_approval", "等%s批准%s" % (you if hand_at is None else "人在 MR 上",
+                                                          GATE_KIND_LABEL.get(a["kind"], "")), at,
+                       _who(you) if hand_at is None else "product" if a.get("kind") == "RELEASE" else "people")
             elif a.get("state") == "stale" and A[g]["status"] != "merged":
-                fo.put(g, "stalled", "文件改过了：要重新请求批准", _first(a.get("at"), now))
+                fo.put(g, "stalled", "文件改过了：要重新请求批准", at)
             elif a.get("state") == "approved" and A[g]["status"] in ("waiting", "awaiting_approval"):
-                fo.put(g, "merged", "已批准", _first(a.get("at"), now))
+                fo.put(g, "merged", "已批准", at)
     if state == "local" and not hand_at:
         s = local[-1] if local else None
         pend = any(a.get("state") == "pending" for a in f.get("approvals") or [])
