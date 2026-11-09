@@ -10,6 +10,7 @@ import { fmtDay, fmtSpan, isoDay } from '../format'
 import type { Actor, BoardEvent, ReqBoard } from '../types'
 
 const RUNNERS = new Set(['runner', 'bridge', 'signer'])
+const GATES = new Set(['req', 'design', 'release', 'reflect'])
 
 /** Where the time went, from the board's actors: AI on this machine, the runner, waiting for a person, done again. */
 export type Part = 'agent' | 'runner' | 'person' | 'rework'
@@ -40,7 +41,8 @@ function partOf(a: Actor, kind: 'work' | 'wait' | 'fix'): Part {
 
 function labelOf(a: Actor, part: Part): string {
   if (part === 'rework') return PART_LABEL.rework
-  if (part === 'person') return a.key === 'local' ? '会话等人' : a.title
+  // a gate's wait is the gate (需求审批); the session or the runner waiting on a person says so (运行机等人)
+  if (part === 'person') return GATES.has(a.key) ? a.title : a.key === 'local' ? '会话等人' : `${a.title}等人`
   return a.key === 'local' ? PART_LABEL.agent : a.title
 }
 
@@ -111,6 +113,9 @@ export function StreamCard({ board, at, onAt }: { board: ReqBoard | null; at: nu
   const segs = board ? valueStream(board, at) : []
   if (!board || !segs.length) return null
   const t0 = segs[0].from, t1 = segs[segs.length - 1].to
+  // the whole time is 周期's (brain start → the merge or now); a quiet end with nothing recorded is said, not drawn
+  const begin = board.events.find((e) => e.kind === 'start')?.at ?? t0
+  const end = Math.max(t1, board.ended_at ?? at)
   const parts = PARTS.filter((p) => segs.some((s) => s.part === p))
   const who = (s: StreamSeg) => (s.part === 'person' ? '人' : s.part === 'runner' ? s.label : s.part === 'rework' ? 'AI' : 'AI（本机会话）')
   const days = isoDay(new Date(t0 * 1000).toISOString()) !== isoDay(new Date(t1 * 1000).toISOString())
@@ -118,7 +123,7 @@ export function StreamCard({ board, at, onAt }: { board: ReqBoard | null; at: nu
     <section className="cto-card" aria-label="价值流" data-testid="item-stream">
       <div className="cto-chart-head">
         <h3>价值流</h3>
-        <span className="cto-dim">从开工到{board.ended_at ? '合并' : '此刻'}，共 {fmtSpan(t1 - t0)} · 点任一段或任一时刻，到需求看板的那一刻</span>
+        <span className="cto-dim">从开工到{board.ended_at ? '合并' : '此刻'}，共 {fmtSpan(end - begin)}{end - t1 >= 600 ? `（最后 ${fmtSpan(end - t1)} 没有动静）` : ''} · 点任一段或任一时刻，到需求看板的那一刻</span>
         <span className="cto-grow" />
         <div className="cto-seg" role="group" aria-label="图或表格">
           <button type="button" aria-pressed={!asTable} onClick={() => setAsTable(false)}>图</button>

@@ -205,6 +205,8 @@ interface Now {
   /** the open MR question (D-n) it waits on, and how it is answered: its options (A / B …), else approve / reject */
   question: string | null
   choices: string
+  /** a refused hand-over: how to hand it over again, as the board's step says it (its reason line is the text already) */
+  how: string | null
 }
 
 /** 此刻: one judgment (the backend's waits) with where to take the step. */
@@ -222,6 +224,7 @@ function nowOf(x: RequirementDetail, board: ReqBoard | null, live: SessionRow | 
     mrUrl: board?.accept.step.mr_url ?? open?.mr_url ?? x.row.mr?.url ?? null,
     question: open?.id ?? null,
     choices: open?.options.length ? `选 ${open.options.map((o) => o.id).join(' / ')}` : 'approve / reject',
+    how: step === 'redo_handoff' && board?.row.waits.do === 'redo_handoff' ? board.accept.step.text.split('\n').filter((l) => l && !l.startsWith('接手被拒')).join(' ') || null : null,
   }
 }
 
@@ -547,7 +550,7 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
     case 'redo_handoff':
       body = (
         <div>
-          <p>做什么：{now.do === 'tool' ? '在会话里批准这个工具调用' : `${DO_NAME.redo_handoff}（在会话里改，再交接一次）`}。</p>
+          <p>做什么：{now.do === 'tool' ? '在会话里批准这个工具调用。' : now.how ?? `${DO_NAME.redo_handoff}（在会话里改，再交接一次）。`}</p>
           {x.row.waits.raw && <details className="br-raw"><summary>细节</summary><pre>{x.row.waits.raw}</pre></details>}
         </div>
       )

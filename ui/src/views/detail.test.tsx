@@ -201,6 +201,18 @@ describe('需求详情', () => {
     expect(within(bar).getByRole('button', { name: '打开会话' })).toBeInTheDocument()
   })
 
+  test('此刻 for a refused hand-over says how to hand it over again as 需求看板 says it, the reason once', async () => {
+    const waits = { who: 'you' as const, text: '接手被拒：标签是 bob 打的，不是负责人 alice', line: null, raw: '', do: 'redo_handoff' as const, since: null, where: 'session' as const }
+    const b = fx.board()
+    b.row.waits = waits
+    b.accept.step = { ...b.accept.step, text: '接手被拒：标签是 bob 打的，不是负责人 alice\n改好后，在终端里、这个需求的分支上重新跑 brain handoff', line: null }
+    withDetail((d) => { Object.assign(d.row, { state: 'rejected', waits }) }, { [`GET ${API}/board/*`]: () => b })
+    renderDetail()
+    const bar = await screen.findByRole('region', { name: '此刻' })
+    await waitFor(() => expect(bar).toHaveTextContent('做什么：改好后，在终端里、这个需求的分支上重新跑 brain handoff'))
+    expect(bar.textContent!.match(/标签是 bob 打的/g)).toHaveLength(1)
+  })
+
   describe('claimed, not started', () => {
     const claimed = (d: RequirementDetail, who: 'you' | 'people' = 'you') => {
       Object.assign(d.row, { state: 'claimed', state_label: '已认领', where: 'claim', branch: null, intent: null, worktree: null, stage: null })
@@ -603,6 +615,17 @@ describe('需求详情', () => {
     expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item', at: 1794047460 })
     fireEvent.click(within(chart).getByRole('button', { name: /你批准了需求：看板回放到这一刻/ }))
     expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item', at: 1794048720 })
+  })
+
+  test('价值流 says the whole time 周期 says; a quiet end with nothing recorded is said, not drawn', async () => {
+    const b = fx.board()
+    for (const a of b.actors) a.spans = a.spans.map((x) => ({ ...x, b: x.b ?? b.at }))
+    b.at += 5 * 3600
+    installFixtureRoutes({ [`GET ${API}/board/*`]: () => structuredClone(b) })
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '价值流' })
+    expect(card).toHaveTextContent('从开工到此刻，共 33 小时（最后 5 小时 没有动静）')
+    expect(within(screen.getByRole('article', { name: '周期' })).getByTestId('item-cycle')).toHaveTextContent(/^33 小时$/)
   })
 
   test('价值流 as a table: one row per part with its time, who, how long and how it ended', async () => {
