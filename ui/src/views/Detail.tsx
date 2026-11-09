@@ -278,7 +278,7 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
   const live = x ? x.sessions.find((s) => s.kind === 'local' && !s.error) ?? null : null
   const toBoard = (more: Partial<BoardEntry> = {}) => props.go({ kind: 'board', repo: entry.repo, key: entry.key, from: 'item', ...more })
   // 回交付总览: back when that is where it was opened from (its filters kept), else a move there
-  const toOverview = entry.from === 'overview' && onBack ? onBack : () => props.go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) })
+  const back = onBack ? { name: from, go: onBack } : { name: VIEW_NAME.overview, go: () => props.go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) }) }
   return (
     <main className="kt-root br-view cto-root cto-item br-detail" data-testid="br-detail">
       <style>{DETAIL_CSS}</style>
@@ -297,7 +297,7 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{from}</button>}
         </div>
       </div>
-      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} onOverview={toOverview} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
+      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} backName={back.name} onBack={back.go} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
       {x && (
         <Page x={x} board={board} live={live} entry={entry} props={props} opened={opened} localOnly={x.row.local_only ?? repoInfo?.remote === false}
           onOpened={(r) => { setOpened(r); after() }} after={after} toBoard={toBoard} />

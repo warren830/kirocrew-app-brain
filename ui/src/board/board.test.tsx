@@ -449,6 +449,12 @@ describe('需求看板', () => {
     fireEvent.click(within(card).getByRole('button', { name: '回交付总览' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'overview', repo: 'r1' })
     expect(boardCalls({ repo: 'r1', key: 'PAY-9' })).toHaveLength(1)
+    cleanup()
+    // opened from 待办: back there, as the crumb says
+    const back = vi.fn()
+    renderBoard({ repo: 'r1', key: 'PAY-9', from: 'todo' }, {}, back)
+    fireEvent.click(within(await screen.findByRole('region', { name: '没有这个需求' })).getByRole('button', { name: '回待办' }))
+    expect(back).toHaveBeenCalledTimes(1)
   })
 
   test('a backend without the /board route (a 404 without an error body) is the same missing state', async () => {

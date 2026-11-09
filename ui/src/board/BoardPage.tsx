@@ -193,7 +193,8 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
         </div>
         {live.missing && !board
           ? <NotFound repoName={status?.repos.find((r) => r.id === entry.repo)?.name ?? (entry.repo === 'runner' ? '运行机' : null)} reqKey={entry.key}
-              onOverview={() => go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) })} testId="br-board-missing" />
+              backName={onBack ? fromName : VIEW_NAME.overview} onBack={onBack ?? (() => go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) }))}
+              testId="br-board-missing" />
           : <LoadState loading={live.loading} error={live.error} has={!!board} />}
         {board && lay && (
           <>

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ItemEntry } from '../nav'
@@ -269,17 +269,27 @@ describe('需求详情', () => {
     })
   })
 
-  test('a requirement that is not there: which repo, what to do, back to 交付总览; no HTTP code, no 需求看板', async () => {
+  test('a requirement that is not there: which repo, what to do, back where it was opened from (as the crumb); no HTTP code, no 需求看板', async () => {
     installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => { throw apiError(404, 'not_found', '没有这个需求') } })
-    const { go } = renderDetail({ repo: 'r1', key: 'PAY-99', from: 'todo' })
+    const { go, onBack } = renderDetail({ repo: 'r1', key: 'PAY-99', from: 'todo' })
     const card = await screen.findByRole('region', { name: '没有这个需求' })
     expect(card).toHaveTextContent('shop-pay 仓库里没有 PAY-99')
-    expect(card).toHaveTextContent('做什么：在上面「切换需求」里换一个，或者回交付总览找。')
+    expect(card).toHaveTextContent('做什么：在上面「切换需求」里换一个，或者回待办找。')
     expect(document.body).not.toHaveTextContent('404')
     expect(screen.queryByRole('button', { name: '需求看板 ↗' })).toBeNull()
-    fireEvent.click(within(card).getByRole('button', { name: '回交付总览' }))
-    expect(go).toHaveBeenCalledWith({ kind: 'overview', repo: 'r1' })
+    fireEvent.click(within(card).getByRole('button', { name: '回待办' }))
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(go).not.toHaveBeenCalled()
     expect(apiCalls.find((c) => !c.path.startsWith(`${API}/overview`))?.path).toBe(`${API}/requirements/r1/PAY-99`)
+    cleanup()
+    renderDetail({ repo: 'runner', key: 'PAY-99', from: 'team' })
+    expect(within(await screen.findByRole('region', { name: '没有这个需求' })).getByRole('button', { name: '回运行机' })).toBeInTheDocument()
+    cleanup()
+    // opened with no way back (a link): 交付总览
+    const go2 = vi.fn()
+    render(<DetailView entry={{ repo: 'r1', key: 'PAY-99' }} status={fx.status()} go={go2} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} pollMs={60_000} />)
+    fireEvent.click(within(await screen.findByRole('region', { name: '没有这个需求' })).getByRole('button', { name: '回交付总览' }))
+    expect(go2).toHaveBeenCalledWith({ kind: 'overview', repo: 'r1' })
   })
 
   test('another error answer still shows errorText', async () => {
