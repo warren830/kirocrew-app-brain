@@ -130,7 +130,7 @@ describe('待办', () => {
     await screen.findByRole('region', { name: 'KiroCrew 的问题' })
     const crew = group('KiroCrew 的问题')
     expect(within(crew).queryByRole('button', { name: '把引擎换成 kas' })).toBeNull()
-    fireEvent.click(within(crew).getByRole('button', { name: /brain-dev 的 Lean hook/ }))
+    fireEvent.click(within(crew).getByRole('button', { name: '补上 Lean 的 hook' }))
     expect(await within(crew).findByText('已重装 brain-dev agent')).toBeInTheDocument()
     expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/crew/fix`, body: { what: 'agent' } })
     expect(reloadStatus).toHaveBeenCalled()

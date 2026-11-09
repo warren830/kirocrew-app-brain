@@ -58,7 +58,7 @@ export const sourceName = (s: string | null | undefined): string => (s ? SOURCE_
 
 /** how a document is classified (gate 2) */
 export const CLASS_NAME: Record<string, string> = {
-  public: '公开', internal: '内部', confidential: '机密', restricted: '严格受限', unsure: '不确定',
+  public: '公开', internal: '内部', confidential: '机密', restricted: '严格受限', unsure: '不确定', secret: '绝密',
 }
 
 /** 4 done · 6 skipped · next: 发布 — the one way the whole app says Lean's progress (#8) */
@@ -68,3 +68,11 @@ export function leanProgress(lean: Pick<LeanSummary, 'done_n' | 'skipped_n' | 'n
   parts.push(lean.next ? `下一步：${lean.next.label}` : '全部做完')
   return parts.join(' · ')
 }
+
+/** brain-kit's optional modules (Status.brainkit.modules) → what they do for a person */
+export const MODULE_NAME: Record<string, string> = {
+  trace: '需求时间线', evaluate: '交付评估', golden: '标准考题', intents: '需求来源', mrdesc: '变更说明',
+}
+
+/** kit.json tracker → one word (设置, 导入仓库) */
+export const TRACKER_NAME: Record<string, string> = { none: '不用 Jira', jira: '用 Jira' }

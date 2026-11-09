@@ -9,7 +9,7 @@ import { API, installFixtureRoutes } from './test/routes'
 import { apiCalls, apiError, badges, navigations } from './test/stubs/app-sdk'
 
 const bar = () => within(screen.getByTestId('br-appbar'))
-const FIX = '补上 brain-dev 的 Lean hook'
+const FIX = '补上 Lean 的 hook'
 /** the ledger's row of *key* on 交付总览 */
 const ledgerRow = async (key: string) => {
   const table = await screen.findByTestId('req-table')
