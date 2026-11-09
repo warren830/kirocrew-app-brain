@@ -248,7 +248,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
       <section className="br-hero nr-hero" aria-label="开需求">
         <div>
           <h2>{claimed ? `开工：${claimed}` : '开需求'}</h2>
-          <p>{claimed ? `${claimed} 已经认领了，还没开工。补上英文短名（和文档，有的话），点「开工」。` : HERO_TEXT}</p>
+          <p>{claimed ? `${claimed} 已经认领了，还没开工。看一眼英文短名，有文档的话填上，点「开工」。` : HERO_TEXT}</p>
         </div>
         <Flow steps={flow} label="开需求的步骤" />
       </section>

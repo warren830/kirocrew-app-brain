@@ -120,8 +120,19 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
     : shown.next === 'listed' || addedHere ? 'done' : 'now'
   const states: StepState[] = [shown ? 'done' : 'now', shown ? (shown.next === 'fix' ? 'bad' : 'done') : inspect.busy ? 'now' : undefined, s3, s4]
   const flow: FlowStep[] = IMPORT_FLOW.map((s, i) => ({ ...s, state: states[i], ...(i === 2 && s3 === 'off' ? { text: '已经装了：不用装' } : {}) }))
-  const showInstall = !!shown && (shown.next === 'install' || !!installFor || (!!shown.install && shown.next === 'pending') || (!!shown.install && shown.next === 'listed' && !!shown.pending))
+  // an install branch that can no longer go in: its card first, then the way out (改成直接装) under it
+  const again = !!shown && !installFor && !!shown.install && shown.next !== 'install' && !!shown.pending
+  const showInstall = !!shown && (shown.next === 'install' || !!installFor || again)
   const found = (defaults.data?.found ?? []).filter((f) => f.path !== shown?.path)
+  const installCard = shown && (
+    <InstallCard key={`install:${shown.path}`} c={shown} job={installFor} state={s3} readError={install.readError} onStart={install.start}
+      onCommitted={async () => {
+        if (shown.path && !shown.listed) await runAdd(shown.path)
+        recheck()
+      }}
+      added={addedHere} addBusy={add.busy} addError={add.error} onAdd={() => shown.path && void runAdd(shown.path)}
+      onChanged={() => { reloadStatus(); recheck() }} go={go} />
+  )
 
   return (
     <main className="kt-root br-view imp-root" data-testid="br-import">
@@ -165,18 +176,11 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
       </section>
 
       {shown && <InspectCard c={shown} busy={inspect.busy} state={states[1]} onRecheck={recheck} onFixed={() => { reloadStatus(); recheck() }} />}
-      {shown && showInstall && (
-        <InstallCard key={`install:${shown.path}`} c={shown} job={installFor} state={s3} readError={install.readError} onStart={install.start}
-          onCommitted={async () => {
-            if (shown.path && !shown.listed) await runAdd(shown.path)
-            recheck()
-          }}
-          added={addedHere} addBusy={add.busy} addError={add.error} onAdd={() => shown.path && void runAdd(shown.path)}
-          onChanged={() => { reloadStatus(); recheck() }} go={go} />
-      )}
+      {showInstall && !again && installCard}
       {shown && !installFor && (shown.next === 'pending' || shown.next === 'listed') && shown.pending && shown.path && (
         <PendingCard key={`pending:${shown.path}`} path={shown.path} p={shown.pending} onChanged={() => { reloadStatus(); recheck() }} />
       )}
+      {again && installCard}
       {shown && !installFor && shown.next === 'listed' && (
         <section className="br-card imp-sec is-ok" aria-label="加入列表">
           <StepHead n={4} title="加入列表" state="done" />
