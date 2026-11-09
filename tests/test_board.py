@@ -363,7 +363,7 @@ def test_the_merge_ends_the_requirements_time_and_its_14_days_are_watched_not_wa
                             ev(T + 16 * M, "APPROVED", kind="RELEASE", sha256="ab" * 32)]
     b = snapshot(facts(evs, merged=True), row_of("merged", "nobody", "已合并"), sessions=[session(T + 17 * M)],
                  t=merged_trace(merged_at, merged_at + 14 * 86400), brain_={"proposals": 2},
-                 app_events=[{"at": iso(merged_at + 15 * H), "label": "brain reflect --apply：成功", "detail": "brain/DEMO-3-reflect-1"}],
+                 app_events=[{"at": iso(merged_at + 15 * H), "label": "回写 Brain：成功", "detail": "brain/DEMO-3-reflect-1"}],
                  reflect_refs=[("brain/DEMO-3-reflect-1", merged_at + 15 * H)], now=merged_at + 2 * 86400)
     assert b["ended_at"] == merged_at
     assert all(s["b"] is not None and s["b"] <= merged_at for a in b["actors"] for s in a["spans"])

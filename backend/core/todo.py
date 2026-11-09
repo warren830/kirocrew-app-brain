@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from .deliveries import approve_text
 from .detail import mr_questions, park_question
 
 # the step a row waits on (Waits.do) -> the 待办 kind, when nothing more specific was listed for it
@@ -62,7 +63,8 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
             for a in f.get("approvals") or []:
                 if a["state"] == "pending" and a.get("line"):
                     items.append({**base, "kind": "lean_approval", "approval": a["kind"], "line": a["line"],
-                                  "text": "读完再批：在会话里自己打这一行。app 不会替你发。"})
+                                  "text": w.get("text") if a["line"] == w.get("line") and w.get("text")
+                                  else approve_text(a)})
             q = park_question(f.get("park"), answerable=bool(e.get("own") and e.get("has_session")), via="session")
             if q and q["state"] == "waiting":
                 items.append({**base, "kind": "clarify" if q["answerable_here"] else "question", "question": q,

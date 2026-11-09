@@ -357,7 +357,7 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
             add(at, "session", "person", "local", label)
         elif "回答" in label:
             add(at, "answer", "person", "local" if "澄清" in label else "bridge", label)
-        elif "reflect" in label:
+        elif label.startswith("回写 Brain"):
             add(at, "reflect", "person", "reflect", "回写 Brain：%s" % label.split("：")[-1], ref=e.get("detail") or None)
         elif "开工" in label:
             continue   # run.created_at says it already

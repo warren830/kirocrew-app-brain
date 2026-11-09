@@ -27,6 +27,7 @@ from .gateway import Gateway
 from .httpkit import AppError
 from .repo import Git, Repo, Source, read_facts
 from .sessions import SessionManager
+from . import store as store_mod
 from .store import Store
 
 _REGISTRY: dict[str, "Service"] = {}
@@ -812,38 +813,48 @@ class Service:
 
     # ---- sessions and answers ------------------------------------------------------------------------- #
 
-    async def open_session(self, rid: str, key: str, trust: bool = True, kickoff: bool = True) -> dict[str, Any]:
+    async def open_session(self, rid: str, key: str, trust: bool = True, kickoff: bool = True,
+                           review: bool = False) -> dict[str, Any]:
+        """The requirement's brain-dev session on this machine: the live one, else a new one. *review*: a new one in
+        any case (开审查会话: the session that wrote the code may not review it), told Lean's review line."""
         repo = self._repo(rid)
         f = await asyncio.to_thread(self._facts, repo, key)
         run = f.get("run") or {}
         if not run or run.get("handoff") or f.get("merged"):
-            raise AppError("只有本地开发中的需求能在这里开 brain-dev 会话", "not_local", 409)
+            raise AppError("只有本地开发中的需求能在这里开会话", "not_local", 409)
         if not f.get("worktree"):
-            raise AppError("这台机器上没有检出 %s 的分支：先 git worktree add 或在开需求里开工" % f.get("branch"), "no_worktree", 409)
-        return await self._open_local(repo, key, f["branch"], f["worktree"], run, trust=trust, kickoff=kickoff)
+            raise AppError("这台机器上没有检出 %s 的分支：先在开需求里开工" % f.get("branch"), "no_worktree", 409)
+        return await self._open_local(repo, key, f["branch"], f["worktree"], run, trust=trust, kickoff=kickoff,
+                                      review=review)
 
     async def _open_local(self, repo: Repo, key: str, branch: str, wt: str, run: dict[str, Any], *, trust: bool,
-                          kickoff: bool) -> dict[str, Any]:
+                          kickoff: bool, review: bool = False) -> dict[str, Any]:
         self.crew = await asyncio.to_thread(self.crew_sync)
         if not crewcheck.agent_ok(self.crew["rows"]):
             raise AppError("brain-dev 还没带上 Lean 的 hook：先在设置里修好（KiroCrew 检查）", "agent_not_ready", 409)
         scope = scope_of(repo.id, key)
-        live = [i for i in self.sessions.roots(key=scope, kind="local") if i.slot and not
-                (self.sessions.slot_stats(i.slot) or {}).get("missing")]
-        if live:
-            return {"ok": True, "slot": live[-1].slot, "url": "/chat?sid=%s" % live[-1].slot}
-        task = intake.kickoff(key, branch, run.get("intent"),
-                              [str(m.get("package")) for m in run.get("materials") or [] if isinstance(m, dict)]) \
-            if kickoff else ""
+        if review:
+            task = intake.review_task(key, branch, run.get("intent"))
+            if not task:
+                raise AppError("这个需求的记录里没有 Lean 的 intent：开不了审查会话", "no_intent", 409)
+            title, said = "%s · 审查" % key, "开了审查会话"
+        else:
+            live = [i for i in self.sessions.roots(key=scope, kind="local") if i.slot and not
+                    (self.sessions.slot_stats(i.slot) or {}).get("missing")]
+            if live:
+                return {"ok": True, "slot": live[-1].slot, "url": "/chat?sid=%s" % live[-1].slot}
+            task = intake.kickoff(key, branch, run.get("intent"),
+                                  [str(m.get("package")) for m in run.get("materials") or [] if isinstance(m, dict)]) \
+                if kickoff else ""
+            title, said = "%s · 本地开发" % key, "开了本机会话"
         slug = branch.rsplit("/", 1)[-1][len(key) + 1:] or key.lower()
         info = await self.sessions.open_session(
-            task, parent_session_key="%s:%s" % (self.name, scope), cwd=wt, title="%s · 本地开发" % key,
+            task, parent_session_key="%s:%s" % (self.name, scope), cwd=wt, title=title,
             folder="%s · %s" % (key, slug), agent=LOCAL_AGENT, root_folder=LOCAL_FOLDER, project_dir=wt,
             strict_agent=True, resend_ok=True, nudge_ok=False, trust_ok=bool(trust), kind="local", key=scope)
         if info.error or not info.slot:
             raise AppError(info.error or "会话没开成", "session_failed", 502)
-        await asyncio.to_thread(self.store.append, scope, "app", "开了 brain-dev 会话",
-                                "%s%s" % (info.slot, "，信任这个会话" if trust else ""))
+        await asyncio.to_thread(self.store.append, scope, "app", said, store_mod.TRUSTED if trust else None)
         await self.sessions.save()
         return {"ok": True, "slot": info.slot, "url": "/chat?sid=%s" % info.slot}
 
@@ -974,7 +985,7 @@ class Service:
         f = await asyncio.to_thread(self._facts, repo, key)
         out = scrub_tree(await asyncio.to_thread(brainview.apply, repo, f, push), self.scrub)
         await asyncio.to_thread(self.store.append, scope_of(rid, key), "app",
-                                "brain reflect --apply%s：%s" % (" --push" if push else "", "成功" if out["ok"] else "失败"),
+                                "回写 Brain%s：%s" % (" 并推送" if push else "", "成功" if out["ok"] else "失败"),
                                 out.get("branch"))
         return out
 

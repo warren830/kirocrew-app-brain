@@ -67,7 +67,8 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
     async def open_session(request: Any) -> Any:
         body = await kit.body(request)
         return kit.json(await svc.open_session(_rid(request), _key(request), trust=body.get("trust", True) is not False,
-                                               kickoff=body.get("kickoff", True) is not False))
+                                               kickoff=body.get("kickoff", True) is not False,
+                                               review=body.get("review") is True))
 
     async def answer(request: Any) -> Any:
         body = await kit.body(request)

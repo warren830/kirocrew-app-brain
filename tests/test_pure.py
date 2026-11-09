@@ -1,6 +1,8 @@
 """Pure readers: the bridge's MR comments parsed back (a person's machine), states from the bridge ledger (team
 mode), overlaps, the decision funnel's fallback."""
 
+import json
+
 import pytest
 
 from appkit import BRAINKIT, mod
@@ -266,10 +268,12 @@ def test_a_hand_over_without_its_label_is_said_to_be_nothing_handed_over():
         row = {"state": "", "state_label": "", "waits": {}}
         mr = {"state": mr_state, "labels": labels, "sha": sha, "questions": []}
         deliveries.classify(row, f, mr=mr, slot=None, cfg=cfg, at_handover=at_handover)
-        return row["state"], row["waits"]["who"], row["waits"]["text"]
+        return row["state"], row["waits"]["who"], row["waits"]["text"], row["waits"]["raw"]
 
-    st, who, text = state([])
-    assert (st, who) == ("handed_over", "you") and "没有交接标签 ai-handoff" in text and "什么也没交出去" in text
+    st, who, text, raw = state([])
+    assert (st, who) == ("handed_over", "you") and "没有交接标签" in text and "什么也没交出去" in text
+    # the command to hand over again is under 细节, never in the sentence (REST-29)
+    assert "brain handoff" not in text and "brain handoff" in raw and "ai-handoff" in raw
     assert state(["ai-handoff"])[:2] == ("handed_over", "bridge")            # labelled: the bridge looks at it
     assert state(["ai-running"])[:2] == ("running", "runner")
     assert state([], at_handover=False)[:2] == ("handed_over", "bridge")     # the runner's work on top: not said
@@ -415,3 +419,17 @@ def test_the_eval_queue_says_what_people_did_in_words():
     assert deliveries.acts_in_words("判断点之外有人介入 2 次（allow_test_change、platform_merge）") == \
         "判断点之外有人介入 2 次（允许改验收测试、平台上的手动操作）"
     assert deliveries.acts_in_words("验收被驳回 1 次（RELEASE）") == "验收被驳回 1 次（RELEASE）"
+
+
+def test_what_an_older_app_wrote_is_read_in_words(tmp_path):
+    """The app's own record is said in words (REST-29): an older app wrote the command it ran and the session's slot
+    name; they are read back the way it writes them now."""
+    st = mod("store").Store(tmp_path)
+    (tmp_path / "r1-DEMO-1.jsonl").write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in (
+        {"at": "2026-11-09T00:29:34Z", "kind": "app", "label": "开了 brain-dev 会话", "detail": "brain-r1-demo-1-1-4115，信任这个会话"},
+        {"at": "2026-11-09T00:51:05Z", "kind": "app", "label": "brain reflect --apply：成功", "detail": "brain/DEMO-1-reflect-1"},
+        {"at": "2026-11-09T00:52:05Z", "kind": "app", "label": "brain reflect --apply --push：失败", "detail": None})) + "\n")
+    st.append("r1-DEMO-1", "app", "开了审查会话", None)
+    assert [(e["label"], e["detail"]) for e in st.events("r1-DEMO-1")] == [
+        ("开了本机会话", "工具调用不用逐个批准"), ("回写 Brain：成功", "brain/DEMO-1-reflect-1"), ("回写 Brain 并推送：失败", None),
+        ("开了审查会话", None)]

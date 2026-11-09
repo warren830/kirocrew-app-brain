@@ -376,3 +376,21 @@ def kickoff(key: str, branch: str, intent: str | None, materials: list[str]) -> 
              + ("" if not pkgs else "，然后读材料包 .brain-materials/%s/toc.md" % pkgs[0]) + "。",
              "有问题一次问完，每题带推荐答案。"]
     return "\n".join(l for l in lines if not APPROVAL_LINE_RE.match(l))
+
+
+# what Lean's release skill (aidlc-lean-release) tells the person to say in a new chat: the review is made by a context
+# that did not write the code
+REVIEW_LINE = ("Review intent %s against its requirements, design and plans, using the diff, and write "
+               "construction/build-and-test/review.md.")
+
+
+def review_task(key: str, branch: str, intent: str | None) -> str:
+    """The first message to a requirement's review session: Lean's review line for its intent, ids only, checked like
+    kickoff's (no approval line can get in). '' when run.json names no usable intent."""
+    if not (isinstance(intent, str) and INTENT_RE.match(intent)):
+        return ""
+    key = key if KEY_RE.match(key or "") else "?"
+    branch = branch if parse_branch(branch or "", branch.split("/", 1)[0] if branch else "ai") else "?"
+    lines = ["这是需求 %s 的审查会话：新开的，没写过这次的代码。分支 %s，Lean intent %s。" % (key, branch, intent),
+             REVIEW_LINE % intent]
+    return "\n".join(l for l in lines if not APPROVAL_LINE_RE.match(l))

@@ -33,7 +33,9 @@ CAT_ORDER = ("person", "check", "brain", "agent", "unknown", "unclassified")
 # brain-kit's ledger states of a decision that leave the run waiting for good: nobody can answer it any more (the
 # signer refused the answer, the question is void, or it could not be asked) until the run pushes again
 # a pushed hand-over the MR carries no label for (`brain handoff` exits 1 then): nothing was handed over
-NOT_LABELLED = "推上去了，但 MR 上没有交接标签 %s：什么也没交出去。看一眼 MR，再在分支上跑一次 brain handoff"
+NOT_LABELLED = "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次"
+# the command it takes, for 细节 (a person types it in a terminal, on the requirement's branch)
+NOT_LABELLED_RAW = "MR 上要有标签 %s。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）"
 # brain-kit's ledger states of a question the bridge has not put on the MR yet: posting (to be posted), asking (one
 # bridge process is posting it right now, 72b278e)
 NOT_POSTED = ("posting", "asking")
@@ -135,10 +137,8 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
     if not run.get("handoff"):
         if pending:
             a = pending[0]
-            what = lean_view.KIND_LABEL.get(a["kind"], a["kind"])
-            what = " %s 的%s" % (a["unit"], what) if a.get("unit") else what
-            return put("local", you, "approve", "等%s批准%s：读完再在会话里自己打那一行" % (them, what),
-                       where="session", since=a.get("at"), line=a["line"] if mine else None)
+            return put("local", you, "approve", approve_text(a, them), where="session", since=a.get("at"),
+                       line=a["line"] if mine else None)
         if park_waiting(park):
             kind = str(park.get("kind") or "other")
             here = mine and slot is not None and kind == "clarify" and not park.get("lean_request")
@@ -188,9 +188,16 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
     if cfg.get("running_label") in labels or bot_commits:
         return put("running", "runner", "none", "运行机在跑")
     if at_handover and not_labelled(f, mr, cfg):
-        return put("handed_over", you, "label_handoff", NOT_LABELLED % cfg.get("handoff_label"), where="session",
-                   since=f.get("tip_at"))
+        return put("handed_over", you, "label_handoff", NOT_LABELLED, where="session", since=f.get("tip_at"),
+                   raw=NOT_LABELLED_RAW % cfg.get("handoff_label"))
     return put("handed_over", "bridge", "none", "等桥核对交接", since=f.get("tip_at"))
+
+
+def approve_text(a: dict[str, Any], them: str = "你") -> str:
+    """A pending Lean approval of a run on this machine, said as what waits: 「等你批准代码生成计划：读完再在会话里自己打那一行」."""
+    what = lean_view.KIND_LABEL.get(a["kind"], a["kind"])
+    what = " %s 的%s" % (a["unit"], what) if a.get("unit") else what
+    return "等%s批准%s：读完再在会话里自己打那一行" % (them, what)
 
 
 def mr_ask(who: str, what: str, did: Any, *, approval: bool, owner: str | None = None) -> str:
