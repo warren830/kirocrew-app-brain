@@ -35,8 +35,10 @@ answer     ``decisions.check_answer`` on the MR, bound to the question note the 
            counts, and an allowed person's such reply holds the round (a conflict: nothing is signed); edited by its
            author before this signer first read it: it counts as it reads now; its text changed after that: it never
            counts. When GraphQL cannot be read, this signer answers nothing (a check it cannot make: the bridge asks
-           again) and records nothing for that reply, where brain-kit's own bridge records it as "cannot tell" for
-           good and tells the person to reply again; either way nothing is signed for it.
+           again) and records nothing for that reply. brain-kit's own bridge does the same since QA round 3
+           (0d52e97): the reply is "pending", read again each round, and counts once GraphQL answers (the MR is told
+           once after edit_check_rounds rounds); a check_answer verdict that names pending replies is no refusal here
+           either. (An older bridge recorded such a reply as "cannot tell" for good.) Fail closed, but not for good.
 What this signer adds, because brain-kit cannot know it or does not offer it:
 - the voucher is rebuilt from what those checks found and must be the one asked for, byte for byte (canonical JSON).
   brain-kit has no public voucher builder, so ``handoff_voucher`` / ``answer_voucher`` below copy the layout of
@@ -190,11 +192,11 @@ class CannotCheck(Exception):
 
 class EditsOrNothing:
     """The signer's GitLab as the brain-kit Bridge inside this signer sees it: the same client, with one difference.
-    brain-kit's DecisionLoop.reply_states, when GitLab GraphQL fails (rest.GitLab.note_edits raises BrainError), records
-    the reply as "unknown" for good: its bridge then tells the person to reply again. Here that failure is a check the
-    signer cannot make: note_edits raises CannotCheck, which goes through reply_states before anything is recorded for
-    that reply, so the request gets no answer and is checked again when the bridge asks again. Everything else goes
-    to the client as it is."""
+    When GitLab GraphQL fails (rest.GitLab.note_edits raises BrainError), brain-kit's DecisionLoop.reply_states
+    records the reply as "unknown" for good up to 48b6b97, and marks it "pending" (recorded nothing, read again next
+    round) since QA round 3. Here that failure is a check the signer cannot make on either: note_edits raises
+    CannotCheck, which goes through reply_states before anything is recorded for that reply, so the request gets no
+    answer and is checked again when the bridge asks again. Everything else goes to the client as it is."""
 
     def __init__(self, gl, brain_error):
         self._gl, self._brain_error = gl, brain_error
@@ -556,6 +558,11 @@ class Signer:
             {"id": did, "run_id": v["run_id"], "sha": v["sha"], "park_hash": v["park_hash"],
              "kind": v["decision_kind"], "lean_request": v.get("lean_request"), "question_note": qn},
             raw, notes, kit, self.br.roles, run["owner"], mr["sha"], pushed, edits=edits)
+        if getattr(got, "pending", None):
+            # brain-kit QA round 3: a reply whose edits cannot be checked yet holds the decision until they can. That
+            # is a check this signer cannot make now, not a refusal: no answer, the bridge asks again next round
+            raise CannotCheck("%s: the edits of replies %s cannot be checked yet (nothing signed)" % (
+                did, ", ".join(str(x) for x in got.pending)))
         if not got.ok:
             status = "held" if got.status == "conflict" and got.held else got.status
             raise Refuse(VERDICT.get(status, "%s 不签") % did + ("（%s）" % got.reason if got.reason else ""))

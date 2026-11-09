@@ -195,7 +195,8 @@ def test_an_edited_question_is_refused(flow):
     assert flow.decision()["state"] == "void" and any(b.startswith("D-1 作废（") for b in flow.gl.bodies())
     d, r = signer_ask(flow.w, answer_voucher(sha, flow.park_raw(sha), "D-1", "A", "alice", q["id"]))
     assert d == "refused" and "edited" in reasons(r), r
-    assert flow.kc.sent == []
+    # nothing of the answer reaches the run; brain-kit 0d52e97 tells it (once) that D-1 is void, to ask again
+    assert len(flow.kc.sent) <= 1 and all(m["message"].startswith("问题作废：D-1 ") for m in flow.kc.sent), flow.kc.sent
 
 
 # ---------------------------------------------------------------- answers: brain-kit 72b278e's edit signal
@@ -344,25 +345,69 @@ def test_graphql_down_signs_nothing_and_records_nothing(flow):
     assert replies(flow) == {reply["id"]: "original"}
 
 
+def holds_pending():
+    """brain-kit QA round 3 (0d52e97): a reply whose edits cannot be read is "pending" (recorded nothing, read again
+    next round, the whole decision held); 48b6b97 recorded it as "cannot tell" for good."""
+    from brainkit.bridge import decisions
+    return hasattr(decisions.Verdict("none"), "pending")
+
+
 def test_graphql_down_for_everyone_fails_closed(flow):
-    """GraphQL answers nobody: brain-kit's bridge does not count alice's touched reply and tells the MR once; the
-    signer does not sign it either. alice's new reply (untouched) needs no GraphQL: the bridge delivers it, and the
-    signer signs it once GraphQL answers again (it still has her first reply to judge)."""
+    """GraphQL answers nobody: fail closed, but not for good. brain-kit's bridge does not count alice's touched reply;
+    since 0d52e97 it holds D-1 (the reply is read again each round) and tells the MR once after edit_check_rounds
+    rounds (3 by default); the signer signs nothing and records nothing for it either. Once GraphQL answers, her
+    reply counts as she wrote it: nobody replies again. (48b6b97 recorded it as "cannot tell" for good and told the
+    MR at once: there she replied again.)"""
     flow.hand_over()
     sha, q = flow.ask()
     first = flow.gl.note("alice", "answer D-1 B")
     flow.gl.award(first)
     flow.gl.graphql_down.add("*")
-    assert flow.bridge.collect() == 0 and flow.bridge.collect() == 0
+    assert [flow.bridge.collect() for _ in range(3)] == [0, 0, 0]
     told = [b for b in flow.gl.bodies() if b.startswith("D-1：") and "查不到" in b]
-    assert len(told) == 1, flow.gl.bodies()
+    assert len(told) == 1 and flow.decision()["state"] == "open", flow.gl.bodies()
+    assert flow.bridge.collect() == 0 and len([b for b in flow.gl.bodies() if b.startswith("D-1：")]) == 1  # told once
     d, r = signer_ask(flow.w, answer_voucher(sha, flow.park_raw(sha), "D-1", "B", "alice", q["id"]))
     assert (d, r) == (None, None) and first["id"] not in replies(flow)
-    flow.gl.note("alice", "answer D-1 B")
+    if holds_pending():
+        assert "不用重新回复" in told[0], told
+    else:
+        flow.gl.note("alice", "answer D-1 B")
     flow.gl.graphql_down.clear()
     flow.signer._failed.clear()           # (the bridge's voucher may be the very request the signer could not check)
     assert flow.bridge.collect() == 1 and flow.decision()["state"] == "delivered"
     assert replies(flow)[first["id"]] == "original"
+    # what is signed is her B for that question (the request written straight into the spool above, held while GraphQL
+    # was down, is answered too once the signer can check it)
+    ans = [x["voucher"] for x in flow.vouchers() if x["voucher"]["kind"] == "answer"]
+    assert {(a["choice"], a["question_note"]) for a in ans} == {("B", q["id"])}
+    assert flow.decision()["voucher_id"] in {a["voucher_id"] for a in ans}
+
+
+def test_a_pending_verdict_is_no_refusal(flow):
+    """The signer never turns brain-kit's hold into a refusal: a check_answer verdict that names pending replies (their
+    edits cannot be read now) gets no answer (the bridge asks again), and the voucher is signed once it can tell."""
+    if not holds_pending():
+        pytest.skip("brain-kit before QA round 3 has no pending replies")
+    from brainkit.bridge import decisions
+    flow.hand_over()
+    sha, q = flow.ask()
+    flow.gl.note("alice", "answer D-1 B")
+    raw = flow.park_raw(sha)
+    real = decisions.check_answer
+
+    def held(*a, **kw):
+        got = real(*a, **kw)
+        return decisions.Verdict("none", "edits of replies 1 cannot be checked yet", pending=[1], last_id=got.last_id)
+
+    decisions.check_answer = held
+    try:
+        assert signer_ask(flow.w, answer_voucher(sha, raw, "D-1", "B", "alice", q["id"])) == (None, None)
+    finally:
+        decisions.check_answer = real
+    assert not os.listdir(flow.w["sspool"] / "refused")
+    flow.signer._failed.clear()
+    assert signer_ask(flow.w, answer_voucher(sha, raw, "D-1", "B", "alice", q["id"]))[0] == "signed"
 
 
 def test_a_made_up_question_is_refused(flow):
