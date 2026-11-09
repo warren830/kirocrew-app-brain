@@ -244,6 +244,13 @@ describe('replayAt', () => {
     expect(replayAt(b, RELEASE_OK).accept.state).toBe('accepted')
   })
 
+  it('counts Lean’s stages the live board’s way: a moment before the end, the numbers the board says', () => {
+    for (const b of [fx.board(), fx.boardMerged()]) {
+      const { lean } = replayAt(b, replaySpan(b).end - 0.5).row
+      expect([lean.done_n, lean.skipped_n, lean.next], b.row.key).toEqual([b.row.lean.done_n, b.row.lean.skipped_n, b.row.lean.next])
+    }
+  })
+
   it('offers nothing to do: no line to type, no step, no facts or credits', () => {
     for (const [b, t] of [[fx.board(), 1794100000], [fx.boardMerged(), RELEASE_OK + 60]] as const) {
       const r = replayAt(b, t)
