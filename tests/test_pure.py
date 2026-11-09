@@ -304,6 +304,26 @@ def test_commit_dates_and_how_a_run_was_merged_in_the_timeline():
     assert any(i["detail"] == "%s （a new way）" % ("3" * 12) for i in detail.trace_timeline(t))
 
 
+def test_the_timeline_says_what_happened_in_words_never_the_record_codes():
+    """REST-29: no 「verify 通过」, 「park：clarify（waiting）」, 「Lean 拦下（inception）」, 「D-1 delivered」 or 「桥：bridge
+    accepted」 on 需求详情's timeline; the board's words for the same records."""
+    detail, lv = mod("detail"), mod("lean_view")
+    t = {"checks": {"verify": [{"at": "2026-11-09T01:00:00Z", "ok": False}]},
+         "actions": {"blocked": [{"at": "2026-11-09T00:10:00Z", "gate": "inception", "path": "src/pay/api.py"}],
+                     "questions": [{"at": "2026-11-09T00:20:00Z", "kind": "clarify", "status": "waiting"},
+                                   {"at": "2026-11-09T00:30:00Z", "kind": "clarify", "status": "answered"}],
+                     "handovers": [{"at": "2026-11-09T02:00:00Z", "kind": "bridge accepted", "run_id": "RUN-PAY-1-1"}]},
+         "decisions": [{"source": "bridge", "id": "D-1", "state": "delivered", "at": "2026-11-09T03:00:00Z", "choice": "A"}]}
+    labels = [i["label"] for i in detail.trace_timeline(t)]
+    assert labels == ["Lean 拦下了一个不该做的改动：需求和设计还没批", "停下问人：澄清", "澄清的问题回答了，接着做", "自动检查没过",
+                      "桥接手了", "D-1 回答了，桥签好送回运行机"]
+    ledger = [{"event": "BLOCKED", "data": {"gate": "records", "path": "aidlc-docs/x/audit.md"}, "ts": "2026-11-09T00:00:00Z"},
+              {"event": "APPROVED", "data": {"kind": "REQUIREMENTS"}, "ts": "2026-11-09T00:01:00Z"},
+              {"event": "VERIFY", "data": {"ok": True}, "ts": "2026-11-09T00:02:00Z"}]
+    assert [i["label"] for i in lv.stage_events(ledger)] == ["Lean 拦下了一个不该做的改动：记录文件只能由 Lean 自己写", "批准需求",
+                                                             "自动检查通过"]
+
+
 def test_evaluate_notes_say_which_runs_wait_for_their_merge():
     """brain-kit 72b278e: an unmerged run whose acceptance was rejected is autonomy's "wrong_open" (it waits for its
     merge and 14 days); one already in delivery's wrong_open is not listed twice."""

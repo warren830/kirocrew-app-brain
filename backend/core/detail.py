@@ -179,6 +179,14 @@ def _human_label(h: dict[str, Any]) -> str:
     return str(kind or "人")
 
 
+# brainkit.trace's hand-over records and the bridge's question states, said as the board says them
+HANDOVER_LABEL = {"requested": "交接", "voucher": "签名服务签了接手合同", "bridge accepted": "桥接手了",
+                  "bridge rejected": "桥拒绝接手"}
+DECISION_SAID = {"open": "%s 在 MR 上问人", "posting": "%s 等桥贴到 MR 上", "asking": "%s 等桥贴到 MR 上",
+                 "answered": "%s 回答了", "delivered": "%s 回答了，桥签好送回运行机", "delivery_unknown": "%s 回答了，送没送到不清楚",
+                 "refused": "%s 的回答签名服务不签", "void": "%s 作废了", "invalid": "%s 发不出去"}
+
+
 def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
     """Timeline items from brainkit.trace.build's record (who is a username, a pseudonym or a role, never an email)."""
     items = []
@@ -200,20 +208,22 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                       "label": ("运行机提交" if c.get("by") == "bot" else "提交") + ("（只改记录）" if c.get("records_only") else ""),
                       "detail": detail, "who": c.get("who"), "src": c.get("src")})
     for b in a.get("blocked") or []:
-        items.append({"at": b.get("at"), "kind": "blocked", "label": "Lean 拦下（%s）" % (b.get("gate") or "?"),
+        items.append({"at": b.get("at"), "kind": "blocked", "label": "%s：%s" % (lean_view.BLOCKED, lean_view.block_rule(b.get("gate"))),
                       "detail": b.get("path") or b.get("tool"), "who": None, "src": b.get("src")})
     for h in a.get("handovers") or []:
-        label = {"requested": "交接", "voucher": "桥签了接手合同"}.get(h.get("kind"), "桥：%s" % h.get("kind"))
+        label = HANDOVER_LABEL.get(str(h.get("kind")), "桥记下了这次交接")
         items.append({"at": h.get("at"), "kind": "handover", "label": label,
                       "detail": h.get("run_id") or h.get("reason") or h.get("commit"), "who": h.get("by"), "src": h.get("src")})
     for q in a.get("questions") or []:
+        what = KIND_LABEL.get(str(q.get("kind")), "问题")
         items.append({"at": q.get("at"), "kind": "question",
-                      "label": "park：%s（%s）" % (KIND_LABEL.get(str(q.get("kind")), q.get("kind") or "?"), q.get("status") or "?"),
+                      "label": "%s的问题回答了，接着做" % what if q.get("status") == "answered" else "停下问人：%s" % what,
                       "detail": q.get("lean_request"), "who": None, "src": q.get("src")})
     for d in t.get("decisions") or []:
         if d.get("source") == "bridge":
             items.append({"at": d.get("at") or d.get("asked_at"), "kind": "decision",
-                          "label": "%s %s" % (d.get("id"), d.get("state") or ""), "detail": d.get("choice"),
+                          "label": DECISION_SAID.get(str(d.get("state")), "%s 在 MR 上问人") % d.get("id"),
+                          "detail": d.get("choice"),
                           "who": d.get("who"), "src": ", ".join(d.get("src") or [])[:200] or None})
     for r in (t.get("checks") or {}).get("verify") or []:
         items.append({"at": r.get("at"), "kind": "verify", "label": "自动检查%s" % ("通过" if r.get("ok") else "没过"),
