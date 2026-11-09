@@ -5,7 +5,8 @@
  * A tone is a meaning, not a colour: styles.ts maps each to a colour per host mode (kiro-dark / kiro-light), so the
  * same word always has the same colour and every colour has a word next to it.
  */
-import type { ActorStatus, BoardEventKind } from '../types'
+import type { ActorStatus, BoardEventKind, CheckWall, LeanSummary, ReqBoard, WaitWho } from '../types'
+import { STAGE_NAME, waitsOn } from '../vocab'
 
 export const POLL_MS = 2000
 
@@ -163,4 +164,91 @@ export const CELL_META: Record<string, { label: string; glyph: string }> = {
   fail: { label: '没过', glyph: '✕' },
   wait: { label: '等人', glyph: '✋' },
   skip: { label: '还没到', glyph: '–' },
+  watch: { label: '观察中', glyph: '⏳' },
+  not_needed: { label: '这次不需要', glyph: '–' },
+}
+
+/** Who a requirement waits on, in one word: 「等你」 only for the person looking; 「等 carol」 for another person whose
+ * name is known; else vocab's word. */
+export function whoWord(who: WaitWho, owner: string | null): string {
+  if (who === 'people' && owner) return `等 ${owner}`
+  return waitsOn(who) || '等人'
+}
+
+/** An actor's state in words: one that waits says whom it waits for. */
+export function actorLabel(status: ActorStatus, who: WaitWho, owner: string | null): string {
+  return status === 'awaiting_approval' ? whoWord(who, owner) : actorMeta(status).label
+}
+
+/** The ones a requirement may wait on that are people. */
+export const PERSON: ReadonlySet<WaitWho> = new Set<WaitWho>(['you', 'product', 'people', 'builder'])
+
+/** The board waits on the person looking at it. */
+export const waitsOnMe = (b: Pick<ReqBoard, 'row'>) => b.row.waits.who === 'you'
+
+/** Its repo has no remote: done only on this machine (an older backend: every actor of the runner's part skipped). */
+export function localOnly(b: Pick<ReqBoard, 'row' | 'actors' | 'direct'>): boolean {
+  if (typeof b.row.local_only === 'boolean') return b.row.local_only
+  const runner = b.actors.filter((a) => RUNNER_PART.has(a.key))
+  return b.direct || (runner.length > 0 && runner.every((a) => a.status === 'skipped'))
+}
+export const RUNNER_PART: ReadonlySet<string> = new Set(['handover', 'bridge', 'signer', 'runner'])
+
+export type LeanNow = { done_n: number; skipped_n: number; next: { id: string; label: string; n: number } | null; total: number; started: boolean }
+
+/** Lean's progress the one way (vocab.leanProgress's parts); an older backend's counts read as done, none skipped. */
+export function leanOf(l: LeanSummary): LeanNow {
+  const started = l.stage_state === 'started'
+  if (typeof l.done_n === 'number') return { done_n: l.done_n, skipped_n: l.skipped_n ?? 0, next: l.next ?? null, total: l.total, started }
+  const next = (l.stage_state === 'started' || l.stage_state === 'todo') && l.stage_label && l.stage_n !== null
+    ? { id: l.stage ?? '', label: l.stage_label, n: l.stage_n } : null
+  return { done_n: l.done, skipped_n: 0, next, total: l.total, started }
+}
+
+const STAGES = Object.entries(STAGE_NAME)
+
+/** Lean's progress as its stage events tell it up to *t* (回放): a stage done or skipped (each unit's counts once). */
+export function leanFromEvents(events: ReadonlyArray<{ kind: string; at: number; text: string }>, t: number, total = 11): LeanNow {
+  const done = new Set<string>()
+  const skipped = new Set<string>()
+  let open: string | null = null
+  for (const e of events) {
+    if (e.kind !== 'stage' || e.at > t) continue
+    const m = /^(开始|做完|跳过)「([^」（]+)/.exec(e.text)
+    if (!m) continue
+    const label = m[2]
+    if (m[1] === '开始') open = label
+    else (m[1] === '做完' ? done : skipped).add(label)
+    if (m[1] !== '开始' && open === label) open = null
+  }
+  // the stage at work is the next one; else the first, in Lean's order, neither done nor skipped
+  const at = open !== null ? STAGES.findIndex(([, label]) => label === open) : -1
+  const i = at >= 0 ? at : STAGES.findIndex(([, label]) => !done.has(label) && !skipped.has(label))
+  const next = i < 0 ? null : { id: STAGES[i][0], label: STAGES[i][1], n: i + 1 }
+  return { done_n: done.size, skipped_n: skipped.size, next, total, started: at >= 0 }
+}
+
+export interface ChecksSay {
+  text: string
+  tone: 'ok' | 'bad' | 'approve' | 'info' | 'idle'
+  /** every check passed and none is left to come */
+  green: boolean
+}
+
+/** What the checks say, the one way (the KPI, the wall, 验收): 「目前 3 项都过 · 还剩 发布审批」. A check that waits for
+ * a person names whom; the 14 days after the merge are 「在观察」, nobody's turn. */
+export function checksSay(w: CheckWall, who: WaitWho, owner: string | null): ChecksSay {
+  const n = (s: string) => w.cells.filter((c) => c.status === s).length
+  const wait = n('wait')
+  const watch = n('watch')
+  const todo = w.todo ?? w.cells.filter((c) => c.status === 'skip' && (c.group === 'gate' || c.group === 'verify'))
+    .map((c) => (c.group === 'gate' ? `${c.label}审批` : c.label))
+  const left = todo.length ? ` · 还剩 ${todo.join('、')}` : ''
+  const watching = watch ? ` · ${watch} 项在观察` : ''
+  if (!w.total && !watch) return { text: todo.length ? `还没有检查结果${left}` : '还没有检查结果', tone: 'idle', green: false }
+  if (w.failed) return { text: `${w.failed} 项没过${left}`, tone: 'bad', green: false }
+  if (wait) return { text: `${wait} 项${PERSON.has(who) ? whoWord(who, owner) : '等人'}${left}`, tone: 'approve', green: false }
+  const all = w.passed === 1 ? '1 项过了' : `${w.passed} 项都过`
+  if (todo.length) return { text: `目前 ${all}${left}${watching}`, tone: 'info', green: false }
+  return { text: `${w.passed === 1 ? '1 项过了' : `${w.passed} 项全过`}${watching}`, tone: 'ok', green: !watch }
 }
