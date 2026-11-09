@@ -317,11 +317,11 @@ describe('交付总览', () => {
     render(<OverviewView entry={{}} {...props()} />)
     const table = await screen.findByTestId('req-table')
     const cell = (key: string) => within(rowOf(table, key)).getByTestId('lean-cell')
-    expect(cell('PAY-3')).toHaveTextContent(/^做完 2 · 跳过 4 · 下一步：代码生成$/)
-    expect(within(cell('PAY-3')).getByRole('img')).toHaveAccessibleName('做完 2 · 跳过 4 · 下一步：代码生成')
+    expect(cell('PAY-3')).toHaveTextContent(/^做完 4 · 跳过 4 · 下一步：代码生成$/)
+    expect(within(cell('PAY-3')).getByRole('img')).toHaveAccessibleName('做完 4 · 跳过 4 · 下一步：代码生成')
     expect(within(cell('PAY-3')).getByText('下一步：代码生成')).toHaveClass('br-nw') // never broken inside a stage name
-    expect(cell('PAY-7')).toHaveTextContent(/^做完 4 · 跳过 3 · 下一步：发布$/)
-    expect(cell('PAY-2')).toHaveTextContent(/^全部做完（跳过 3）$/)
+    expect(cell('PAY-7')).toHaveTextContent(/^做完 4 · 跳过 6 · 下一步：发布$/)
+    expect(cell('PAY-2')).toHaveTextContent(/^全部做完（跳过 6）$/)
     expect(cell('PAY-6')).toHaveTextContent(/^还没开工$/)
   })
 

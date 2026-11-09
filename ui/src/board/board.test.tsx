@@ -59,14 +59,14 @@ describe('需求看板', () => {
     expect(kpis.getByTestId('br-checks-counter')).toHaveTextContent('2/4')
     expect(kpis.getByTestId('br-checks-say')).toHaveTextContent('1 项没过')
     const lean = kpis.getByText('AI-DLC Lean').parentElement as HTMLElement
-    expect(lean).toHaveAccessibleName('AI-DLC Lean：做完 2 · 跳过 4 · 下一步：代码生成')
-    expect(within(lean).getByTestId('br-lean-counter')).toHaveTextContent('2做完 · 跳过 4')
+    expect(lean).toHaveAccessibleName('AI-DLC Lean：做完 4 · 跳过 4 · 下一步：代码生成')
+    expect(within(lean).getByTestId('br-lean-counter')).toHaveTextContent('4做完 · 跳过 4')
     expect(lean).toHaveTextContent('下一步：代码生成')
-    expect(lean).toHaveTextContent('批准 2退回 0拦下 1')
-    // the person's acts: 2 approvals, and the answer they decided (D-3) counts as a judgment point too
+    expect(lean).toHaveTextContent('批准 3退回 0拦下 1')
+    // the person's acts: 3 approvals, and the answer they decided (D-3) counts as a judgment point too
     const people = kpis.getByText('人介入').parentElement as HTMLElement
-    expect(people).toHaveTextContent('3次')
-    expect(people).toHaveTextContent('判断点上 3（审批 2 · 回答 1） · 判断点之外 0')
+    expect(people).toHaveTextContent('4次')
+    expect(people).toHaveTextContent('判断点上 4（审批 3 · 回答 1） · 判断点之外 0')
     // 1 of the 10 actors is through (需求审批); 本机会话, 设计审批 and the question answerable here wait for the person
     expect(kpis.getByTestId('br-steps-counter')).toHaveTextContent(`1/${b.actors.length}`)
     expect(kpis.getByText('· 3 个等你', { exact: false })).toBeInTheDocument()
@@ -130,7 +130,7 @@ describe('需求看板', () => {
     expect(within(card).getByTestId('accept-first')).toHaveTextContent(b.mr_desc.first as string)
     // the same sentence as the counter's, not a second count
     expect(within(card).getByTestId('accept-checks')).toHaveTextContent('1 项没过')
-    expect(card).toHaveTextContent('人 1Brain 条目（引用） 2没归类（「谁定的」没按规定写） 1')
+    expect(card).toHaveTextContent('人 1照 Brain 2没归类（「谁定的」没按规定写） 1')
     expect(card).not.toHaveTextContent('Who')
     expect(card).toHaveTextContent('金额列带币种，单独一列 currency（一位组员）')
     expect(card).not.toHaveTextContent('P-1A2B')
@@ -721,37 +721,38 @@ describe('需求看板 · 轮到谁、做什么', () => {
   })
 
   test('the lanes show what each one changed: the files and their lines, the commits', async () => {
-    const b = fx.board()
-    const [records, skeleton, csv] = b.belt
-    records.changes = [{ path: 'aidlc-docs/261107-refund-export/aidlc-state.md', added: 12, removed: 0, status: 'A' }]
-    skeleton.changes = [
-      { path: 'src/export/__init__.py', added: 4, removed: 0, status: 'A' }, { path: 'src/export/api.py', added: 60, removed: 0, status: 'A' },
-      { path: 'tests/test_export_api.py', added: 40, removed: 0, status: 'A' }, { path: 'src/refund/routes.py', added: 9, removed: 3, status: 'M' },
-    ]
-    csv.changes = [
-      { path: 'src/export/csv.py', added: 120, removed: 0, status: 'A' }, { path: 'src/export/api.py', added: 18, removed: 6, status: 'M' },
-      { path: 'tests/test_export_csv.py', added: 8, removed: 9, status: 'M' },
-    ]
-    installFixtureRoutes(boardRoute(() => structuredClone(b)))
-    renderBoard()
-    await loaded()
-    const lane = screen.getAllByTestId('kt-lane').find((l) => l.dataset.role === 'local') as HTMLElement
-    const changes = within(lane).getByTestId('kt-changes')
-    // a file two commits changed is one row, its lines summed
-    expect(changes.querySelector('.kt-files-head')).toHaveTextContent('改动+271−187 个文件 · 提交 3 次')
-    expect(changes.querySelector('.kt-files li .kt-file-path')).toHaveTextContent('src/export/csv.py')
-    expect(changes).toHaveTextContent('还有 2 个文件')
-    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent('d98cdc55PAY-3：CSV 字段和金额格式')
-  })
-
-  test('a backend that read no files: each commit says how many files it changed', async () => {
     installFixtureRoutes()
     renderBoard()
     await loaded()
     const lane = screen.getAllByTestId('kt-lane').find((l) => l.dataset.role === 'local') as HTMLElement
     const changes = within(lane).getByTestId('kt-changes')
-    expect(changes.querySelector('.kt-files-head')).toHaveTextContent(/^改动提交 3 次$/)
-    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent('e7e3cc10PAY-3：需求初稿2 个文件 · 只改记录')
+    const head = changes.querySelector('.kt-files-head') as HTMLElement
+    expect(head.querySelector('.kt-add')).toHaveTextContent(/^\+323$/)
+    expect(head.querySelector('.kt-del')).toHaveTextContent(/^−21$/)
+    expect(head).toHaveTextContent('7 个文件 · 提交 4 次')
+    // a file two commits changed is one row, its lines summed; the biggest first, five shown
+    const rows = Array.from(changes.querySelectorAll<HTMLElement>('.kt-files li:not(.kt-more)'))
+    expect(rows.map((r) => r.querySelector('.kt-file-path')!.textContent)).toEqual([
+      'aidlc-docs/261107-refund-export/audit.md', 'aidlc-docs/261107-refund-export/inception/application-design/application-design.md',
+      'src/refund/api.py', 'tests/test_refund.py', 'src/refund/jobs.py',
+    ])
+    expect(rows[0]).toHaveTextContent('+104 −14')
+    expect(rows[3]).toHaveTextContent('+31 −7')
+    expect(changes).toHaveTextContent('还有 2 个文件')
+    // the newest commits, newest first
+    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent(/^61ddbc30PAY-3：refund-api 的代码计划193239b7PAY-3：refund-export：分批写 CSV93b2dea5PAY-3：导出接口的骨架还有 1 次提交/)
+  })
+
+  test('a backend that read no files: each commit says how many files it changed', async () => {
+    const b = fx.board()
+    for (const x of b.belt) delete x.changes
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    await loaded()
+    const lane = screen.getAllByTestId('kt-lane').find((l) => l.dataset.role === 'local') as HTMLElement
+    const changes = within(lane).getByTestId('kt-changes')
+    expect(changes.querySelector('.kt-files-head')).toHaveTextContent(/^改动提交 4 次$/)
+    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent('61ddbc30PAY-3：refund-api 的代码计划1 个文件 · 只改记录')
   })
 
   test('small words: one credits number everywhere, 运行记录里的合计 without sessions; +N for more Brain entries; one verify round is said, not drawn', async () => {
