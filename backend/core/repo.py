@@ -28,6 +28,7 @@ from . import lean_view
 from .constants import GIT_BIN, KEY_RE
 
 GIT_ENV = {"GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C"}
+REFLECT_RE = re.compile(r"^refs/(?:heads|remotes/origin)/brain/(?P<key>[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6})-reflect-[1-9][0-9]*$")
 BRANCH_RE = re.compile(r"^(?P<prefix>[a-z]+)/(?P<owner>[a-z0-9][a-z0-9._-]{0,63})/"
                        r"(?P<key>[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6})(?:-(?P<slug>[a-z0-9][a-z0-9-]{0,39}))?$")
 MAX_FILE = 4 * 1024 * 1024
@@ -139,6 +140,17 @@ class Source:
             return sorted(out)
         return self.git.ls(self.ref or "HEAD", prefix)
 
+    def changed_at(self, rel: str) -> float | None:
+        """When *rel* last changed here: a worktree file's mtime, else the time of the last commit on the ref that
+        touched it. None when it is not there."""
+        if self.path:
+            try:
+                return os.path.getmtime(os.path.join(self.path, rel))
+            except OSError:
+                return None
+        s = self.git.out("log", "-1", "--format=%ct", self.ref or "HEAD", "--", rel)
+        return float(s) if s.isdigit() else None
+
     def sig(self, rels: list[str]) -> tuple:
         """What changes when a worktree's files change (a ref's files only change with its sha)."""
         if not self.path:
@@ -159,8 +171,8 @@ class Source:
 
 
 def empty_facts() -> dict[str, Any]:
-    return {"run": None, "park": None, "park_sha": None, "state_text": None, "decisions_text": None, "events": [],
-            "approvals": []}
+    return {"run": None, "park": None, "park_sha": None, "park_at": None, "state_text": None, "decisions_text": None,
+            "events": [], "approvals": [], "review": None}
 
 
 def read_facts(src: Source, key: str, runs_dir: str) -> dict[str, Any]:
@@ -176,12 +188,16 @@ def read_facts(src: Source, key: str, runs_dir: str) -> dict[str, Any]:
         except (ValueError, UnicodeDecodeError):
             park = None
         out["park"] = park if isinstance(park, dict) else {"invalid": True}
+        out["park_at"] = src.changed_at("%s/%s/park.json" % (runs_dir, key))
     intent = out["run"].get("intent") if out["run"] and isinstance(out["run"].get("intent"), str) else None
     if intent and re.match(r"^[0-9]{6}-[a-z0-9][a-z0-9-]{0,80}$", intent):
         out["state_text"] = src.text("%s/%s/aidlc-state.md" % (lean_view.DOCS, intent))
         out["decisions_text"] = src.text("%s/%s/decisions.md" % (lean_view.DOCS, intent))
         out["events"] = lean_view.events(src.read, src.ls, intent)
         out["approvals"] = lean_view.approvals(out["events"], src.read)
+        rel = "%s/%s/%s" % (lean_view.DOCS, intent, lean_view.REVIEW_DOC)
+        if src.read(rel) is not None:   # Lean's release review: a worktree's file has a time, a commit's does not
+            out["review"] = {"at": src.changed_at(rel) if src.path else None}
     return out
 
 
@@ -203,6 +219,8 @@ class Repo:
         self._facts: dict[str, tuple[tuple, dict[str, Any]]] = {}
         self._scan: tuple[float, tuple, list[dict[str, Any]]] | None = None
         self._main_sha: tuple[float, str | None] | None = None
+        self._origin: tuple[float, bool] | None = None
+        self._reflected: tuple[float, set[str]] | None = None
 
     # ---- where things are ---------------------------------------------------------------------------- #
 
@@ -223,6 +241,25 @@ class Repo:
         sha = self.git.out("rev-parse", "-q", "--verify", ref + "^{commit}") if ref else ""
         self._main_sha = (now, sha or None)
         return sha or None
+
+    def has_origin(self, ttl: float = 30.0) -> bool:
+        """It has a remote (origin): its requirements may be handed over, 从远端取最新 works. Reused for *ttl* s."""
+        now = time.monotonic()
+        got = self._origin
+        if got is None or now - got[0] >= ttl:
+            got = self._origin = (now, self.git.has_origin())
+        return got[1]
+
+    def reflected(self, ttl: float = 10.0) -> set[str]:
+        """The keys whose Brain proposals `brain reflect --apply` wrote back already (a brain/<KEY>-reflect-<n> branch
+        here or on origin). Reused for *ttl* s."""
+        now = time.monotonic()
+        got = self._reflected
+        if got is None or now - got[0] >= ttl:
+            keys = {m.group("key") for m in (REFLECT_RE.match(r) for r in self.git.refs(
+                "refs/heads/brain/", "refs/remotes/origin/brain/")) if m}
+            got = self._reflected = (now, keys)
+        return got[1]
 
     def _places(self) -> dict[str, Any]:
         pre = self.cfg["branch_prefix"]
@@ -299,8 +336,7 @@ class Repo:
         if cached and cached[0] == fsig:
             run = cached[1].get("run") or {}
             intent = run.get("intent")
-            if not (src and src.path and intent) or cached[1].get("_isig") == src.sig(
-                    ["%s/%s" % (lean_view.DOCS, intent)]):
+            if not (src and src.path and intent) or cached[1].get("_isig") == src.sig(self._intent_dirs(intent)):
                 return cached[1]
         claim = None
         if claim_ref:
@@ -326,14 +362,24 @@ class Repo:
             "local": (b or {}).get("local"), "origin": (b or {}).get("origin"),
             "local_sha": (b or {}).get("local_sha"), "origin_sha": (b or {}).get("origin_sha"),
             "tip": tip, "tip_at": self.git.commit_time(tip) if tip else None,
-            "merged": where == "main", "run": run, "park": park, "park_sha": park_sha,
+            "merged": where == "main", "merged_at": None, "run": run, "park": park, "park_sha": park_sha,
+            "park_at": got["park_at"], "review": got["review"],
             "state_text": state_text, "decisions_text": decisions_text, "events": evs, "approvals": approvals,
             "stages": lean_view.stages(evs),
         }
+        if main and run:   # the merge: the last commit on the default branch's first-parent line that brought run.json
+            at = self.git.out("log", "-1", "--first-parent", "--format=%ct", main, "--", "%s/%s/run.json" % (runs, key))
+            facts["merged_at"] = float(at) if at.isdigit() else None
         if src is not None and src.path and run and run.get("intent"):
-            facts["_isig"] = src.sig(["%s/%s" % (lean_view.DOCS, run["intent"])])
+            facts["_isig"] = src.sig(self._intent_dirs(run["intent"]))
         self._facts[key] = (fsig, facts)
         return facts
+
+    @staticmethod
+    def _intent_dirs(intent: str) -> list[str]:
+        """What a worktree's facts of *intent* are re-read on: its folder, and the one Lean's release review goes in."""
+        d = "%s/%s" % (lean_view.DOCS, intent)
+        return [d, "%s/%s" % (d, lean_view.REVIEW_DOC.rsplit("/", 1)[0])]
 
     def source_for(self, facts: dict[str, Any]) -> Source | None:
         if facts.get("worktree"):
@@ -359,21 +405,46 @@ class Repo:
         out = self.git.out("log", "--format=%ae", "%s..%s" % (base, tip))
         return sum(1 for e in out.splitlines() if e.strip().lower() in emails)
 
-    def fetch(self) -> tuple[bool, str]:
-        if not self.git.has_origin():
-            return False, "这个仓库没有 origin"
+    def fetch(self) -> dict[str, Any]:
+        """「从远端取最新」: {ok, text, raw}. text says in plain Chinese what happened and what to do; raw is git's own
+        words (shown folded)."""
+        self._origin = None
+        if not self.has_origin():
+            return {"ok": False, "raw": "", "text": "这个仓库没有远端，只在这台机器上做：不用取最新。"}
         p = self.git.run("fetch", "--prune", "-q", "origin", timeout=120)
-        with self._lock:
-            self._scan = None
-            self._main_sha = None
+        self.invalidate()
         if p.returncode != 0:
-            return False, (p.stderr or p.stdout).strip()[:300] or "git fetch 失败"
-        return True, "已从 origin 取到最新"
+            raw = (p.stderr or p.stdout).strip()[:1000]
+            return {"ok": False, "raw": raw, "text": fetch_failed(p.returncode, raw)}
+        return {"ok": True, "raw": "", "text": "已经从远端取到最新。"}
 
     def invalidate(self) -> None:
         with self._lock:
             self._scan = None
             self._main_sha = None
+            self._reflected = None
+
+
+FETCH_WHY = (   # (git's words, lower case; what it means and what to do), the first that matches
+    (("could not resolve host", "unable to access", "network is unreachable", "connection refused",
+      "connection timed out", "failed to connect"),
+     "连不上远端：检查网络或 VPN，再点一次。"),
+    (("authentication failed", "permission denied", "could not read username", "access denied", "403", "401",
+      "host key verification failed"),
+     "远端不让读：没有权限，或登录过期了。在终端里对这个仓库跑一次 git fetch，按提示登录，再点一次。"),
+    (("does not appear to be a git repository", "repository not found", "not found", "no such file"),
+     "远端的地址不对，或者远端仓库没有了：在终端里用 git remote -v 看看地址。"),
+)
+
+
+def fetch_failed(code: int, raw: str) -> str:
+    """A failed git fetch, said plainly with what to do."""
+    if code == 124:
+        return "从远端取最新没成功：等了 2 分钟远端也没回。网络慢或远端没响应，过一会再点一次。"
+    low = raw.lower()
+    why = next((t for words, t in FETCH_WHY if any(w in low for w in words)),
+               "原因看下面的细节；在终端里对这个仓库跑一次 git fetch origin 也能看到。")
+    return "从远端取最新没成功：" + why
 
 
 def _key_order(key: str) -> tuple:
