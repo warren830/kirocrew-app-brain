@@ -124,7 +124,7 @@ describe('the app: one bar over the views', () => {
     await user.click(bar().getByRole('tab', { name: '需求看板' }))
     expect(parseView(window.location.search)).toEqual({ kind: 'board', repo: 'r1', key: 'PAY-3' })
     expect(await screen.findByTestId('br-board')).toBeInTheDocument()
-  })
+  }, 20_000)   // five views in a row (the banner test's limit): near 5 s on a loaded machine
 
   test('a ledger row opens 需求看板 (from=overview); 需求详情 then holds the same requirement', async () => {
     const user = userEvent.setup()

@@ -17,9 +17,10 @@ export const md = (iso: string) => iso.slice(5)
 export const slash = (iso: string) => md(iso).replace(/^0/, '').replace('-0', '-').replace('-', '/')
 
 /** How a requirement was delivered: the colours and words the cards, the weekly chart and the ledger share. */
-export const HOW: CtoRun['how'][] = ['unattended', 'people', 'local', 'pending']
-export const HOW_LABEL: Record<CtoRun['how'], string> = { unattended: '无人值守', people: '有人插手', local: '本机做完', pending: '还没评' }
-export const HOW_VAR: Record<CtoRun['how'], string> = { unattended: 'var(--s4)', people: 'var(--vs-person)', local: 'var(--s1)', pending: 'var(--s3)' }
+/** the weekly merges by how (a run that ended without a delivery is never merged) */
+export const HOW: Exclude<CtoRun['how'], 'ended'>[] = ['unattended', 'people', 'local', 'pending']
+export const HOW_LABEL: Record<CtoRun['how'], string> = { unattended: '无人值守', people: '有人插手', local: '本机做完', pending: '还没评', ended: '没交付就结束' }
+export const HOW_VAR: Record<CtoRun['how'], string> = { unattended: 'var(--s4)', people: 'var(--vs-person)', local: 'var(--s1)', pending: 'var(--s3)', ended: 'var(--kt-bad)' }
 
 export function useWidth(fallback = 600): [React.RefObject<HTMLDivElement>, number] {
   const ref = useRef<HTMLDivElement>(null)
@@ -114,22 +115,27 @@ function StackRow({ y0, bh, L, pw, max, segs, total, label, strong, onTip, tipLa
   )
 }
 
-/** 无人值守: the judged hand-over runs (unattended, a person stepped in), and below them the ones not judged yet and the
- * ones done on the person's machine, on one scale. */
+/** 无人值守: the judged hand-over runs (unattended, a person stepped in), and below them the ones not judged yet, the
+ * ones done on the person's machine and (when there are any) the hand-overs that ended without a delivery (brain-kit
+ * counts them in neither side of 无人值守), on one scale. */
 export function MiniUnattended({ c }: { c: CtoNumbers }) {
   const count = (h: CtoRun['how']) => c.runs.filter((r) => r.how === h).length
   const bh = 22, gap = 14, H = 2 * bh + gap + 4, L = 64, R = 56
   const judged = [{ key: 'unattended', n: count('unattended'), fill: HOW_VAR.unattended, name: HOW_LABEL.unattended }, { key: 'people', n: count('people'), fill: HOW_VAR.people, name: HOW_LABEL.people }]
-  const other = [{ key: 'pending', n: count('pending'), fill: HOW_VAR.pending, name: HOW_LABEL.pending }, { key: 'local', n: count('local'), fill: HOW_VAR.local, name: HOW_LABEL.local }]
+  const ended = count('ended')
+  const other = [{ key: 'pending', n: count('pending'), fill: HOW_VAR.pending, name: HOW_LABEL.pending }, { key: 'local', n: count('local'), fill: HOW_VAR.local, name: HOW_LABEL.local },
+    ...(ended ? [{ key: 'ended', n: ended, fill: HOW_VAR.ended, name: HOW_LABEL.ended }] : [])]
   const max = Math.max(1, judged.reduce((a, s) => a + s.n, 0), other.reduce((a, s) => a + s.n, 0))
+  const otherN = other.reduce((a, s) => a + s.n, 0)
   return (
-    <Mini label={`评估过的交接：无人值守 ${judged[0].n}，有人插手 ${judged[1].n}；还没评 ${other[0].n}，本机做完 ${other[1].n}`} height={H}>
+    <Mini label={`评估过的交接：无人值守 ${judged[0].n}，有人插手 ${judged[1].n}；还没评 ${other[0].n}，本机做完 ${other[1].n}${ended ? `，没交付就结束 ${ended}` : ''}`} height={H}>
       {(W, onTip) => {
         const pw = Math.max(10, W - L - R)
         return (
           <>
             <StackRow y0={2} bh={bh} L={L} pw={pw} max={max} segs={judged} total={`${judged[0].n + judged[1].n} 个`} label="评估过的" strong onTip={onTip} tipLabel="交接过、评估过的需求" />
-            <StackRow y0={2 + bh + gap} bh={bh} L={L} pw={pw} max={max} segs={other} total={`${other[0].n + other[1].n} 个`} label="别的" onTip={onTip} tipLabel="还没评、或只在本机做的" />
+            <StackRow y0={2 + bh + gap} bh={bh} L={L} pw={pw} max={max} segs={other} total={`${otherN} 个`} label="别的" onTip={onTip}
+              tipLabel={ended ? '还没评、只在本机做的、没交付就结束的' : '还没评、或只在本机做的'} />
           </>
         )
       }}
