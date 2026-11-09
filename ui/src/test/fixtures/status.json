@@ -46,16 +46,28 @@
   "crew": {
     "rows": [
       {
-        "level": "OK",
-        "text": "KiroCrew 在跑：0.9.2"
-      },
-      {
-        "level": "OK",
-        "text": "agent 引擎是 kas（Lean 的 hook 只在 kas 上生效）"
-      },
-      {
         "level": "FAIL",
-        "text": "brain-dev.json 缺 Lean 的 hook：调用工具前（preToolUse）。修复只补上缺的，别的 hook 和设置都不动"
+        "text": "brain-dev.json 缺 Lean 的 hook：调用工具前",
+        "todo": "点「修复」：只补上缺的（preToolUse），别的 hook 和设置都不动",
+        "fix": "agent",
+        "repo": null,
+        "raw": ""
+      },
+      {
+        "level": "WARN",
+        "text": ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）",
+        "todo": "只有把需求交给运行机时才要紧（运行机靠新版停下来问人）。要交的话点「修复」：在新分支上重装 brain-kit",
+        "fix": "kit",
+        "repo": "/Users/alice/workplace/shop-pay",
+        "raw": ".kiro/brain/lean-hook.py is an older adapter (version 0, needs 2): the team runner could not write runs/<KEY>/park.json, its only way to ask a person, before the Lean approvals; run `brain install` and commit it on main through an MR"
+      },
+      {
+        "level": "OK",
+        "text": "KiroCrew 引擎：kas",
+        "todo": "",
+        "fix": null,
+        "repo": null,
+        "raw": ""
       }
     ],
     "fix": {

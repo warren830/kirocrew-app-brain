@@ -70,7 +70,8 @@ def test_the_bridges_mr_comments_are_read_back(decisions):
     assert qs["D-8"]["state"] == "void" and qs["D-9"]["state"] == "answered"     # answered: nobody answers it again
     assert (qs["D-10"]["state"], qs["D-10"]["answerer"], qs["D-10"]["voucher_id"]) == ("delivered", "alice_w", "V-0123456789")
     only = mrinfo.parse_notes(notes[:1])
-    assert "added by bob" in only["rejected_reason"]
+    assert only["rejected_reason"] == "标签是 bob 打的，不是负责人 alice"          # the bridge's reason in short Chinese ...
+    assert only["rejected_raw"] == "label 'ai-handoff' was added by bob, not by the branch owner alice"   # ... and as it wrote it
     fake = mrinfo.parse_notes([note(1, ask(decisions, "D-9", clarify, ["mallory"], "clarify"), "mallory")],
                               bridge_user="brain-bridge")
     assert fake["questions"] == []  # with the bridge's account known, nobody else's comment reads as a question

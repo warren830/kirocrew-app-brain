@@ -22,7 +22,7 @@ import time
 from typing import Any
 from urllib.parse import quote
 
-from . import bk
+from . import bk, problems
 
 TTL_S = 60.0
 # the answerer: a GitLab username (brain-kit's decisions.USER), as the bridge writes it (lower case)
@@ -38,14 +38,15 @@ OPT_RE = re.compile(r"^([A-H])\. (.*)$")
 
 
 def parse_notes(notes: list[dict[str, Any]], bridge_user: str | None = None) -> dict[str, Any]:
-    """{questions: [...], rejected_reason} from an MR's notes, oldest first. *bridge_user*: kit.json's bridge_user
-    (only its notes count); unknown: every note is read."""
+    """{questions: [...], rejected_reason, rejected_raw} from an MR's notes, oldest first. *bridge_user*: kit.json's
+    bridge_user (only its notes count); unknown: every note is read. rejected_reason: the bridge's reasons in short
+    Chinese (problems.reason), rejected_raw: as the bridge wrote them."""
     dec = bk.m("bridge.decisions")
     head_re = dec.Q_HEAD_RE
     desc_title = str(getattr(dec, "DESC_TITLE", "") or "**变更说明**")
     delivered_re = re.compile(DELIVERED_FMT % getattr(dec, "USER", r"[a-z0-9][a-z0-9._-]*"))
     qs: dict[str, dict[str, Any]] = {}
-    rejected = None
+    rejected, rejected_raw = None, None
     for n in notes:
         if n.get("system"):
             continue
@@ -107,14 +108,16 @@ def parse_notes(notes: list[dict[str, Any]], bridge_user: str | None = None) -> 
                                        "note_id": n.get("id"), "at": n.get("created_at")})["state"] = "invalid"
             continue
         if first.startswith(REJECT_HEAD):
-            rejected = " ".join(x.lstrip("- ").strip() for x in body.split("\n")[1:] if x.startswith("- "))[:500]
+            reasons = [x[2:].strip() for x in body.split("\n")[1:] if x.startswith("- ")]
+            rejected, rejected_raw = problems.reasons_text(reasons, 500)
+            rejected = rejected or None
         elif first.startswith("AI 已接手"):
-            rejected = None
-    return {"questions": list(qs.values()), "rejected_reason": rejected}
+            rejected, rejected_raw = None, None
+    return {"questions": list(qs.values()), "rejected_reason": rejected, "rejected_raw": rejected_raw}
 
 
 class MrCache:
-    """Per (project, branch): {at, mr: {iid, url, state, labels, questions, rejected_reason}} or an error."""
+    """Per (project, branch): {at, mr: {iid, url, state, labels, questions, rejected_reason, rejected_raw}} or an error."""
 
     def __init__(self) -> None:
         self._rows: dict[tuple, dict[str, Any]] = {}

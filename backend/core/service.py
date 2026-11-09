@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import bk, brainview, crewcheck, deliveries, detail, importer, installer, intake, lean_view, mrdesc_view, mrinfo
+from . import problems
+from . import board as board_mod
 from . import settings as settings_mod
 from . import todo as todo_mod
 from .constants import APP_NAME, APP_ROOT, KEY_RE, LOCAL_AGENT, LOCAL_FOLDER, REPO_ID_RE, TICK_S, VERSION
@@ -45,7 +47,7 @@ def scope_of(rid: str, key: str) -> str:
 
 SCRUB_KEYS = ("text", "why", "question", "label", "detail", "status", "next", "open_questions", "output", "reasons",
               "findings", "review", "blocking", "error", "session_error", "notes", "warnings", "problems", "summary",
-              "first")
+              "first", "todo", "raw", "doing", "facts", "title", "name", "checks")
 
 
 def scrub_tree(obj: Any, scrub: Callable[[str], str], key: str = "") -> Any:
@@ -83,6 +85,7 @@ class Service:
         # listed repos whose brain-kit is on its way (the install branch, merged but not pulled): (path, state)
         self.repo_pending: dict[str, tuple[str, dict[str, Any]]] = {}
         self.imports = importer.Records(self.data_dir / "imports.json")   # what 导入仓库 installed where
+        self.upgrades = importer.Records(self.data_dir / "upgrades.json")  # the kit fix's branches (apart from installs)
         self.jobs = importer.Jobs(now)                                      # clone / install in the background
         self.crew: dict[str, Any] = {"rows": [], "fix": {"agent": False, "engine": False}, "checked_at": None}
         self.team: Any = None
@@ -92,6 +95,7 @@ class Service:
         self._eval_running: set[str] = set()
         self._trace: dict[tuple, tuple] = {}
         self.desc = mrdesc_view.DescCache()     # each requirement's 变更说明, by the commits it is made from
+        self._subj: dict[tuple, dict[str, str]] = {}   # the board's commit subjects, by the commits asked for
         self._me: str | None = None
 
     # ---- lifecycle ------------------------------------------------------------------------------------ #
@@ -164,7 +168,24 @@ class Service:
                 self.repo_errors[rid] = (path, str(exc).split("\n", 1)[0][:300])
         self._eval.clear()
         self._trace.clear()
-        self.crew = crewcheck.checks([r.path for r in self.repos.values()])
+        self.crew = self.crew_sync()
+
+    def team_paths(self) -> list[str]:
+        """The listed repos handed to the team runner (see runner_repo): their runner-only KiroCrew checks FAIL; for
+        the others they are a reminder. A few local git reads per repo (repo.scan, cached for a few seconds)."""
+        out = []
+        for r in self.repos.values():
+            try:
+                facts = [] if r.cfg.get("bridge_user") else r.scan()
+            except Exception:  # noqa: BLE001 - an unreadable repo is said by the checks themselves
+                facts = []
+            if runner_repo(r.cfg, facts):
+                out.append(r.path)
+        return out
+
+    def crew_sync(self) -> dict[str, Any]:
+        """The KiroCrew checks of the listed repos (blocking: call it in a thread off the event loop)."""
+        return crewcheck.checks([r.path for r in self.repos.values()], team_paths=self.team_paths())
 
     async def _start_team(self) -> None:
         team = self.settings["team"]
@@ -215,7 +236,7 @@ class Service:
                     await asyncio.to_thread(self.reload_sync)
                 if time.monotonic() - last_crew > CREW_EVERY_S:
                     last_crew = time.monotonic()
-                    self.crew = await asyncio.to_thread(crewcheck.checks, [r.path for r in self.repos.values()])
+                    self.crew = await asyncio.to_thread(self.crew_sync)
             except asyncio.CancelledError:
                 raise
             except Exception:  # noqa: BLE001
@@ -434,16 +455,20 @@ class Service:
                     q_counts["answered"] += d.get("state") in ("answered", "delivered", "delivery_unknown", "refused")
                     q_counts["delivered"] += d.get("state") == "delivered"
         overlaps = deliveries.overlaps(rows)
-        view, funnel = self._eval_view(which, snap)
+        parts: list[tuple[str, dict[str, Any]]] = []
+        view, funnel = self._eval_view(which, snap, parts)
         if funnel is None:
             funnel = deliveries.funnel_app(all_decisions, q_counts)
         else:
             funnel["questions"] = q_counts
-        return {"at": self.now(), "rows": rows, "overlaps": overlaps, "funnel": funnel, "eval": view,
+        cto = deliveries.cto_numbers(parts, rows, available=bool(view.get("available")), now=self.now())
+        return {"at": self.now(), "rows": rows, "overlaps": overlaps, "funnel": funnel, "eval": view, "cto": cto,
                 "counts": deliveries.counts(rows), "errors": errors}
 
-    def _eval_view(self, which: str, snap: dict[str, Any]) -> tuple[dict[str, Any], dict | None]:
-        """Eval from the cache (computed in the background, at most every EVAL_TTL_S per repo and main sha)."""
+    def _eval_view(self, which: str, snap: dict[str, Any],
+                   parts: list[tuple[str, dict[str, Any]]] | None = None) -> tuple[dict[str, Any], dict | None]:
+        """Eval from the cache (computed in the background, at most every EVAL_TTL_S per repo and main sha). *parts*
+        gets each repo's part of the 交付总览's numbers (deliveries.cto_part)."""
         ids = [rid for rid in self.repos if which in ("all", rid)]
         if not bk.has("evaluate"):
             return deliveries.evaluate("", {}, None, None)
@@ -455,7 +480,11 @@ class Service:
             if not got or got[0] != sha or time.monotonic() - got[1] > EVAL_TTL_S:
                 stale.append((rid, sha))
             if got:
-                views.append(got[2])
+                v = dict(got[2])
+                part = v.pop("_cto", None)
+                if part is not None and parts is not None:
+                    parts.append((rid, part))
+                views.append(v)
                 if got[3]:
                     funnels.append(got[3])
         for rid, sha in stale:
@@ -525,9 +554,10 @@ class Service:
         d = os.path.join(os.path.abspath(os.path.expanduser(s)), "vouchers")
         return d if os.path.isdir(d) else None
 
-    def _detail_sync(self, rid: str, key: str, snap: dict[str, Any]) -> dict[str, Any]:
+    def _detail_sync(self, rid: str, key: str, snap: dict[str, Any], parts: dict[str, Any] | None = None) -> dict[str, Any]:
+        """需求详情. *parts*, when given, gets what the board is built from as well (facts, the raw trace, the MR)."""
         if rid == "runner":
-            return self._team_detail(key, snap)
+            return self._team_detail(key, snap, parts)
         repo = self._repo(rid)
         f = self._facts(repo, key)
         row = self._row(repo, f, snap)
@@ -545,6 +575,9 @@ class Service:
             questions.append(pq)
         questions += detail.mr_questions(mr, own=own, can_post=can_post)
         tl = self._timeline(repo, f, snap, scope)
+        if parts is not None:
+            parts.update(repo=repo, facts=f, trace=tl.get("trace"), mr=mr, scope=scope, decisions=[], me=me,
+                         cfg=repo.cfg, path=repo.path, local_only=not (base and project))
         return {
             "row": row, "where_label": self._where_label(f),
             "run": {"owner": run.get("owner"), "branch": run.get("branch"), "intent": run.get("intent"),
@@ -592,7 +625,7 @@ class Service:
         tl["items"] = sorted(tl["items"] + self.store.events(scope), key=lambda x: (x["at"] or "", x["kind"]))
         return tl
 
-    def _team_detail(self, key: str, snap: dict[str, Any]) -> dict[str, Any]:
+    def _team_detail(self, key: str, snap: dict[str, Any], parts: dict[str, Any] | None = None) -> dict[str, Any]:
         hit = next(((r, f, d) for r, f, d in self._team_rows(snap) if r["key"] == key), None)
         if hit is None:
             raise AppError("运行机上没有 %s" % key, "not_found", 404)
@@ -616,6 +649,14 @@ class Service:
             tl["items"] += self.store.events(rid)
         tl["items"].sort(key=lambda x: (x["at"] or "", x["kind"]))
         sess = [s for x in row["run_ids"] for s in snap["by"].get(x, [])]
+        if parts is not None:
+            try:
+                cfg_t = bk.m("config").load(path) if path else dict(bk.m("config").DEFAULTS)
+            except Exception:  # noqa: BLE001
+                cfg_t = dict(bk.m("config").DEFAULTS)
+            parts.update(repo=None, facts=f, trace=tl.get("trace"), mr=None, scope=None, decisions=decs, me=None,
+                         cfg=cfg_t, path=path, local_only=False, sessions=sess,
+                         app_events=[e for rid in row["run_ids"] for e in self.store.events(rid)])
         return {
             "row": row, "where_label": "运行机工作区 %s" % (path or "（还没建）"),
             "run": {"owner": run.get("owner"), "branch": run.get("branch"), "intent": run.get("intent"),
@@ -656,6 +697,69 @@ class Service:
         snap = self._sessions_snapshot()
         return scrub_tree(await asyncio.to_thread(self._detail_sync, rid, key, snap), self.scrub)
 
+    # ---- 需求看板 ------------------------------------------------------------------------------------- #
+
+    def _subjects(self, git: Git, shas: list[str]) -> dict[str, str]:
+        """The commits' subjects (one git call, kept by the commits asked for)."""
+        shas = [x for x in shas if re.match(r"^[0-9a-f]{40}$", x or "")][-board_mod.MAX_BELT:]
+        if not shas:
+            return {}
+        sig = (git.repo, tuple(shas))
+        got = self._subj.get(sig)
+        if got is None:
+            p = git.run("log", "--no-walk=unsorted", "--format=%H%x00%s", *shas, timeout=20)
+            got = board_mod.subjects_from_log(p.stdout if p.returncode == 0 else "")
+            if len(self._subj) > 200:
+                self._subj.clear()
+            self._subj[sig] = got
+        return got
+
+    @staticmethod
+    def _reflect_refs(git: Git, key: str) -> list[tuple[str, float]]:
+        """brain reflect's branches for *key* (brain/<KEY>-reflect-<n>, local or origin's) and when they were made."""
+        out, seen = [], set()
+        rx = re.compile(r"^refs/(?:heads|remotes/origin)/(brain/%s-reflect-[1-9][0-9]*)$" % re.escape(key))
+        for ref in sorted(git.refs("refs/heads/brain/", "refs/remotes/origin/brain/")):
+            m = rx.match(ref)
+            if m and m.group(1) not in seen:
+                at = git.commit_time(ref)
+                if at:
+                    seen.add(m.group(1))
+                    out.append((m.group(1), at))
+        return out
+
+    def _board_sync(self, rid: str, key: str, snap: dict[str, Any]) -> dict[str, Any]:
+        parts: dict[str, Any] = {}
+        d = self._detail_sync(rid, key, snap, parts)
+        f, t, cfg = parts.get("facts") or {}, parts.get("trace"), parts.get("cfg") or {}
+        repo = parts.get("repo")
+        git = repo.git if repo is not None else (Git(parts["path"]) if parts.get("path") else None)
+        commits = ((t or {}).get("actions") or {}).get("commits") or []
+        subjects = self._subjects(git, [str(c.get("sha") or "") for c in commits]) if git is not None else {}
+        sessions = parts["sessions"] if parts.get("sessions") is not None else snap["by"].get(parts.get("scope") or "", [])
+        app_events = parts["app_events"] if parts.get("app_events") is not None else (
+            self.store.events(parts["scope"]) if parts.get("scope") else [])
+        g = board_mod.build(
+            f, d["row"], t, mr=parts.get("mr"), sessions=sessions, app_events=app_events,
+            team_decisions=parts.get("decisions") or [], subjects=subjects,
+            reflect_refs=self._reflect_refs(git, key) if git is not None else [],
+            default_branch=str(cfg.get("default_branch") or "main"), local_only=bool(parts.get("local_only")),
+            kit_rows=board_mod.kit_cells(self.crew.get("rows") or [], parts.get("path") or ""),
+            decisions=d["decisions"], brain=d["brain"], me=parts.get("me"), now=self.now())
+        return {"at": self.now(), "row": d["row"], "branch": d["row"].get("branch"),
+                "base": str(cfg.get("default_branch") or "main"), "started_at": g["started_at"], "ended_at": g["ended_at"],
+                "live": g["live"], "person": g["person"], "actors": g["actors"],
+                "edges": [list(e) for e in board_edges([a["key"] for a in g["actors"]], g["direct"])], "direct": g["direct"],
+                "events": g["events"], "belt": g["belt"], "checks": g["checks"], "accept": g["accept"],
+                "brain": d["brain"], "decisions": d["decisions"], "questions": d["questions"], "mr_desc": d["mr_desc"],
+                "sessions": d["sessions"], "credits": d["credits"], "source": d["timeline"]["source"],
+                "missing": d["timeline"]["missing"], "error": d["timeline"]["error"]}
+
+    async def board(self, rid: str, key: str) -> dict[str, Any]:
+        """需求看板: polled every 2 s; the trace, the facts and the 变更说明 come from their caches."""
+        snap = self._sessions_snapshot()
+        return scrub_tree(await asyncio.to_thread(self._board_sync, rid, key, snap), self.scrub)
+
     # ---- sessions and answers ------------------------------------------------------------------------- #
 
     async def open_session(self, rid: str, key: str, trust: bool = True, kickoff: bool = True) -> dict[str, Any]:
@@ -670,7 +774,7 @@ class Service:
 
     async def _open_local(self, repo: Repo, key: str, branch: str, wt: str, run: dict[str, Any], *, trust: bool,
                           kickoff: bool) -> dict[str, Any]:
-        self.crew = await asyncio.to_thread(crewcheck.checks, [r.path for r in self.repos.values()])
+        self.crew = await asyncio.to_thread(self.crew_sync)
         if not crewcheck.agent_ok(self.crew["rows"]):
             raise AppError("brain-dev 还没带上 Lean 的 hook：先在设置里修好（KiroCrew 检查）", "agent_not_ready", 409)
         scope = scope_of(repo.id, key)
@@ -776,7 +880,7 @@ class Service:
     # ---- KiroCrew checks ------------------------------------------------------------------------------ #
 
     async def crew_checks(self) -> dict[str, Any]:
-        self.crew = await asyncio.to_thread(crewcheck.checks, [r.path for r in self.repos.values()])
+        self.crew = await asyncio.to_thread(self.crew_sync)
         return self.crew
 
     async def crew_fix(self, what: Any) -> dict[str, Any]:
@@ -787,7 +891,7 @@ class Service:
             ok = True
         except Exception as exc:  # noqa: BLE001
             text, ok = str(exc)[:300], False
-        self.crew = await asyncio.to_thread(crewcheck.checks, [r.path for r in self.repos.values()])
+        self.crew = await asyncio.to_thread(self.crew_sync)
         return {"ok": ok, "text": text, "rows": self.crew["rows"]}
 
     # ---- Brain ---------------------------------------------------------------------------------------- #
@@ -933,7 +1037,7 @@ class Service:
         """检查: read only (see importer.inspect)."""
         token = await asyncio.to_thread(self._token_present)
         got = await asyncio.to_thread(importer.inspect, body.get("path"), listed=list(self.settings["repos"]),
-                                      records=self.imports, token=token)
+                                      records=self.imports, token=token, team_of=runner_repo_at)
         return scrub_tree(got, self.scrub)
 
     def _start_job(self, kind: str, target: str, steps: tuple, work: Callable[[Callable[..., None]], Any],
@@ -1018,27 +1122,63 @@ class Service:
                               lambda step: installer.install(top, kit, branch, work_root, self.imports, step), after)
         return {"job": self.import_job(jid)}
 
-    async def import_commit(self, body: dict[str, Any]) -> dict[str, Any]:
-        """再提交一次: the install's commit after a hook said no (the hooks run again)."""
+    def _purpose(self, body: dict[str, Any]) -> tuple[str, "importer.Records"]:
+        """purpose "install" (the default: imports.json) or "upgrade" (the kit fix: upgrades.json)."""
+        purpose = body.get("purpose", "install")
+        if purpose not in installer.PURPOSES:
+            raise AppError("purpose 只能是 install 或 upgrade", "invalid_purpose")
+        return purpose, (self.upgrades if purpose == "upgrade" else self.imports)
+
+    async def _after_import(self, top: str, purpose: str) -> None:
+        """After a commit or a push: a listed repo whose install moved is read again (the KiroCrew checks with it);
+        else the KiroCrew checks again, so a row's state is fresh."""
+        if purpose == "install" and top in self.settings["repos"]:
+            await asyncio.to_thread(self.reload_sync)
+        else:
+            self.crew = await asyncio.to_thread(self.crew_sync)
+
+    async def import_upgrade(self, body: dict[str, Any]) -> dict[str, Any]:
+        """The 'kit' fix of a KiroCrew check row: brain install again on a new branch (see installer.upgrade), in the
+        background; the page follows the job, then commits again or publishes with purpose "upgrade"."""
         top = await self._import_top(body.get("path"))
         try:
-            got = await asyncio.to_thread(installer.commit, top, self.imports)
+            branch = await asyncio.to_thread(installer.check_branch, body.get("branch"), installer.UPGRADE_BRANCH)
         except importer.ImportFail as exc:
             raise self._fail(exc)
-        if got["ok"] and top in self.settings["repos"]:
-            await asyncio.to_thread(self.reload_sync)
+        work_root = self.settings["work_root"]
+        token = await asyncio.to_thread(self._token_present)
+
+        async def after(_res: Any) -> None:
+            self.crew = await asyncio.to_thread(self.crew_sync)
+
+        jid = self._start_job("upgrade", top, installer.UPGRADE_STEPS,
+                              lambda step: installer.upgrade(top, branch, work_root, self.upgrades, step, token=token),
+                              after)
+        return {"job": self.import_job(jid)}
+
+    async def import_commit(self, body: dict[str, Any]) -> dict[str, Any]:
+        """再提交一次: the install's (or upgrade's) commit after a hook said no (the hooks run again)."""
+        top = await self._import_top(body.get("path"))
+        purpose, records = self._purpose(body)
+        try:
+            got = await asyncio.to_thread(lambda: installer.commit(top, records, purpose=purpose))
+        except importer.ImportFail as exc:
+            raise self._fail(exc)
+        if got["ok"]:
+            await self._after_import(top, purpose)
         return scrub_tree(got, self.scrub)
 
     async def import_publish(self, body: dict[str, Any]) -> dict[str, Any]:
         """推送并开 MR: only with the branch, remote and target the person confirmed on the page."""
         top = await self._import_top(body.get("path"))
+        purpose, records = self._purpose(body)
         confirm = {k: body.get(k) for k in ("branch", "target", "remote_url")}
         try:
-            got = await asyncio.to_thread(installer.publish, top, self.imports, confirm, transport=self.transport)
+            got = await asyncio.to_thread(lambda: installer.publish(top, records, confirm, transport=self.transport,
+                                                                    purpose=purpose))
         except importer.ImportFail as exc:
             raise self._fail(exc)
-        if top in self.settings["repos"]:
-            await asyncio.to_thread(self.reload_sync)
+        await self._after_import(top, purpose)
         return scrub_tree(got, self.scrub)
 
     async def import_add(self, body: dict[str, Any]) -> dict[str, Any]:
@@ -1097,13 +1237,20 @@ class Service:
         led = await asyncio.to_thread(self.team.ledger)
         signer = await asyncio.to_thread(self.team.signer_view)
         signer["waiting"] = await asyncio.to_thread(self.team.pending)
+        # the signer's reasons and a round's errors in short Chinese (problems.reason), their own words beside them
+        signer["refused"] = [dict(x, reasons=[problems.reason(r)["text"] for r in x.get("reasons") or []],
+                                  raw=[str(r) for r in x.get("reasons") or []]) for x in signer.get("refused") or []]
+        handovers = []
+        for h in self.team.handovers():
+            row = {k: h[k] for k in ("project", "iid", "sha", "result", "error", "at", "mr_url")}
+            got = problems.reason(row["error"]) if row["error"] else None
+            row.update(error=got["text"] if got else "", raw=(got["raw"] or "") if got else "")
+            handovers.append(row)
         return {"status": self.team.status(), "ledger": self.team.counts(led),
                 "runs": [{"run_id": r["run_id"], "req": r["req"], "project": r["project"], "iid": int(r["iid"]),
                           "state": r["state"], "slot": r.get("slot"), "mr_url": self.team.mr_url(r["project"], r["iid"]),
                           "updated": r.get("updated")} for r in led["runs"]],
-                "handovers": [{k: h[k] for k in ("project", "iid", "sha", "result", "error", "at", "mr_url")}
-                              for h in self.team.handovers()],
-                "signer": signer}
+                "handovers": handovers, "signer": signer}
 
     async def team_loop(self) -> dict[str, Any]:
         if self.team is None or self.team.host is None:
@@ -1113,6 +1260,35 @@ class Service:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "summary": {}, "error": str(exc)[:300]}
         return {"ok": not self.team.loop_error, "summary": summary, "error": self.team.loop_error}
+
+
+def runner_repo(cfg: dict[str, Any], facts: list[dict[str, Any]]) -> bool:
+    """A repo handed to the team runner: its kit.json names bridge_user, or one of its requirements has a hand-over
+    (run.json handoff). The checks that matter only to the runner (the hook adapter's version, Lean counting runs/**
+    as code) FAIL for it; for a local-only repo they are a reminder."""
+    if str(cfg.get("bridge_user") or "").strip():
+        return True
+    return any((f.get("run") or {}).get("handoff") for f in facts if isinstance(f, dict))
+
+
+def runner_repo_at(path: str, cfg: dict[str, Any]) -> bool:
+    """runner_repo for a repo that is not listed (导入仓库's 检查): its requirements read here (blocking)."""
+    if str(cfg.get("bridge_user") or "").strip():
+        return True
+    try:
+        return runner_repo(cfg, Repo("import", path, cfg).scan())
+    except Exception:  # noqa: BLE001 - not known: the checks say it as brain-kit does (FAIL)
+        return True
+
+
+def board_edges(keys: list[str], direct: bool) -> list[tuple[str, str]]:
+    """The way's edges among *keys* (the UI's board/layout.ts edgesOf draws the same)."""
+    have = set(keys)
+    all_ = [("local", "req"), ("local", "design"), ("req", "handover"), ("design", "handover"), ("handover", "bridge"),
+            ("bridge", "signer"), ("signer", "runner"), ("runner", "ci"), ("ci", "release"), ("release", "reflect")]
+    if direct:
+        all_.append(("design", "ci"))
+    return [(a, b) for a, b in all_ if a in have and b in have]
 
 
 def answer_choices(options: list[str]) -> set[str]:

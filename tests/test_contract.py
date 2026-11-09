@@ -68,6 +68,7 @@ def test_the_backend_answers_with_the_fixtures_keys(tmp_path, home):
             return {
                 "status.json": await svc.status(), "settings.json": svc.settings_view(),
                 "overview.json": await svc.overview("all"), "detail.json": await svc.requirement("r1", "PAY-1"),
+                "board.json": await svc.board("r1", "PAY-1"),
                 "todo.json": await svc.todo(), "brain.json": await svc.brain("r1"),
                 "intake-next.json": await svc.intake_next("r1"), "intake-check.json": await svc.intake_check(body),
                 "crew.json": await svc.crew_checks(), "reflect-preview.json": await svc.reflect_preview("r1", "PAY-1"),
@@ -84,15 +85,22 @@ def test_the_backend_answers_with_the_fixtures_keys(tmp_path, home):
     assert not problems, "\n".join(problems)
     assert got["detail.json"]["sessions"] and got["detail.json"]["decisions"] and got["todo.json"]["items"]
     assert got["overview.json"]["counts"].keys() == fixture("overview.json")["counts"].keys()
+    assert got["overview.json"]["cto"].keys() == fixture("overview.json")["cto"].keys()
+    board = got["board.json"]
+    assert [a["key"] for a in board["actors"]] == [a["key"] for a in fixture("board.json")["actors"]]
+    assert board["events"] and board["checks"]["cells"] and board["accept"]["state"]
 
 
 def test_the_import_routes_answer_with_the_fixtures_keys(tmp_path, home, monkeypatch):
     """导入仓库's answers (ui/src/test/fixtures/import-*.json): defaults, a 检查 before and after the install (pending),
-    the clone and install jobs as the page polls them, the push and MR (a fake GitLab, a token made at run time)."""
+    the clone and install jobs as the page polls them, the push and MR (a fake GitLab, a token made at run time), and
+    the kit fix's job (POST /import/upgrade) on a repo whose kit on main is older."""
     import secrets
 
     from test_import import KIT, FakeGitLab, plain_repo
+    from test_upgrade import older_kit
     repo, bare = plain_repo(tmp_path, "refund")
+    shop = older_kit(tmp_path, name="shop")
     svc = make_service(tmp_path, [], transport=FakeGitLab())
 
     async def go():
@@ -109,12 +117,15 @@ def test_the_import_routes_answer_with_the_fixtures_keys(tmp_path, home, monkeyp
             monkeypatch.setenv("GITLAB_TOKEN", "fake-" + secrets.token_hex(8))
             out["import-publish.json"] = await svc.import_publish({"path": str(repo), "branch": p["branch"],
                                                                    "target": p["target"], "remote_url": p["remote_url"]})
+            job = (await svc.import_upgrade({"path": str(shop)}))["job"]
+            out["import-upgrade-job.json"] = await svc.wait_job(job["id"])
             return out
         finally:
             await svc.stop()
 
     got = run(go())
     assert got["import-job.json"]["state"] == "done" and got["import-publish.json"]["mr"]
+    assert got["import-upgrade-job.json"]["state"] == "done" and got["import-upgrade-job.json"]["result"]["changed"]
     problems = []
     for name, real in got.items():
         problems += ["%s %s" % (name, p) for p in diff_keys(fixture(name), json.loads(json.dumps(real)))]

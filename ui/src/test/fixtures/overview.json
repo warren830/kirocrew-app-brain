@@ -24,7 +24,8 @@
       "waits": {
         "who": "you",
         "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
-        "line": "approve PLAN 5d1e7a90"
+        "line": "approve PLAN 5d1e7a90",
+        "raw": ""
       },
       "summary": "退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。",
       "credits": 12.4,
@@ -65,7 +66,8 @@
       "waits": {
         "who": "product",
         "text": "停在 D-2：等产品在 MR 上回答",
-        "line": null
+        "line": null,
+        "raw": ""
       },
       "summary": "退款到账后给商户发通知（规模 S）。现在：Lean 在「代码生成」进行中，已交给团队运行机，等人在 MR 上回答澄清问题。",
       "credits": null,
@@ -114,7 +116,8 @@
       "waits": {
         "who": "you",
         "text": "等你验收：在 MR 上回答 D-3",
-        "line": null
+        "line": null,
+        "raw": ""
       },
       "summary": "周报加上退款金额一栏（规模 S）。现在：Lean 在「发布」进行中，已交给团队运行机，等人在 MR 上回答验收问题。",
       "credits": 31.0,
@@ -159,8 +162,9 @@
       "stage": "10/11 构建和测试（下一步）",
       "waits": {
         "who": "you",
-        "text": "接手被拒：run.json 的 brain_commit 不在 main 上，先 rebase 到最新的 main 再交接",
-        "line": null
+        "text": "接手被拒：标签是 bob 打的，不是负责人 alice；run.json 里没有交接记录",
+        "line": null,
+        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice; run.json has no hand-over (run `brain handoff`)"
       },
       "summary": "退款超过一万要两人复核（规模 M）。现在：Lean 在「构建测试」做完，已交给团队运行机。",
       "credits": 18.2,
@@ -202,7 +206,8 @@
       "waits": {
         "who": "people",
         "text": "已认领，还没开工",
-        "line": null
+        "line": null,
+        "raw": ""
       },
       "summary": null,
       "credits": null,
@@ -238,11 +243,12 @@
       "waits": {
         "who": "nobody",
         "text": "已合并",
-        "line": null
+        "line": null,
+        "raw": ""
       },
       "summary": "对账单按自然日切分（规模 S）。现在：Lean 在「发布」做完，已交给团队运行机，RELEASE 已批。",
       "credits": 22.7,
-      "updated_at": 1793800800,
+      "updated_at": 1793663640,
       "mr": {
         "iid": 37,
         "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/37",
@@ -419,5 +425,155 @@
       "repo": "r2",
       "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装到一个新分支上"
     }
-  ]
+  ],
+  "cto": {
+    "available": true,
+    "sentence": "交给运行机的 1 个需求里，0 个交接以后没人插手就做完了；人介入 5 次，5 次落在判断点上；每个需求平均 21.1 credits。",
+    "ref": "origin/main",
+    "unattended": [
+      0,
+      1
+    ],
+    "stepped_in": {
+      "at_points": 5,
+      "outside": 0,
+      "kinds": [
+        {
+          "label": "批准",
+          "n": 4,
+          "point": true
+        },
+        {
+          "label": "回答问题",
+          "n": 1,
+          "point": true
+        }
+      ]
+    },
+    "credits": {
+      "per_req": 21.1,
+      "total": 84.3,
+      "reqs": 4
+    },
+    "runs": [
+      {
+        "key": "PAY-2",
+        "repo": "r1",
+        "how": "people",
+        "beyond": [
+          "回答问题"
+        ],
+        "at_points": 5,
+        "outside": 0,
+        "credits": 22.7,
+        "merged_at": 1793661540
+      },
+      {
+        "key": "PAY-4",
+        "repo": "r1",
+        "how": "pending",
+        "beyond": [],
+        "at_points": 2,
+        "outside": 0,
+        "credits": null,
+        "merged_at": null
+      },
+      {
+        "key": "PAY-5",
+        "repo": "r1",
+        "how": "pending",
+        "beyond": [],
+        "at_points": 2,
+        "outside": 0,
+        "credits": 31.0,
+        "merged_at": null
+      }
+    ],
+    "weekly": [
+      {
+        "week": "2026-08-17",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-08-24",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-08-31",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-09-07",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-09-14",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-09-21",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-09-28",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-10-05",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-10-12",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-10-19",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-10-26",
+        "unattended": 0,
+        "people": 0,
+        "local": 0,
+        "pending": 0
+      },
+      {
+        "week": "2026-11-02",
+        "unattended": 0,
+        "people": 1,
+        "local": 0,
+        "pending": 0
+      }
+    ]
+  }
 }

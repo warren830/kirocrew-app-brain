@@ -1,5 +1,6 @@
 """Brain: the entries on the default branch by file and section with their sources, how runs use them
-(brainkit.usage), lint (brainkit.brainlint, static rules), and reflect (brainkit.reflect).
+(brainkit.usage), lint (brainkit.brainlint, static rules; each line a problems.lint CheckRow), and reflect
+(brainkit.reflect).
 
 Reflect preview is the planning half of ``brain reflect`` (cmd_reflect): parse the run's brain-proposal and brain-gap
 blocks, plan them against the Brain on main (ids used on open brain/* branches skipped, proposals already written
@@ -16,7 +17,7 @@ import re
 import subprocess
 from typing import Any
 
-from . import bk
+from . import bk, problems
 from .intake import brain_cmd
 from .repo import Repo
 
@@ -83,7 +84,9 @@ def view(repo: Repo, reflectable: list[dict[str, Any]]) -> dict[str, Any]:
         out["files"].append({"key": key, "letter": meta["letter"], "side": meta["side"], "types": list(meta["types"]),
                              "count": count, "sections": sections})
     errors, warnings = bk.m("brainlint").check(brain)
-    out["lint"] = {"errors": [str(e) for e in errors][:100], "warnings": [str(w) for w in warnings][:100]}
+    bd = str(repo.cfg.get("brain_dir") or "brain")
+    out["lint"] = {"errors": [problems.lint("FAIL", e, brain_dir=bd, repo=repo.path) for e in errors][:100],
+                   "warnings": [problems.lint("WARN", w, brain_dir=bd, repo=repo.path) for w in warnings][:100]}
     if u:
         out["usage"] = {
             "useful": list(u.get("useful") or [0, 0]), "repeat_rate": list(u.get("repeat_rate") or [0, 0]),

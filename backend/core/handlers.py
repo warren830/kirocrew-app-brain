@@ -61,6 +61,9 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
     async def requirement(request: Any) -> Any:
         return kit.json(await svc.requirement(_rid(request), _key(request)))
 
+    async def board(request: Any) -> Any:
+        return kit.json(await svc.board(_rid(request), _key(request)))
+
     async def open_session(request: Any) -> Any:
         body = await kit.body(request)
         return kit.json(await svc.open_session(_rid(request), _key(request), trust=body.get("trust", True) is not False,
@@ -132,6 +135,9 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
     async def import_install(request: Any) -> Any:
         return kit.json(await svc.import_install(await kit.body(request)))
 
+    async def import_upgrade(request: Any) -> Any:
+        return kit.json(await svc.import_upgrade(await kit.body(request)))
+
     async def import_job(request: Any) -> Any:
         jid = str(request.match_info.get("job", ""))
         if not re.fullmatch(r"[0-9a-f]{12}", jid):
@@ -164,6 +170,7 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
         AppRoute("POST", "/refresh", kit.guarded(refresh)),
         AppRoute("GET", "/overview", kit.guarded(overview)),
         AppRoute("GET", "/requirements/{repo}/{key}", kit.guarded(requirement)),
+        AppRoute("GET", "/board/{repo}/{key}", kit.guarded(board)),
         AppRoute("POST", "/requirements/{repo}/{key}/session", kit.guarded(open_session)),
         AppRoute("POST", "/requirements/{repo}/{key}/answer", kit.guarded(answer)),
         AppRoute("GET", "/intake/next", kit.guarded(intake_next)),
@@ -181,6 +188,7 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
         AppRoute("POST", "/import/inspect", kit.guarded(import_inspect)),
         AppRoute("POST", "/import/clone", kit.guarded(import_clone)),
         AppRoute("POST", "/import/install", kit.guarded(import_install)),
+        AppRoute("POST", "/import/upgrade", kit.guarded(import_upgrade)),
         AppRoute("GET", "/import/jobs/{job}", kit.guarded(import_job)),
         AppRoute("POST", "/import/commit", kit.guarded(import_commit)),
         AppRoute("POST", "/import/publish", kit.guarded(import_publish)),

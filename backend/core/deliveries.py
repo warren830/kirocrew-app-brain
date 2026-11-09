@@ -58,7 +58,7 @@ def base_row(repo_id: str, f: dict[str, Any]) -> dict[str, Any]:
         "repo": repo_id, "key": f["key"], "title": title or f["key"], "owner": f.get("owner"),
         "source": str(claim.get("source") or "product"), "state": "claimed", "state_label": STATE_LABEL["claimed"],
         "where": f.get("where") or "claim", "branch": f.get("branch"), "intent": run.get("intent"),
-        "lean": lean, "stage": lean_view.stage_text(lean), "waits": {"who": "nobody", "text": "", "line": None},
+        "lean": lean, "stage": lean_view.stage_text(lean), "waits": {"who": "nobody", "text": "", "line": None, "raw": ""},
         "summary": None,     # the first line of its 变更说明 (mrdesc_view), filled in by the service
         "credits": None,
         "updated_at": None, "mr": None, "worktree": f.get("worktree"), "run_ids": [], "sessions": 0,
@@ -74,9 +74,9 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
     run, park, claim = f.get("run"), f.get("park"), f.get("claim") or {}
     pending = [a for a in f.get("approvals") or [] if a["state"] == "pending" and a.get("line")]
 
-    def put(state: str, who: str, text: str, line: str | None = None) -> None:
+    def put(state: str, who: str, text: str, line: str | None = None, raw: str = "") -> None:
         row["state"], row["state_label"] = state, STATE_LABEL[state]
-        row["waits"] = {"who": who, "text": text, "line": line}
+        row["waits"] = {"who": who, "text": text, "line": line, "raw": raw}
 
     if claim.get("closed"):
         why = (claim["closed"] or {}).get("reason") if isinstance(claim.get("closed"), dict) else ""
@@ -105,7 +105,8 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
     if mr and mr.get("state") == "closed":
         return put("closed", "nobody", "MR 已关闭")
     if cfg.get("rejected_label") in labels:
-        return put("rejected", "you", "接手被拒：" + (str((mr or {}).get("rejected_reason") or "看 MR 上的说明")[:200]))
+        return put("rejected", "you", "接手被拒：" + (str((mr or {}).get("rejected_reason") or "看 MR 上的说明")[:200]),
+                   raw=str((mr or {}).get("rejected_raw") or "")[:2000])   # the bridge's own words (problems.reason)
     open_q = [q for q in (mr or {}).get("questions") or [] if q.get("state") == "open"]
     if park_waiting(park) or open_q:
         q = open_q[-1] if open_q else {}
@@ -149,7 +150,7 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
 
     def put(state: str, who: str, text: str) -> None:
         row["state"], row["state_label"] = state, STATE_LABEL[state]
-        row["waits"] = {"who": who, "text": text, "line": None}
+        row["waits"] = {"who": who, "text": text, "line": None, "raw": ""}
 
     row["open_questions"] = [d["id"] for d in open_d]
     if st == "closed":
@@ -308,6 +309,7 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
     if unmerged:
         notes.append("已知有问题、还没合并（验收被驳回过；合并满 14 天才算进自主度）：%s" % "、".join(unmerged[:20]))
     view.update(available=True, queue=queue, ref=data.get("ref") or ref, skipped=skipped, notes=notes)
+    view["_cto"] = cto_part(data)   # the 交付总览's numbers (the service takes it out before the page gets the view)
     f = data.get("funnel") if isinstance(data.get("funnel"), dict) else None
     funnel = None
     if f and isinstance(f.get("counts"), dict):
@@ -340,3 +342,127 @@ def updated_at(f: dict[str, Any], slot: dict[str, Any] | None) -> float | None:
 
 def now() -> float:
     return time.time()
+
+
+# ---------------------------------------------------------------- the 交付总览's three numbers (the CTO 视图's)
+
+ACT_LABEL = {"approval": "批准", "rejection": "退回", "answer": "回答问题", "approval_refused": "口令没被接受",
+             "push_after_handover": "交接后推代码", "allow_test_change": "允许改验收测试"}
+
+
+def act_label(kind: str) -> str:
+    """A person's act in brain-kit's words (trace humans[].kind), in Chinese."""
+    k = str(kind or "")
+    if k.startswith("platform_"):
+        return "平台上的手动操作"
+    return ACT_LABEL.get(k, k or "别的")
+
+
+def cto_part(data: dict[str, Any]) -> dict[str, Any]:
+    """One repo's part of the numbers, from brainkit.evaluate's data: each run (how it went, what a person did, its
+    credits, its merge), autonomy's [unattended, judged] and judgment's acts."""
+    a = data.get("autonomy") if isinstance(data.get("autonomy"), dict) else {}
+    rows = {str(r.get("key")): r for r in a.get("runs") or [] if isinstance(r, dict) and r.get("key")}
+    runs = []
+    for t in data.get("traces") or []:
+        if not isinstance(t, dict) or not t.get("key"):
+            continue
+        key = str(t["key"])
+        r = rows.get(key) or {}
+        o = t.get("outcome") if isinstance(t.get("outcome"), dict) else {}
+        handed = bool((o.get("handed_over") or {}).get("value"))
+        st = r.get("status")
+        if not handed or st == "local only":
+            how = "local"
+        elif st == "counted":
+            how = "unattended" if r.get("autonomous") and r.get("correct") == "correct" else "people"
+        else:
+            how = "pending"
+        humans = [h for h in t.get("humans") or [] if isinstance(h, dict)]
+        beyond = sorted({act_label(str(x).split(" ", 1)[0]) for x in r.get("beyond") or []})
+        cost = t.get("cost") if isinstance(t.get("cost"), dict) else {}
+        c = cost.get("credits")
+        runs.append({"key": key, "repo": "", "how": how, "beyond": beyond,
+                     "at_points": sum(1 for h in humans if h.get("judgment_point")),
+                     "outside": sum(1 for h in humans if not h.get("judgment_point")),
+                     "credits": round(float(c), 2) if isinstance(c, (int, float)) and not isinstance(c, bool) else None,
+                     "merged_at": lean_view.epoch(((o.get("merged_at") or {}).get("value")))})
+    j = data.get("judgment") if isinstance(data.get("judgment"), dict) else {}
+    kinds: dict[tuple, int] = {}
+    for k, n in (j.get("by_kind") or {}).items():
+        point = "（判断点）" in str(k)
+        kind = str(k).split("（", 1)[0]
+        kinds[(act_label(kind), point)] = kinds.get((act_label(kind), point), 0) + int(n or 0)
+    return {"unattended": _pair(a.get("value")), "judgment": _pair(j.get("value")),
+            "kinds": [{"label": lab, "n": n, "point": pt} for (lab, pt), n in sorted(kinds.items(), key=lambda kv: (not kv[0][1], -kv[1]))],
+            "runs": runs, "ref": data.get("ref")}
+
+
+def _week(t: float) -> str:
+    d = time.gmtime(t - ((time.gmtime(t).tm_wday) * 86400))
+    return "%04d-%02d-%02d" % (d.tm_year, d.tm_mon, d.tm_mday)
+
+
+def cto_numbers(parts: list[tuple[str, dict[str, Any]]], rows: list[dict[str, Any]], *, available: bool, now: float,
+                weeks: int = 12) -> dict[str, Any]:
+    """CtoNumbers for the page: the repos' parts added up; credits per requirement from the rows (the sessions this
+    app opened); the merges of the last *weeks* weeks, by how they went. Without brainkit.evaluate: the rows only."""
+    runs = []
+    for rid, p in parts:
+        for r in p.get("runs") or []:
+            runs.append(dict(r, repo=rid))
+    pairs = [p["unattended"] for _, p in parts if p.get("unattended")]
+    unattended = [sum(x[0] for x in pairs), sum(x[1] for x in pairs)] if pairs else None
+    js = [p["judgment"] for _, p in parts if p.get("judgment")]
+    kinds: dict[tuple, int] = {}
+    for _, p in parts:
+        for k in p.get("kinds") or []:
+            kinds[(k["label"], k["point"])] = kinds.get((k["label"], k["point"]), 0) + int(k["n"])
+    stepped = None
+    if js:
+        at_points, all_ = sum(x[0] for x in js), sum(x[1] for x in js)
+        stepped = {"at_points": at_points, "outside": max(0, all_ - at_points),
+                   "kinds": [{"label": lab, "n": n, "point": pt} for (lab, pt), n in
+                             sorted(kinds.items(), key=lambda kv: (not kv[0][1], -kv[1]))]}
+    with_c = [r for r in rows if isinstance(r.get("credits"), (int, float)) and r.get("credits")]
+    total = round(sum(float(r["credits"]) for r in with_c), 1) if with_c else None
+    credits = {"per_req": round(total / len(with_c), 1) if with_c else None, "total": total, "reqs": len(with_c)}
+    # the weekly merges: a run brain-kit judged says how it went; a merged row it did not judge is counted as pending
+    first = _week(now) if now else ""
+    starts = []
+    if first:
+        y, m, d = (int(x) for x in first.split("-"))
+        base = time.mktime((y, m, d, 12, 0, 0, 0, 0, 0))
+        starts = [_week(base - 7 * 86400 * i) for i in range(weeks - 1, -1, -1)]
+    weekly = {w: {"week": w, "unattended": 0, "people": 0, "local": 0, "pending": 0} for w in starts}
+    judged = set()
+    for r in runs:
+        if r.get("merged_at"):
+            judged.add((r["repo"], r["key"]))
+            w = _week(r["merged_at"])
+            if w in weekly:
+                weekly[w][r["how"]] += 1
+    for row in rows:
+        if row.get("state") == "merged" and (row.get("repo"), row.get("key")) not in judged and row.get("updated_at"):
+            w = _week(float(row["updated_at"]))
+            if w in weekly:
+                weekly[w]["pending"] += 1
+    ref = next((p.get("ref") for _, p in parts if p.get("ref")), None)
+    return {"available": bool(available and parts), "sentence": cto_sentence(unattended, stepped, credits),
+            "ref": ref, "unattended": unattended, "stepped_in": stepped, "credits": credits, "runs": runs,
+            "weekly": list(weekly.values())}
+
+
+def cto_sentence(unattended: list[int] | None, stepped: dict[str, Any] | None, credits: dict[str, Any]) -> str:
+    parts = []
+    if unattended and unattended[1]:
+        parts.append("交给运行机的 %d 个需求里，%d 个交接以后没人插手就做完了" % (unattended[1], unattended[0]))
+    elif unattended is not None:
+        parts.append("还没有交给运行机、已经评估完的需求")
+    if stepped is not None:
+        n = stepped["at_points"] + stepped["outside"]
+        parts.append("人介入 %d 次，%d 次落在判断点上" % (n, stepped["at_points"]) if n else "人还没有介入过")
+    if credits.get("per_req") is not None:
+        parts.append("每个需求平均 %s credits" % credits["per_req"])
+    return ("；".join(parts) + "。") if parts else "还没有可以算的数：需求合并以后，这里会说它们是怎么交付的。"
+

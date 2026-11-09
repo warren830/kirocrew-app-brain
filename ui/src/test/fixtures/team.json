@@ -80,7 +80,8 @@
       "result": "waiting",
       "error": "",
       "at": 1794146350,
-      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/48"
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/48",
+      "raw": ""
     },
     {
       "project": "shop/shop-pay",
@@ -89,16 +90,18 @@
       "result": "unlabelled",
       "error": "",
       "at": 1794146350,
-      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/52"
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/52",
+      "raw": ""
     },
     {
       "project": "shop/shop-pay",
       "iid": 53,
       "sha": "2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c",
       "result": "error",
-      "error": "the signer did not answer handoff-RUN-PAY-9-1-0a1b2c3d4e5f within 30s",
+      "error": "签名服务 30 秒内没答复",
       "at": 1794146350,
-      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/53"
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/53",
+      "raw": "the signer did not answer handoff-RUN-PAY-9-1-0a1b2c3d4e5f within 30s"
     }
   ],
   "signer": {
@@ -115,6 +118,9 @@
         "req_id": "SIG-0039",
         "kind": "handoff",
         "reasons": [
+          "MR 的作者 dave 不在 decision_roles.owner 里"
+        ],
+        "raw": [
           "MR 的作者 dave 不在 decision_roles.owner 里"
         ]
       }

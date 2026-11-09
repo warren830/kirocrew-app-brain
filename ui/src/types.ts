@@ -18,7 +18,26 @@ export const BASE = '/api/apps/brain'
 // ---------------------------------------------------------------- shared
 
 export type Level = 'OK' | 'WARN' | 'FAIL'
-export interface CheckRow { level: Level; text: string }
+/**
+ * One check, said for a person (backend/core/problems.py): OK ✓, WARN ! (a reminder, stops nothing), FAIL ✗. The
+ * backend always sends every field; the optional ones are optional here only so older literals still compile.
+ */
+export interface CheckRow {
+  level: Level
+  /** what is wrong (or right): plain short Chinese (code names such as `lean.json` or runs/** may be in it) */
+  text: string
+  /** 做什么: one plain Chinese line ('' for an OK row, or when there is nothing to do) */
+  todo?: string
+  /** the one-click fix: agent (add Lean's hooks to ~/.kiro/agents/brain-dev.json) and engine (kirocrew engine kas),
+   * both POST /crew/fix {what}; kit (reinstall brain-kit onto a new branch of `repo`: POST /import/upgrade {path:
+   * repo}); null: none */
+  fix?: 'agent' | 'engine' | 'kit' | null
+  /** the repo (its path) the row is about; null for a machine-wide row */
+  repo?: string | null
+  /** what brain-kit (or the app's older code) said, verbatim, for debugging (shown folded); '' when there is nothing
+   * more than text and todo */
+  raw?: string
+}
 
 /** Where a requirement is now. */
 export type ReqState =
@@ -53,6 +72,9 @@ export interface Waits {
   text: string
   /** the exact Lean approval line the person must type themselves in the session, when that is what it waits on */
   line: string | null
+  /** what text was made from, verbatim, for debugging (shown folded): a refused hand-over's reasons as the bridge wrote
+   * them on the MR (text has them in short Chinese, backend/core/problems.py); '' otherwise. The backend always sends it */
+  raw?: string
 }
 
 export interface LeanSummary {
@@ -253,12 +275,12 @@ export interface ImportInspect {
 export type JobStepState = 'todo' | 'running' | 'ok' | 'warn' | 'fail'
 export interface JobStep { id: string; label: string; state: JobStepState; detail: string }
 
-/** A clone or an install, run in the background (POST /import/clone, /import/install answer {job}); GET
- * /import/jobs/{id} until it is not running. */
-export interface ImportJob<R = CloneResult | InstallResult> {
+/** A clone, an install or an upgrade, run in the background (POST /import/clone, /import/install, /import/upgrade
+ * answer {job}); GET /import/jobs/{id} until it is not running. */
+export interface ImportJob<R = CloneResult | InstallResult | UpgradeResult> {
   id: string
-  kind: 'clone' | 'install'
-  /** the clone's target folder, the install's repo */
+  kind: 'clone' | 'install' | 'upgrade'
+  /** the clone's target folder, the install's (or upgrade's) repo */
   target: string
   state: 'running' | 'done' | 'failed'
   steps: JobStep[]
@@ -276,9 +298,14 @@ export interface CloneResult { path: string | null; output: string; kind: string
 
 export interface InstallBody { path: string; branch: string; kit: KitForm }
 export interface FileChange { change: 'added' | 'modified' | 'deleted' | 'other'; path: string }
-/** The install's commit (git add -A, git commit with the person's identity; their hooks run). blocked: a hook said
- * no (text has what it said); POST /import/commit {path} tries again. */
+/** The install's (or upgrade's) commit (git add -A, git commit with the person's identity; their hooks run). blocked:
+ * a hook said no (text has what it said); POST /import/commit {path, purpose} tries again. */
 export interface CommitResult { ok: boolean; sha: string | null; blocked: boolean; text: string; output: string }
+/** Which records /import/commit and /import/publish act on: the install's (imports.json, the default) or the kit
+ * upgrade's (upgrades.json: kept apart, so a listed repo is never taken for a pending install). */
+export type ImportPurpose = 'install' | 'upgrade'
+/** POST /import/commit: 再提交一次 after a hook said no */
+export interface CommitBody { path: string; purpose?: ImportPurpose }
 export interface InstallResult {
   path: string
   branch: string
@@ -294,8 +321,33 @@ export interface InstallResult {
   commit: CommitResult
 }
 
+/**
+ * POST /import/upgrade {path, branch?}: the 'kit' fix of a CheckRow (an older hook adapter, Lean or the adapter not
+ * committed, Lean counting runs/** as code). Like the install, for a repo that has brain-kit: a new branch (default
+ * brain/upgrade-kit; -2, -3 … when that name is taken here or on origin) from the default branch (origin's, else the
+ * local one) in its own worktree under work_root, `brain install` there (kit.json kept; the kit files refreshed, runs/**
+ * added to lean.json), `brain doctor --offline`, a commit with the person's identity and hooks. The person's checkout is
+ * never touched. Answers {job} (kind 'upgrade'); then /import/commit and /import/publish with purpose 'upgrade'.
+ */
+export interface UpgradeBody { path: string; branch?: string }
+export interface UpgradeResult extends InstallResult {
+  /** false: brain install changed nothing (text 「已经是最新的：没有要提交的改动」; the worktree and branch were taken back,
+   * worktree null, files []) */
+  changed: boolean
+  /** origin's URL (never a password); '' when the repo has no origin */
+  remote_url: string
+  /** the default branch the MR goes into */
+  target: string
+  gitlab_project: string
+  /** a GitLab token is on this machine and the project and origin are known: 推送并开 MR opens the MR itself */
+  can_open_mr: boolean
+  /** one plain sentence: where the commit is and what to do next, e.g. 「提交在本机分支 brain/upgrade-kit 上（这个仓库没有
+   * 远端）：在本机把它合进 main」 */
+  text: string
+}
+
 /** POST /import/publish: only with confirm true and what the person saw (the branch, the remote, the target). */
-export interface PublishBody { path: string; branch: string; target: string; remote_url: string; confirm: true }
+export interface PublishBody { path: string; branch: string; target: string; remote_url: string; confirm: true; purpose?: ImportPurpose }
 export interface PublishResult {
   /** pushed (and the MR opened, or the way to open it) */
   ok: boolean
@@ -388,6 +440,8 @@ export interface Overview {
   overlaps: Overlap[]
   funnel: Funnel
   eval: EvalView
+  /** the 交付总览's three numbers, their charts and the weekly deliveries (CtoNumbers, below) */
+  cto: CtoNumbers
   /** state → count */
   counts: Partial<Record<ReqState, number>>
   errors: { repo: string; error: string }[]
@@ -663,7 +717,9 @@ export interface BrainView {
   repo: string
   ref: string
   files: BrainFileView[]
-  lint: { errors: string[]; warnings: string[] }
+  /** brain lint (static rules) on the default branch: errors as FAIL rows, warnings as WARN rows (text 「brain/TECH.md 第
+   * 12 行：条目号 T-PAY-1-1 重复了」, todo, raw: brain lint's own line) */
+  lint: { errors: CheckRow[]; warnings: CheckRow[] }
   usage: {
     useful: [number, number]
     repeat_rate: [number, number]
@@ -760,7 +816,10 @@ export interface TeamHandover {
   iid: number
   sha: string
   result: HandoverResult
+  /** why it could not be checked this round, in short Chinese ('' unless result is error) */
   error: string
+  /** error as brain-kit said it, for debugging ('' when there is nothing more) */
+  raw: string
   /** epoch seconds */
   at: number
   mr_url: string | null
@@ -777,8 +836,9 @@ export interface TeamView {
   signer: {
     /** signature requests waiting for the signer */
     pending: { req_id: string; kind: string; run_id: string; since: string | null }[]
-    /** requests it refused, with its reasons */
-    refused: { req_id: string; kind: string; reasons: string[] }[]
+    /** requests it refused, with its reasons in short Chinese (problems.reason); raw: the same reasons as the signer
+     * wrote them (brain-kit's words for a hand-over check), one per reason, for debugging */
+    refused: { req_id: string; kind: string; reasons: string[]; raw: string[] }[]
     /** vouchers asked for in an earlier round that the signer has not answered yet (brain-kit's pending_vouchers): the
      * next round asks for the very same voucher, so a late signature is still used. ref: what it is for, as brain-kit
      * names it: 「answer D-2」, or 「handoff shop/shop-pay!41 <head sha>#<label event id>」 (only those within brain-kit's
@@ -791,3 +851,207 @@ export interface TeamLoopResult { ok: boolean; summary: Record<string, number>; 
 // ---------------------------------------------------------------- POST /refresh {repo}
 
 export interface RefreshResult { ok: boolean; text: string }
+
+// ---------------------------------------------------------------- GET /board/{repo}/{key}: 需求看板
+
+/**
+ * An actor's state on a requirement's board, in the sample team board's words and looks (the same CSS): waiting (not
+ * reached yet), queued (handed to it, not picked up yet), running (at work now), stalled (stuck: needs a look),
+ * awaiting_approval (waits for a person), done (did its part), merged (finished: green), fixing (at it again after a
+ * no), failed (refused or failed), skipped (not on this requirement's way).
+ */
+export type ActorStatus =
+  | 'waiting' | 'queued' | 'running' | 'stalled' | 'awaiting_approval' | 'done' | 'merged' | 'fixing' | 'failed' | 'skipped'
+
+/** local (the brain-dev session) · req / design / release (Lean's approvals) · handover · bridge · signer · runner (the
+ * brain-run session) · ci (verify) · reflect (the write-back into the Brain) */
+export type ActorKey = 'local' | 'req' | 'design' | 'handover' | 'bridge' | 'signer' | 'runner' | 'ci' | 'release' | 'reflect'
+
+export interface ActorSpan {
+  /** epoch seconds; b null: still going */
+  a: number
+  b: number | null
+  /** work (the actor at it), wait (it waits for a person), fix (at it again after a no) */
+  kind: 'work' | 'wait' | 'fix'
+}
+export interface ActorMark { at: number; kind: string; title: string }
+
+export interface Actor {
+  key: ActorKey
+  /** 本机会话 */
+  title: string
+  /** what it is: brain-dev · AI-DLC Lean */
+  sub: string
+  /** the RoleIcon it is drawn with */
+  icon: string
+  status: ActorStatus
+  /** one short line: what it does, did, or waits for (plain Chinese) */
+  doing: string
+  /** when its status began */
+  since: number | null
+  /** its status over time, oldest first: what 回放 shows at a moment */
+  history: { at: number; status: ActorStatus; doing: string }[]
+  /** its lane's time track */
+  spans: ActorSpan[]
+  marks: ActorMark[]
+  /** a few plain facts for its hover card and lane: 「提交 5 次」, 「verify 12 项通过」 … */
+  facts: string[]
+  credits: number | null
+  /** its Kiro Crew session, to open */
+  session: { slot: string; url: string; busy: boolean } | null
+  /** a pending Lean approval: the exact line the person types themselves in the session (never sent by the app) */
+  line: string | null
+}
+
+export type BoardEventKind =
+  | 'claim' | 'start' | 'stage' | 'request' | 'approve' | 'reject' | 'refused' | 'blocked' | 'commit' | 'handover'
+  | 'accepted' | 'rejected' | 'signed' | 'question' | 'answer' | 'verify' | 'merge' | 'reflect' | 'session' | 'app'
+
+/** One thing that happened, from the trace (brainkit.trace), the Lean ledger, the MR, the bridge, or this app. */
+export interface BoardEvent {
+  /** its place in the requirement's history, from 1 (the order the board was built in: by time) */
+  seq: number
+  at: number
+  kind: BoardEventKind
+  /** where it travels on the graph: actor keys, 'person' (the owner), 'branch' (the run branch rail), 'checks' (the
+   * check ring); from === to: a blip on that one */
+  from: string | null
+  to: string | null
+  /** plain Chinese, one line */
+  text: string
+  /** a step a reader may hide (Lean's stage events and blocked tool calls: 「Lean 细节」) */
+  detail: boolean
+  src: string | null
+}
+
+/** One commit of the run branch, the hand-over commit, or the merge into the default branch (the conveyor). */
+export interface BeltItem {
+  kind: 'commit' | 'handover' | 'merge'
+  at: number
+  /** 12 hex */
+  sha: string
+  by: 'person' | 'bot'
+  /** its subject, or what it is */
+  text: string
+  files: number
+  /** it changed only Lean's and the run's records */
+  records_only: boolean
+  /** the actor whose lane it drops into the rail from: local, runner, handover */
+  actor: ActorKey
+}
+
+/** One cell of the check wall: a Lean approval, a verify check, the bridge's and the signer's checks, Brain lint, the
+ * 14 days after the merge. */
+export interface CheckCell {
+  id: string
+  group: 'gate' | 'verify' | 'handover' | 'brain' | 'after'
+  /** in the cell: 需求, pytest, 桥 … */
+  label: string
+  /** in the inspector line: 需求审批（REQUIREMENTS） */
+  name: string
+  /** pass, fail, wait (waits for a person), skip (not run, not needed yet) */
+  status: 'pass' | 'fail' | 'wait' | 'skip'
+  /** when it was decided (null: not yet) */
+  at: number | null
+  /** one plain line */
+  detail: string
+  actor: ActorKey | null
+}
+export interface CheckWall {
+  cells: CheckCell[]
+  passed: number
+  failed: number
+  total: number
+  at: number | null
+  /** verify rounds: passed / failed checks over time (the sparkline) */
+  history: { at: number; passed: number; failed: number }[]
+}
+
+/** 验收 (the sample's 签字单): what a person needs to accept the requirement, and the one step they take now. */
+export interface Acceptance {
+  /** not_yet (not at the release stage), waiting (RELEASE / acceptance waits for a person), accepted, rejected
+   * (sent back), merged */
+  state: 'not_yet' | 'waiting' | 'accepted' | 'rejected' | 'merged'
+  /** the one step a person takes now; text '' when there is none */
+  step: { text: string; who: string; line: string | null; mr_url: string | null; session_url: string | null }
+  /** who settled the decisions (decisions.md's Who): person, check, brain, agent, unknown, unclassified */
+  by: { id: string; label: string; count: number }[]
+  /** what the checks say, one line */
+  checks: string
+  /** when it was accepted or merged, and by whom (a username or pseudonym, never an email) */
+  done: { at: number; who: string | null; how: string } | null
+}
+
+export interface ReqBoard {
+  at: number
+  row: Requirement
+  /** the run branch and the default branch it leaves from and lands on */
+  branch: string | null
+  base: string
+  /** the first thing that happened, and the end (merged or closed) */
+  started_at: number | null
+  ended_at: number | null
+  /** something is at work right now (a session busy, the runner running): the board glows */
+  live: boolean
+  /** the owner (the sample's orchestrator slot) */
+  person: { status: ActorStatus; doing: string; owner: string | null; me: boolean }
+  actors: Actor[]
+  /** the way's edges (from, to) */
+  edges: [string, string][]
+  /** a local-only requirement past its design: the way goes from the design approval straight to the checks */
+  direct: boolean
+  events: BoardEvent[]
+  belt: BeltItem[]
+  checks: CheckWall
+  accept: Acceptance
+  /** what the run took from the Brain (the list under the person) */
+  brain: RequirementDetail['brain']
+  decisions: Decision[]
+  questions: Question[]
+  mr_desc: MrDesc
+  sessions: SessionRow[]
+  credits: { total: number | null; note: string }
+  /** trace: built from brainkit.trace; app: from the Lean ledger and the repo only */
+  source: 'trace' | 'app'
+  missing: string[]
+  error: string
+}
+
+// ---------------------------------------------------------------- GET /overview: the 交付总览 numbers (the CTO 视图's)
+
+/** One requirement in the eval batch (brainkit.evaluate's runs), for the cards' charts and the ledger's Eval column. */
+export interface CtoRun {
+  key: string
+  repo: string
+  /** unattended: handed over, nobody acted after the hand-over beyond the required approvals, delivered correctly;
+   * people: handed over, a person stepped in beyond them (or it was not delivered correctly); pending: not judged yet
+   * (its 14 days after the merge are not over, or it is not merged); local: never handed over (the person did it with
+   * the AI on their machine) */
+  how: 'unattended' | 'people' | 'pending' | 'local'
+  /** what the person did beyond the required approvals (brain-kit's words for the kinds, in Chinese) */
+  beyond: string[]
+  /** a person's acts at the judgment points, and outside them */
+  at_points: number
+  outside: number
+  credits: number | null
+  /** merged into the default branch (epoch s) */
+  merged_at: number | null
+}
+
+export interface CtoNumbers {
+  /** brainkit.evaluate ran (else the cards say why, and the numbers that need it are null) */
+  available: boolean
+  /** the one sentence over the three numbers */
+  sentence: string
+  /** what the numbers are read at (main @ sha) */
+  ref: string | null
+  /** 无人值守: [unattended, judged hand-over runs] */
+  unattended: [number, number] | null
+  /** 人介入: a person's acts at the judgment points and outside them; by kind */
+  stepped_in: { at_points: number; outside: number; kinds: { label: string; n: number; point: boolean }[] } | null
+  /** credits per requirement (the requirements with credits) and in all */
+  credits: { per_req: number | null; total: number | null; reqs: number }
+  runs: CtoRun[]
+  /** merged per week (Monday, YYYY-MM-DD), by how: the last 12 weeks */
+  weekly: { week: string; unattended: number; people: number; local: number; pending: number }[]
+}

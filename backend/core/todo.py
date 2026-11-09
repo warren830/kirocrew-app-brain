@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from .detail import mr_questions, park_question
@@ -69,8 +70,12 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
                 items.append({**base, "kind": "handoff_unlabelled", "text": row["waits"]["text"]})
         elif row["state"] == "rejected":
             items.append({**base, "kind": "handoff_rejected", "text": row["waits"]["text"]})
-    for r in crew_rows:
-        if r["level"] == "FAIL":
-            items.append({"kind": "crew", "repo": "", "key": "", "title": "KiroCrew 检查", "text": r["text"], "line": None,
+    for r in crew_rows:   # a FAIL only: a WARN (e.g. a runner-only check of a local-only repo) is a reminder, no 待办
+        if r.get("level") == "FAIL":
+            todo = str(r.get("todo") or "")
+            repo = r.get("repo")
+            items.append({"kind": "crew", "repo": "", "key": "",
+                          "title": "KiroCrew 检查" + (" · %s" % os.path.basename(os.path.normpath(repo)) if repo else ""),
+                          "text": "%s。%s" % (r["text"], todo) if todo else r["text"], "line": None,
                           "approval": None, "mr_url": None, "question": None, "session": None, "since": None})
     return {"items": items, "team": team}

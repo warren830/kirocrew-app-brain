@@ -14,6 +14,7 @@ export function fixtureRoutes(): Record<string, RouteHandler> {
     [`GET ${API}/settings`]: () => fx.settings(),
     [`GET ${API}/overview*`]: () => fx.overview(),
     [`GET ${API}/requirements/*`]: () => fx.detail(),
+    [`GET ${API}/board/*`]: () => fx.board(),
     [`GET ${API}/intake/next*`]: () => fx.intakeNext(),
     [`GET ${API}/crew`]: () => fx.crew(),
     [`GET ${API}/brain*`]: () => fx.brain(),

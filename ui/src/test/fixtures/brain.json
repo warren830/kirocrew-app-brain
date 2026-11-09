@@ -194,10 +194,32 @@
   ],
   "lint": {
     "errors": [
-      "TECH.md: T-PAY-5-1 的 src 里有一项不是引用：「见群聊」"
+      {
+        "level": "FAIL",
+        "text": "brain/TECH.md 第 14 行：出处「见群聊」不是引用",
+        "todo": "出处写 D01#S003、PKG-…、D-3、V-…、RUN-… 或条目号",
+        "fix": null,
+        "repo": "/Users/alice/workplace/shop-pay",
+        "raw": "TECH.md:14: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
+      }
     ],
     "warnings": [
-      "PRODUCT.md: P-7 被 6 次运行加载，一次也没被引用"
+      {
+        "level": "WARN",
+        "text": "brain/TECH.md 第 20 行：T-PAY-2-1 已经重复出现 3 次",
+        "todo": "把它做成一个会失败的检查（gate），别再加文字",
+        "fix": null,
+        "repo": "/Users/alice/workplace/shop-pay",
+        "raw": "TECH.md:20: T-PAY-2-1 came back 3 times: make it a gate (a check that fails), not more text"
+      },
+      {
+        "level": "WARN",
+        "text": "brain/PRODUCT.md：有 1 行文字不在条目里",
+        "todo": "它们不算知识，可每个 run 都会读到：看一眼，要的话写成条目",
+        "fix": null,
+        "repo": "/Users/alice/workplace/shop-pay",
+        "raw": "PRODUCT.md: 1 line(s) of text outside entries (not tracked as knowledge; read them): 退款要在 7 天内处理"
+      }
     ]
   },
   "usage": {

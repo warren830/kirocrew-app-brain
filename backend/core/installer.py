@@ -6,13 +6,21 @@
            ``brain doctor --offline``; the changed files; a commit with the person's own git identity and their hooks
            (a hook that says no is shown as it said it: nothing is bypassed, 「再提交一次」 runs them again). A failure
            before the commit takes back the worktree and the branch it made.
+  upgrade  the same for a repo that HAS brain-kit (the 'kit' fix of a KiroCrew check row: an older hook adapter, Lean
+           or the adapter not committed, Lean counting runs/** as code): a new branch (default brain/upgrade-kit; -2,
+           -3 … when that name is taken here or on origin) from the default branch in its own worktree, ``brain
+           install`` there (kit.json is kept: brain-kit refreshes the kit files and adds runs/** to lean.json),
+           ``brain doctor --offline``, the changed files, the person's commit. Nothing changed: said so, and the
+           worktree and the branch are taken back.
   publish  only after the person confirmed the branch, the remote and the target: ``git push origin <branch>`` (no
            force, no prompt), then the MR with the person's GitLab token through brain-kit's GitLab client (an open
            MR of that branch is reused), its description a plain list of what the install adds. Without a token or a
            GitLab project: the exact git / glab commands and GitLab's new-MR link.
 
 What the app installed where is kept in importer.Records (imports.json), so 检查 and the list know a repo whose
-brain-kit is on the unmerged install branch.
+brain-kit is on the unmerged install branch. The upgrades have Records of their own (upgrades.json): a listed repo
+with an upgrade branch is never taken for a pending install. *purpose* ("install" | "upgrade") picks the commit
+message, the MR title and the MR description's first line.
 """
 
 from __future__ import annotations
@@ -26,9 +34,10 @@ from typing import Any, Callable
 from urllib.parse import quote
 
 from . import bk
+from . import problems
 from .constants import GIT_BIN
 from .importer import (CTRL_RE, DEFAULT_BRANCH, GIT_TIMEOUT_S, KIT, PREFIX_RE, PROJECT_RE, STATUS_TIMEOUT_S, ImportFail,
-                       Records, _status_rows, base_ref, git_failure, has_at, last_lines, origin_of,
+                       Records, _status_rows, base_ref, default_branch, git_failure, has_at, last_lines, origin_of,
                        planted_link, quiet_env, run_quiet, short_ref, symlinks_on_targets, tail)
 from .intake import brain_cmd
 from .repo import Git
@@ -44,14 +53,22 @@ BASE_RE = re.compile(r"^https?://[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]{1,5})?(?:/[A
 DOCTOR_RE = re.compile(r"^(OK|WARN|FAIL)\s+(.+)$")
 INSTALL_STEPS = (("branch", "建分支和工作目录"), ("install", "跑 brain install"), ("kit", "写 kit.json"),
                  ("doctor", "跑 brain doctor"), ("commit", "提交"))
+UPGRADE_BRANCH = "brain/upgrade-kit"
+UPGRADE_STEPS = (("branch", "建分支和工作目录"), ("install", "跑 brain install（更新 kit 文件）"),
+                 ("doctor", "跑 brain doctor"), ("commit", "提交"))
+PURPOSES = ("install", "upgrade")
+UP_TO_DATE = "已经是最新的：没有要提交的改动"
+# Lean's install.sh starts a new audit file (one INIT event) each time it runs: a reinstall that adds nothing else
+# changed nothing. When something else changed, it is committed with the rest, as `brain install` + `git add -A` would.
+LEAN_AUDIT = "aidlc-docs/audit/"
 
 
 # ---- 安装到新分支 ----------------------------------------------------------------------------------------------------- #
 
-def check_branch(raw: Any) -> str:
-    b = str(raw).strip() if isinstance(raw, str) and raw.strip() else DEFAULT_BRANCH
+def check_branch(raw: Any, default: str = DEFAULT_BRANCH) -> str:
+    b = str(raw).strip() if isinstance(raw, str) and raw.strip() else default
     if not BRANCH_RE.match(b) or ".." in b or "//" in b or b.endswith(("/", ".", ".lock")) or "/." in b or "@{" in b:
-        raise ImportFail("分支名只能用字母、数字和 . _ - /，比如 brain/install", "invalid_branch")
+        raise ImportFail("分支名只能用字母、数字和 . _ - /，比如 %s" % default, "invalid_branch")
     p = Git(os.path.expanduser("~")).run("check-ref-format", "--branch", b, timeout=10)
     if p.returncode != 0:
         raise ImportFail("git 不接受这个分支名：%s" % b, "invalid_branch")
@@ -157,12 +174,14 @@ def worktrees_of(top: str) -> set[str]:
     return {os.path.realpath(x[9:]) for x in (p.stdout.splitlines() if p.returncode == 0 else []) if x.startswith("worktree ")}
 
 
-def doctor_rows(text: str) -> list[dict[str, str]]:
+def doctor_rows(text: str) -> list[dict[str, Any]]:
+    """`brain doctor`'s lines as CheckRows (problems.row: short Chinese, brain-kit's line in raw). They are about the
+    install worktree, not a listed repo: no 'kit' fix on them."""
     out = []
     for line in (text or "").splitlines():
         m = DOCTOR_RE.match(line.strip())
         if m:
-            out.append({"level": m.group(1), "text": m.group(2).strip()[:500]})
+            out.append(problems.row(m.group(1), m.group(2).strip()[:500]))
     return out
 
 
@@ -281,15 +300,171 @@ def install(top: str, kit: dict[str, str], branch: str, work_root: str, records:
     return res
 
 
-def commit_message(kit: dict[str, str]) -> tuple[str, str]:
+# ---- 更新 kit 文件 (the 'kit' fix) ----------------------------------------------------------------------------------- #
+
+def free_branch(g: Git, branch: str) -> str:
+    """*branch*, or *branch*-2, -3 … : the first name that is neither a local branch nor one on origin."""
+    for n in range(1, 100):
+        b = branch if n == 1 else "%s-%d" % (branch, n)
+        if not (g.ok("rev-parse", "-q", "--verify", "refs/heads/" + b) or
+                g.ok("rev-parse", "-q", "--verify", "refs/remotes/origin/" + b)):
+            return b
+    raise ImportFail("%s、%s-2 … 到 -99 都有了：换个分支名" % (branch, branch), "branch_exists", 409)
+
+
+def kit_form(cfg: dict[str, Any]) -> dict[str, str]:
+    """A repo's kit.json values in the install form's shape (KitForm)."""
+    gl = cfg.get("gitlab") if isinstance(cfg.get("gitlab"), dict) else {}
+    jr = cfg.get("jira") if isinstance(cfg.get("jira"), dict) else {}
+    return {"req_prefix": str(cfg.get("req_prefix") or ""), "tracker": str(cfg.get("tracker") or ""),
+            "jira_base": str(jr.get("base") or ""), "gitlab_base": str(gl.get("base") or ""),
+            "gitlab_project": str(gl.get("project") or ""), "default_branch": str(cfg.get("default_branch") or ""),
+            "team": str(cfg.get("team") or "")}
+
+
+def _kit_of(path: str) -> dict[str, Any] | None:
+    """brain-kit's config of the repo at *path* (kit.json merged with the defaults), None when it cannot be read."""
+    if os.path.islink(os.path.join(path, KIT)) or not os.path.isfile(os.path.join(path, KIT)):
+        return None
+    try:
+        return bk.m("config").load(path)
+    except Exception:  # noqa: BLE001 - brain-kit says what is wrong with it elsewhere (检查)
+        return None
+
+
+def upgrade_text(res: dict[str, Any]) -> str:
+    c = res.get("commit") or {}
+    if not res.get("changed"):
+        return UP_TO_DATE
+    if not c.get("ok"):
+        return c.get("text") or "还没提交"
+    if res.get("remote_url"):
+        return "提交在新分支 %s 上：推送并开 MR，合进 %s 以后在这个目录里 git pull" % (res["branch"], res["target"])
+    return "提交在本机分支 %s 上（这个仓库没有远端）：在本机把它合进 %s" % (res["branch"], res["target"])
+
+
+def upgrade(top: str, branch: str, work_root: str, records: Records, step: Callable[..., None], *,
+            token: bool = False) -> dict[str, Any]:
+    """brain install again, for a repo that has brain-kit, on a new branch in its own worktree (blocking: run it in a
+    thread). *branch*: the name asked for (a taken one gets -2, -3 …); *records*: the upgrade records (upgrades.json),
+    never the install ones. The person's checkout, its branch, index and files are never touched; a failure before
+    the commit, or nothing to commit, takes back the worktree and the branch."""
+    res: dict[str, Any] = {"path": top, "branch": branch, "base": None, "base_sha": None, "worktree": None,
+                           "output": "", "kit": kit_form({}), "doctor": {"ran": False, "rows": [], "output": ""},
+                           "files": [], "commit": {"ok": False, "sha": None, "blocked": False, "text": "", "output": ""},
+                           "changed": False, "remote_url": "", "target": "", "gitlab_project": "", "can_open_mr": False,
+                           "text": ""}
+    step("branch", "running")
+    if not bk.ok():
+        raise ImportFail("brain-kit 没装载：先在设置里写对它的位置", "no_brainkit", 409, res)
+    g = Git(top)
+    cfg = _kit_of(top)
+    d = str((cfg or {}).get("default_branch") or "") or (default_branch(g)[0] or "")
+    origin = origin_of(g)
+    res["remote_url"] = (origin or {}).get("url") or ""
+    got = base_ref(g, d) if d else None
+    if not got:
+        raise ImportFail("找不到默认分支%s（origin 上和本机都没有）" % (" " + d if d else ""), "no_default_branch", 409, res)
+    ref, sha = got
+    res.update(base=short_ref(ref), base_sha=sha, target=d)
+    if not has_at(g, sha, KIT):
+        raise ImportFail("%s 上还没有 .brain/kit.json：先在「导入仓库」里把 brain-kit 装到新分支上，合进 %s" % (short_ref(ref), d),
+                         "not_installed", 409, res)
+    links = symlinks_on_targets(g, sha)
+    if links:
+        raise ImportFail("仓库里 %s 是符号链接：brain install 会顺着它写到别处，这里不装。先把它换成普通的目录或文件" %
+                         "、".join(links), "symlink", 409, res)
+    if not work_root:
+        raise ImportFail("设置里没有「每个需求的工作目录」", "no_work_root", 409, res)
+    wr = os.path.realpath(os.path.expanduser(work_root))
+    link = planted_link(os.path.join(os.path.expanduser(work_root), os.path.basename(top)))
+    if link:
+        raise ImportFail("工作目录的路径经过一个符号链接：%s → %s" % link, "symlink", 409, res)
+    branch = free_branch(g, branch)
+    if not install_branch_ok(branch, d):
+        raise ImportFail("分支名 %s 不能用（不能是默认分支）" % branch, "invalid_branch", 400, res)
+    res["branch"] = branch
+    wt = _worktree_dir(wr, top, branch)
+    os.makedirs(os.path.dirname(wt), exist_ok=True)
+    p = run_quiet([GIT_BIN, "-C", top, "worktree", "add", "--no-track", "-b", branch, wt, sha], top, WORKTREE_TIMEOUT_S,
+                  brain_env())
+    if p.returncode != 0:
+        if os.path.isdir(wt):
+            _drop(top, wt, branch, sha)
+        text = "建分支和工作目录没成功：%s" % last_lines(tail(p))
+        step("branch", "fail", text)
+        raise ImportFail(text, "worktree_failed", 500, res)
+    wt = os.path.realpath(wt)
+    res["worktree"] = wt
+    step("branch", "ok", "%s，从 %s（%s）建的，在 %s" % (branch, short_ref(ref), sha[:8], wt))
+    try:
+        step("install", "running")
+        p = run_quiet(brain_cmd() + ["install", wt], wt, INSTALL_TIMEOUT_S, brain_env())
+        res["output"] = tail(p)
+        wcfg = _kit_of(wt) if p.returncode == 0 else None
+        if wcfg is None:
+            text = ("brain install 没成功（退出码 %d），新建的分支和工作目录已经删掉：\n%s" % (
+                p.returncode, last_lines(res["output"], 12)) if p.returncode != 0 else
+                "brain install 跑完了，可读不了 .brain/kit.json（默认分支上的它就有问题？）：新建的分支和工作目录已经删掉")
+            step("install", "fail", text)
+            raise ImportFail(text, "install_failed", 500, res)
+        step("install", "ok", "brain-kit %s" % (bk.info().get("version") or ""))
+        kit = kit_form(wcfg)
+        kit["default_branch"] = kit["default_branch"] or d
+        res["kit"] = kit
+        base = kit["gitlab_base"] or (origin or {}).get("base") or ""
+        res["gitlab_project"] = kit["gitlab_project"] or (origin or {}).get("project") or ""
+        res["can_open_mr"] = bool(token and origin and base and res["gitlab_project"])
+
+        step("doctor", "running")
+        p = run_quiet(brain_cmd() + ["doctor", "--offline"], wt, DOCTOR_TIMEOUT_S, brain_env())
+        rows = doctor_rows(p.stdout)
+        res["doctor"] = {"ran": True, "rows": rows, "output": tail(p, 8000)}
+        fails = sum(1 for r in rows if r["level"] == "FAIL")
+        warns = sum(1 for r in rows if r["level"] == "WARN")
+        if not rows:
+            step("doctor", "warn", "brain doctor 没给出结果（退出码 %d）" % p.returncode)
+        else:
+            step("doctor", "warn" if fails else "ok", "%d 项通过，%d 项注意，%d 项没过" % (len(rows) - fails - warns, warns,
+                                                                                 fails))
+        res["files"] = _status_rows(Git(wt).run("status", "--porcelain=v1", "-z", "--untracked-files=all",
+                                                timeout=STATUS_TIMEOUT_S).stdout)[:MAX_FILES]
+    except BaseException:
+        _drop(top, wt, branch, sha)
+        res["worktree"] = None
+        raise
+    if not [f for f in res["files"] if not (f["change"] == "added" and f["path"].startswith(LEAN_AUDIT))]:
+        _drop(top, wt, branch, sha)
+        res.update(worktree=None, files=[], text=UP_TO_DATE)
+        res["commit"]["text"] = UP_TO_DATE
+        step("commit", "ok", UP_TO_DATE)
+        return res
+    res["changed"] = True
+    records.put(top, {"purpose": "upgrade", "branch": branch, "worktree": wt, "base": short_ref(ref), "base_sha": sha,
+                      "commit": None, "kit": res["kit"], "files": res["files"],
+                      "doctor": {"ok": len(rows) - fails - warns, "warn": warns, "fail": fails}, "at": time.time(),
+                      "pushed": False, "mr_iid": None, "mr_url": None, "brainkit": bk.info().get("version")})
+    res["commit"] = commit(top, records, step, purpose="upgrade")
+    res["text"] = upgrade_text(res)
+    return res
+
+
+def commit_message(kit: dict[str, str], purpose: str = "install", version: Any = None) -> tuple[str, str]:
+    if purpose == "upgrade":
+        return ("Update brain-kit's kit files (brain install)",
+                "brain-kit%s 的 `brain install` 在单独的工作目录里重装了这个仓库的 kit 文件（AI-DLC Lean、KiroCrew 的 hook "
+                "适配、aidlc-docs/lean.json 的 fingerprint_exclude 加上 runs/** 等）；.brain/kit.json 没动。由 Brain app "
+                "的「修复」发起。\n\nkit.json: %s" % (" " + str(version) if version else "", kit_line(kit)))
     return ("Install brain-kit (brain install)",
             "AI-DLC Lean, the KiroCrew hook adapter, .brain/kit.json, the Brain files and AGENTS.md, made by brain-kit's "
             "`brain install` in a worktree of its own (the Brain app's 导入仓库).\n\nkit.json: %s" % kit_line(kit))
 
 
-def commit(top: str, records: Records, step: Callable[..., None] | None = None) -> dict[str, Any]:
-    """git add -A and git commit in the install worktree, with the person's own identity (their git config) and their
-    hooks: a hook that says no is shown as it said it, nothing is bypassed. Again after a hook said no: the same."""
+def commit(top: str, records: Records, step: Callable[..., None] | None = None, *,
+           purpose: str = "install") -> dict[str, Any]:
+    """git add -A and git commit in the install (or upgrade) worktree, with the person's own identity (their git
+    config) and their hooks: a hook that says no is shown as it said it, nothing is bypassed. Again after a hook said
+    no: the same. *records*: the install records, or the upgrade records for purpose "upgrade"."""
     step = step or (lambda *a, **k: None)
     out = {"ok": False, "sha": None, "blocked": False, "text": "", "output": ""}
     rec = records.get(top)
@@ -313,7 +488,7 @@ def commit(top: str, records: Records, step: Callable[..., None] | None = None) 
         out.update(text="git add 没成功：%s" % last_lines(tail(p)), output=tail(p))
         step("commit", "fail", out["text"])
         return out
-    subject, body = commit_message(rec.get("kit") or {})
+    subject, body = commit_message(rec.get("kit") or {}, purpose, rec.get("brainkit"))
     p = run_quiet([GIT_BIN, "-C", wt, "commit", "-q", "-m", subject, "-m", body], wt, COMMIT_TIMEOUT_S, brain_env())
     out["output"] = tail(p)
     if p.returncode == 0:
@@ -328,7 +503,8 @@ def commit(top: str, records: Records, step: Callable[..., None] | None = None) 
         out["text"] = ("git 不知道你是谁：在终端里设好 git config --global user.name 和 user.email（这里不替你填），"
                        "再点「再提交一次」")
     elif "nothing to commit" in low or "nothing added to commit" in low:
-        out["text"] = "没有可提交的改动：brain install 什么也没写？看看工作目录 %s" % wt
+        out["text"] = (UP_TO_DATE if purpose == "upgrade" else
+                       "没有可提交的改动：brain install 什么也没写？看看工作目录 %s" % wt)
     else:
         out["blocked"] = True
         out["text"] = "提交被拦下了（多半是 git hook），它说：\n%s\n\n改动还在 %s 里：处理好以后点「再提交一次」。" % (
@@ -339,8 +515,8 @@ def commit(top: str, records: Records, step: Callable[..., None] | None = None) 
 
 # ---- 推送并开 MR ------------------------------------------------------------------------------------------------------ #
 
-def mr_title() -> str:
-    return "装上 brain-kit（brain install）"
+def mr_title(purpose: str = "install") -> str:
+    return "更新 brain-kit 的 kit 文件（brain install）" if purpose == "upgrade" else "装上 brain-kit（brain install）"
 
 
 FILE_GROUPS = (
@@ -352,8 +528,9 @@ FILE_GROUPS = (
 )
 
 
-def mr_description(rec: dict[str, Any]) -> str:
-    """What the install adds, as a plain list (made inert like brain-kit's own MR texts when mrdesc is there)."""
+def mr_description(rec: dict[str, Any], purpose: str = "install") -> str:
+    """What the install adds (or the upgrade changes), as a plain list (made inert like brain-kit's own MR texts when
+    mrdesc is there)."""
     kit = rec.get("kit") or {}
     files = [f for f in rec.get("files") or [] if isinstance(f, dict)]
     groups: dict[str, list[str]] = {}
@@ -362,8 +539,13 @@ def mr_description(rec: dict[str, Any]) -> str:
         label = next((lab for pre, lab in FILE_GROUPS if path == pre or path.startswith(pre)), "其他")
         key = next((pre for pre, _ in FILE_GROUPS if path == pre or path.startswith(pre)), path)
         groups.setdefault("%s\0%s" % (key, label), []).append(path)
-    lines = ["用 brain-kit%s 的 `brain install` 装进这个仓库。在单独的工作目录里做的，原来的检出没动。" % (
-        " " + str(rec["brainkit"]) if rec.get("brainkit") else ""), "", "**装了什么**", ""]
+    version = " " + str(rec["brainkit"]) if rec.get("brainkit") else ""
+    if purpose == "upgrade":
+        lines = ["用 brain-kit%s 的 `brain install` 更新这个仓库的 kit 文件（.brain/kit.json 没动）。在单独的工作目录里做的，"
+                 "原来的检出没动。" % version, "", "**改了什么**", ""]
+    else:
+        lines = ["用 brain-kit%s 的 `brain install` 装进这个仓库。在单独的工作目录里做的，原来的检出没动。" % version, "",
+                 "**装了什么**", ""]
     for k, paths in groups.items():
         pre, label = k.split("\0", 1)
         lines.append("- `%s`：%s（%d 个文件）" % (pre, label, len(paths)))
@@ -377,7 +559,9 @@ def mr_description(rec: dict[str, Any]) -> str:
     d = rec.get("doctor") or {}
     if d:
         lines += ["", "`brain doctor`：%s 项通过，%s 项注意，%s 项没过" % (d.get("ok", 0), d.get("warn", 0), d.get("fail", 0))]
-    lines += ["", "合并以后在各自的检出里 git pull，Brain app 里这个仓库就能用了（app 给每个需求建的工作目录从默认分支来）。"]
+    lines += ["", "合并以后在各自的检出里 git pull，Brain app 里这个仓库就能用了（app 给每个需求建的工作目录从默认分支来）。"
+              if purpose != "upgrade" else
+              "合并以后在各自的检出里 git pull：app 给每个需求建的工作目录从默认分支来，新的 kit 文件从那时起生效。"]
     text = "\n".join(lines)
     try:
         return bk.m("mrdesc").inert(text) if bk.has("mrdesc") and hasattr(bk.m("mrdesc"), "inert") else text
@@ -393,22 +577,26 @@ def new_mr_link(base: str, project: str, branch: str, target: str) -> str | None
         quote("merge_request[target_branch]", safe=""), quote(target, safe=""))
 
 
-def mr_commands(top: str, branch: str, target: str, base: str, project: str, desc: str) -> list[str]:
+def mr_commands(top: str, branch: str, target: str, base: str, project: str, desc: str,
+                purpose: str = "install") -> list[str]:
     q = shlex.quote
     cmds = ["git -C %s push origin %s" % (q(top), q(branch))]
     repo = "%s/%s" % (base.rstrip("/"), project) if base and project else ""
     cmds.append("glab mr create %s--source-branch %s --target-branch %s --title %s --description %s --yes" % (
-        "-R %s " % q(repo) if repo else "", q(branch), q(target), q(mr_title()), q(desc)))
+        "-R %s " % q(repo) if repo else "", q(branch), q(target), q(mr_title(purpose)), q(desc)))
     return cmds
 
 
-def publish(top: str, records: Records, confirm: dict[str, Any], *, transport: Any = None) -> dict[str, Any]:
-    """Push the install branch to origin and open its MR with the person's GitLab token (blocking: run it in a thread).
-    *confirm* is what the person confirmed on the page: the branch, the remote URL and the target; anything else is
-    refused (the page was out of date). Without a token or a GitLab project, the exact commands instead."""
+def publish(top: str, records: Records, confirm: dict[str, Any], *, transport: Any = None,
+            purpose: str = "install") -> dict[str, Any]:
+    """Push the install (or upgrade) branch to origin and open its MR with the person's GitLab token (blocking: run it
+    in a thread). *confirm* is what the person confirmed on the page: the branch, the remote URL and the target;
+    anything else is refused (the page was out of date). Without a token or a GitLab project, the exact commands
+    instead. *records*: the install records, or the upgrade records for purpose "upgrade"."""
     rec = records.get(top)
     if not rec or not rec.get("branch"):
-        raise ImportFail("这个仓库没有 app 装的分支：先「安装到新分支」", "no_install", 409)
+        raise ImportFail("这个仓库没有 app 更新 kit 文件的分支：先点「修复」" if purpose == "upgrade" else
+                         "这个仓库没有 app 装的分支：先「安装到新分支」", "no_install", 409)
     if not rec.get("commit"):
         raise ImportFail("还没提交：先提交，再推送", "not_committed", 409)
     g = Git(top)
@@ -426,9 +614,10 @@ def publish(top: str, records: Records, confirm: dict[str, Any], *, transport: A
         raise ImportFail("页面上的信息过期了：重新检查一下，再确认", "stale_confirm", 409)
     base = kit.get("gitlab_base") or origin["base"]
     project = kit.get("gitlab_project") or origin["project"]
-    desc = mr_description(rec)
+    desc = mr_description(rec, purpose)
     out = {"ok": False, "pushed": False, "branch": branch, "target": target, "remote_url": origin["url"],
-           "mr": None, "text": "", "output": "", "commands": mr_commands(top, branch, target, base, project, desc),
+           "mr": None, "text": "", "output": "",
+           "commands": mr_commands(top, branch, target, base, project, desc, purpose),
            "new_mr_url": new_mr_link(base, project, branch, target)}
     p = run_quiet([GIT_BIN, "-C", top, "push", "origin", "refs/heads/%s:refs/heads/%s" % (branch, branch)], top,
                   PUSH_TIMEOUT_S, quiet_env(top))
@@ -458,7 +647,7 @@ def publish(top: str, records: Records, confirm: dict[str, Any], *, transport: A
         mr = gl.mr_for_branch(project, branch)
         existing = bool(mr)
         if not mr:
-            mr = gl.create_mr(project, branch, target, mr_title(), [], description=desc)
+            mr = gl.create_mr(project, branch, target, mr_title(purpose), [], description=desc)
         iid = int((mr or {}).get("iid") or 0)
         url = (mr or {}).get("web_url") or "%s/%s/-/merge_requests/%d" % (base.rstrip("/"), project, iid)
         out["mr"] = {"iid": iid, "url": url, "existing": existing}

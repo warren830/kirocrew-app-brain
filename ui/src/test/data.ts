@@ -5,9 +5,11 @@
  * file, and `Extra<J, T>` (the file's keys the contract does not have) must be never.
  */
 import type {
-  BrainView, CloneResult, CrewChecks, ImportDefaults, ImportInspect, ImportJob, InstallResult, IntakeCheck, IntakeNext, Overview,
-  PublishResult, ReflectPreview, RequirementDetail, Settings, StartResult, Status, TeamView, Todo,
+  BrainView, ReqBoard, CloneResult, CrewChecks, ImportDefaults, ImportInspect, ImportJob, InstallResult, IntakeCheck, IntakeNext, Overview,
+  PublishResult, ReflectPreview, RequirementDetail, Settings, StartResult, Status, TeamView, Todo, UpgradeResult,
 } from '../types'
+import boardJson from './fixtures/board.json'
+import boardMergedJson from './fixtures/board-merged.json'
 import brainJson from './fixtures/brain.json'
 import crewJson from './fixtures/crew.json'
 import detailJson from './fixtures/detail.json'
@@ -17,6 +19,7 @@ import importInspectPendingJson from './fixtures/import-inspect-pending.json'
 import importInspectJson from './fixtures/import-inspect.json'
 import importJobJson from './fixtures/import-job.json'
 import importPublishJson from './fixtures/import-publish.json'
+import importUpgradeJobJson from './fixtures/import-upgrade-job.json'
 import intakeCheckJson from './fixtures/intake-check.json'
 import intakeNextJson from './fixtures/intake-next.json'
 import overviewJson from './fixtures/overview.json'
@@ -50,6 +53,8 @@ const files = {
   status: exact<Status>()(statusJson),
   overview: exact<Overview>()(overviewJson),
   detail: exact<RequirementDetail>()(detailJson),
+  board: exact<ReqBoard>()(boardJson),
+  boardMerged: exact<ReqBoard>()(boardMergedJson),
   todo: exact<Todo>()(todoJson),
   brain: exact<BrainView>()(brainJson),
   intakeNext: exact<IntakeNext>()(intakeNextJson),
@@ -65,6 +70,7 @@ const files = {
   importJob: exact<ImportJob<InstallResult>>()(importJobJson),
   importCloneJob: exact<ImportJob<CloneResult>>()(importCloneJobJson),
   importPublish: exact<PublishResult>()(importPublishJson),
+  importUpgradeJob: exact<ImportJob<UpgradeResult>>()(importUpgradeJobJson),
 }
 
 export const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T

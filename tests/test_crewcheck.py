@@ -17,7 +17,11 @@ UPGRADE = {"revision": 2, "fingerprint": "sha256:" + "a" * 64, "source": "sha256
 LEAN = {"agentSpawn": "SessionStart", "userPromptSubmit": "UserPromptSubmit", "preToolUse": "PreToolUse"}
 
 
+ROW_KEYS = {"level", "text", "todo", "fix", "repo", "raw"}
+
+
 def levels(rows):
+    assert all(set(r) == ROW_KEYS for r in rows), rows      # every row is a problems.py CheckRow
     return [(r["level"], r["text"]) for r in rows]
 
 
@@ -93,6 +97,10 @@ def test_checks_and_fixes(tmp_path, home):
     assert spec == json.loads((BRAINKIT / "crew" / "brain-dev.json").read_text())
     assert fe["ok"] and (tmp_path / "engine").read_text().strip() == "kas"
     assert all(r["level"] == "OK" for r in fe["rows"])
+    agent = next(r for r in first["rows"] if r["fix"] == "agent")
+    assert agent["text"] == "没有 ~/.kiro/agents/brain-dev.json" and "修复" in agent["todo"] and agent["repo"] is None
+    engine = next(r for r in first["rows"] if r["fix"] == "engine")
+    assert engine["level"] == "WARN" and engine["text"] == "KiroCrew 引擎是 kiro，不是 kas" and "kas" in engine["todo"]
 
 
 def test_a_different_brain_dev_with_leans_hooks_is_left_alone(tmp_path, home):
@@ -109,8 +117,10 @@ def test_a_different_brain_dev_with_leans_hooks_is_left_alone(tmp_path, home):
     assert levels(got["rows"])[0] == ("OK", "brain-dev 带着 Lean 的三个 hook")
     assert not [r for r in got["rows"] if r["level"] != "OK"]  # no drift warning: only Lean's hooks matter
     # brain-kit 72b278e: the person's own fields stay (`brain crew-agent --force` only adds what is missing): said
-    assert ("OK", "brain-dev 用的是你自己的 description、prompt（`brain crew-agent --reset` 换回 brain-kit 的；--force 只补缺的）") \
-        in levels(got["rows"])
+    custom = next(r for r in got["rows"] if r["text"] == "brain-dev 用的是你自己的 description、prompt")
+    assert custom["level"] == "OK" and custom["todo"] == "" and custom["fix"] is None
+    assert custom["raw"] == "brain-dev 用的是你自己的 description、prompt（`brain crew-agent --reset` 换回 brain-kit 的；" \
+                            "--force 只补缺的）"
     assert got["fix"]["agent"] is False and cc.agent_ok(got["rows"])
     assert "什么都没改" in cc.fix_agent()
     assert p.read_bytes() == before and not backups(home)
@@ -127,7 +137,13 @@ def test_a_repo_without_the_hook_adapter_in_git_fails(tmp_path, home):
     rows = cc.checks([str(repo)])["rows"]
     probs = mod("bk").m("cli").runner_kit_problems(str(repo))
     assert len(probs) == 1 and ".kiro/brain/lean-hook.py is not committed" in probs[0]
-    assert ("FAIL", "仓库 pay：" + probs[0]) in levels(rows)
+    row = next(r for r in rows if r["repo"] == str(repo))
+    assert (row["level"], row["text"], row["fix"], row["raw"]) == ("FAIL", ".kiro/brain/lean-hook.py 没提交到 git", "kit",
+                                                                   probs[0])
+    assert "修复" in row["todo"] and "新分支" in row["todo"]
+    # not committed matters to every repo (the app's worktrees are made from main): FAIL for a local-only one too
+    local = cc.checks([str(repo)], team_paths=[])["rows"]
+    assert [r["level"] for r in local if r["repo"] == str(repo)] == ["FAIL"]
     assert cc.agent_ok(rows)  # the repo's problem does not make brain-dev unusable
 
 
@@ -138,7 +154,7 @@ def test_kiros_list_format_with_orca_gets_only_the_missing_lean_hooks(tmp_path, 
     got = cc.checks([])
     row = agent_row(got["rows"])
     assert row["level"] == "FAIL" and "发消息" in row["text"] and "调用工具前" in row["text"]
-    assert "会话开始" not in row["text"]
+    assert "会话开始" not in row["text"] and row["fix"] == "agent" and "只补上缺的" in row["todo"]
     assert got["fix"]["agent"] is True and not cc.agent_ok(got["rows"])
 
     text = cc.fix_agent()
@@ -155,7 +171,9 @@ def test_kiros_list_format_with_orca_gets_only_the_missing_lean_hooks(tmp_path, 
     assert [b.read_bytes() for b in backups(home)] == [raw]
 
     again = cc.checks([])
-    assert agent_row(again["rows"]) == {"level": "OK", "text": "brain-dev 带着 Lean 的三个 hook（另有 3 个别的 hook，留着不动）"}
+    ok = agent_row(again["rows"])
+    assert (ok["level"], ok["text"], ok["todo"], ok["fix"]) == ("OK", "brain-dev 带着 Lean 的三个 hook（另有 3 个别的 hook，留着不动）",
+                                                                "", None)
     assert again["fix"]["agent"] is False and cc.agent_ok(again["rows"])
     fixed = p.read_bytes()
     assert "什么都没改" in cc.fix_agent()
@@ -208,7 +226,7 @@ def test_a_spec_that_cannot_be_read_is_never_overwritten(tmp_path, home, raw, wh
     cc = loaded(tmp_path)
     got = cc.checks([])
     row = agent_row(got["rows"])
-    assert row["level"] == "FAIL" and why in row["text"] and "自己修好或删掉它" in row["text"]
+    assert row["level"] == "FAIL" and why in row["text"] and "自己修好或删掉" in row["todo"] and row["fix"] is None
     assert got["fix"]["agent"] is False and not cc.agent_ok(got["rows"])
     with pytest.raises(RuntimeError, match="自己修好或删掉它"):
         cc.fix_agent()
@@ -235,10 +253,12 @@ def test_a_repo_whose_lean_counts_the_run_records_as_code_fails(tmp_path, home):
     cfg = json.loads(lj.read_text(encoding="utf-8"))
     if "runs/**" not in (cfg.get("fingerprint_exclude") or []):
         pytest.skip("this brain-kit's install does not add runs/** (older than 48b6b97)")
-    assert not [r for r in cc.checks([str(repo)])["rows"] if "fingerprint" in r["text"] or "指纹" in r["text"]]
+    assert not [r for r in cc.checks([str(repo)])["rows"] if r["repo"]]
     cfg["fingerprint_exclude"] = [p for p in cfg["fingerprint_exclude"] if p != "runs/**"]
     lj.write_text(json.dumps(cfg), encoding="utf-8")
     got = cc.checks([str(repo)])
-    row = [r for r in got["rows"] if r["text"].startswith("仓库 pay：") and "指纹" in r["text"]]
-    assert len(row) == 1 and row[0]["level"] == "FAIL" and "runs/**" in row[0]["text"], got["rows"]
+    row = [r for r in got["rows"] if r["repo"] == str(repo)]
+    assert len(row) == 1 and row[0]["level"] == "FAIL" and row[0]["text"] == "Lean 把 runs/ 下的记录算成代码", got["rows"]
+    assert row[0]["fix"] == "kit" and "runs/**" in row[0]["todo"] and "交接会被拒" in row[0]["todo"]
+    assert "指纹" in row[0]["raw"] and "runs/**" in row[0]["raw"]        # brain-kit's own words, kept for the page
     assert got["fix"] == {"agent": False, "engine": False} and cc.agent_ok(got["rows"])

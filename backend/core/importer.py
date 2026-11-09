@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
-from . import bk, crewcheck
+from . import bk, crewcheck, problems
 from .constants import GIT_BIN
 from .repo import GIT_ENV, Git
 
@@ -65,7 +65,7 @@ NOT_GITLAB = {"github.com", "www.github.com", "bitbucket.org", "codeberg.org"}
 FALSE_BIN = shutil.which("false") or "/usr/bin/false"
 
 CLONE_STEPS = (("clone", "克隆"),)
-KIND_LABEL = {"clone": "克隆", "install": "安装"}
+KIND_LABEL = {"clone": "克隆", "install": "安装", "upgrade": "更新 kit 文件"}
 
 
 class ImportFail(Exception):
@@ -443,7 +443,8 @@ def _status_rows(z: str) -> list[dict[str, str]]:
 
 class Records:
     """imports.json in the app's data dir: {repo top level: what the app installed there}. Small; read on each use,
-    written atomically under a lock.
+    written atomically under a lock. The kit upgrades (installer.upgrade) have a Records of their own, upgrades.json,
+    with the same fields (and purpose "upgrade"): they never count as a pending install.
 
       branch, worktree, base (origin/main), base_sha, commit (null until committed), kit (the form's values), files,
       doctor ({ok, warn, fail} counts), at, pushed, mr_iid, mr_url, brainkit (the version)."""
@@ -579,8 +580,10 @@ def bounded(fn: Callable[[], Any], timeout: float, default: Any) -> Any:
         ex.shutdown(wait=False)
 
 
-def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = False) -> dict[str, Any]:
-    """Every check of the 检查 step (blocking: call it in a thread). Writes nothing."""
+def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = False,
+            team_of: Callable[[str, dict[str, Any]], bool] | None = None) -> dict[str, Any]:
+    """Every check of the 检查 step (blocking: call it in a thread). Writes nothing. *team_of(top, cfg)*: the repo is
+    handed to the team runner (its runner-only KiroCrew checks FAIL; a reminder otherwise); None: not known."""
     out = blank_inspect(raw)
     checks = out["checks"]
     try:
@@ -704,9 +707,12 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
     rid = listed_id(top, listed)
     out["listed"] = rid
     checks.append(row("listed", "OK", "列表", "已经在列表里（%s）" % rid if rid else "还不在列表里"))
-    crew = bounded(lambda: crewcheck.checks([top] if cfg else []), CREW_TIMEOUT_S,
-                   {"rows": [{"level": "WARN", "text": "KiroCrew 的检查没在 %d 秒内做完" % CREW_TIMEOUT_S}],
-                    "fix": {"agent": False, "engine": False}})
+    def crew_rows() -> dict[str, Any]:
+        team = None if team_of is None else ([top] if cfg and team_of(top, cfg) else [])
+        return crewcheck.checks([top] if cfg else [], team_paths=team)
+
+    crew = bounded(crew_rows, CREW_TIMEOUT_S, {"rows": [problems.crew_timeout(CREW_TIMEOUT_S)],
+                                               "fix": {"agent": False, "engine": False}})
     out["crew"] = {"rows": list(crew.get("rows") or []), "fix": dict(crew.get("fix") or {"agent": False, "engine": False})}
     out["form"] = form_defaults(top, origin, d)
     out["pending"] = pend

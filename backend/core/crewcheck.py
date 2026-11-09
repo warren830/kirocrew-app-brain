@@ -13,11 +13,17 @@
 - the engine (``agent.acp_backend``) is kas: Lean via agent hooks is tested there only. Fix:
   ``kirocrew config set agent.acp_backend kas``.
 - every repo has Lean and the hook adapter committed in git (``runner_kit_problems``): the app's worktrees are made
-  from main, so a file that is only on this disk is not there. There is no fix from here (commit it through an MR).
+  from main, so a file that is only on this disk is not there. d46765f: the committed adapter is new enough for the
+  team runner (``crew_hook_problem``: version 2 lets a run write its own park.json in every Lean approval state).
 - every repo's aidlc-docs/lean.json leaves runs/** out of Lean's code fingerprint (``mrdesc.write_problem``, brain-kit
   72b278e; 48b6b97's `brain doctor` FAILs and `brain handoff` refuses without it: a park.json or MR.md written after
-  `lean release` would void the RELEASE approval). The file is the person's (the agent cannot edit it): no fix from
-  here; `brain install <repo>` adds it, then it is reviewed and committed.
+  `lean release` would void the RELEASE approval). The file is the person's (the agent cannot edit it).
+  Fix for these repo rows ('kit'): 导入仓库's reinstall on a new branch (installer.upgrade: `brain install` there
+  refreshes the kit files and adds runs/** to lean.json, then a commit and an MR the person reviews).
+  The adapter's version and runs/** matter only to a repo handed to the team runner (``team_paths``): FAIL there, a
+  WARN reminder for a local-only repo. Not committed stays FAIL everywhere.
+
+Every row is a problems.py CheckRow: short Chinese, 做什么, the fix, the repo, brain-kit's own words in ``raw``.
 - brain-kit 72b278e: a spec that sets its own model, tools, resources or prompt keeps them (`brain crew-agent
   --force` only adds what is missing; `--reset` takes brain-kit's): said in an OK row, nothing to fix.
 
@@ -35,24 +41,26 @@ import time
 from typing import Any
 
 from . import bk
+from . import problems as P
 from .constants import kirocrew_bin
 
-TRIGGER_NAMES = {"agentSpawn": "会话开始", "userPromptSubmit": "发消息", "preToolUse": "调用工具前"}
+TRIGGER_NAMES = P.TRIGGER_NAMES
 NEEDS = ("CREW_HOOK", "CREW_EVENTS", "agent_hook_commands", "missing_lean_hooks", "add_lean_hooks",
          "runner_kit_problems")
-AGENT_OK = "brain-dev 带着 Lean 的三个 hook"   # the one row agent_ok accepts (always the start of its text)
+AGENT_OK = P.AGENT_OK   # the one row agent_ok accepts (always the start of its text)
 
 
-def _engine() -> tuple[str | None, str]:
+def _engine() -> tuple[str | None, str, str]:
+    """(the engine, '' | no_kirocrew | failed, the error text)."""
     kc = kirocrew_bin()
     if not kc:
-        return None, "找不到 kirocrew 命令（~/.local/bin/kirocrew）：看不了引擎设置"
+        return None, "no_kirocrew", ""
     try:
         p = subprocess.run([kc, "config", "get", "agent.acp_backend"], capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return None, "kirocrew config get 跑不了：%s" % exc
+        return None, "failed", str(exc)[:300]
     lines = [x.strip() for x in (p.stdout or "").splitlines() if x.strip()]
-    return (lines[-1] if lines else ""), ""
+    return (lines[-1] if lines else ""), "", ""
 
 
 def _load(path: str) -> tuple[dict[str, Any] | None, str]:
@@ -61,7 +69,7 @@ def _load(path: str) -> tuple[dict[str, Any] | None, str]:
         with open(path, "rb") as f:
             raw = f.read()
     except OSError as exc:
-        return None, "读不了（%s）" % exc
+        return None, "读不了（%s）" % exc   # agent_unreadable splits the OS error off into raw
     try:
         spec = json.loads(raw.decode("utf-8"))
     except ValueError:
@@ -101,60 +109,62 @@ def _write_in_place(path: str, spec: dict[str, Any]) -> None:
         raise
 
 
-def checks(repo_paths: list[str]) -> dict[str, Any]:
-    rows: list[dict[str, str]] = []
+def checks(repo_paths: list[str], team_paths: Any = None) -> dict[str, Any]:
+    """The rows (problems.py CheckRows) and which fix buttons apply. *team_paths*: the repos handed to the team runner
+    (service.team_paths); None: not known, so a runner-only problem is as brain-kit says it (FAIL)."""
+    rows: list[dict[str, Any]] = []
     fix = {"agent": False, "engine": False}
     if not bk.ok():
-        return {"rows": [{"level": "FAIL", "text": "brain-kit 没装载：先在设置里写对它的位置"}], "fix": fix,
-                "checked_at": time.time()}
+        return {"rows": [P.brainkit_missing()], "fix": fix, "checked_at": time.time()}
     cli = bk.m("cli")
     lacking = [n for n in NEEDS if not hasattr(cli, n)]
     if lacking:
-        return {"rows": [{"level": "FAIL", "text": "brain-kit 太旧（没有 %s）：先把它更新" % "、".join(lacking)}],
-                "fix": fix, "checked_at": time.time()}
+        return {"rows": [P.brainkit_old(lacking)], "fix": fix, "checked_at": time.time()}
     path = cli.crew_agent_path()
     if not os.path.exists(path):
-        rows.append({"level": "FAIL", "text": "没有 ~/.kiro/agents/brain-dev.json：Lean 的 hook 在 KiroCrew 里不会跑"})
+        rows.append(P.agent_missing())
         fix["agent"] = True
     else:
         spec, why = _load(path)
         if spec is None:
-            rows.append({"level": "FAIL", "text": _unreadable(why)})
+            rows.append(_unreadable_row(why))
         else:
             missing = cli.missing_lean_hooks(spec)
             if missing:
-                rows.append({"level": "FAIL", "text": "brain-dev.json 缺 Lean 的 hook：%s。修复只补上缺的，"
-                                                      "别的 hook 和设置都不动" % _names(missing)})
+                rows.append(P.agent_lacks(missing))
                 fix["agent"] = True
             else:
                 others = sum(1 for cmds in cli.agent_hook_commands(spec).values() for c in cmds
                              if cli.CREW_HOOK not in c)
-                rows.append({"level": "OK", "text": AGENT_OK + ("（另有 %d 个别的 hook，留着不动）" % others
-                                                                 if others else "")})
+                rows.append(P.agent_ok(others))
                 custom = _custom_fields(cli, spec)
                 if custom:
-                    rows.append({"level": "OK", "text": "brain-dev 用的是你自己的 %s（`brain crew-agent --reset` 换回 "
-                                                        "brain-kit 的；--force 只补缺的）" % "、".join(custom)})
+                    rows.append(P.agent_custom(custom))
+    team = None if team_paths is None else {os.path.realpath(p) for p in team_paths}
     for rp in repo_paths:
-        name = os.path.basename(os.path.normpath(rp))
+        is_team = None if team is None else os.path.realpath(rp) in team
         try:
             probs = cli.runner_kit_problems(rp)
         except Exception as exc:  # noqa: BLE001 - one unreadable repo must not hide the other checks
-            probs = ["查不了它的 git：%s" % str(exc)[:200]]
+            rows.append(P.repo_unreadable(rp, str(exc)))
+            probs = []
         for p in probs:
-            rows.append({"level": "FAIL", "text": "仓库 %s：%s" % (name, p)})
+            rows.append(P.row("FAIL", p, repo=rp, team=is_team))
         why = _records_counted(rp)
         if why:
-            rows.append({"level": "FAIL", "text": "仓库 %s：%s" % (name, why)})
-    be, why = _engine()
-    if be is None:
-        rows.append({"level": "WARN", "text": why})
-    elif be in ("kas", ""):
-        rows.append({"level": "OK", "text": "KiroCrew 引擎：%s" % (be or "默认（kas）")})
-    else:
-        rows.append({"level": "WARN", "text": "KiroCrew 引擎是 %s：Lean 的 hook 只在 kas（v3）上测过" % be})
+            rows.append(P.row("FAIL", why, repo=rp, team=is_team))
+    be, how, detail = _engine()
+    rows.append(P.engine(be, how, detail))
+    if be not in (None, "kas", ""):
         fix["engine"] = True
     return {"rows": rows, "fix": fix, "checked_at": time.time()}
+
+
+def _unreadable_row(why: str) -> dict[str, Any]:
+    """读不了（<OS error>）: the OS error goes into raw."""
+    if why.startswith("读不了（") and why.endswith("）"):
+        return P.agent_unreadable("读不了", why[len("读不了（"):-1])
+    return P.agent_unreadable(why)
 
 
 def _custom_fields(cli: Any, spec: dict[str, Any]) -> list[str]:
@@ -183,7 +193,7 @@ def _records_counted(repo_path: str) -> str:
     return ("%s。%s" % (str(why).rstrip("。"), fix) if fix else str(why)) if why else ""
 
 
-def agent_ok(rows: list[dict[str, str]]) -> bool:
+def agent_ok(rows: list[dict[str, Any]]) -> bool:
     """brain-dev may be opened: the checks found its spec carrying Lean's three hooks. Only that OK row counts, so a
     missing, unreadable or incomplete spec, brain-kit not loaded, or rows from elsewhere all say no."""
     return any(r.get("level") == "OK" and str(r.get("text", "")).startswith(AGENT_OK) for r in rows)

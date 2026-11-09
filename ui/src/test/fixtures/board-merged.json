@@ -1,0 +1,1697 @@
+{
+  "at": 1794146400,
+  "row": {
+    "repo": "r1",
+    "key": "PAY-2",
+    "title": "退款单号校验",
+    "owner": "alice",
+    "source": "product",
+    "state": "merged",
+    "state_label": "已合并",
+    "where": "main",
+    "branch": "ai/alice/PAY-2-refund-id",
+    "intent": "261101-refund-id",
+    "lean": {
+      "stage": "release",
+      "stage_label": "发布",
+      "stage_n": 11,
+      "stage_state": "done",
+      "done": 11,
+      "total": 11
+    },
+    "stage": "11/11 发布（做完）",
+    "waits": {
+      "who": "nobody",
+      "text": "已合并",
+      "line": null,
+      "raw": ""
+    },
+    "summary": "对账单按自然日切分（规模 S）。现在：Lean 在「发布」做完，已交给团队运行机，RELEASE 已批。",
+    "credits": 22.7,
+    "updated_at": 1793663640,
+    "mr": {
+      "iid": 37,
+      "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/37",
+      "state": "merged"
+    },
+    "worktree": null,
+    "run_ids": [
+      "RUN-PAY-2-1"
+    ],
+    "sessions": 1,
+    "overlap": [],
+    "open_questions": [],
+    "expected_paths": [
+      "src/refund/id.py"
+    ]
+  },
+  "branch": "ai/alice/PAY-2-refund-id",
+  "base": "main",
+  "started_at": 1793620800.0,
+  "ended_at": 1793661540.0,
+  "live": false,
+  "person": {
+    "status": "merged",
+    "doing": "已合并",
+    "owner": "alice",
+    "me": true
+  },
+  "actors": [
+    {
+      "key": "local",
+      "title": "本机会话",
+      "sub": "brain-dev · AI-DLC Lean",
+      "icon": "laptop",
+      "status": "merged",
+      "doing": "已合并",
+      "since": 1793661540.0,
+      "history": [
+        {
+          "at": 1793628000.0,
+          "status": "running",
+          "doing": "开工：读需求、按 Lean 推进"
+        },
+        {
+          "at": 1793628180,
+          "status": "running",
+          "doing": "在做：需求分析"
+        },
+        {
+          "at": 1793629860,
+          "status": "done",
+          "doing": "交给你批准需求"
+        },
+        {
+          "at": 1793631300,
+          "status": "running",
+          "doing": "在做：应用设计"
+        },
+        {
+          "at": 1793633760,
+          "status": "done",
+          "doing": "交给你批准设计"
+        },
+        {
+          "at": 1793635080,
+          "status": "fixing",
+          "doing": "按你的意见重写"
+        },
+        {
+          "at": 1793636580,
+          "status": "done",
+          "doing": "交给你批准设计"
+        },
+        {
+          "at": 1793639340.0,
+          "status": "done",
+          "doing": "交给运行机了"
+        },
+        {
+          "at": 1793661540.0,
+          "status": "merged",
+          "doing": "已合并"
+        }
+      ],
+      "spans": [
+        {
+          "a": 1793628000.0,
+          "b": 1793629860,
+          "kind": "work"
+        },
+        {
+          "a": 1793631300,
+          "b": 1793633760,
+          "kind": "work"
+        },
+        {
+          "a": 1793635080,
+          "b": 1793636580,
+          "kind": "fix"
+        }
+      ],
+      "marks": [
+        {
+          "at": 1793629680.0,
+          "kind": "commit",
+          "title": "提交 b1c99d39：PAY-2：需求初稿"
+        },
+        {
+          "at": 1793632200,
+          "kind": "blocked",
+          "title": "Lean 拦下了写 src/refund/service.py（inception）"
+        },
+        {
+          "at": 1793636460.0,
+          "kind": "commit",
+          "title": "提交 622f3943：PAY-2：按意见改设计（接口加分页）"
+        },
+        {
+          "at": 1793639100.0,
+          "kind": "commit",
+          "title": "提交 9d9baab4：PAY-2：交接说明"
+        },
+        {
+          "at": 1793639340.0,
+          "kind": "handover",
+          "title": "交接：brain handoff（9ed34417）"
+        }
+      ],
+      "facts": [
+        "Lean 做完 11/11 个阶段",
+        "提交 3 次",
+        "Lean 拦下 1 次",
+        "会话 1 个"
+      ],
+      "credits": 8.3,
+      "session": {
+        "slot": "brain-PAY-2-1c4e",
+        "url": "/chat?sid=brain-PAY-2-1c4e",
+        "busy": false
+      },
+      "line": null
+    },
+    {
+      "key": "req",
+      "title": "需求审批",
+      "sub": "REQUIREMENTS",
+      "icon": "req",
+      "status": "merged",
+      "doing": "你批准了 · 需求",
+      "since": 1793631120,
+      "history": [
+        {
+          "at": 1793629860,
+          "status": "awaiting_approval",
+          "doing": "等你批准需求"
+        },
+        {
+          "at": 1793631120,
+          "status": "merged",
+          "doing": "你批准了 · 需求"
+        }
+      ],
+      "spans": [
+        {
+          "a": 1793629860,
+          "b": 1793631120,
+          "kind": "wait"
+        }
+      ],
+      "marks": [
+        {
+          "at": 1793629860,
+          "kind": "request",
+          "title": "请你批准需求（REQUIREMENTS · 4b040832）"
+        },
+        {
+          "at": 1793631120,
+          "kind": "approved",
+          "title": "你批准了需求"
+        }
+      ],
+      "facts": [
+        "请求批准 1 次"
+      ],
+      "credits": null,
+      "session": null,
+      "line": null
+    },
+    {
+      "key": "design",
+      "title": "设计审批",
+      "sub": "DESIGN · PLAN",
+      "icon": "design",
+      "status": "merged",
+      "doing": "你批准了 · 设计",
+      "since": 1793637960,
+      "history": [
+        {
+          "at": 1793633760,
+          "status": "awaiting_approval",
+          "doing": "等你批准设计"
+        },
+        {
+          "at": 1793635080,
+          "status": "fixing",
+          "doing": "你退回了：等它改好再请你批"
+        },
+        {
+          "at": 1793636580,
+          "status": "awaiting_approval",
+          "doing": "等你批准设计"
+        },
+        {
+          "at": 1793637960,
+          "status": "merged",
+          "doing": "你批准了 · 设计"
+        }
+      ],
+      "spans": [
+        {
+          "a": 1793633760,
+          "b": 1793635080,
+          "kind": "wait"
+        },
+        {
+          "a": 1793636580,
+          "b": 1793637960,
+          "kind": "wait"
+        }
+      ],
+      "marks": [
+        {
+          "at": 1793633760,
+          "kind": "request",
+          "title": "请你批准设计（DESIGN · 56cd1e0a）"
+        },
+        {
+          "at": 1793635080,
+          "kind": "rejected",
+          "title": "你退回了设计"
+        },
+        {
+          "at": 1793636580,
+          "kind": "request",
+          "title": "请你批准设计（DESIGN · 336fbcbc）"
+        },
+        {
+          "at": 1793637960,
+          "kind": "approved",
+          "title": "你批准了设计"
+        }
+      ],
+      "facts": [
+        "请求批准 2 次",
+        "退回 1 次"
+      ],
+      "credits": null,
+      "session": null,
+      "line": null
+    },
+    {
+      "key": "handover",
+      "title": "交接",
+      "sub": "brain handoff",
+      "icon": "handover",
+      "status": "merged",
+      "doing": "桥接手了",
+      "since": 1793639460.0,
+      "history": [
+        {
+          "at": 1793639340.0,
+          "status": "queued",
+          "doing": "等桥核对交接"
+        },
+        {
+          "at": 1793639460.0,
+          "status": "merged",
+          "doing": "桥接手了"
+        }
+      ],
+      "spans": [],
+      "marks": [
+        {
+          "at": 1793639340.0,
+          "kind": "handover",
+          "title": "交接：brain handoff（9ed34417）"
+        }
+      ],
+      "facts": [
+        "MR !37",
+        "分支 ai/alice/PAY-2-refund-id"
+      ],
+      "credits": null,
+      "session": null,
+      "line": null
+    },
+    {
+      "key": "bridge",
+      "title": "桥",
+      "sub": "核对交接 · 转问题",
+      "icon": "bridge",
+      "status": "merged",
+      "doing": "已合并",
+      "since": 1793661540.0,
+      "history": [
+        {
+          "at": 1793639340.0,
+          "status": "running",
+          "doing": "核对交接：标签、提交、材料"
+        },
+        {
+          "at": 1793639460.0,
+          "status": "done",
+          "doing": "接手了 · 转问题和回答"
+        },
+        {
+          "at": 1793661540.0,
+          "status": "merged",
+          "doing": "已合并"
+        }
+      ],
+      "spans": [
+        {
+          "a": 1793639340.0,
+          "b": 1793639460.0,
+          "kind": "work"
+        }
+      ],
+      "marks": [
+        {
+          "at": 1793639460.0,
+          "kind": "accepted",
+          "title": "桥接手了 !37"
+        },
+        {
+          "at": 1793648040.0,
+          "kind": "question",
+          "title": "D-1 在 MR 上问人：澄清"
+        },
+        {
+          "at": 1793656440.0,
+          "kind": "question",
+          "title": "D-2 在 MR 上问人：验收"
+        }
+      ],
+      "facts": [
+        "转了 2 个问题"
+      ],
+      "credits": null,
+      "session": null,
+      "line": null
+    },
+    {
+      "key": "signer",
+      "title": "签名",
+      "sub": "接手合同 · 回答凭证",
+      "icon": "signer",
+      "status": "merged",
+      "doing": "签了接手合同",
+      "since": 1793639460.0,
+      "history": [
+        {
+          "at": 1793639460.0,
+          "status": "merged",
+          "doing": "签了接手合同"
+        }
+      ],
+      "spans": [],
+      "marks": [
+        {
+          "at": 1793639480.0,
+          "kind": "signed",
+          "title": "签名服务签了接手合同（RUN-PAY-2-1）"
+        },
+        {
+          "at": 1793650501.0,
+          "kind": "signed",
+          "title": "签了回答凭证"
+        },
+        {
+          "at": 1793659441.0,
+          "kind": "signed",
+          "title": "签了回答凭证"
+        }
+      ],
+      "facts": [
+        "签了 1 张凭证"
+      ],
+      "credits": null,
+      "session": null,
+      "line": null
+    },
+    {
+      "key": "runner",
+      "title": "运行机",
+      "sub": "brain-run · 无人值守",
+      "icon": "runner",
+      "status": "merged",
+      "doing": "已合并",
+      "since": 1793661540.0,
+      "history": [
+        {
+          "at": 1793639460.0,
+          "status": "running",
+          "doing": "在做：运行机接手了"
+        },
+        {
+          "at": 1793639580,
+          "status": "running",
+          "doing": "在做：代码生成"
+        },
+        {
+          "at": 1793647980.0,
+          "status": "awaiting_approval",
+          "doing": "停下问人：澄清"
+        },
+        {
+          "at": 1793648040.0,
+          "status": "awaiting_approval",
+          "doing": "停下问人：澄清（D-1）"
+        },
+        {
+          "at": 1793650500.0,
+          "status": "running",
+          "doing": "按回答接着做"
+        },
+        {
+          "at": 1793651880,
+          "status": "running",
+          "doing": "做完代码生成"
+        },
+        {
+          "at": 1793651940,
+          "status": "running",
+          "doing": "在做：构建测试"
+        },
+        {
+          "at": 1793654640,
+          "status": "running",
+          "doing": "做完构建测试"
+        },
+        {
+          "at": 1793654700,
+          "status": "running",
+          "doing": "在做：发布"
+        },
+        {
+          "at": 1793655180,
+          "status": "done",
+          "doing": "交给你批准发布"
+        },
+        {
+          "at": 1793655240.0,
+          "status": "awaiting_approval",
+          "doing": "停下问人：验收"
+        },
+        {
+          "at": 1793656440.0,
+          "status": "awaiting_approval",
+          "doing": "停下问人：验收（D-2）"
+        },
+        {
+          "at": 1793659440.0,
+          "status": "running",
+          "doing": "按回答接着做"
+        },
+        {
+          "at": 1793659560,
+          "status": "running",
+          "doing": "做完发布"
+        },
+        {
+          "at": 1793661540.0,
+          "status": "merged",
+          "doing": "已合并"
+        }
+      ],
+      "spans": [
+        {
+          "a": 1793639460.0,
+          "b": 1793647980.0,
+          "kind": "work"
+        },
+        {
+          "a": 1793647980.0,
+          "b": 1793650500.0,
+          "kind": "wait"
+        },
+        {
+          "a": 1793650500.0,
+          "b": 1793655180,
+          "kind": "work"
+        },
+        {
+          "a": 1793655240.0,
+          "b": 1793659440.0,
+          "kind": "wait"
+        },
+        {
+          "a": 1793659440.0,
+          "b": 1793661540.0,
+          "kind": "work"
+        }
+      ],
+      "marks": [
+        {
+          "at": 1793641020.0,
+          "kind": "commit",
+          "title": "运行机提交 54d719b8：PAY-2：接口和数据结构（refund-api）"
+        },
+        {
+          "at": 1793642880.0,
+          "kind": "commit",
+          "title": "运行机提交 7bed9339：PAY-2：主流程（refund-api）"
+        },
+        {
+          "at": 1793645160.0,
+          "kind": "commit",
+          "title": "运行机提交 6d408bfb：PAY-2：错误处理和重试（refund-api）"
+        },
+        {
+          "at": 1793647860.0,
+          "kind": "commit",
+          "title": "运行机提交 d287c543：PAY-2：测试（refund-api）"
+        },
+        {
+          "at": 1793647980.0,
+          "kind": "question",
+          "title": "停下问人：澄清"
+        },
+        {
+          "at": 1793648040.0,
+          "kind": "question",
+          "title": "D-1 在 MR 上问人：澄清"
+        },
+        {
+          "at": 1793650500.0,
+          "kind": "answer",
+          "title": "D-1 回答了：A"
+        },
+        {
+          "at": 1793650501.0,
+          "kind": "answer",
+          "title": "桥把 D-1 的回答签好送回运行机"
+        },
+        {
+          "at": 1793650560.0,
+          "kind": "answer",
+          "title": "澄清的问题回答了，接着做"
+        },
+        {
+          "at": 1793651760.0,
+          "kind": "commit",
+          "title": "运行机提交 f7f76b55：PAY-2：按 D-1 的回答改"
+        },
+        {
+          "at": 1793653620.0,
+          "kind": "commit",
+          "title": "运行机提交 2e839630：PAY-2：修好 pytest 里没过的两个用例"
+        },
+        {
+          "at": 1793655240.0,
+          "kind": "question",
+          "title": "停下问人：验收"
+        },
+        {
+          "at": 1793656440.0,
+          "kind": "question",
+          "title": "D-2 在 MR 上问人：验收"
+        },
+        {
+          "at": 1793659440.0,
+          "kind": "answer",
+          "title": "D-2 回答了：approve"
+        },
+        {
+          "at": 1793659441.0,
+          "kind": "answer",
+          "title": "桥把 D-2 的回答签好送回运行机"
+        }
+      ],
+      "facts": [
+        "提交 6 次",
+        "停下问人 4 次",
+        "RUN-PAY-2-1"
+      ],
+      "credits": 14.4,
+      "session": {
+        "slot": "brain-run-RUN-PAY-2-1",
+        "url": "/chat?sid=brain-run-RUN-PAY-2-1",
+        "busy": false
+      },
+      "line": null
+    },
+    {
+      "key": "ci",
+      "title": "CI 检查",
+      "sub": "lean verify",
+      "icon": "ci",
+      "status": "merged",
+      "doing": "已合并",
+      "since": 1793661540.0,
+      "history": [
+        {
+          "at": 1793651940,
+          "status": "running",
+          "doing": "跑 verify：构建和测试"
+        },
+        {
+          "at": 1793652660,
+          "status": "failed",
+          "doing": "verify 没过：pytest"
+        },
+        {
+          "at": 1793654580,
+          "status": "done",
+          "doing": "verify 通过：3 项都过了"
+        },
+        {
+          "at": 1793661540.0,
+          "status": "merged",
+          "doing": "已合并"
+        }
+      ],
+      "spans": [
+        {
+          "a": 1793651940,
+          "b": 1793652660,
+          "kind": "work"
+        },
+        {
+          "a": 1793652660,
+          "b": 1793654580,
+          "kind": "fix"
+        }
+      ],
+      "marks": [
+        {
+          "at": 1793652660,
+          "kind": "verify-fail",
+          "title": "verify 没过：pytest"
+        },
+        {
+          "at": 1793654580,
+          "kind": "verify-ok",
+          "title": "verify 通过：3 项都过了"
+        }
+      ],
+      "facts": [
+        "verify 2 次",
+        "没过 1 次",
+        "verify 通过：3 项都过了"
+      ],
+      "credits": null,
+      "session": null,
+      "line": null
+    },
+    {
+      "key": "release",
+      "title": "发布验收",
+      "sub": "RELEASE · 验收",
+      "icon": "release",
+      "status": "merged",
+      "doing": "你批准了 · 发布",
+      "since": 1793659500,
+      "history": [
+        {
+          "at": 1793655180,
+          "status": "awaiting_approval",
+          "doing": "等你批准发布"
+        },
+        {
+          "at": 1793659500,
+          "status": "merged",
+          "doing": "你批准了 · 发布"
+        }
+      ],
+      "spans": [
+        {
+          "a": 1793655180,
+          "b": 1793659500,
+          "kind": "wait"
+        }
+      ],
+      "marks": [
+        {
+          "at": 1793655180,
+          "kind": "request",
+          "title": "请你批准发布（RELEASE · 32e925aa）"
+        },
+        {
+          "at": 1793659500,
+          "kind": "approved",
+          "title": "你批准了发布"
+        }
+      ],
+      "facts": [
+        "请求批准 1 次"
+      ],
+      "credits": null,
+      "session": null,
+      "line": null
+    },
+    {
+      "key": "reflect",
+      "title": "回写 Brain",
+      "sub": "brain reflect",
+      "icon": "brain",
+      "status": "done",
+      "doing": "回写分支 brain/PAY-2-reflect-1",
+      "since": 1793715540,
+      "history": [
+        {
+          "at": 1793661540.0,
+          "status": "awaiting_approval",
+          "doing": "等你回写 1 条新知识"
+        },
+        {
+          "at": 1793715540.0,
+          "status": "done",
+          "doing": "回写 Brain：成功"
+        },
+        {
+          "at": 1793715540,
+          "status": "done",
+          "doing": "回写分支 brain/PAY-2-reflect-1"
+        }
+      ],
+      "spans": [
+        {
+          "a": 1793661540.0,
+          "b": 1793715540.0,
+          "kind": "wait"
+        }
+      ],
+      "marks": [
+        {
+          "at": 1793715540.0,
+          "kind": "reflect",
+          "title": "回写 Brain：成功"
+        },
+        {
+          "at": 1793715540,
+          "kind": "reflect",
+          "title": "写好了回写分支 brain/PAY-2-reflect-1"
+        }
+      ],
+      "facts": [
+        "提议 1 条新知识"
+      ],
+      "credits": null,
+      "session": null,
+      "line": null
+    }
+  ],
+  "edges": [
+    [
+      "local",
+      "req"
+    ],
+    [
+      "local",
+      "design"
+    ],
+    [
+      "req",
+      "handover"
+    ],
+    [
+      "design",
+      "handover"
+    ],
+    [
+      "handover",
+      "bridge"
+    ],
+    [
+      "bridge",
+      "signer"
+    ],
+    [
+      "signer",
+      "runner"
+    ],
+    [
+      "runner",
+      "ci"
+    ],
+    [
+      "ci",
+      "release"
+    ],
+    [
+      "release",
+      "reflect"
+    ]
+  ],
+  "direct": false,
+  "events": [
+    {
+      "seq": 1,
+      "at": 1793620800.0,
+      "kind": "claim",
+      "from": "person",
+      "to": "person",
+      "text": "认领 PAY-2：退款单号校验",
+      "detail": false,
+      "src": "claim/PAY-2"
+    },
+    {
+      "seq": 2,
+      "at": 1793628000.0,
+      "kind": "start",
+      "from": "person",
+      "to": "local",
+      "text": "开工：brain start，在它自己的工作目录里",
+      "detail": false,
+      "src": "runs/PAY-2/run.json"
+    },
+    {
+      "seq": 3,
+      "at": 1793628120,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "跳过「逆向工程」：新功能，代码已经读过",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 4,
+      "at": 1793628180,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "开始「需求分析」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 5,
+      "at": 1793629680.0,
+      "kind": "commit",
+      "from": "local",
+      "to": "branch",
+      "text": "提交 b1c99d39：PAY-2：需求初稿",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 6,
+      "at": 1793629860,
+      "kind": "request",
+      "from": "local",
+      "to": "req",
+      "text": "请你批准需求（REQUIREMENTS · 4b040832）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 7,
+      "at": 1793631120,
+      "kind": "approve",
+      "from": "person",
+      "to": "req",
+      "text": "你批准了需求",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 8,
+      "at": 1793631180,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "做完「需求分析」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 9,
+      "at": 1793631240,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "跳过「用户故事」：小需求",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 10,
+      "at": 1793631300,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "开始「应用设计」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 11,
+      "at": 1793632200,
+      "kind": "blocked",
+      "from": "local",
+      "to": "local",
+      "text": "Lean 拦下了写 src/refund/service.py（inception）",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 12,
+      "at": 1793633760,
+      "kind": "request",
+      "from": "local",
+      "to": "design",
+      "text": "请你批准设计（DESIGN · 56cd1e0a）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 13,
+      "at": 1793635080,
+      "kind": "reject",
+      "from": "person",
+      "to": "design",
+      "text": "你退回了设计",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 14,
+      "at": 1793636460.0,
+      "kind": "commit",
+      "from": "local",
+      "to": "branch",
+      "text": "提交 622f3943：PAY-2：按意见改设计（接口加分页）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 15,
+      "at": 1793636580,
+      "kind": "request",
+      "from": "local",
+      "to": "design",
+      "text": "请你批准设计（DESIGN · 336fbcbc）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 16,
+      "at": 1793637960,
+      "kind": "approve",
+      "from": "person",
+      "to": "design",
+      "text": "你批准了设计",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 17,
+      "at": 1793638020,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "做完「应用设计」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 18,
+      "at": 1793638080,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "跳过「拆分单元」：只有一个单元",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 19,
+      "at": 1793639100.0,
+      "kind": "commit",
+      "from": "local",
+      "to": "branch",
+      "text": "提交 9d9baab4：PAY-2：交接说明",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 20,
+      "at": 1793639340.0,
+      "kind": "handover",
+      "from": "local",
+      "to": "handover",
+      "text": "交接：brain handoff（9ed34417）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 21,
+      "at": 1793639460.0,
+      "kind": "accepted",
+      "from": "handover",
+      "to": "bridge",
+      "text": "桥接手了 !37",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 22,
+      "at": 1793639480.0,
+      "kind": "signed",
+      "from": "bridge",
+      "to": "signer",
+      "text": "签名服务签了接手合同（RUN-PAY-2-1）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 23,
+      "at": 1793639580,
+      "kind": "stage",
+      "from": "runner",
+      "to": "runner",
+      "text": "开始「代码生成（refund-api）」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 24,
+      "at": 1793641020.0,
+      "kind": "commit",
+      "from": "runner",
+      "to": "branch",
+      "text": "运行机提交 54d719b8：PAY-2：接口和数据结构（refund-api）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 25,
+      "at": 1793642880.0,
+      "kind": "commit",
+      "from": "runner",
+      "to": "branch",
+      "text": "运行机提交 7bed9339：PAY-2：主流程（refund-api）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 26,
+      "at": 1793645160.0,
+      "kind": "commit",
+      "from": "runner",
+      "to": "branch",
+      "text": "运行机提交 6d408bfb：PAY-2：错误处理和重试（refund-api）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 27,
+      "at": 1793647860.0,
+      "kind": "commit",
+      "from": "runner",
+      "to": "branch",
+      "text": "运行机提交 d287c543：PAY-2：测试（refund-api）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 28,
+      "at": 1793647980.0,
+      "kind": "question",
+      "from": "runner",
+      "to": "person",
+      "text": "停下问人：澄清",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 29,
+      "at": 1793648040.0,
+      "kind": "question",
+      "from": "bridge",
+      "to": "person",
+      "text": "D-1 在 MR 上问人：澄清",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 30,
+      "at": 1793650500.0,
+      "kind": "answer",
+      "from": "person",
+      "to": "bridge",
+      "text": "D-1 回答了：A",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 31,
+      "at": 1793650501.0,
+      "kind": "answer",
+      "from": "bridge",
+      "to": "runner",
+      "text": "桥把 D-1 的回答签好送回运行机",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 32,
+      "at": 1793650560.0,
+      "kind": "answer",
+      "from": "person",
+      "to": "runner",
+      "text": "澄清的问题回答了，接着做",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 33,
+      "at": 1793651760.0,
+      "kind": "commit",
+      "from": "runner",
+      "to": "branch",
+      "text": "运行机提交 f7f76b55：PAY-2：按 D-1 的回答改",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 34,
+      "at": 1793651880,
+      "kind": "stage",
+      "from": "runner",
+      "to": "runner",
+      "text": "做完「代码生成（refund-api）」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 35,
+      "at": 1793651940,
+      "kind": "stage",
+      "from": "runner",
+      "to": "runner",
+      "text": "开始「构建测试」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 36,
+      "at": 1793652660,
+      "kind": "verify",
+      "from": "branch",
+      "to": "checks",
+      "text": "verify 没过：pytest",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 37,
+      "at": 1793653620.0,
+      "kind": "commit",
+      "from": "runner",
+      "to": "branch",
+      "text": "运行机提交 2e839630：PAY-2：修好 pytest 里没过的两个用例",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 38,
+      "at": 1793654580,
+      "kind": "verify",
+      "from": "branch",
+      "to": "checks",
+      "text": "verify 通过：3 项都过了",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 39,
+      "at": 1793654640,
+      "kind": "stage",
+      "from": "runner",
+      "to": "runner",
+      "text": "做完「构建测试」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 40,
+      "at": 1793654700,
+      "kind": "stage",
+      "from": "runner",
+      "to": "runner",
+      "text": "开始「发布」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 41,
+      "at": 1793655180,
+      "kind": "request",
+      "from": "runner",
+      "to": "release",
+      "text": "请你批准发布（RELEASE · 32e925aa）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 42,
+      "at": 1793655240.0,
+      "kind": "question",
+      "from": "runner",
+      "to": "person",
+      "text": "停下问人：验收",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 43,
+      "at": 1793656440.0,
+      "kind": "question",
+      "from": "bridge",
+      "to": "person",
+      "text": "D-2 在 MR 上问人：验收",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 44,
+      "at": 1793659440.0,
+      "kind": "answer",
+      "from": "person",
+      "to": "bridge",
+      "text": "D-2 回答了：approve",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 45,
+      "at": 1793659441.0,
+      "kind": "answer",
+      "from": "bridge",
+      "to": "runner",
+      "text": "桥把 D-2 的回答签好送回运行机",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 46,
+      "at": 1793659500,
+      "kind": "approve",
+      "from": "person",
+      "to": "release",
+      "text": "你批准了发布",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 47,
+      "at": 1793659560,
+      "kind": "stage",
+      "from": "runner",
+      "to": "runner",
+      "text": "做完「发布」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 48,
+      "at": 1793661540.0,
+      "kind": "merge",
+      "from": "branch",
+      "to": "branch",
+      "text": "合并进 main（合并提交）",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 49,
+      "at": 1793715540.0,
+      "kind": "reflect",
+      "from": "person",
+      "to": "reflect",
+      "text": "回写 Brain：成功",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 50,
+      "at": 1793715540,
+      "kind": "reflect",
+      "from": "person",
+      "to": "reflect",
+      "text": "写好了回写分支 brain/PAY-2-reflect-1",
+      "detail": false,
+      "src": null
+    }
+  ],
+  "belt": [
+    {
+      "kind": "commit",
+      "at": 1793629680.0,
+      "sha": "b1c99d394a9e",
+      "by": "person",
+      "text": "PAY-2：需求初稿",
+      "files": 2,
+      "records_only": true,
+      "actor": "local"
+    },
+    {
+      "kind": "commit",
+      "at": 1793636460.0,
+      "sha": "622f3943f97a",
+      "by": "person",
+      "text": "PAY-2：按意见改设计（接口加分页）",
+      "files": 1,
+      "records_only": true,
+      "actor": "local"
+    },
+    {
+      "kind": "commit",
+      "at": 1793639100.0,
+      "sha": "9d9baab498b8",
+      "by": "person",
+      "text": "PAY-2：交接说明",
+      "files": 1,
+      "records_only": true,
+      "actor": "local"
+    },
+    {
+      "kind": "handover",
+      "at": 1793639340.0,
+      "sha": "9ed344170a66",
+      "by": "person",
+      "text": "PAY-2：交接（brain handoff）",
+      "files": 2,
+      "records_only": true,
+      "actor": "handover"
+    },
+    {
+      "kind": "commit",
+      "at": 1793641020.0,
+      "sha": "54d719b8e546",
+      "by": "bot",
+      "text": "PAY-2：接口和数据结构（refund-api）",
+      "files": 3,
+      "records_only": false,
+      "actor": "runner"
+    },
+    {
+      "kind": "commit",
+      "at": 1793642880.0,
+      "sha": "7bed9339bba4",
+      "by": "bot",
+      "text": "PAY-2：主流程（refund-api）",
+      "files": 4,
+      "records_only": false,
+      "actor": "runner"
+    },
+    {
+      "kind": "commit",
+      "at": 1793645160.0,
+      "sha": "6d408bfb7601",
+      "by": "bot",
+      "text": "PAY-2：错误处理和重试（refund-api）",
+      "files": 5,
+      "records_only": false,
+      "actor": "runner"
+    },
+    {
+      "kind": "commit",
+      "at": 1793647860.0,
+      "sha": "d287c5439f62",
+      "by": "bot",
+      "text": "PAY-2：测试（refund-api）",
+      "files": 6,
+      "records_only": false,
+      "actor": "runner"
+    },
+    {
+      "kind": "commit",
+      "at": 1793651760.0,
+      "sha": "f7f76b5503ff",
+      "by": "bot",
+      "text": "PAY-2：按 D-1 的回答改",
+      "files": 2,
+      "records_only": false,
+      "actor": "runner"
+    },
+    {
+      "kind": "commit",
+      "at": 1793653620.0,
+      "sha": "2e839630c4b6",
+      "by": "bot",
+      "text": "PAY-2：修好 pytest 里没过的两个用例",
+      "files": 2,
+      "records_only": false,
+      "actor": "runner"
+    },
+    {
+      "kind": "merge",
+      "at": 1793661540.0,
+      "sha": "d79e488882fb",
+      "by": "person",
+      "text": "合并进 main（合并提交）",
+      "files": 0,
+      "records_only": false,
+      "actor": "release"
+    }
+  ],
+  "checks": {
+    "cells": [
+      {
+        "id": "gate-REQUIREMENTS",
+        "group": "gate",
+        "label": "需求",
+        "name": "需求审批（REQUIREMENTS）",
+        "status": "pass",
+        "at": 1793631120,
+        "detail": "你批准了",
+        "actor": "req"
+      },
+      {
+        "id": "gate-DESIGN",
+        "group": "gate",
+        "label": "设计",
+        "name": "设计审批（DESIGN）",
+        "status": "pass",
+        "at": 1793637960,
+        "detail": "你批准了",
+        "actor": "design"
+      },
+      {
+        "id": "gate-RELEASE",
+        "group": "gate",
+        "label": "发布",
+        "name": "发布审批（RELEASE）",
+        "status": "pass",
+        "at": 1793659500,
+        "detail": "你批准了",
+        "actor": "release"
+      },
+      {
+        "id": "verify-pytest-1",
+        "group": "verify",
+        "label": "pytest",
+        "name": "lean verify：pytest",
+        "status": "pass",
+        "at": 1793654580,
+        "detail": "通过",
+        "actor": "ci"
+      },
+      {
+        "id": "verify-ruff-1",
+        "group": "verify",
+        "label": "ruff",
+        "name": "lean verify：ruff",
+        "status": "pass",
+        "at": 1793654580,
+        "detail": "通过",
+        "actor": "ci"
+      },
+      {
+        "id": "verify-mypy-1",
+        "group": "verify",
+        "label": "mypy",
+        "name": "lean verify：mypy",
+        "status": "pass",
+        "at": 1793654580,
+        "detail": "通过",
+        "actor": "ci"
+      },
+      {
+        "id": "bridge",
+        "group": "handover",
+        "label": "桥",
+        "name": "桥核对交接",
+        "status": "pass",
+        "at": 1793639460.0,
+        "detail": "接手了",
+        "actor": "bridge"
+      },
+      {
+        "id": "signer",
+        "group": "handover",
+        "label": "签名",
+        "name": "签名服务签接手合同",
+        "status": "pass",
+        "at": 1793639460.0,
+        "detail": "签了",
+        "actor": "signer"
+      },
+      {
+        "id": "brain-cite",
+        "group": "brain",
+        "label": "引用",
+        "name": "引用的 Brain 条目",
+        "status": "pass",
+        "at": null,
+        "detail": "引用了 2 条，都在",
+        "actor": "reflect"
+      },
+      {
+        "id": "after-14d",
+        "group": "after",
+        "label": "14 天",
+        "name": "合并后 14 天没有回滚或热修",
+        "status": "wait",
+        "at": null,
+        "detail": "还在观察：到 2026-11-16",
+        "actor": "release"
+      }
+    ],
+    "passed": 9,
+    "failed": 0,
+    "total": 10,
+    "at": 1793659500,
+    "history": [
+      {
+        "at": 1793652660,
+        "passed": 2,
+        "failed": 1
+      },
+      {
+        "at": 1793654580,
+        "passed": 3,
+        "failed": 0
+      }
+    ]
+  },
+  "accept": {
+    "state": "merged",
+    "step": {
+      "text": "",
+      "who": "",
+      "line": null,
+      "mr_url": null,
+      "session_url": null
+    },
+    "by": [
+      {
+        "id": "person",
+        "label": "人",
+        "count": 1
+      },
+      {
+        "id": "brain",
+        "label": "Brain 条目（引用）",
+        "count": 2
+      }
+    ],
+    "checks": "检查 9/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "done": {
+      "at": 1793661540.0,
+      "who": "P-9E3B",
+      "how": "合并提交"
+    }
+  },
+  "brain": {
+    "loaded": 12,
+    "cited": [
+      "P-PAY-2-1",
+      "T-12"
+    ],
+    "stale": [],
+    "unknown": [],
+    "proposals": 1
+  },
+  "decisions": [
+    {
+      "id": "D-1",
+      "date": "2026-11-07",
+      "stage": "requirements",
+      "text": "导出只给有退款权限的运营看",
+      "why": "退款单里有收款人姓名",
+      "who": "P-PAY-2-1",
+      "by": "brain",
+      "cites": [
+        "P-PAY-2-1"
+      ],
+      "vouchers": [],
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L8"
+    },
+    {
+      "id": "D-2",
+      "date": "2026-11-07",
+      "stage": "application-design",
+      "text": "大文件分批写，一批 5000 行",
+      "why": "TECH 里记过一次导出把内存打满",
+      "who": null,
+      "by": "agent",
+      "cites": [
+        "T-PAY-2-1",
+        "T-12"
+      ],
+      "vouchers": [],
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L9"
+    },
+    {
+      "id": "D-3",
+      "date": "2026-11-08",
+      "stage": "code-generation",
+      "text": "金额列带币种，单独一列 currency",
+      "why": "回答了澄清问题",
+      "who": "P-1A2B",
+      "by": "person",
+      "cites": [],
+      "vouchers": [
+        "V-1a2b3c4d5e"
+      ],
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L10"
+    }
+  ],
+  "questions": [],
+  "mr_desc": {
+    "available": true,
+    "text": "## PAY-2 · 退款单导出 CSV\n\n**一句话**：对账单按自然日切分（规模 S）。现在：Lean 在「发布」做完，已交给团队运行机，RELEASE 已批。\n（分支 `ai/alice/PAY-2-refund-export`；负责人 alice；intent `261107-refund-export`）\n\n### 做了什么 / 没做什么\n- 不做：不做 Excel 导出\n- 代码计划：refund-api 做完 3/5 步\n\n### 验收标准和证据\n还没跑 verify。\n\n| AC | 要求 | 测试 | 结果 |\n|---|---|---|---|\n| AC-1 | 选一段日期 → 下载这段时间的退款单 CSV | `tests/test_export.py::test_range` | 还没跑 verify |\n\n### 关键决定\n| ID | 决定 | 为什么 | 谁定的 | Brain |\n|---|---|---|---|---|\n| D-2 | 退款单号按 RF+9 位 | 见 T-PAY-1-2 | agent（agent 自己定的） | T-PAY-1-2 |\n\n### 怎么审\n1. 先看 AC-1 的测试 `tests/test_export.py::test_range`；它的边界是 agent 自己定的（D-2）\n\n### 还没有\n- 还没跑 verify\n\n---\n由 `brain mr-desc` 从记录生成（run.json、Lean 记录、git），别手改。重新生成：`brain mr-desc PAY-2 --write`。\n",
+    "first": "对账单按自然日切分（规模 S）。现在：Lean 在「发布」做完，已交给团队运行机，RELEASE 已批。",
+    "source": "file",
+    "path": "runs/PAY-2/MR.md",
+    "ref": "69bc4ac06c1b",
+    "error": ""
+  },
+  "sessions": [
+    {
+      "slot": "brain-PAY-2-1c4e",
+      "title": "PAY-2 退款单号校验",
+      "agent": "brain-dev",
+      "kind": "local",
+      "credits": 8.3,
+      "turns": 19,
+      "busy": false,
+      "awaiting": false,
+      "last_activity": 1793639340,
+      "opened_at": 1794038400,
+      "project": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
+      "url": "/chat?sid=brain-PAY-2-1c4e",
+      "error": null
+    },
+    {
+      "slot": "brain-run-RUN-PAY-2-1",
+      "title": "RUN-PAY-2-1",
+      "agent": "brain-run",
+      "kind": "runner",
+      "credits": 14.4,
+      "turns": 41,
+      "busy": false,
+      "awaiting": false,
+      "last_activity": 1793661540,
+      "opened_at": 1794038400,
+      "project": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
+      "url": "/chat?sid=brain-run-RUN-PAY-2-1",
+      "error": null
+    }
+  ],
+  "credits": {
+    "total": 22.7,
+    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+  },
+  "source": "trace",
+  "missing": [
+    "CI pipelines (GitLab, not readable here)"
+  ],
+  "error": ""
+}

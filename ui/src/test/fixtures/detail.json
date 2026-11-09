@@ -22,7 +22,8 @@
     "waits": {
       "who": "you",
       "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
-      "line": "approve PLAN 5d1e7a90"
+      "line": "approve PLAN 5d1e7a90",
+      "raw": ""
     },
     "summary": "退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。",
     "credits": 12.4,
