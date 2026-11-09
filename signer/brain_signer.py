@@ -12,26 +12,43 @@ answers in ``<spool>/signed/<req>.json`` ({req_id, voucher, sig}) or ``<spool>/r
 A check it cannot make (GitLab down, more notes than brain-kit reads) gets no answer: the SpoolSigner gives up after its
 timeout and the bridge asks again next round. Nothing in a request is trusted.
 
-The rules are brain-kit's own, run with this signer's identities, ledger, GitLab token and Jira, and the kit config
-read from the default branch (never anything from the app):
+The rules are brain-kit's own (commit 9935b11 or newer), run with this signer's identities, ledger, GitLab token and
+Jira, and the kit config read from the default branch (never anything from the app):
 hand-over  ``Bridge.verify`` for the MR as GitLab shows it now: branch, the label added by the owner after GitLab
-           recorded the head as pushed (MR versions), claim, run.json, the Lean note, the Brain commit, materials, no
-           other open run.
-answer     ``decisions.check_answer`` on the MR alone (no question id or round cursor from the app): the question is the
-           unedited text the bridge posts for park.json at that commit, by kit.json ``bridge_user``, posted after GitLab
-           recorded the push, its D-n bound to nothing else; the first valid reply after it (or after the bridge's last
-           conflict note) is by a person allowed for that kind (decision_roles from main, this signer's roles; never a
-           bot or the bridge account); no other allowed person answered differently; the MR head has not moved.
+           recorded the head as pushed (MR versions), the head is the hand-over commit itself (one parent, and it
+           changes run.json: what ``brain handoff`` commits; a commit pushed on top of it was not handed over), claim,
+           run.json, the Lean note, the Brain commit, materials, no other open run.
+answer     ``decisions.check_answer`` on the MR, bound to the question note the voucher names (``question_note``: the
+           note id brain-kit's ledger recorded when the bridge posted it; a voucher without one is refused). That note
+           is on the MR (deleted: the decision is void), by kit.json ``bridge_user``, the unedited text the bridge
+           posts for park.json at that commit, posted after GitLab recorded the push, its D-n bound to nothing else;
+           the first valid reply after it (or after the bridge's last conflict note) is by a person allowed for that
+           kind (decision_roles from main, this signer's roles; never a bot or the bridge account) and was never
+           edited (updated_at after created_at); no other allowed person answered differently; the MR head has not
+           moved. A question without options is answered approve / reject; a batch review's item list is whole.
 What this signer adds, because brain-kit cannot know it or does not offer it:
 - the voucher is rebuilt from what those checks found and must be the one asked for, byte for byte (canonical JSON).
   brain-kit has no public voucher builder, so ``handoff_voucher`` / ``answer_voucher`` below copy the layout of
-  ``Bridge._process`` and ``DecisionLoop.deliver``: a field brain-kit adds is refused until they are updated;
+  ``Bridge._process`` and ``DecisionLoop.deliver`` (9935b11: an answer names its ``question_note``): a field
+  brain-kit adds is refused until they are updated;
 - the projects it serves; ``issued_at`` within max_clock_skew_s; a contract's expiry within contract_ttl_hours;
+- a hand-over's run id is reserved in this signer's ledger before it is checked, in brain-kit's own reservation state
+  (``ledger.RESERVED``, "signing"), as one step with "this requirement has no other open run": two hand-overs of one
+  requirement never both get a contract. A contract asked for again for the same MR and commit (the bridge got no
+  answer, or its waiting voucher grew old) is signed again: its run is a reservation while it is checked, so
+  ``Bridge.verify`` (``Ledger.is_reservation_for``) does not count it as another open run;
 - an answer only for a run whose contract this signer signed, still open, on that MR, with that run's owner;
-- in its own ledger: one answer per question (run, commit, park.json) and a D-n never bound to a second question.
-  check_answer sees the MR as it is now, and whoever holds the bridge account's token (the agents' OS user can read
-  the app's bridge.json) can delete the bridge's notes: what was signed is remembered here;
-- a contract asked for again by the app (it did not get the first answer) is signed again for the same MR and commit.
+- in its own ledger: one answer per question (run, commit, park.json), and a D-n never bound to a second question or a
+  second question note. check_answer sees the MR as it is now, and whoever holds the bridge account's token (the
+  agents' OS user can read the app's bridge.json) can delete, edit and post the bridge's notes: what was signed is
+  remembered here. On the MR it also refuses a question note that an allowed person's reply to its D-n comes before:
+  that reply answered an earlier copy of the question (deleted, or still there), and check_answer counts only the
+  replies after the note it is bound to, so a copy posted later would drop it. (brain-kit posts a second copy itself
+  only when GitLab took a post without returning its id, or when it asks again a question an older bridge asked in
+  the old layout; if someone had replied in between, the signer refuses rather than drop that reply.)
+A late answer is used as it is: brain-kit's bridge asks for the very same voucher again (its pending voucher, one per
+hand-over check or decision), which is the same request, and a request that has its answer in signed/ or refused/ is
+not looked at again.
 
 What it signs is copied into vouchers_dir (brain-intake) and published there: the signer is that repo's only writer.
 
@@ -60,6 +77,7 @@ from datetime import timedelta
 RETRY_S = 10.0
 REQ_RE = re.compile(r"^[a-z]+-[A-Za-z0-9-]{1,80}-[0-9a-f]{12}\.json$")
 MAX_REQUEST = 64 * 1024   # brain-kit's sign.MAX_SPOOL_FILE
+STALE_RESERVATION_S = 900  # brain-kit's Bridge drops its own reservations after max(900 s, 4 x the signer's timeout)
 SIGNED_SCHEMA = """
 CREATE TABLE IF NOT EXISTS signed_answers (
   run_id TEXT NOT NULL, sha TEXT NOT NULL, park_hash TEXT NOT NULL, decision TEXT NOT NULL, voucher_id TEXT NOT NULL,
@@ -68,8 +86,14 @@ CREATE TABLE IF NOT EXISTS bound_decisions (
   run_id TEXT NOT NULL, decision TEXT NOT NULL, sha TEXT NOT NULL, park_hash TEXT NOT NULL,
   PRIMARY KEY (run_id, decision));
 """
+ADDED_COLUMNS = (("signed_answers", "answer", "TEXT"), ("bound_decisions", "question_note", "INTEGER"))
 VERDICT = {"none": "MR 上没有可以回答 %s 的人的有效回答", "conflict": "%s 收到不同的回答，不签",
            "stale": "%s 作废：问题发出后分支又有了新推送", "void": "%s 作废：问题没有绑在这次推送和 park.json 上"}
+# what a brain-kit checkout must offer (9935b11: the hand-over commit rule, run reservations, answers bound to their
+# question note)
+NEEDS = (("bridge.decisions", "check_answer"), ("bridge.decisions", "VOUCHER_TIME_FIELDS"), ("sign", "SpoolSigner"),
+         ("bridge.ledger", "RESERVED"), ("bridge.ledger", "Ledger.is_reservation_for"),
+         ("bridge.handoff", "Bridge.handoff_commit_problems"), ("rest", "GitLab.commit"))
 
 
 def is_int(x):
@@ -108,12 +132,29 @@ def load_brainkit(path):
     if not os.path.isfile(os.path.join(path, "brainkit", "__init__.py")):
         raise SystemExit("brain-signer: no brain-kit at %s" % path)
     sys.path.insert(0, path)
+    import importlib
     import brainkit  # noqa: F401
-    from brainkit import sign
-    from brainkit.bridge import decisions
-    if not (hasattr(decisions, "check_answer") and hasattr(sign, "SpoolSigner")):
-        raise SystemExit("brain-signer: brain-kit at %s is too old (needs decisions.check_answer and sign.SpoolSigner)"
-                         % path)
+    lacking = []
+    for mod, attr in NEEDS:
+        obj = importlib.import_module("brainkit." + mod)
+        for part in attr.split("."):
+            obj = getattr(obj, part, None)
+        if obj is None:
+            lacking.append("%s.%s" % (mod, attr))
+    if lacking:
+        raise SystemExit("brain-signer: brain-kit at %s is too old (needs %s: commit 9935b11 or newer)"
+                         % (path, ", ".join(lacking)))
+
+
+def _nid(note):
+    try:
+        return int(note.get("id") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _author(note):
+    return str(((note.get("author") or {}).get("username")) or "").lower()
 
 
 class Refuse(Exception):
@@ -133,10 +174,12 @@ def handoff_voucher(v, mr, facts, principal):
 
 def answer_voucher(v, run, verdict, answerer, principal):
     """The answer voucher brain-kit's DecisionLoop.deliver signs for what check_answer found (the decision, commit and
-    park.json it is bound to, and the time, from the request)."""
+    park.json it is bound to, and the time, from the request): the question note is the one check_answer bound the
+    answer to."""
     out = {"schema": 1, "kind": "answer", "decision": v["decision"], "run_id": v["run_id"], "project": run["project"],
            "mr_iid": int(run["iid"]), "sha": v["sha"], "park_hash": v["park_hash"], "decision_kind": verdict.kind,
-           "choice": verdict.choice, "answerer": answerer, "issued_at": v["issued_at"], "issuer": principal}
+           "choice": verdict.choice, "answerer": answerer, "issued_at": v["issued_at"], "issuer": principal,
+           "question_note": _nid(verdict.question or {})}
     if v.get("lean_request"):                       # check_answer: it is park.json's
         out["lean_request"] = v["lean_request"]
     if verdict.review:
@@ -151,7 +194,7 @@ class Signer:
         from brainkit import common, rest, sign
         from brainkit.bridge import decisions
         from brainkit.bridge.handoff import BRIDGE_DEFAULTS, Bridge
-        from brainkit.bridge.ledger import OPEN_RUN_STATES
+        from brainkit.bridge.ledger import OPEN_RUN_STATES, RESERVED
         from brainkit.config import merged
         self.cfg, self.gl, self.out = cfg, gitlab, out
         self.common, self.rest, self.sign, self.decisions = common, rest, sign, decisions
@@ -164,12 +207,18 @@ class Signer:
         self.ledger = self.br.ledger            # brain-kit's Ledger: any thread may use it; .lock for several steps
         with self.ledger.lock:
             self.ledger.db.executescript(SIGNED_SCHEMA)
-            if "answer" not in {r[1] for r in self.ledger.db.execute("PRAGMA table_info(signed_answers)")}:
-                try:
-                    self.ledger.db.execute("ALTER TABLE signed_answers ADD COLUMN answer TEXT")
-                except sqlite3.OperationalError:
-                    pass
-        self.open_states = tuple(OPEN_RUN_STATES) + ("reissue",)
+            for table, col, kind in ADDED_COLUMNS:
+                if col not in {r[1] for r in self.ledger.db.execute("PRAGMA table_info(%s)" % table)}:
+                    try:
+                        self.ledger.db.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, col, kind))
+                    except sqlite3.OperationalError:
+                        pass
+            # an earlier version of this signer parked a contract it was signing again as 'reissue' (and put it back
+            # after): one left by a stop in between is the open run it was
+            self.ledger.db.execute("UPDATE runs SET state='spooled' WHERE state='reissue'")
+        self.OPEN, self.RESERVED = tuple(OPEN_RUN_STATES), RESERVED
+        # a run this signer signed a contract for: open, or being signed again right now (its voucher stays on the row)
+        self.open_states = self.OPEN + (RESERVED,)
         self.projects = [p["project"] if isinstance(p, dict) else p for p in cfg.get("projects") or []]
         self.bridge_users = {str(u).lower() for u in cfg.get("bridge_users") or []}
         self._failed = {}   # req id -> when a check could not be made (GitLab down): tried again after RETRY_S
@@ -309,6 +358,54 @@ class Signer:
             if (mr or {}).get("state") in ("merged", "closed"):
                 self.ledger.set_run(row["run_id"], row["state"], mr["state"])
 
+    def _reserve(self, v):
+        """The run id the request names, taken for this hand-over in brain-kit's reservation state before anything is
+        checked, as brain-kit's ``Ledger.reserve_run`` takes the bridge's (one step: the requirement has no other
+        open run, or nothing is reserved). Returns (mode, prior):
+          ("new", None)      the run id is reserved for this hand-over; released again unless it is signed
+          ("again", state)   this signer signed this very hand-over (same project, MR and commit) under this run id
+                             before and is asked again: the run is a reservation while it is checked, then back to
+                             `state`, with the new voucher
+          ("none", None)     the requirement has another open run: nothing reserved (Bridge.verify says so)
+        Another hand-over under this run id, or a run that has ended, is refused. A reservation left by a signer that
+        stopped while checking is dropped after STALE_RESERVATION_S, as brain-kit's are."""
+        led, R, now = self.ledger, self.RESERVED, self.common.utcnow()
+        run_id, key = v["run_id"], v["key"]
+        this = (v["project"], int(v["mr_iid"]), v["sha"])
+        with led.lock:
+            led.db.execute("BEGIN IMMEDIATE")   # one step for another process on this ledger (`close`), too
+            try:
+                led.db.execute("DELETE FROM runs WHERE req=? AND state=? AND voucher_id='' AND updated<?",
+                               (key, R, self.common.iso(now - timedelta(seconds=STALE_RESERVATION_S))))
+                old = led.run(run_id)
+                if old is None:
+                    if led.open_run_for(key) is not None:
+                        mode, prior = "none", None
+                    else:
+                        led.db.execute("INSERT INTO runs(run_id,project,req,iid,sha,voucher_id,state,created,updated) "
+                                       "VALUES (?,?,?,?,?,?,?,?,?)", (run_id, v["project"], key, int(v["mr_iid"]),
+                                                                      v["sha"], "", R, self.common.iso(now),
+                                                                      self.common.iso(now)))
+                        mode, prior = "new", None
+                elif (old["project"], int(old["iid"]), old["sha"]) != this:
+                    raise Refuse("run id %s 已经签给别的交接了" % run_id)
+                elif old["state"] == R:
+                    # left by a signer that stopped while checking it: a contract it had signed before stays open
+                    mode, prior = ("again", "spooled") if old["voucher_id"] else ("new", None)
+                elif old["state"] not in self.OPEN:
+                    raise Refuse("run %s 已经结束（%s）" % (run_id, old["state"]))
+                else:
+                    led.db.execute("UPDATE runs SET state=?, updated=? WHERE run_id=?", (R, self.common.iso(now), run_id))
+                    mode, prior = "again", old["state"]
+                led.db.execute("COMMIT")
+                return mode, prior
+            except BaseException:
+                try:
+                    led.db.execute("ROLLBACK")
+                except sqlite3.Error:
+                    pass
+                raise
+
     def handoff(self, v, issued):
         for k in ("key", "expires_at"):
             if not is_str(v.get(k), 200):
@@ -322,37 +419,48 @@ class Signer:
         mr = self._mr(v)
         kit = self.br.kit(v["project"])
         self._close_finished(v["key"])
-        led = self.ledger
-        with led.lock:
-            old = led.run(v["run_id"])
-            reissue = None
-            if old is not None:
-                if (old["project"], int(old["iid"]), old["sha"]) != (v["project"], v["mr_iid"], v["sha"]):
-                    raise Refuse("run id %s 已经签给别的交接了" % v["run_id"])
-                if old["state"] not in self.open_states:
-                    raise Refuse("run %s 已经结束（%s）" % (v["run_id"], old["state"]))
-                # the app asked again (it did not get the first answer): not "another open run" (reissue is not an
-                # open state for Bridge.verify)
-                reissue = old["state"]
-                led.set_run(v["run_id"], old["state"], "reissue")
+        led, R = self.ledger, self.RESERVED
+        mode, prior = self._reserve(v)
         try:
             probs, facts = self.br.verify(v["project"], kit, mr)
             if probs:
                 raise Refuse(*probs)
+            if mode == "none":   # verify let another open run pass (a reservation of this hand-over under another id)
+                raise Refuse("%s 在签名服务这边还有一个没结束的 run，不再签第二个" % v["key"])
             self.same(v, handoff_voucher(v, mr, facts, self.sign.PRINCIPAL))
             sig = self.key.sign(v)
             with led.lock:
-                if reissue is not None:
-                    led.db.execute("UPDATE runs SET voucher_id=?, voucher=?, state=? WHERE run_id=?",
-                                   (v["voucher_id"], json.dumps(v, ensure_ascii=False), reissue, v["run_id"]))
-                else:
+                if mode == "again":
+                    led.db.execute("UPDATE runs SET voucher_id=?, voucher=?, state=?, updated=? WHERE run_id=? AND "
+                                   "state=?", (v["voucher_id"], json.dumps(v, ensure_ascii=False), prior,
+                                               self.common.iso(self.common.utcnow()), v["run_id"], R))
+                else:            # brain-kit's add_run: the reservation becomes the 'spooled' run
                     led.add_run(v["run_id"], v["project"], v["key"], v["mr_iid"], v["sha"], v["voucher_id"],
                                 paths=facts.get("expected_paths") or [], owner=v["owner"], voucher=v)
             return sig
         except BaseException:
-            if reissue is not None:  # whatever went wrong, the earlier contract stays open (never "reissue")
-                led.set_run(v["run_id"], "reissue", reissue)
+            # whatever went wrong: a new reservation is given back, an earlier contract stays open as it was
+            if mode == "new":
+                led.release_run(v["run_id"])
+            elif mode == "again":
+                led.set_run(v["run_id"], R, prior)
             raise
+
+    def earlier_reply(self, notes, did, qid, bridge, who):
+        """The first reply to `did` by a person allowed to answer it that is older than its question note `qid`, or
+        None. check_answer counts the replies after the note it is bound to: such a reply answered an earlier copy of
+        the question (one that was deleted, or that is still there), and binding the answer to this later copy would
+        drop it (whoever holds the bridge account's token can post a copy, and delete the first)."""
+        for n in sorted((n for n in notes or [] if isinstance(n, dict)), key=_nid):
+            nid = _nid(n)
+            if nid >= qid:
+                return None
+            if n.get("system") or _author(n) == bridge:
+                continue
+            m = self.decisions.ANSWER_RE.match(str(n.get("body") or "").split("\n", 1)[0])
+            if m and m.group(1).upper() == did and _author(n) in who:
+                return nid
+        return None
 
     def answer(self, v):
         for k in ("decision", "park_hash", "decision_kind", "choice", "answerer"):
@@ -360,9 +468,12 @@ class Signer:
                 raise Refuse("%s 要是一行字" % k)
         if not self.decisions.DECISION_ID_RE.match(v["decision"]):
             raise Refuse("decision 不是 D-<n>")
+        qn = v.get("question_note")
+        if not is_int(qn) or qn <= 0:
+            raise Refuse("question_note 要是正整数：回答凭证要写明它回答的是 MR 上哪一条问题评论（brain-kit 9935b11 起）")
         led = self.ledger
         run = led.run(v["run_id"])
-        if run is None:
+        if run is None or not run["voucher_id"]:
             raise Refuse("这个签名服务没签过 %s 的接手合同" % v["run_id"])
         if run["state"] not in self.open_states:
             raise Refuse("run %s 已经结束（%s）" % (v["run_id"], run["state"]))
@@ -379,9 +490,11 @@ class Signer:
         raw = self.gl.file_raw(project, "%s/%s/park.json" % (kit["runs_dir"], run["req"]), v["sha"])
         pushed = self.rest.head_pushed_at(self.gl.mr_versions(project, iid), v["sha"])
         notes = self.gl.mr_notes(project, iid)               # all of them, or an error (a flood is not decided)
+        # bound to the question note the voucher names (an answer voucher's question_note, as brain-kit's ledger
+        # recorded it): only that note counts, and when it is gone the decision is void
         got = self.decisions.check_answer(
             {"id": did, "run_id": v["run_id"], "sha": v["sha"], "park_hash": v["park_hash"],
-             "kind": v["decision_kind"], "lean_request": v.get("lean_request")},
+             "kind": v["decision_kind"], "lean_request": v.get("lean_request"), "question_note": qn},
             raw, notes, kit, self.br.roles, run["owner"], mr["sha"], pushed)
         if not got.ok:
             raise Refuse(VERDICT.get(got.status, "%s 不签") % did + ("（%s）" % got.reason if got.reason else ""))
@@ -389,18 +502,29 @@ class Signer:
         answer = json.dumps({"decision": did, "choice": got.choice, "rejected": list(got.items),
                              "answerer": v["answerer"]}, sort_keys=True)
         with led.lock:   # read what was signed, sign, record: one step
+            why = []
             bound = led.db.execute("SELECT * FROM bound_decisions WHERE run_id=? AND decision=?",
                                    (v["run_id"], did)).fetchone()
             if bound is not None and (bound["sha"], bound["park_hash"]) != (v["sha"], v["park_hash"]):
-                raise Refuse("%s 已经是另一个问题（%s）的号了" % (did, bound["sha"][:12]))
+                why.append("%s 已经是另一个问题（%s）的号了" % (did, bound["sha"][:12]))
+            elif bound is not None and bound["question_note"] not in (None, qn):
+                why.append("%s 绑在问题评论 %s 上，不是 %d：问题被重新贴过，不签" % (did, bound["question_note"], qn))
             had = led.db.execute("SELECT * FROM signed_answers WHERE run_id=? AND sha=? AND park_hash=?",
                                  (v["run_id"], v["sha"], v["park_hash"])).fetchone()
             if had is not None and (had["decision"] != did or (had["answer"] or None) not in (None, answer)
                                     or had["choice"] != got.choice):
-                raise Refuse("这个问题已经签过另一个回答（%s）" % had["voucher_id"])
+                why.append("这个问题已经签过另一个回答（%s）" % had["voucher_id"])
+            early = self.earlier_reply(notes, did, qn, bridge, got.who)
+            if early is not None:
+                why.append("%s 在问题评论 %d 之前已经有人回答过（评论 %d）：这条问题是后来又贴的一份（原来的被删了或还在），"
+                           "绑在它上面会丢掉之前的回答，不签" % (did, qn, early))
+            if why:
+                raise Refuse(*why)
             sig = self.key.sign(v)
-            led.db.execute("INSERT OR IGNORE INTO bound_decisions(run_id,decision,sha,park_hash) VALUES (?,?,?,?)",
-                           (v["run_id"], did, v["sha"], v["park_hash"]))
+            led.db.execute("INSERT OR IGNORE INTO bound_decisions(run_id,decision,sha,park_hash,question_note) "
+                           "VALUES (?,?,?,?,?)", (v["run_id"], did, v["sha"], v["park_hash"], qn))
+            led.db.execute("UPDATE bound_decisions SET question_note=? WHERE run_id=? AND decision=? AND "
+                           "question_note IS NULL", (qn, v["run_id"], did))
             led.db.execute("INSERT OR REPLACE INTO signed_answers(run_id,sha,park_hash,decision,voucher_id,choice,"
                            "created,answer) VALUES (?,?,?,?,?,?,?,?)", (v["run_id"], v["sha"], v["park_hash"], did,
                                                                          v["voucher_id"], got.choice, v["issued_at"],

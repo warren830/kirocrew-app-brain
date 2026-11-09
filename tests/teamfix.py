@@ -1,9 +1,10 @@
-"""The team runner, offline: a fake GitLab served from a bare repo, a project handed over by alice, the separate signer
-(signer/brain_signer.py with its own identities and ledger) and the bridge.json the app hosts, with brain-kit's spool
-signer and no key.
+"""The team runner, offline: a fake GitLab served from a bare repo, a project handed over by alice with `brain
+handoff` (its hand-over commit: one parent, run.json changed), the separate signer (signer/brain_signer.py with its
+own identities and ledger) and the bridge.json the app hosts, with brain-kit's spool signer and no key.
 
-GitLab's notes, labels and MR versions are in memory; authors come from the token (the bridge's, the signer's, a
-person's). A note can be edited or deleted in place, as whoever holds the account's token can on GitLab.
+GitLab's notes, labels and MR versions are in memory; commits come from the bare repo (id and parent_ids, as GitLab's
+commits API shows them); authors come from the token (the bridge's, the signer's, a person's). A note can be edited
+(GitLab keeps its id and moves updated_at) or deleted, as whoever holds the account's token can on GitLab.
 """
 
 from __future__ import annotations
@@ -63,11 +64,20 @@ class GitLab:
 
     def note(self, author, body):
         self.sync()
+        t = self.tick()
         n = {"id": self.next_note, "body": body, "author": {"username": author}, "system": False,
-             "created_at": self.tick()}
+             "created_at": t, "updated_at": t}
         self.next_note += 1  # GitLab never reuses a note id
         self.notes.append(n)
         return n
+
+    def edit(self, n, body):
+        """The note's author (or a Maintainer) edits it: same id, new body, updated_at moves."""
+        n["body"] = body
+        n["updated_at"] = self.tick()
+
+    def delete(self, n):
+        self.notes.remove(n)
 
     def label(self, user, action="add", name="ai-handoff"):
         self.sync()
@@ -122,9 +132,18 @@ class GitLab:
             return (200, p.stdout) if p.returncode == 0 else ok({"message": "404"}, 404)
         m = re.match(re.escape(pre) + r"/repository/commits/(.+)$", path)
         if m:
-            e = subprocess.run(["git", "-C", self.bare, "cat-file", "-e", m.group(1) + "^{commit}"]).returncode
-            return ok({"id": m.group(1)}) if e == 0 else ok({}, 404)
+            return ok(self.commit(m.group(1))) if self.commit(m.group(1)) else ok({}, 404)
         return ok({"message": "404 (fake)"}, 404)
+
+    def commit(self, rev):
+        """GET /projects/:id/repository/commits/:sha as GitLab answers it: id, parent_ids, author and committer."""
+        p = subprocess.run(["git", "-C", self.bare, "show", "-s", "--format=%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%cI",
+                            rev + "^{commit}"], capture_output=True, text=True)
+        f = p.stdout.rstrip("\n").split("\0")
+        if p.returncode != 0 or len(f) != 7:
+            return None
+        return {"id": f[0], "short_id": f[0][:8], "parent_ids": f[1].split(), "author_name": f[2], "author_email": f[3],
+                "committer_name": f[4], "committer_email": f[5], "committed_date": f[6]}
 
 
 def load_signer():
@@ -214,6 +233,13 @@ def push_park(path, park=PARK):
     return commit_push(path, {"runs/PAY-1/park.json": park}, "park")
 
 
+def hand_off(world):
+    """alice runs `brain handoff --no-label` again in her worktree: a new hand-over commit (run.json and nothing else,
+    on top of the branch), pushed. The label is hers to add (``world["gl"].label("alice")``)."""
+    brain(world["wt"], "handoff", "--no-label")
+    return sh("git", "-C", world["wt"], "rev-parse", "HEAD").stdout.strip()
+
+
 def spool_request(spool, v):
     """A request exactly as brain-kit's SpoolSigner writes it (what an agent with the app's OS user can also write)."""
     from brainkit import sign
@@ -240,12 +266,15 @@ def signer_ask(world, v, fix_id=True):
     return None, None
 
 
-def answer_voucher(sha, park_raw, did, choice, author, kind="clarify", **extra):
-    """An answer voucher in brain-kit's layout (DecisionLoop.deliver), salt "s"."""
+def answer_voucher(sha, park_raw, did, choice, author, question_note, kind="clarify", **extra):
+    """An answer voucher in brain-kit's layout (DecisionLoop.deliver, 9935b11: question_note is the question note the
+    ledger recorded), salt "s". question_note None: the voucher names none."""
     from brainkit.common import iso, utcnow
     pseud = "P-" + hashlib.sha256(("s" + author).encode()).hexdigest()[:4].upper()
     v = {"schema": 1, "kind": "answer", "decision": did, "run_id": "RUN-PAY-1-1", "project": P, "mr_iid": 5,
          "sha": sha, "park_hash": hashlib.sha256(park_raw).hexdigest(), "decision_kind": kind, "choice": choice,
          "answerer": pseud, "issued_at": iso(utcnow()), "issuer": "brain-bridge"}
+    if question_note is not None:
+        v["question_note"] = question_note
     v.update(extra)
     return v

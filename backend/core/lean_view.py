@@ -112,14 +112,31 @@ def stages(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """The current stage of Lean's 11 (the row the overview shows, the same stages the detail view lists): the one
+    furthest along that is started; else the next one to do after the last one done or skipped; else (nothing left
+    after it) that last one, done. None only when Lean has recorded no stage at all."""
     started = [r for r in rows if r["state"] == "started"]
     cur = started[-1] if started else None
-    if cur is None:  # nothing open: the next stage still to do after the last one done
+    if cur is None:
         done_n = [r["n"] for r in rows if r["state"] in ("done", "skipped")]
-        cur = next((r for r in rows if r["state"] == "todo" and r["n"] > max(done_n)), None) if done_n else None
+        if done_n:
+            last = max(done_n)
+            cur = next((r for r in rows if r["state"] == "todo" and r["n"] > last), None) or \
+                next(r for r in rows if r["n"] == last)
     return {"stage": cur["id"] if cur else None, "stage_label": cur["label"] if cur else None,
-            "stage_n": cur["n"] if cur else None,
+            "stage_n": cur["n"] if cur else None, "stage_state": cur["state"] if cur else None,
             "done": sum(1 for r in rows if r["state"] in ("done", "skipped")), "total": len(rows)}
+
+
+STAGE_HINT = {"todo": "（下一步）", "done": "（做完）", "skipped": "（做完）"}
+
+
+def stage_text(lean: dict[str, Any]) -> str | None:
+    """``9/11 代码生成``; ``3/11 用户故事（下一步）``; ``11/11 发布（做完）``; None before Lean recorded a stage."""
+    if not lean.get("stage_n"):
+        return None
+    return "%d/%d %s%s" % (lean["stage_n"], lean["total"], lean.get("stage_label") or lean.get("stage") or "",
+                           STAGE_HINT.get(str(lean.get("stage_state")), ""))
 
 
 def _approval_sha(path: str, raw: bytes | None) -> str | None:
@@ -202,14 +219,34 @@ def notes(text: str | None) -> dict[str, Any]:
     return {"status": status, "next": items("Next"), "open_questions": items("Open questions")}
 
 
+def audit_labels(paths: list[str]) -> dict[str, str]:
+    """{audit file: label}. Lean names its file after the clone (<host>-<6 hex>.jsonl): the page shows the label
+    brainkit.trace.audit_labels gives it (aidlc-docs/audit/L-<6 hex of sha256(path)>.jsonl), never the host name."""
+    try:
+        from . import bk
+        if bk.has("trace") and hasattr(bk.m("trace"), "audit_labels"):
+            return dict(bk.m("trace").audit_labels(paths))
+    except Exception:  # noqa: BLE001 - the same rule below
+        pass
+    out, used = {}, set()
+    for p in sorted(set(paths)):
+        h, n = hashlib.sha256(p.encode()).hexdigest().upper(), 6
+        while "L-" + h[:n] in used:
+            n += 2
+        used.add("L-" + h[:n])
+        out[p] = "%s/audit/L-%s.jsonl" % (DOCS, h[:n])
+    return out
+
+
 def stage_events(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Timeline items from the ledger (when brainkit.trace is not there): stages, approvals, blocked tool calls,
-    verify rounds, human turns. Never the text a person typed."""
+    verify rounds, human turns. Never the text a person typed, nor the audit file's host name."""
     out = []
+    labels = audit_labels([str(e.get("_file") or "") for e in evs])
     for e in evs:
         ev, d = e.get("event"), _data(e)
         at = e.get("ts") if isinstance(e.get("ts"), str) else None
-        src = "%s#%s" % (e["_file"], e.get("seq"))
+        src = "%s#%s" % (labels.get(str(e.get("_file") or ""), DOCS + "/audit"), e.get("seq"))
         if ev in STAGE_STATE:
             label = "%s：%s" % (STAGE_LABEL.get(str(d.get("stage")), str(d.get("stage"))),
                                {"started": "开始", "done": "完成", "skipped": "跳过"}[STAGE_STATE[ev]])

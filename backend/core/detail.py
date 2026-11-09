@@ -13,8 +13,15 @@ from .deliveries import KIND_LABEL, park_waiting
 
 CITE_RE = re.compile(r"(?<![A-Za-z0-9-])([PTIJ]-[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,3})(?![0-9-])")
 VOUCHER_RE = re.compile(r"(?<![0-9A-Za-z])V-[0-9a-f]{10}(?![0-9a-f])")
-WHO_ROLE = re.compile(r"^(agent|ai|bot|brain-run|brain-dev|human|person|owner|product|builder|security|bridge|"
-                      r"check|ci|verify|lint|产品|人|负责人|开发|安全|桥|P-[0-9A-F]{4}|[a-z0-9][a-z0-9._-]{0,63})$", re.I)
+# decisions.md Who, in the runner's vocabulary (brainkit.trace.classify_who, brain-kit 9935b11), each optionally
+# followed by a note in brackets: agent | a kit bot user | brain <entry id>[, <id>] | check | <P-xxxx> <V-xxxxxxxxxx> |
+# owner. Anything else is "unclassified": not guessed, and not shown (it may be a real name).
+_ENTRY = r"[PTIJ]-(?:[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,3}|[0-9]{1,5})"
+_NOTE = r"(?:\s*[(（][^()（）]*[)）])?"
+WHO_WORD_RE = re.compile(r"^(?i:(agent|check))" + _NOTE + r"$")
+WHO_BRAIN_RE = re.compile(r"^(?i:brain)\s+(%s(?:\s*[,，、;；]\s*%s)*)" % (_ENTRY, _ENTRY) + _NOTE + r"$")
+WHO_PERSON_RE = re.compile(r"^(P-[0-9A-F]{4})\s+V-[0-9a-f]{10}" + _NOTE + r"$")
+WHO_OWNER_RE = re.compile(r"^(?i:owner)" + _NOTE + r"$")
 NO_TOKENS = "KiroCrew 只报 credits，input / output / cache token 都是 0"
 
 
@@ -22,6 +29,32 @@ NO_TOKENS = "KiroCrew 只报 credits，input / output / cache token 都是 0"
 
 def _cells(line: str) -> list[str]:
     return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
+
+
+def classify_who(who: str | None, bot_users: list[str]) -> tuple[str | None, str | None]:
+    """(by, who shown) of a Who cell: brainkit.trace.classify_who when it is there, else the same rules."""
+    if bk.has("trace") and hasattr(bk.m("trace"), "classify_who"):
+        try:
+            return bk.m("trace").classify_who(who, bot_users)
+        except Exception:  # noqa: BLE001 - the same rules below
+            pass
+    w = str(who or "").strip().strip("`").strip()
+    if not w:
+        return None, None
+    if w.lower() in {str(b).lower() for b in bot_users}:
+        return "agent", w.lower()
+    m = WHO_WORD_RE.match(w)
+    if m:
+        return m.group(1).lower(), m.group(1).lower()
+    m = WHO_BRAIN_RE.match(w)
+    if m:
+        return "brain", ", ".join(re.findall(_ENTRY, m.group(1)))
+    m = WHO_PERSON_RE.match(w)
+    if m:
+        return "person", m.group(1)
+    if WHO_OWNER_RE.match(w):
+        return "person", "owner"
+    return "unclassified", None
 
 
 def decisions(text: str | None, path: str, bot_users: list[str]) -> list[dict[str, Any]]:
@@ -61,20 +94,10 @@ def decisions(text: str | None, path: str, bot_users: list[str]) -> list[dict[st
         if not did or not dec:
             continue
         whole = " ".join(v for k, v in row.items() if k != "id")
-        who = row.get("who", "").strip()
-        by = None
-        low = who.lower()
-        if low in ("agent", "ai", "bot", "brain-run", "brain-dev") or low in [b.lower() for b in bot_users]:
-            by = "agent"
-        elif low in ("check", "ci", "verify", "lint", "lean verify", "brain lint"):
-            by = "check"
-        elif low == "bridge" or re.search(r"P-[0-9A-F]{4}", who):
-            by = "person" if re.search(r"P-[0-9A-F]{4}", who) else "bridge"
-        elif who:
-            by = "person"
-        rows.append({"id": did, "date": row.get("date") or None, "stage": row.get("stage") or None,
-                     "text": dec[:1000], "why": row.get("why") or None,
-                     "who": who if who and WHO_ROLE.match(who) else None, "by": by,
+        by, who = classify_who(row.get("who"), bot_users)
+        rows.append({"id": did, "date": row.get("date") if re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", row.get("date") or "")
+                     else None, "stage": row.get("stage") or None, "text": dec[:1000], "why": row.get("why") or None,
+                     "who": who, "by": by,
                      "cites": sorted(set(CITE_RE.findall(whole))), "vouchers": sorted(set(VOUCHER_RE.findall(whole))),
                      "src": "%s:%d" % (path, n)})
     return rows
@@ -183,8 +206,14 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                       "detail": None, "who": None, "src": r.get("src")})
     m = ((t.get("outcome") or {}).get("merged_at") or {})
     if m.get("value"):
-        items.append({"at": m.get("value"), "kind": "merge", "label": "合并进默认分支", "detail": str(m.get("commit") or "")[:12],
+        detail = " ".join(x for x in (str(m.get("commit") or "")[:12], "（%s）" % m["how"] if m.get("how") else "",
+                                      str(m.get("note") or "")[:300]) if x)
+        items.append({"at": m.get("value"), "kind": "merge", "label": "合并进默认分支", "detail": detail or None,
                       "who": None, "src": m.get("src")})
+    elif m.get("note"):   # e.g. the bridge ledger says merged (bridge_state) but this clone has no merge of it
+        items.append({"at": None, "kind": "merge", "label": "桥的账本说已合并，这里看不到合并（要先取最新？）"
+                      if "merged" in (m.get("bridge_state") or []) else "合并：看不清",
+                      "detail": str(m["note"])[:300], "who": None, "src": m.get("src")})
     items.sort(key=lambda x: (x["at"] or "", x["kind"]))
     return items
 

@@ -131,6 +131,39 @@ def test_a_missing_brain_dev_template_fails_closed_instead_of_crews_default_agen
     assert not any(c[0] == "agent" and c[1] == "" for c in gw.calls) and not gw.slot_rows
 
 
+def test_expected_paths_as_a_list_or_one_string(tmp_path, home):
+    """Live regression 2026-11-09: the start API refused "paths": "calc.py,tests". A list or one string separated by
+    commas, spaces or new lines is accepted; brain start gets them comma separated."""
+    intake = mod("intake")
+    assert intake.expected_paths("calc.py,tests") == ["calc.py", "tests"]
+    assert intake.expected_paths(" src/pay  tests\ndocs，src/pay、x.py ") == ["src/pay", "tests", "docs", "x.py"]
+    assert intake.expected_paths(["src/my module", "tests"]) == ["src/my module", "tests"]   # a list item is one path
+    assert intake.expected_paths(None) == [] and intake.expected_paths("") == [] and intake.expected_paths([]) == []
+    for bad in ({"a": 1}, ["a", 2], 7):
+        with pytest.raises(intake.IntakeError, match="paths"):
+            intake.expected_paths(bad)
+    repo = make_project(tmp_path)
+    svc = make_service(tmp_path, [repo])
+
+    async def go():
+        await svc.start()
+        try:
+            out = await svc.intake_start({"repo": "r1", "slug": "calc", "title": "计算", "docs": [], "consent": False,
+                                          "classification": "", "business": "", "exclude": [],
+                                          "paths": "calc.py,tests", "open_session": False})
+            with pytest.raises(AppError, match="相对路径"):
+                await svc.intake_start({"repo": "r1", "slug": "abs", "title": "x", "docs": [], "paths": "/etc,x",
+                                        "open_session": False})
+            return out
+        finally:
+            await svc.stop()
+
+    out = run(go())
+    assert out["ok"], out["output"]
+    wt = home / "workplace" / "brain-app" / "pay" / "calc"
+    assert json.loads((wt / "runs" / out["key"] / "run.json").read_text())["expected_paths"] == ["calc.py", "tests"]
+
+
 def test_form_errors(tmp_path, home):
     repo = make_project(tmp_path)
     svc = make_service(tmp_path, [repo])

@@ -57,6 +57,11 @@ def test_entries_usage_lint_and_reflect(tmp_path, home):
     assert [(o["kind"], o["file"], o["type"], o["section"]) for o in prev["ops"]] == [("new", "TECH", "pitfall", "外部系统")]
     assert applied["ok"] and applied["branch"] == "brain/PAY-1-reflect-1", applied["output"]
     assert sh("git", "-C", repo, "rev-parse", "--verify", "-q", "brain/PAY-1-reflect-1").returncode == 0
+    # live regression 2026-11-09: the reply names the worktree brain-kit wrote the branch in (it printed it)
+    wt_reflect = applied["worktree"]
+    assert wt_reflect and wt_reflect in applied["output"], applied
+    assert sh("git", "-C", wt_reflect, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip() == "brain/PAY-1-reflect-1"
+    assert wt_reflect.startswith(str(home / ".brain" / "worktrees")) and "brain-PAY-1-reflect-1" in wt_reflect
     assert sh("git", "-C", repo, "status", "--porcelain", "--untracked-files=no").stdout.strip() == ""
     assert again["ops"] == [] and any("already" in n for n in again["notes"])  # the same proposal is not written twice
 

@@ -20,9 +20,16 @@ OPEN_STATES = ("claimed", "local", "handed_over", "running", "parked", "acceptan
 KIND_LABEL = {"clarify": "澄清", "design": "设计", "plan": "计划", "acceptance": "验收", "action": "危险动作",
               "other": "其他", "requirements": "需求批准"}
 ASK_WHO = {"product": "product", "builder": "builder", "owner": "you", "security": "people", "data": "people"}
+# who settled a decision (brainkit.evaluate's categories and labels; "unclassified": a Who outside the runner's
+# vocabulary, listed and never guessed)
 CAT_LABEL = {"person": "人", "check": "确定性检查", "brain": "Brain 条目（引用）", "agent": "agent 自己定（权限内）",
-             "unknown": "看不出"}
-CAT_ORDER = ("person", "check", "brain", "agent", "unknown")
+             "unknown": "看不出（Who 空着）", "unclassified": "没归类（Who 不是规定的写法）"}
+CAT_ORDER = ("person", "check", "brain", "agent", "unknown", "unclassified")
+# brain-kit's ledger states of a decision that leave the run waiting for good: nobody can answer it any more (the
+# signer refused the answer, the question is void, or it could not be asked) until the run pushes again
+STUCK_DECISION = {"refused": "%s 的回答签名服务不签：看运行机页的拒签原因",
+                  "void": "%s 作废（问题没绑上这次推送和 park.json）：run 要重新推送才会重新提问",
+                  "invalid": "%s 发不出去（park.json 不对）：run 要改好重新推送"}
 
 
 def park_waiting(park: Any) -> bool:
@@ -46,7 +53,8 @@ def base_row(repo_id: str, f: dict[str, Any]) -> dict[str, Any]:
         "repo": repo_id, "key": f["key"], "title": title or f["key"], "owner": f.get("owner"),
         "source": str(claim.get("source") or "product"), "state": "claimed", "state_label": STATE_LABEL["claimed"],
         "where": f.get("where") or "claim", "branch": f.get("branch"), "intent": run.get("intent"),
-        "lean": lean, "waits": {"who": "nobody", "text": "", "line": None}, "credits": None,
+        "lean": lean, "stage": lean_view.stage_text(lean), "waits": {"who": "nobody", "text": "", "line": None},
+        "credits": None,
         "updated_at": None, "mr": None, "worktree": f.get("worktree"), "run_ids": [], "sessions": 0,
         "overlap": [], "open_questions": [],
         "expected_paths": [p for p in run.get("expected_paths") or [] if isinstance(p, str)][:50],
@@ -107,10 +115,13 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
 
 def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[dict[str, Any]],
                   park: Any) -> None:
-    """Team mode: the ledger's run state and its open decisions."""
+    """Team mode: the ledger's run state and its decisions (brain-kit's states). A run id reserved while the signer
+    signs its contract (``signing``) is a hand-over not taken yet; a decision whose answer the signer refused, that is
+    void, or that could not be asked leaves the run waiting until a person looks."""
     st = run_row.get("state")
     open_d = [d for d in decisions if d.get("state") == "open"]
     posting = [d for d in decisions if d.get("state") == "posting"]     # brain-kit: not on the MR yet
+    mine = [d for d in decisions if not run_row.get("run_id") or d.get("run_id") in (None, run_row.get("run_id"))]
 
     def put(state: str, who: str, text: str) -> None:
         row["state"], row["state_label"] = state, STATE_LABEL[state]
@@ -121,6 +132,8 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
         return put("merged", "nobody", "MR 已合并或关闭，运行结束")
     if st == "failed":
         return put("rejected", "people", "工作区没建成，要人看一下")
+    if st == "signing":
+        return put("handed_over", "bridge", "签名服务在签接手合同（%s 先占着）" % (run_row.get("run_id") or "run 号"))
     if st in ("spooled", "ready"):
         return put("handed_over", "runner", "运行机在准备工作区")
     if st == "send_unknown":
@@ -130,7 +143,13 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
         if d.get("kind") == "acceptance":
             return put("acceptance", "product", "等产品验收（%s，在 MR 上回答）" % d["id"])
         return put("parked", "people", "等回答 %s（%s，在 MR 上回答）" % (d["id"], KIND_LABEL.get(str(d.get("kind")), d.get("kind"))))
-    if posting or park_waiting(park):
+    if posting:
+        return put("parked", "bridge", "run 停下了：等桥把问题贴到 MR 上")
+    last = mine[-1] if mine else None
+    if last and last.get("state") in STUCK_DECISION and (park is None or park_waiting(park)) and \
+            (not run_row.get("last_sha") or not last.get("sha") or last["sha"] == run_row["last_sha"]):
+        return put("parked", "people", STUCK_DECISION[last["state"]] % last["id"])
+    if park_waiting(park):
         return put("parked", "bridge", "run 停下了：等桥把问题贴到 MR 上")
     return put("running", "runner", "运行机在跑")
 
@@ -154,11 +173,11 @@ def overlaps(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def category(d: dict[str, Any]) -> str:
-    """Who settled a decisions.md row (the app's fallback for brainkit.evaluate's funnel)."""
+    """Who settled a decisions.md row (the app's fallback for brainkit.evaluate's funnel, the same order)."""
     if d.get("by") in ("person", "bridge"):
         return "person"
-    if d.get("by") == "check":
-        return "check"
+    if d.get("by") in ("check", "brain", "unclassified"):
+        return d["by"]
     if d.get("cites"):
         return "brain"
     if d.get("by") == "agent":
@@ -167,13 +186,20 @@ def category(d: dict[str, Any]) -> str:
 
 
 def funnel_app(decisions: list[dict[str, Any]], questions: dict[str, int]) -> dict[str, Any]:
+    """*decisions*: detail.decisions rows, each with the "key" of its requirement."""
     counts = {c: 0 for c in CAT_ORDER}
+    unclassified = []
     for d in decisions:
-        counts[category(d)] += 1
+        c = category(d)
+        counts[c] += 1
+        if c == "unclassified":
+            unclassified.append({"key": str(d.get("key") or ""), "id": str(d.get("id") or ""),
+                                 "src": str(d.get("src") or "")})
     return {"source": "app", "total": sum(counts.values()),
             "rows": [{"id": c, "label": CAT_LABEL[c], "count": counts[c]} for c in CAT_ORDER],
             "questions": {"asked": int(questions.get("asked", 0)), "answered": int(questions.get("answered", 0)),
-                          "delivered": int(questions.get("delivered", 0))}}
+                          "delivered": int(questions.get("delivered", 0))},
+            "unclassified": unclassified}
 
 
 def _call(fn: Any, *args: Any, **kw: Any) -> Any:
@@ -196,7 +222,7 @@ def _pair(x: Any) -> list[int] | None:
 def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict[str, Any] | None,
              ledger_path: str | None = None, vouchers_dir: str | None = None) -> tuple[dict[str, Any], dict | None]:
     """(EvalView, the funnel from brainkit.evaluate or None). Without the module: available false."""
-    view = {"available": False, "error": "", "ref": ref, "metrics": [], "queue": []}
+    view = {"available": False, "error": "", "ref": ref, "metrics": [], "queue": [], "skipped": [], "notes": []}
     if not bk.has("evaluate"):
         view["error"] = "brain-kit 还没有 evaluate 模块" + (
             "（%s）" % bk.info()["module_errors"].get("evaluate") if bk.info()["module_errors"].get("evaluate") else "")
@@ -241,7 +267,16 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
             queue.append({"key": str(q["key"]), "intent": q.get("intent"),
                           "reasons": [str(r.get("text") if isinstance(r, dict) else r)[:200]
                                       for r in q.get("reasons") or []][:10]})
-    view.update(available=True, queue=queue, ref=data.get("ref") or ref)
+    skipped = [{"key": str(x.get("key") or ""), "why": str(x.get("why") or "")[:300]}
+               for x in data.get("skipped") or [] if isinstance(x, dict)][:50]
+    notes = []
+    if cost.get("note"):
+        notes.append(str(cost["note"])[:300])
+    d = data.get("delivery") if isinstance(data.get("delivery"), dict) else {}
+    wrong_open = [str(k) for k in d.get("wrong_open") or []]
+    if wrong_open:
+        notes.append("已知有问题、14 天还没满（满了再算进交付正确率）：%s" % "、".join(wrong_open[:20]))
+    view.update(available=True, queue=queue, ref=data.get("ref") or ref, skipped=skipped, notes=notes)
     f = data.get("funnel") if isinstance(data.get("funnel"), dict) else None
     funnel = None
     if f and isinstance(f.get("counts"), dict):
@@ -249,7 +284,10 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
         cats = [c for c in CAT_ORDER if c in counts] + [c for c in counts if c not in CAT_ORDER]
         funnel = {"source": "evaluate", "total": int(f.get("total") or 0),
                   "rows": [{"id": c, "label": CAT_LABEL.get(c, c), "count": int(counts[c] or 0)} for c in cats],
-                  "questions": {"asked": 0, "answered": 0, "delivered": 0}}
+                  "questions": {"asked": 0, "answered": 0, "delivered": 0},
+                  "unclassified": [{"key": str(x.get("key") or ""), "id": str(x.get("id") or ""),
+                                    "src": str(x.get("src") or "")}
+                                   for x in f.get("unclassified") or [] if isinstance(x, dict)][:100]}
     return view, funnel
 
 

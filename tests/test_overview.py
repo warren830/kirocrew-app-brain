@@ -39,6 +39,7 @@ def test_every_requirement_shows_where_it_is_and_what_it_waits_on(tmp_path, home
     assert one["state"] == "local" and one["where"] == "worktree" and one["worktree"] == str(wt1)
     assert one["waits"]["who"] == "you" and one["waits"]["line"] == line and line.startswith("approve REQUIREMENTS ")
     assert one["lean"]["stage"] == "requirements" and one["lean"]["stage_label"] == "需求分析" and one["lean"]["total"] == 11
+    assert one["lean"]["stage_n"] == 2 and one["lean"]["stage_state"] == "started" and one["stage"] == "2/11 需求分析"
     assert rows["PAY-2"]["state"] == "local" and rows["PAY-2"]["waits"]["line"] is None
     assert rows["PAY-3"]["state"] == "claimed" and rows["PAY-3"]["title"] == "只认领"
     # overlap: src/pay contains src/pay/report
@@ -86,8 +87,13 @@ def test_detail_lists_stages_approvals_decisions_with_brain_citations(tmp_path, 
     intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
     line = request_requirements(wt, intent)
     dec = wt / "aidlc-docs" / intent / "decisions.md"
+    # Who in brain-kit's vocabulary (9935b11): agent; owner (the run's owner answered in the local chat); a person's
+    # pseudonym and voucher (an answer through the bridge); brain <entry>; anything else is unclassified
     dec.write_text(dec.read_text() + "| D-2 | 2026-11-08 | requirements | 退款单号按 RF+9 位 | 见 T-PAY-1-2 | agent |\n"
-                   "| D-3 | 2026-11-08 | requirements | 退款上限是原单金额 | 产品确认 | product |\n")
+                   "| D-3 | 2026-11-08 | requirements | 退款上限是原单金额 | 产品确认 | owner |\n"
+                   "| D-4 | 2026-11-08 | requirements | 退款要人工审核 | MR 上回答 | P-1A2B V-0123456789 |\n"
+                   "| D-5 | 2026-11-08 | requirements | 对账按自然日 | Brain | brain T-PAY-1-2 |\n"
+                   "| D-6 | 2026-11-08 | requirements | 先不做导出 | 产品说的 | product |\n")
     svc = make_service(tmp_path, [repo])
 
     async def go():
@@ -104,7 +110,10 @@ def test_detail_lists_stages_approvals_decisions_with_brain_citations(tmp_path, 
     assert ap == [dict(ap[0], kind="REQUIREMENTS", state="pending", line=line)]
     by = {x["id"]: x for x in d["decisions"]}
     assert by["D-2"]["cites"] == ["T-PAY-1-2"] and by["D-2"]["by"] == "agent"
-    assert by["D-3"]["by"] == "person"
+    assert (by["D-3"]["by"], by["D-3"]["who"]) == ("person", "owner")
+    assert (by["D-4"]["by"], by["D-4"]["who"]) == ("person", "P-1A2B")
+    assert (by["D-5"]["by"], by["D-5"]["who"]) == ("brain", "T-PAY-1-2")
+    assert (by["D-6"]["by"], by["D-6"]["who"]) == ("unclassified", None)     # not a person: not in the vocabulary
     assert d["credits"]["note"].startswith("KiroCrew 只报 credits")
     # editing the requirements after the request voids the line
     (wt / "aidlc-docs" / intent / "inception" / "requirements" / "requirements.md").write_text("# changed\n")

@@ -1,9 +1,11 @@
-"""Team mode, offline end to end: a labelled MR is checked by brain-kit's bridge inside the app, the contract is signed
-by the separate signer (signer/brain_signer.py, its own brain-kit, identities and ledger) through brain-kit's
-SpoolSigner, runnerd (in the app) builds the workspace, the run is dispatched into a brain-run session through the
-app's session runner, a parked question goes on the MR as D-1, the owner's answer is checked by brain-kit, signed by
-the signer and sent to the session once. A tampered answerer list in the app does not get an answer signed. The app
-never has a key: bridge.json names the spool signer only.
+"""Team mode, offline end to end: a labelled MR (its head the hand-over commit `brain handoff` made) is checked by
+brain-kit's bridge inside the app, its run id reserved (brain-kit's `signing`) while the separate signer
+(signer/brain_signer.py, its own brain-kit, identities and ledger) signs the contract through brain-kit's SpoolSigner,
+runnerd (in the app) builds the workspace, the run is dispatched into a brain-run session through the app's session
+runner, a parked question goes on the MR as D-1, the owner's answer is checked by brain-kit (bound to that question
+note), signed by the signer and sent to the session once. A contract the signer signs late is taken the next round. A
+tampered answerer list in the app does not get an answer signed. The app never has a key: bridge.json names the spool
+signer only.
 """
 
 import json
@@ -16,20 +18,30 @@ import pytest
 
 from appkit import mod, sh
 from brainfix import FakeGateway, make_service, needs_brainkit, run
-from teamfix import BRANCH, PARK, push_park, world  # noqa: F401  (world: the fixture)
+from teamfix import BRANCH, PARK, push_park, spool_request, world  # noqa: F401  (world: the fixture)
 
 pytestmark = [needs_brainkit, pytest.mark.skipif(subprocess.run(["which", "ssh-keygen"], capture_output=True).returncode,
                                                  reason="ssh-keygen not found")]
 
 
-def service(world, tmp_path, gw=None, **team):
-    return make_service(tmp_path / "app", [], gw=gw or FakeGateway(), team=dict(world["team"], **team),
-                        transport=world["gl"], kick=lambda: world["signer"].once())
+def service(world, tmp_path, gw=None, kick=None, sign_timeout=None, **team):
+    svc = make_service(tmp_path / "app", [], gw=gw or FakeGateway(), team=dict(world["team"], **team),
+                       transport=world["gl"], kick=kick or (lambda: world["signer"].once()))
+    if sign_timeout is not None:
+        svc.sign_timeout = sign_timeout
+    return svc
 
 
 def test_hand_over_dispatch_question_and_answer_through_the_separate_signer(world, tmp_path):
     gw = FakeGateway()
-    svc = service(world, tmp_path, gw)
+    during = []
+
+    def kick():   # while brain-kit's SpoolSigner waits on the signer: what the page shows, then the signer answers
+        if not during:
+            during.append((svc._team_rows({"by": {}, "credits": {}}), svc.team.pending()))
+        world["signer"].once()
+
+    svc = service(world, tmp_path, gw, kick=kick)
     bk = mod("bk")
     seen = {}
 
@@ -57,6 +69,12 @@ def test_hand_over_dispatch_question_and_answer_through_the_separate_signer(worl
 
     first, second, third, view, overview, todo = run(go())
     assert first["ok"], first
+    # while the contract was being signed: the run id reserved (brain-kit's `signing`), the voucher waiting
+    rows, waiting = during[0]
+    (row, _, _), = rows
+    assert row["key"] == "PAY-1" and row["state"] == "handed_over" and "签接手合同" in row["waits"]["text"]
+    assert [(w["kind"], w["run_id"]) for w in waiting] == [("handoff", "RUN-PAY-1-1")]
+    assert view["signer"]["waiting"] == []                               # taken: nothing waits any more
     # brain-kit's own Bridge and SpoolSigner (the app's private copy), no key, nothing patched
     assert seen["bridge"] == bk.PKG + ".bridge.handoff.Bridge" and seen["signer"] == bk.PKG + ".sign.SpoolSigner"
     assert seen["key"] == "" and seen["sign_fn"] == bk.PKG + ".sign"   # sign.sign is brain-kit's own
@@ -146,8 +164,41 @@ def test_a_push_after_the_owners_label_is_not_handed_over(world, tmp_path):
     assert view["runs"] == [] and not gw.slot_rows
     rejected = [b for b in world["gl"].bodies() if b.startswith("AI 接手被拒")]
     assert rejected and "after the label 'ai-handoff' was added" in rejected[0]
+    assert "hand-over commit" in rejected[0]                             # brain-kit 9935b11: and it is not one
     assert "ai-handoff-rejected" in world["gl"].labels
     assert not (world["sspool"] / "requests").exists() or not os.listdir(world["sspool"] / "requests")
+
+
+def test_a_contract_signed_late_is_taken_the_next_round(world, tmp_path):
+    """The signer is slow: brain-kit's SpoolSigner gives up, the run id it reserved is given back and its voucher waits
+    (the page lists it). The signer signs it late; the next round asks for that very voucher and takes the signature:
+    one contract, signed once, the run goes on."""
+    on = []
+    svc = service(world, tmp_path, kick=lambda: world["signer"].once() if on else None, sign_timeout=0.3)
+
+    async def go():
+        await svc.start()
+        try:
+            await svc.team_loop()
+            first = await svc.team_view()
+            (pending,) = [json.loads(r[0]) for r in svc.team.host.ledger.db.execute(
+                "SELECT voucher FROM pending_vouchers")]
+            spool_request(world["sspool"], pending)                       # what the signer had read: it answers now
+            world["signer"].once()
+            on.append(True)
+            await svc.team_loop()
+            return first, pending, await svc.team_view()
+        finally:
+            await svc.stop()
+
+    first, pending, second = run(go())
+    assert first["runs"] == [] and [(w["kind"], w["run_id"]) for w in first["signer"]["waiting"]] == \
+        [("handoff", "RUN-PAY-1-1")]
+    assert [r["run_id"] for r in second["runs"]] == ["RUN-PAY-1-1"] and second["signer"]["waiting"] == []
+    signed = os.listdir(tmp_path / "signer-vouchers" / "RUN-PAY-1-1")
+    assert signed == [pending["voucher_id"] + ".json"]
+    assert os.listdir(tmp_path / "app-vouchers" / "RUN-PAY-1-1") == signed
+    assert any(b.startswith("AI 已接手：RUN-PAY-1-1") for b in world["gl"].bodies())
 
 
 def test_team_mode_never_holds_a_key(world, tmp_path):

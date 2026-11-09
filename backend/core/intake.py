@@ -51,6 +51,31 @@ def _lines(v: Any, limit: int = MAX_DOCS) -> list[str]:
     return [str(x).strip() for x in v if isinstance(x, str) and str(x).strip()][:limit]
 
 
+PATH_SEP_RE = re.compile(r"[\s,，、；;]+")
+MAX_PATHS = 50
+
+
+def expected_paths(v: Any) -> list[str]:
+    """The expected paths of the form or the API: a list (one path per item, as given), or one string of paths
+    separated by commas, spaces or new lines (``"calc.py,tests"``, ``"src/pay tests"``). Anything else is an
+    IntakeError. brain-kit's ``brain start --paths`` takes them comma separated."""
+    if v is None or v == "":
+        return []
+    if isinstance(v, str):
+        items = PATH_SEP_RE.split(v)
+    elif isinstance(v, list) and all(isinstance(x, str) for x in v):
+        items = v
+    else:
+        raise IntakeError("paths 要是路径的列表，或一串用逗号、空格分开的路径")
+    out = []
+    for p in (x.strip() for x in items):
+        if p and p not in out:
+            out.append(p)
+    if len(out) > MAX_PATHS:
+        raise IntakeError("预计改动的路径最多 %d 个" % MAX_PATHS)
+    return out
+
+
 def clean_body(repo: Repo, body: dict[str, Any], *, start: bool) -> dict[str, Any]:
     """The form, checked; IntakeError says what is wrong (in Chinese)."""
     cfg = repo.cfg
@@ -83,10 +108,10 @@ def clean_body(repo: Repo, body: dict[str, Any], *, start: bool) -> dict[str, An
     if docs and body.get("consent") is not True:
         raise IntakeError("门 1：确认你是作者，或已取得作者同意")
     exclude = _lines(body.get("exclude"), 30)
-    paths = _lines(body.get("paths"), 50)
+    paths = expected_paths(body.get("paths"))
     for p in paths:
-        if not re.match(r"^[A-Za-z0-9_./*-][A-Za-z0-9_./* -]{0,199}$", p) or ".." in p:
-            raise IntakeError("预计改动的路径要是仓库里的相对路径：%s" % p)
+        if not re.match(r"^[A-Za-z0-9_./*-][A-Za-z0-9_./* -]{0,199}$", p) or ".." in p or p.startswith("/"):
+            raise IntakeError("预计改动的路径要是仓库里的相对路径（列表，或用逗号、空格分开的一串）：%s" % p)
     return {"slug": slug, "title": title, "key": key, "docs": [os.path.expanduser(d) for d in docs],
             "classification": cls, "business": business, "consent": body.get("consent") is True,
             "exclude": exclude, "paths": paths}

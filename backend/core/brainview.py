@@ -4,7 +4,9 @@
 Reflect preview is the planning half of ``brain reflect`` (cmd_reflect): parse the run's brain-proposal and brain-gap
 blocks, plan them against the Brain on main (ids used on open brain/* branches skipped, proposals already written
 skipped), lint the dry run; nothing is written. ``--apply`` / ``--push`` are brain-kit's own command, run as is (a new
-branch brain/<KEY>-reflect-<n> in its own worktree; with --push the MR); its output is shown verbatim.
+branch brain/<KEY>-reflect-<n> in its own worktree under ~/.brain/worktrees/<repo>/; with --push the MR); its output
+is shown verbatim, and the reply names the branch and that worktree (git's own list: the worktree that has the new
+branch checked out; else the folder brain-kit printed).
 """
 
 from __future__ import annotations
@@ -21,6 +23,9 @@ from .repo import Repo
 MIN_RUNS = 3
 SECTION_RE = re.compile(r"^##\s+(.+?)\s*$")
 BRANCH_RE = re.compile(r"brain/[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-reflect-[1-9][0-9]*")
+# what `brain reflect --apply` prints about its worktree (cmd_reflect): committed, not committed, pushed without a token
+PRINTED_WT_RE = (re.compile(r"已提交到本地分支 \S+（(/[^（）\n]+)）"), re.compile(r"写在 (/[^（\n]+?)（分支 "),
+                 re.compile(r"描述在 (/[^\n]+?)\.mr\.md"))
 
 
 def _brain(repo: Repo) -> tuple[Any, str]:
@@ -161,5 +166,21 @@ def apply(repo: Repo, facts: dict[str, Any], push: bool) -> dict[str, Any]:
     except OSError as exc:
         text, code = "跑不了 brain：%s" % exc, 127
     m = BRANCH_RE.search(text)
+    branch = m.group(0) if m else None
     repo.invalidate()
-    return {"ok": code == 0, "output": text[-20000:], "branch": m.group(0) if m else None}
+    return {"ok": code == 0, "output": text[-20000:], "branch": branch,
+            "worktree": reflect_worktree(repo, branch, text) if code == 0 else None}
+
+
+def reflect_worktree(repo: Repo, branch: str | None, text: str) -> str | None:
+    """The worktree `brain reflect --apply` wrote *branch* in: the one git lists with that branch checked out (the
+    truth, whatever brain-kit printed), else the folder its output names."""
+    if branch:
+        for w in repo.git.worktrees():
+            if w.get("branch") == "refs/heads/" + branch and os.path.isdir(w.get("path") or ""):
+                return w["path"]
+    for rx in PRINTED_WT_RE:
+        hit = rx.search(text)
+        if hit and os.path.isdir(hit.group(1)):
+            return hit.group(1)
+    return None

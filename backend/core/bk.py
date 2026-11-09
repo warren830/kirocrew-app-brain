@@ -8,9 +8,10 @@ Required modules (the app does nothing without them): common, config, claims, ru
 reflect, sign, cli, intake.package, bridge.handoff, bridge.decisions, bridge.runnerd, rest.
 Optional ones, added while this app was written, are guarded: trace, evaluate, golden, intents. A missing or broken
 optional module turns its feature off (``has()``), with the import error kept for the page.
-The public interfaces of brain-kit c9e59d1 are required too (NEEDS: the spool signer, the answer verifier, the
-question's first line, the agent-spec hook functions, GitLab's MR versions): an older checkout is refused with a clear
-error instead of half working.
+The public interfaces of brain-kit 9935b11 are required too (NEEDS: the spool signer, the answer verifier bound to
+the recorded question note, the question's first line, the hand-over commit rule, run reservations (``signing``) and
+pending vouchers, the agent-spec hook functions, GitLab's MR versions and commits): an older checkout is refused with a
+clear error instead of half working.
 
 The checkout must not be writable by the agents' OS user in production: whatever is in it runs inside the gateway.
 """
@@ -33,9 +34,12 @@ REQUIRED = ("common", "config", "claims", "runrec", "lean", "entries", "brainlin
 OPTIONAL = ("trace", "evaluate", "golden", "intents")
 CANDIDATES = ("~/brain-kit", "~/warren_ws/brain-kit", "~/workplace/brain-kit", "/opt/brain-kit")
 NEEDS = (("sign", "SpoolSigner"), ("sign", "SignerRefused"), ("sign", "signer_from_config"),
-         ("bridge.decisions", "check_answer"), ("bridge.decisions", "Q_HEAD_RE"), ("bridge.ledger", "Ledger"),
-         ("cli", "missing_lean_hooks"), ("cli", "add_lean_hooks"), ("cli", "runner_kit_problems"),
-         ("rest", "head_pushed_at"))
+         ("bridge.decisions", "check_answer"), ("bridge.decisions", "Q_HEAD_RE"),
+         ("bridge.decisions", "VOUCHER_TIME_FIELDS"), ("bridge.decisions", "DecisionLoop.sign_voucher"),
+         ("bridge.ledger", "Ledger"), ("bridge.ledger", "RESERVED"), ("bridge.ledger", "Ledger.pending_voucher"),
+         ("bridge.handoff", "Bridge.handoff_commit_problems"), ("cli", "missing_lean_hooks"), ("cli", "add_lean_hooks"),
+         ("cli", "runner_kit_problems"), ("rest", "head_pushed_at"), ("rest", "GitLab.commit"))
+VERSION_NEEDED = "9935b11"
 
 _lock = threading.RLock()
 _state: dict[str, Any] = {"path": None, "mods": {}, "errors": {}, "error": "", "version": None}
@@ -88,11 +92,11 @@ def load(path: str) -> dict[str, Any]:
             _state["path"] = path
             _state["error"] = "brain-kit 导入失败：%s: %s" % (type(exc).__name__, str(exc)[:300])
             return info()
-        lacking = ["%s.%s" % (mod, attr) for mod, attr in NEEDS if not hasattr(mods[mod], attr)]
+        lacking = ["%s.%s" % (mod, attr) for mod, attr in NEEDS if _attr(mods[mod], attr) is None]
         if lacking:
             unload()
             _state["path"] = path
-            _state["error"] = "brain-kit 太旧（没有 %s）：要 c9e59d1 或更新的版本" % "、".join(lacking)
+            _state["error"] = "brain-kit 太旧（没有 %s）：要 %s 或更新的版本" % ("、".join(lacking), VERSION_NEEDED)
             return info()
         for name in OPTIONAL:
             try:
@@ -101,6 +105,15 @@ def load(path: str) -> dict[str, Any]:
                 _state["errors"][name] = "%s: %s" % (type(exc).__name__, str(exc)[:200])
         _state["mods"] = mods
         return info()
+
+
+def _attr(obj: Any, dotted: str) -> Any:
+    """``Ledger.reserve_run`` of a module: None when any part is missing."""
+    for part in dotted.split("."):
+        obj = getattr(obj, part, None)
+        if obj is None:
+            return None
+    return obj
 
 
 def info() -> dict[str, Any]:

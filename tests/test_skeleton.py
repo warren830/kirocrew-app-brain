@@ -76,3 +76,34 @@ def test_settings_are_checked_before_they_are_saved(tmp_path, home):
     assert resp.status == 400 and "绝对路径" in resp.body["error"] and "workplace" in resp.body["error"]
     assert "team.bridge_config" in resp.body["error"]
     assert not (tmp_path / "data" / "settings.json").exists()
+
+
+def test_a_brainkit_older_than_9935b11_is_refused(tmp_path):
+    """The app (and its signer) need brain-kit 9935b11's interfaces: a checkout without one of them is refused with a
+    message naming what it lacks, not half used. (A copy of the checkout with run reservations taken out.)"""
+    import shutil
+    from appkit import BRAINKIT, mod
+    import pytest
+    if not (BRAINKIT / "brainkit" / "__init__.py").is_file():
+        pytest.skip("brain-kit checkout not found")
+    old = tmp_path / "old-brain-kit"
+    shutil.copytree(BRAINKIT / "brainkit", old / "brainkit", ignore=shutil.ignore_patterns("__pycache__"))
+    led = old / "brainkit" / "bridge" / "ledger.py"
+    led.write_text(led.read_text(encoding="utf-8").replace('RESERVED = "signing"', 'SIGNING = "signing"')
+                   .replace("RESERVED", "SIGNING"), encoding="utf-8")
+    bk = mod("bk")
+    try:
+        got = bk.load(str(old))
+        assert got["ok"] is False and "bridge.ledger.RESERVED" in got["error"] and "9935b11" in got["error"], got
+        assert bk.load(str(BRAINKIT))["ok"] is True
+    finally:
+        bk.unload()
+    # the signer refuses it too (its own process, as it runs)
+    import subprocess
+    import sys
+    probe = "import sys; sys.path.insert(0, %r); import brain_signer; brain_signer.load_brainkit(sys.argv[1])" % str(
+        ROOT / "signer")
+    p = subprocess.run([sys.executable, "-I", "-c", probe, str(old)], capture_output=True, text=True)
+    assert p.returncode != 0 and "bridge.ledger.RESERVED" in p.stderr and "9935b11" in p.stderr, p.stderr
+    p = subprocess.run([sys.executable, "-I", "-c", probe, str(BRAINKIT)], capture_output=True, text=True)
+    assert p.returncode == 0, p.stderr

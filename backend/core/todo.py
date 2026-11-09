@@ -3,7 +3,8 @@
 - Lean approvals pending in a local run: the exact line the person types themselves in that session (the app never
   sends an approval line anywhere);
 - questions on the team runner (D-<n>): a link to the MR; they are answered on GitLab, where the person is
-  identified (the team dashboard takes no answers);
+  identified (the team dashboard takes no answers); a run left waiting for good (the signer refused its answer, the
+  question is void or could not be asked) is listed for a person to look at;
 - the person's own runs: a clarify question may be answered here (into the local session, or as their own MR
   comment); acceptance waits for the product on the MR; a refused hand-over says why.
 """
@@ -25,6 +26,9 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
                 "mr_url": (row.get("mr") or {}).get("url"), "question": None, "session": e.get("session"),
                 "since": row.get("updated_at")}
         if team:
+            if row["state"] == "parked" and (row.get("waits") or {}).get("who") == "people" and \
+                    not any(d.get("state") == "open" for d in e.get("decisions") or []):
+                items.append({**base, "kind": "question", "mr_url": e.get("mr_url"), "text": row["waits"]["text"]})
             for d in e.get("decisions") or []:
                 if d.get("state") != "open":      # on the MR, waiting for a person (brain-kit's states)
                     continue

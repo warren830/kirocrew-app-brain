@@ -335,7 +335,10 @@ class Service:
             for f in facts:
                 row = self._row(repo, f, snap)
                 rows.append(row)
-                all_decisions += detail.decisions(f.get("decisions_text"), "decisions.md", repo.cfg.get("bot_users") or [])
+                intent = (f.get("run") or {}).get("intent")
+                all_decisions += [dict(d, key=f["key"]) for d in detail.decisions(
+                    f.get("decisions_text"), "aidlc-docs/%s/decisions.md" % intent if intent else "decisions.md",
+                    repo.cfg.get("bot_users") or [])]
         for rid, (path, err) in self.repo_errors.items():
             if which in ("all", rid):
                 errors.append({"repo": rid, "error": "%s：%s" % (path, err)})
@@ -381,11 +384,13 @@ class Service:
                 threading_start(self._eval_compute, rid, sha, credits)
         if not views:
             return {"available": False, "error": "正在算 Eval…" if ids else "没有仓库", "ref": None, "metrics": [],
-                    "queue": []}, None
+                    "queue": [], "skipped": [], "notes": []}, None
         if len(views) == 1:
             return views[0], (dict(funnels[0]) if funnels else None)
         merged = {"available": any(v["available"] for v in views), "error": "；".join(v["error"] for v in views if v["error"]),
-                  "ref": None, "metrics": [], "queue": [q for v in views for q in v["queue"]]}
+                  "ref": None, "metrics": [], "queue": [q for v in views for q in v["queue"]],
+                  "skipped": [x for v in views for x in v.get("skipped") or []],
+                  "notes": [x for v in views for x in v.get("notes") or []]}
         for m in views[0]["metrics"]:
             vals = [next((x["value"] for x in v["metrics"] if x["id"] == m["id"]), None) for v in views]
             pairs = [x for x in vals if isinstance(x, list)]
@@ -396,6 +401,7 @@ class Service:
             funnel["rows"] = [{**r, "count": sum(next((x["count"] for x in f["rows"] if x["id"] == r["id"]), 0)
                                                  for f in funnels)} for r in funnels[0]["rows"]]
             funnel["total"] = sum(f["total"] for f in funnels)
+            funnel["unclassified"] = [x for f in funnels for x in f.get("unclassified") or []]
         return merged, funnel
 
     def _eval_compute(self, rid: str, sha: str, credits: dict[str, Any]) -> None:
@@ -407,7 +413,8 @@ class Service:
             self._eval[rid] = (sha, time.monotonic(), view, funnel)
         except Exception as exc:  # noqa: BLE001
             self._eval[rid] = (sha, time.monotonic(), {"available": False, "error": "Eval 算不出来：%s" % str(exc)[:200],
-                                                        "ref": None, "metrics": [], "queue": []}, None)
+                                                        "ref": None, "metrics": [], "queue": [], "skipped": [],
+                                                        "notes": []}, None)
         finally:
             self._eval_running.discard(rid)
 
@@ -598,10 +605,12 @@ class Service:
 
     async def answer(self, rid: str, key: str, choice: Any, note: Any, did: Any = None) -> dict[str, Any]:
         """A clarify question of the person's own run: into its local session, or as their own MR comment. Never a Lean
-        approval: a question with a lean_request is not answerable here."""
-        if not isinstance(choice, str) or not re.fullmatch(r"[A-H]", choice.strip().upper()):
-            raise AppError("回答选一个选项（A–H）", "invalid_choice")
-        choice = choice.strip().upper()
+        approval: a question with a lean_request is not answerable here. *choice*: one of the question's options (A–H),
+        or approve / reject for a question without options (brain-kit counts nothing else for one)."""
+        if not isinstance(choice, str) or not re.fullmatch(r"(?i)[A-H]|approve|reject", choice.strip()):
+            raise AppError("回答选一个选项（A–H）；没有选项的问题答 approve 或 reject", "invalid_choice")
+        choice = choice.strip()
+        choice = choice.lower() if choice.lower() in ("approve", "reject") else choice.upper()
         note = " ".join(str(note or "").split())[:300]
         repo = self._repo(rid)
         f = await asyncio.to_thread(self._facts, repo, key)
@@ -614,7 +623,7 @@ class Service:
         if not run.get("handoff"):
             if not deliveries.park_waiting(park) or park.get("kind") != "clarify" or park.get("lean_request"):
                 raise AppError("这个需求没有等你回答的澄清问题", "no_question", 409)
-            if choice not in {str(o.get("id")) for o in park.get("options") or [] if isinstance(o, dict)}:
+            if choice not in answer_choices([str(o.get("id")) for o in park.get("options") or [] if isinstance(o, dict)]):
                 raise AppError("没有选项 %s" % choice, "invalid_choice")
             live = [i for i in self.sessions.roots(key=scope, kind="local") if i.slot]
             if not live:
@@ -633,7 +642,7 @@ class Service:
         if not mr or not open_q:
             raise AppError("MR 上没有等你回答的澄清问题", "no_question", 409)
         q = open_q[-1]
-        if q.get("options") and choice not in {o["id"] for o in q["options"]}:
+        if choice not in answer_choices([o["id"] for o in q.get("options") or []]):
             raise AppError("没有选项 %s" % choice, "invalid_choice")
         try:
             await asyncio.to_thread(self.mr.post_answer, base, project, mr["iid"], q["id"], choice, note,
@@ -818,13 +827,15 @@ class Service:
     async def team_view(self) -> dict[str, Any]:
         if self.team is None:
             return {"status": self._team_status(), "ledger": {"runs": {}, "decisions": {}, "handoffs": {}}, "runs": [],
-                    "signer": {"pending": [], "refused": []}}
+                    "signer": {"pending": [], "refused": [], "waiting": []}}
         led = await asyncio.to_thread(self.team.ledger)
+        signer = await asyncio.to_thread(self.team.signer_view)
+        signer["waiting"] = await asyncio.to_thread(self.team.pending)
         return {"status": self.team.status(), "ledger": self.team.counts(led),
                 "runs": [{"run_id": r["run_id"], "req": r["req"], "project": r["project"], "iid": int(r["iid"]),
                           "state": r["state"], "slot": r.get("slot"), "mr_url": self.team.mr_url(r["project"], r["iid"]),
                           "updated": r.get("updated")} for r in led["runs"]],
-                "signer": await asyncio.to_thread(self.team.signer_view)}
+                "signer": signer}
 
     async def team_loop(self) -> dict[str, Any]:
         if self.team is None or self.team.host is None:
@@ -834,6 +845,11 @@ class Service:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "summary": {}, "error": str(exc)[:300]}
         return {"ok": not self.team.loop_error, "summary": summary, "error": self.team.loop_error}
+
+
+def answer_choices(options: list[str]) -> set[str]:
+    """What counts as an answer (brain-kit's check_answer): one of the options; approve / reject when there are none."""
+    return set(options) if options else {"approve", "reject"}
 
 
 def local_answer(choice: str, note: str) -> str:

@@ -4,7 +4,9 @@ brainkit.rest.read_token reads it: $GITLAB_TOKEN, else ~/.brain/gitlab-token, on
 What the bridge wrote on the MR is parsed back: its questions (the first line brain-kit's ``decisions.Q_HEAD_RE``
 reads: ``**D-5 · 澄清 · RUN-PAY-3-1** · 提交 <sha12> · park <hash12> · 需要 @… 回答``; a question of an older bridge
 without commit and park counts for nothing and is asked again), their answers, stale (a new push), void (not bound to
-its push or park.json), refused (the signer would not sign the answer) and invalid ones, and the hand-over refusal.
+its push or park.json, or its question note deleted), refused (the signer would not sign the answer), answered (the
+bridge has the answer but could not sign it this round: it sends it later, nobody answers again) and invalid ones, and
+the hand-over refusal.
 Only the notes of the bridge's account count when kit.json names it (``bridge_user``): a look-alike posted by a person
 is not a question. The token never leaves brain-kit's GitLab client: it is not logged, stored or returned. Refreshed
 in the background (``refresh``), at most every TTL_S per MR; the overview only reads the cache.
@@ -21,9 +23,11 @@ from urllib.parse import quote
 from . import bk
 
 TTL_S = 60.0
-DELIVERED_RE = re.compile(r"^(D-[1-9][0-9]*) 已收到 @([a-z0-9][a-z0-9._-]*) 的回答：([A-Za-z]+)[^（(]*[（(]凭证 (V-[0-9a-f]{10})")
+# the answerer: a GitLab username (brain-kit's decisions.USER), as the bridge writes it (lower case)
+DELIVERED_FMT = r"^(D-[1-9][0-9]*) 已收到 @(%s) 的回答：([A-Za-z]+)[^（(]*[（(]凭证 (V-[0-9a-f]{10})"
 VOID_RE = re.compile(r"^(D-[1-9][0-9]*) 作废(：|（)")      # 作废：a new push (stale); 作废（why）: not bound (void)
 REFUSED_RE = re.compile(r"^(D-[1-9][0-9]*) 的回答没有送回 run：签名服务不签")
+NOT_SIGNED_RE = re.compile(r"^(D-[1-9][0-9]*) 收到了回答，但桥这一轮没能签名")   # DecisionLoop._tell_not_signed
 INVALID_RE = re.compile(r"^(D-[1-9][0-9]*) 无法发出")
 REJECT_HEAD = "AI 接手被拒"
 LABEL_KIND = {"澄清": "clarify", "设计": "design", "计划": "plan", "验收": "acceptance", "危险动作": "action", "其他": "other",
@@ -34,7 +38,9 @@ OPT_RE = re.compile(r"^([A-H])\. (.*)$")
 def parse_notes(notes: list[dict[str, Any]], bridge_user: str | None = None) -> dict[str, Any]:
     """{questions: [...], rejected_reason} from an MR's notes, oldest first. *bridge_user*: kit.json's bridge_user
     (only its notes count); unknown: every note is read."""
-    head_re = bk.m("bridge.decisions").Q_HEAD_RE
+    dec = bk.m("bridge.decisions")
+    head_re = dec.Q_HEAD_RE
+    delivered_re = re.compile(DELIVERED_FMT % getattr(dec, "USER", r"[a-z0-9][a-z0-9._-]*"))
     qs: dict[str, dict[str, Any]] = {}
     rejected = None
     for n in notes:
@@ -72,9 +78,13 @@ def parse_notes(notes: list[dict[str, Any]], bridge_user: str | None = None) -> 
                               "answerer": None, "voucher_id": None, "note_id": n.get("id"),
                               "at": n.get("created_at")}
             continue
-        m = DELIVERED_RE.match(first)
+        m = delivered_re.match(first)
         if m and m.group(1) in qs:
             qs[m.group(1)].update(state="delivered", answer=m.group(3), answerer=m.group(2), voucher_id=m.group(4))
+            continue
+        m = NOT_SIGNED_RE.match(first)
+        if m and m.group(1) in qs and qs[m.group(1)]["state"] == "open":
+            qs[m.group(1)]["state"] = "answered"
             continue
         m = VOID_RE.match(first)
         if m and m.group(1) in qs:

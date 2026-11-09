@@ -16,7 +16,10 @@ patched or subclassed. What the app changes:
 
 The ledger is brain-kit's ``Ledger``: one sqlite connection any thread may use, ``ledger.lock`` around several
 statements. Rounds run one at a time on the runtime's own worker thread (a round may wait on GitLab, KiroCrew and the
-signer for a while: it stays off the event loop and the default pool); the page reads the same Ledger from any thread.
+signer for a while: it stays off the event loop and the default pool); the page reads the same Ledger from any thread:
+its runs (brain-kit 9935b11: a run id reserved while its contract is signed is in state ``signing``), decisions and
+hand-overs, and the vouchers the signer has not answered yet (``pending_vouchers``: the next round asks for the very
+same voucher, so a late signature is used).
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ import stat
 import threading
 import time
 from collections import deque
+from datetime import timedelta
 from typing import Any
 
 from .. import bk
@@ -37,6 +41,7 @@ from .crewadapter import KiroCrewAdapter
 
 REQ_RE = re.compile(r"^[a-z]+-[A-Za-z0-9-]{1,80}-[0-9a-f]{12}\.json$")
 MAX_SPOOL_FILE = 64 * 1024
+PENDING_WINDOW_S = 3600   # brain-kit's Ledger.pending_voucher(newer_than=3600): older ones are not asked for again
 
 
 def load_config(path: str) -> dict[str, Any]:
@@ -204,8 +209,8 @@ class TeamRuntime:
                 tables = {r[0] for r in led.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
                 if "runs" in tables:
                     out["runs"] = [dict(r) for r in led.db.execute(
-                        "SELECT run_id, project, req, iid, sha, voucher_id, state, slot, path, paths, owner, created, "
-                        "updated FROM runs ORDER BY created")]
+                        "SELECT run_id, project, req, iid, sha, voucher_id, state, slot, path, paths, owner, last_sha, "
+                        "created, updated FROM runs ORDER BY created")]
                 if "decisions" in tables:
                     out["decisions"] = [dict(r) for r in led.db.execute(
                         "SELECT id, run_id, project, iid, sha, kind, lean_request, state, answer, answerer, voucher_id, "
@@ -216,6 +221,36 @@ class TeamRuntime:
                         "ORDER BY updated")]
         except sqlite3.Error:  # closed by stop() meanwhile
             return {"runs": [], "decisions": [], "handoffs": []}
+        return out
+
+    def pending(self, window_s: float = PENDING_WINDOW_S) -> list[dict[str, Any]]:
+        """Vouchers the bridge asked the signer for in an earlier round and got no answer to (brain-kit's
+        pending_vouchers): the next attempt asks for that very voucher again, so a late signature is used. Only those
+        still within brain-kit's reuse window (Ledger.pending_voucher's newer_than)."""
+        host = self.host
+        if host is None:
+            return []
+        led = host.ledger
+        common = bk.m("common")
+        since = common.iso(common.utcnow() - timedelta(seconds=window_s))
+        out = []
+        try:
+            with led.lock:
+                if not led.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pending_vouchers'"
+                                      ).fetchone():
+                    return []
+                rows = led.db.execute("SELECT ref, voucher, created FROM pending_vouchers WHERE created>=? "
+                                      "ORDER BY created", (since,)).fetchall()
+        except sqlite3.Error:
+            return []
+        for r in rows:
+            try:
+                v = json.loads(r["voucher"] or "{}")
+            except ValueError:
+                v = {}
+            v = v if isinstance(v, dict) else {}
+            out.append({"ref": str(r["ref"])[:200], "kind": str(v.get("kind") or ""), "run_id": str(v.get("run_id") or ""),
+                        "since": r["created"] if isinstance(r["created"], str) else None})
         return out
 
     def counts(self, rows: dict[str, Any]) -> dict[str, dict[str, int]]:
