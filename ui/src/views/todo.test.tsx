@@ -25,9 +25,9 @@ describe('待办', () => {
     renderTodo()
     await screen.findByRole('region', { name: 'Lean 审批' })
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(
-      ['Lean 审批', '本地澄清', '运行机上的问题', '等验收', '接手被拒', '没交出去的交接', 'KiroCrew 的问题'])
+      ['会话在等你回话', 'Lean 审批', '本地澄清', '运行机上的问题', '等验收', '认领了还没开工', '接手被拒', '没交出去的交接', 'KiroCrew 的问题'])
     // one card per item; KiroCrew's problems are its checks' rows, with their fixes
-    expect(screen.getAllByTestId('todo-item')).toHaveLength(6)
+    expect(screen.getAllByTestId('todo-item')).toHaveLength(8)
     expect(screen.queryByText(TEAM_SENTENCE)).toBeNull()
     expect(group('接手被拒')).toHaveTextContent('run.json 的 brain_commit 不在 main 上')
     expect(within(group('接手被拒')).getByRole('link', { name: '看 MR' })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/46')
@@ -42,36 +42,36 @@ describe('待办', () => {
   test('the count as a card: one cell per item, and each kind with its count jumps to its group', async () => {
     renderTodo()
     const count = await screen.findByTestId('todo-count')
-    expect(count).toHaveTextContent('7件')
-    expect(within(count).getByRole('img')).toHaveAccessibleName('Lean 审批 1，本地澄清 1，运行机上的问题 1，等验收 1，接手被拒 1，没交出去的交接 1，KiroCrew 的问题 1')
-    expect(Array.from(count.querySelectorAll('.td-cells i')).map((i) => i.className)).toEqual(['is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-bad', 'is-warn', 'is-bad'])
+    expect(count).toHaveTextContent('9件')
+    expect(within(count).getByRole('img')).toHaveAccessibleName('会话在等你回话 1，Lean 审批 1，本地澄清 1，运行机上的问题 1，等验收 1，认领了还没开工 1，接手被拒 1，没交出去的交接 1，KiroCrew 的问题 1')
+    expect(Array.from(count.querySelectorAll('.td-cells i')).map((i) => i.className)).toEqual(['is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-bad', 'is-warn', 'is-bad'])
     const jumps = within(screen.getByRole('navigation', { name: '待办的种类' })).getAllByRole('button')
-    expect(jumps.map((b) => b.textContent)).toEqual(['Lean 审批 1', '本地澄清 1', '运行机上的问题 1', '等验收 1', '接手被拒 1', '没交出去的交接 1', 'KiroCrew 的问题 1'])
+    expect(jumps.map((b) => b.textContent)).toEqual(['会话在等你回话 1', 'Lean 审批 1', '本地澄清 1', '运行机上的问题 1', '等验收 1', '认领了还没开工 1', '接手被拒 1', '没交出去的交接 1', 'KiroCrew 的问题 1'])
     const scroll = vi.mocked(HTMLElement.prototype.scrollIntoView)
     scroll.mockClear()
-    fireEvent.click(jumps[4])
+    fireEvent.click(jumps[6])
     expect(scroll.mock.contexts[0]).toBe(group('接手被拒'))
   })
 
   test('a session that waits for your reply and a claim not started yet are on the list, each with its one step', async () => {
-    const base = fx.todo().items[0]
-    const reply: TodoItem = { ...base, kind: 'reply', key: 'DEMO-3', title: '计算器乘法', approval: null, line: null,
-      text: '会话空着：轮到你回话（Lean 的下一步是发布）' }
-    const start: TodoItem = { ...base, kind: 'start', key: 'DEMO-2', title: '计算器除法', approval: null, line: null, session: null,
-      text: '认领了 12 小时，还没开工' }
-    installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items: [reply, start] }) })
+    const items = fx.todo().items.filter((i) => i.kind === 'reply' || i.kind === 'start')
+    const reply = items.find((i) => i.kind === 'reply')!
+    reply.since = Date.now() / 1000 - 3 * 3600 - 60
+    installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items }) })
     const status = fx.status()
     status.counts.todo = 2
     const { go } = renderTodo({ status })
     const waiting = await screen.findByRole('region', { name: '会话在等你回话' })
-    expect(waiting).toHaveTextContent('会话空着：轮到你回话（Lean 的下一步是发布）')
+    // what to tell the session, in Lean's words, and how long it has waited, as 交付总览 says it
+    expect(waiting).toHaveTextContent('构建测试做完了，下一步是发布：先开一个新会话做审查')
+    expect(waiting).toHaveTextContent('已等 3 小时')
     fireEvent.click(within(waiting).getByRole('button', { name: '打开会话' }))
-    expect(navigations).toEqual(['/chat?sid=brain-PAY-3-7f3a'])
+    expect(navigations).toEqual(['/chat?sid=brain-PAY-1-3d8e'])
     const claimed = group('认领了还没开工')
-    expect(claimed).toHaveTextContent('认领了 12 小时，还没开工')
+    expect(claimed).toHaveTextContent('已认领，还没开工')
     fireEvent.click(within(claimed).getByRole('button', { name: '去开工' }))
-    // 开需求 with this very key and title: it starts DEMO-2 itself, not the next free key
-    expect(go).toHaveBeenCalledWith({ kind: 'new', repo: 'r1', key: 'DEMO-2', title: '计算器除法' })
+    // 开需求 with this very key and title: it starts PAY-8 itself, not the next free key
+    expect(go).toHaveBeenCalledWith({ kind: 'new', repo: 'r1', key: 'PAY-8', title: '退款失败的提醒' })
     expect(screen.getByTestId('todo-count')).toHaveTextContent('2件')
   })
 
@@ -173,6 +173,15 @@ describe('待办', () => {
     expect(apiCalls.filter((c) => c.method === 'POST')).toEqual([{ method: 'POST', path: `${API}/requirements/r1/PAY-3/answer`, body: { choice: 'B' } }])
     expect(reloadStatus).toHaveBeenCalled()
     expect(screen.getAllByRole('form')).toHaveLength(1) // only the clarify question may be answered here
+  })
+
+  test('a Lean approval says what the line box says only once, as the backend words it', async () => {
+    const lean: TodoItem = { ...fx.todo().items[0], text: `读完再批：${TYPE_IT_YOURSELF}` }   // todo.build's words
+    installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items: [lean] }) })
+    renderTodo()
+    const card = within(await screen.findByRole('region', { name: 'Lean 审批' })).getByTestId('todo-item')
+    expect(card.textContent!.split(TYPE_IT_YOURSELF)).toHaveLength(2)
+    expect(within(card).getByText('读完再批')).toBeInTheDocument()
   })
 
   test('a Lean approval shows its line to type, copies it and opens the session; it is never sent', async () => {
