@@ -248,6 +248,11 @@
       ],
       "marks": [
         {
+          "at": 1794045620.0,
+          "kind": "session",
+          "title": "开了本机会话"
+        },
+        {
           "at": 1794047280.0,
           "kind": "commit",
           "title": "提交 e7e3cc10：PAY-3：需求初稿"
@@ -351,7 +356,7 @@
       "icon": "design",
       "status": "awaiting_approval",
       "doing": "等你批准代码生成计划",
-      "since": 1794146040.0,
+      "since": 1794146040,
       "history": [
         {
           "at": 1794048720,
@@ -385,18 +390,6 @@
         },
         {
           "at": 1794146040,
-          "status": "awaiting_approval",
-          "doing": "等你批准代码生成计划",
-          "who": "you"
-        },
-        {
-          "at": 1794052860.0,
-          "status": "merged",
-          "doing": "已批准",
-          "who": null
-        },
-        {
-          "at": 1794146040.0,
           "status": "awaiting_approval",
           "doing": "等你批准代码生成计划",
           "who": "you"
@@ -526,7 +519,7 @@
       "sub": "构建和测试的自动检查",
       "icon": "ci",
       "status": "waiting",
-      "doing": "等提交以后跑 verify",
+      "doing": "等提交以后跑自动检查",
       "since": null,
       "history": [],
       "spans": [],
@@ -563,9 +556,7 @@
       "history": [],
       "spans": [],
       "marks": [],
-      "facts": [
-        "提议 1 条新知识"
-      ],
+      "facts": [],
       "credits": null,
       "session": null,
       "line": null
@@ -637,6 +628,16 @@
     },
     {
       "seq": 3,
+      "at": 1794045620.0,
+      "kind": "session",
+      "from": "person",
+      "to": "local",
+      "text": "开了本机会话",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 4,
       "at": 1794045720,
       "kind": "stage",
       "from": "local",
@@ -646,7 +647,7 @@
       "src": null
     },
     {
-      "seq": 4,
+      "seq": 5,
       "at": 1794045780,
       "kind": "stage",
       "from": "local",
@@ -656,7 +657,7 @@
       "src": null
     },
     {
-      "seq": 5,
+      "seq": 6,
       "at": 1794047280.0,
       "kind": "commit",
       "from": "local",
@@ -666,7 +667,7 @@
       "src": null
     },
     {
-      "seq": 6,
+      "seq": 7,
       "at": 1794047460,
       "kind": "request",
       "from": "local",
@@ -676,7 +677,7 @@
       "src": null
     },
     {
-      "seq": 7,
+      "seq": 8,
       "at": 1794048720,
       "kind": "approve",
       "from": "person",
@@ -686,7 +687,7 @@
       "src": null
     },
     {
-      "seq": 8,
+      "seq": 9,
       "at": 1794048780,
       "kind": "stage",
       "from": "local",
@@ -696,7 +697,7 @@
       "src": null
     },
     {
-      "seq": 9,
+      "seq": 10,
       "at": 1794048840,
       "kind": "stage",
       "from": "local",
@@ -706,7 +707,7 @@
       "src": null
     },
     {
-      "seq": 10,
+      "seq": 11,
       "at": 1794048900,
       "kind": "stage",
       "from": "local",
@@ -716,7 +717,7 @@
       "src": null
     },
     {
-      "seq": 11,
+      "seq": 12,
       "at": 1794049800,
       "kind": "blocked",
       "from": "local",
@@ -726,7 +727,7 @@
       "src": null
     },
     {
-      "seq": 12,
+      "seq": 13,
       "at": 1794051360,
       "kind": "request",
       "from": "local",
@@ -736,7 +737,7 @@
       "src": null
     },
     {
-      "seq": 13,
+      "seq": 14,
       "at": 1794052860,
       "kind": "approve",
       "from": "person",
@@ -746,7 +747,7 @@
       "src": null
     },
     {
-      "seq": 14,
+      "seq": 15,
       "at": 1794052920,
       "kind": "stage",
       "from": "local",
@@ -756,7 +757,7 @@
       "src": null
     },
     {
-      "seq": 15,
+      "seq": 16,
       "at": 1794052980,
       "kind": "stage",
       "from": "local",
@@ -766,7 +767,7 @@
       "src": null
     },
     {
-      "seq": 16,
+      "seq": 17,
       "at": 1794053520,
       "kind": "stage",
       "from": "local",
@@ -776,7 +777,7 @@
       "src": null
     },
     {
-      "seq": 17,
+      "seq": 18,
       "at": 1794053640,
       "kind": "stage",
       "from": "local",
@@ -786,7 +787,7 @@
       "src": null
     },
     {
-      "seq": 18,
+      "seq": 19,
       "at": 1794053640,
       "kind": "stage",
       "from": "local",
@@ -796,7 +797,7 @@
       "src": null
     },
     {
-      "seq": 19,
+      "seq": 20,
       "at": 1794054720,
       "kind": "stage",
       "from": "local",
@@ -806,7 +807,7 @@
       "src": null
     },
     {
-      "seq": 20,
+      "seq": 21,
       "at": 1794054720,
       "kind": "stage",
       "from": "local",
@@ -816,7 +817,7 @@
       "src": null
     },
     {
-      "seq": 21,
+      "seq": 22,
       "at": 1794054840,
       "kind": "stage",
       "from": "local",
@@ -826,7 +827,7 @@
       "src": null
     },
     {
-      "seq": 22,
+      "seq": 23,
       "at": 1794054840,
       "kind": "stage",
       "from": "local",
@@ -836,7 +837,7 @@
       "src": null
     },
     {
-      "seq": 23,
+      "seq": 24,
       "at": 1794054900,
       "kind": "stage",
       "from": "local",
@@ -846,7 +847,7 @@
       "src": null
     },
     {
-      "seq": 24,
+      "seq": 25,
       "at": 1794054900,
       "kind": "stage",
       "from": "local",
@@ -856,7 +857,7 @@
       "src": null
     },
     {
-      "seq": 25,
+      "seq": 26,
       "at": 1794055020,
       "kind": "stage",
       "from": "local",
@@ -866,7 +867,7 @@
       "src": null
     },
     {
-      "seq": 26,
+      "seq": 27,
       "at": 1794055740,
       "kind": "request",
       "from": "local",
@@ -876,7 +877,7 @@
       "src": null
     },
     {
-      "seq": 27,
+      "seq": 28,
       "at": 1794056760,
       "kind": "approve",
       "from": "person",
@@ -886,7 +887,7 @@
       "src": null
     },
     {
-      "seq": 28,
+      "seq": 29,
       "at": 1794057840.0,
       "kind": "commit",
       "from": "local",
@@ -896,7 +897,7 @@
       "src": null
     },
     {
-      "seq": 29,
+      "seq": 30,
       "at": 1794059340.0,
       "kind": "commit",
       "from": "local",
@@ -906,7 +907,7 @@
       "src": null
     },
     {
-      "seq": 30,
+      "seq": 31,
       "at": 1794060240,
       "kind": "stage",
       "from": "local",
@@ -916,7 +917,7 @@
       "src": null
     },
     {
-      "seq": 31,
+      "seq": 32,
       "at": 1794128400,
       "kind": "answer",
       "from": "person",
@@ -926,7 +927,7 @@
       "src": null
     },
     {
-      "seq": 32,
+      "seq": 33,
       "at": 1794128520,
       "kind": "stage",
       "from": "local",
@@ -936,7 +937,7 @@
       "src": null
     },
     {
-      "seq": 33,
+      "seq": 34,
       "at": 1794144000.0,
       "kind": "commit",
       "from": "local",
@@ -946,7 +947,7 @@
       "src": null
     },
     {
-      "seq": 34,
+      "seq": 35,
       "at": 1794145200.0,
       "kind": "question",
       "from": "local",
@@ -956,7 +957,7 @@
       "src": null
     },
     {
-      "seq": 35,
+      "seq": 36,
       "at": 1794146040,
       "kind": "request",
       "from": "local",
@@ -1121,11 +1122,11 @@
       {
         "id": "verify",
         "group": "verify",
-        "label": "verify",
+        "label": "自动检查",
         "name": "自动检查",
         "status": "skip",
         "at": null,
-        "detail": "还没跑过 verify（构建和测试阶段跑）",
+        "detail": "还没跑过自动检查（构建和测试阶段跑）",
         "actor": "ci"
       },
       {
@@ -1199,19 +1200,17 @@
     "done": null
   },
   "brain": {
-    "loaded": 14,
+    "loaded": 7,
     "cited": [
       "P-PAY-2-1",
-      "T-PAY-2-1",
-      "T-12"
+      "T-12",
+      "T-PAY-2-1"
     ],
-    "stale": [
-      "T-12"
-    ],
+    "stale": [],
     "unknown": [
       "T-PAY-9-1"
     ],
-    "proposals": 1
+    "proposals": 0
   },
   "decisions": [
     {

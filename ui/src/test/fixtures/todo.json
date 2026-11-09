@@ -1,12 +1,9 @@
 {
-  "team": false,
   "items": [
     {
-      "kind": "lean_approval",
       "repo": "r1",
       "key": "PAY-3",
       "title": "退款单导出 CSV",
-      "text": "批准 refund-api 的代码计划",
       "line": "approve PLAN 5d1e7a90",
       "approval": "PLAN",
       "mr_url": null,
@@ -16,14 +13,14 @@
         "title": "PAY-3 退款单导出 CSV",
         "url": "/chat?sid=brain-PAY-3-7f3a"
       },
-      "since": 1794146040
+      "since": 1794146040.0,
+      "kind": "lean_approval",
+      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行"
     },
     {
-      "kind": "clarify",
       "repo": "r1",
       "key": "PAY-3",
       "title": "退款单导出 CSV",
-      "text": "回答一个澄清问题：导出文件里的时间用哪个时区",
       "line": null,
       "approval": null,
       "mr_url": null,
@@ -53,7 +50,7 @@
         "answerer": null,
         "voucher_id": null,
         "mr_url": null,
-        "at": 1794145200,
+        "at": null,
         "answerable_here": true,
         "answer_via": "session"
       },
@@ -62,92 +59,101 @@
         "title": "PAY-3 退款单导出 CSV",
         "url": "/chat?sid=brain-PAY-3-7f3a"
       },
-      "since": 1794145200
+      "since": 1794146040.0,
+      "kind": "clarify",
+      "text": "AI 停下问你：可以在这里回答"
     },
     {
-      "kind": "question",
-      "repo": "r1",
+      "repo": "runner",
       "key": "PAY-4",
       "title": "对账单按商户拆分",
-      "text": "运行机停在 D-2，等产品在 MR 上回答",
       "line": null,
       "approval": null,
-      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41#note_812",
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
       "question": {
-        "source": "mr",
+        "source": "bridge",
         "id": "D-2",
         "kind": "design",
         "kind_label": "设计",
-        "question": "按商户拆分后，老的合并对账单还要不要保留？",
-        "options": [
-          {
-            "id": "A",
-            "text": "保留一个月，之后下线"
-          },
-          {
-            "id": "B",
-            "text": "马上下线"
-          },
-          {
-            "id": "C",
-            "text": "一直保留"
-          }
-        ],
-        "recommend": "A",
+        "question": "",
+        "options": [],
+        "recommend": null,
         "lean_request": null,
-        "refs": [
-          "D02#S011"
-        ],
+        "refs": [],
         "state": "open",
         "answer": null,
         "answerer": null,
         "voucher_id": null,
-        "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41#note_812",
-        "at": 1794135600,
+        "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
+        "at": 1794135600.0,
         "answerable_here": false,
-        "answer_via": "mr"
+        "answer_via": null
       },
       "session": null,
-      "since": 1794135600
+      "since": 1794135600.0,
+      "kind": "question",
+      "text": "D-2 等人在 MR 上回答"
     },
     {
-      "kind": "acceptance",
-      "repo": "r1",
+      "repo": "runner",
       "key": "PAY-5",
       "title": "退款回调失败重试",
-      "text": "看 MR 上的交付说明，回答 D-3 验收",
       "line": null,
-      "approval": "RELEASE",
-      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44#note_901",
-      "question": null,
+      "approval": null,
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
+      "question": {
+        "source": "bridge",
+        "id": "D-3",
+        "kind": "acceptance",
+        "kind_label": "验收",
+        "question": "",
+        "options": [],
+        "recommend": null,
+        "lean_request": "RELEASE 0c9a7e21",
+        "refs": [],
+        "state": "open",
+        "answer": null,
+        "answerer": null,
+        "voucher_id": null,
+        "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
+        "at": 1794056400.0,
+        "answerable_here": false,
+        "answer_via": null
+      },
       "session": null,
-      "since": 1794052800
+      "since": 1794056400.0,
+      "kind": "acceptance",
+      "text": "D-3 等产品在 MR 上验收"
     },
     {
-      "kind": "handoff_rejected",
       "repo": "r1",
       "key": "PAY-7",
       "title": "退款原因下拉框",
-      "text": "run.json 的 brain_commit 不在 main 上：先 rebase 到最新的 main 再交接",
       "line": null,
       "approval": null,
       "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/46",
       "question": null,
-      "session": null,
-      "since": 1794128400
+      "session": {
+        "slot": "brain-PAY-7-2b9f",
+        "title": "PAY-7 退款原因下拉框",
+        "url": "/chat?sid=brain-PAY-7-2b9f"
+      },
+      "since": 1794129840.0,
+      "kind": "handoff_rejected",
+      "text": "接手被拒：标签是 bob 打的，不是负责人 alice"
     },
     {
-      "kind": "handoff_unlabelled",
       "repo": "r1",
-      "key": "PAY-9",
-      "title": "退款失败重试",
-      "text": "推上去了，但 MR 上没有交接标签 ai-handoff：什么也没交出去。看一眼 MR，再在分支上跑一次 brain handoff",
+      "key": "PAY-10",
+      "title": "退款审批加二次确认",
       "line": null,
       "approval": null,
       "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/52",
       "question": null,
       "session": null,
-      "since": 1794128400
+      "since": 1794118440.0,
+      "kind": "handoff_unlabelled",
+      "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次"
     },
     {
       "kind": "crew",
@@ -160,7 +166,7 @@
       "mr_url": null,
       "question": null,
       "session": null,
-      "since": 1794146360
+      "since": null
     },
     {
       "repo": "r1",
@@ -192,5 +198,6 @@
       "kind": "reply",
       "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）"
     }
-  ]
+  ],
+  "team": false
 }

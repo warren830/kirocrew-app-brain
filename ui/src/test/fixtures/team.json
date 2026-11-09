@@ -32,13 +32,13 @@
   },
   "runs": [
     {
-      "run_id": "RUN-PAY-8-1",
-      "req": "PAY-8",
+      "run_id": "RUN-PAY-9-1",
+      "req": "PAY-9",
       "project": "shop/shop-pay",
-      "iid": 48,
+      "iid": 53,
       "state": "signing",
       "slot": null,
-      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/48",
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/53",
       "updated": "2026-11-08T21:59:00+08:00"
     },
     {

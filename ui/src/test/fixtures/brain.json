@@ -205,30 +205,6 @@
     "warnings": [
       {
         "level": "WARN",
-        "text": "brain/PRODUCT.md 第 13 行：P-7 是旧式条目号",
-        "todo": "不用改；新条目用 <字母>-<需求号>-<n>",
-        "fix": null,
-        "repo": "/Users/alice/workplace/shop-pay",
-        "raw": "PRODUCT.md:13: legacy sequential id P-7; new entries use <side>-<KEY>-<n>"
-      },
-      {
-        "level": "WARN",
-        "text": "brain/PROJECT.md 第 11 行：J-3 是旧式条目号",
-        "todo": "不用改；新条目用 <字母>-<需求号>-<n>",
-        "fix": null,
-        "repo": "/Users/alice/workplace/shop-pay",
-        "raw": "PROJECT.md:11: legacy sequential id J-3; new entries use <side>-<KEY>-<n>"
-      },
-      {
-        "level": "WARN",
-        "text": "brain/TECH.md 第 11 行：T-12 是旧式条目号",
-        "todo": "不用改；新条目用 <字母>-<需求号>-<n>",
-        "fix": null,
-        "repo": "/Users/alice/workplace/shop-pay",
-        "raw": "TECH.md:11: legacy sequential id T-12; new entries use <side>-<KEY>-<n>"
-      },
-      {
-        "level": "WARN",
         "text": "brain/TECH.md 第 14 行：T-PAY-2-1 已经重复出现 2 次",
         "todo": "把它做成一个会失败的检查，别再加文字",
         "fix": null,
@@ -236,12 +212,12 @@
         "raw": "TECH.md:14: T-PAY-2-1 came back 2 times: make it a gate (a check that fails), not more text"
       },
       {
-        "level": "WARN",
-        "text": "brain/TECH.md 第 20 行：T-13 是旧式条目号",
-        "todo": "不用改；新条目用 <字母>-<需求号>-<n>",
+        "level": "OK",
+        "text": "P-7、J-3、T-12、T-13 是旧式条目号，不用改。新条目的编号是 字母-需求号-序号，比如 P-PAY-3-1",
+        "todo": "",
         "fix": null,
         "repo": "/Users/alice/workplace/shop-pay",
-        "raw": "TECH.md:20: legacy sequential id T-13; new entries use <side>-<KEY>-<n>"
+        "raw": "PRODUCT.md:13: legacy sequential id P-7; new entries use <side>-<KEY>-<n>\nPROJECT.md:11: legacy sequential id J-3; new entries use <side>-<KEY>-<n>\nTECH.md:11: legacy sequential id T-12; new entries use <side>-<KEY>-<n>\nTECH.md:20: legacy sequential id T-13; new entries use <side>-<KEY>-<n>"
       }
     ]
   },
@@ -290,9 +266,16 @@
         "where": "worktree"
       },
       {
+        "key": "PAY-10",
+        "loaded": 7,
+        "cited": [],
+        "where": "branch"
+      },
+      {
         "key": "PAY-3",
         "loaded": 7,
         "cited": [
+          "P-PAY-2-1",
           "T-12",
           "T-PAY-2-1"
         ],
@@ -335,5 +318,6 @@
       "state": "merged"
     }
   ],
-  "error": ""
+  "error": "",
+  "raw": ""
 }

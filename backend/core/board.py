@@ -38,7 +38,7 @@ AFTER_PLAN = ("build-and-test", "release")   # Lean is past code generation, and
 # what an actor waits for before its turn (its line while 还没轮到)
 WAIT_TEXT = {
     "local": "等开工", "req": "等 Lean 走到需求审批", "design": "等需求批准以后的设计", "handover": "等本机做完再交接",
-    "bridge": "等交接以后核对", "signer": "等桥核对完签接手合同", "runner": "等签好合同以后接手", "ci": "等提交以后跑 verify",
+    "bridge": "等交接以后核对", "signer": "等桥核对完签接手合同", "runner": "等签好合同以后接手", "ci": "等提交以后跑自动检查",
     "release": "等 Lean 走到发布审批", "reflect": "等合并以后写回 Brain",
 }
 # Lean's approval kinds -> the gate actors they ask
@@ -50,11 +50,6 @@ FINAL = ("merged", "skipped", "failed")
 MAX_EVENTS = 400
 MAX_BELT = 80
 NOT_NEEDED = "这次不需要"
-# Lean's BLOCKED gates (aidlc_lean.py block()) and tools, in words
-BLOCK_GATE = {"records": "记录文件只能由 Lean 自己写", "protected": "受保护的文件", "danger": "危险命令", "intent": "还没选需求",
-              "contract": "别的团队的文件：要先开变更请求", "verify": "还没过 verify", "requirements": "需求还没批",
-              "design": "设计还没批", "inception": "需求和设计还没批", "ideation": "构思还没批", "released": "已经发布了"}
-BLOCK_TOOL = {"fs_write": "写文件", "write": "写文件", "execute_bash": "跑命令", "shell": "跑命令", "bash": "跑命令"}
 # brainkit.trace's `missing` sources (trace.py): the ones a repo done only on this machine, or a requirement not handed
 # over yet, has nothing to read from are not missing
 MISSING = (("bridge ledger", "runner", "桥的账本：这台机器上读不到，交接以后桥的核对和转的问题看不全"),
@@ -279,15 +274,15 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
             else:
                 add(at, "refused", gates[0], gates[0], "批准的那一行没被接受（%s）" % name, gates=list(gates), lean=kind)
         elif ev == "BLOCKED":
-            what = "写 %s" % _clip(d.get("path"), 50) if d.get("path") else "一次%s" % BLOCK_TOOL.get(str(d.get("tool") or ""), "工具调用")
-            add(at, "blocked", s, s, "Lean 拦下了%s：%s" % (what, BLOCK_GATE.get(str(d.get("gate") or ""), "它的规则不让")),
+            what = "写 %s" % _clip(d.get("path"), 50) if d.get("path") else "一次%s" % lean_view.BLOCK_TOOL.get(str(d.get("tool") or ""), "工具调用")
+            add(at, "blocked", s, s, "Lean 拦下了%s：%s" % (what, lean_view.block_rule(d.get("gate"))),
                 detail=True)
         elif ev == "VERIFY":
             res = [r for r in d.get("results") or [] if isinstance(r, dict)] if isinstance(d.get("results"), list) else []
             bad = [_cmd_name(r.get("cmd")) for r in res if r.get("exit") not in (0, None)]
             ok = bool(d.get("ok"))
-            text = ("verify 通过（%d 项）" % len(res) if res else "verify 通过") if ok else \
-                "verify 没过：%s" % ("、".join(bad[:3]) or "有检查失败")
+            text = ("自动检查通过（%d 项）" % len(res) if res else "自动检查通过") if ok else \
+                "自动检查没过：%s" % ("、".join(bad[:3]) or "有检查失败")
             add(at, "verify", "branch", "checks", text, ok=ok,
                 results=[[_cmd_name(r.get("cmd")), r.get("exit") in (0, None)] for r in res][:40])
     # the trace: commits, the hand-over and the bridge, questions, the merge
@@ -437,7 +432,7 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
                 fo.put(s, "fixing" if A[s]["status"] == "fixing" else "running", "在做：%s" % label, at)
                 fo.open(s, "fix" if A[s]["status"] == "fixing" else "work", at)
                 if e.get("stage") == "build-and-test" and A["ci"]["status"] == "waiting":
-                    fo.put("ci", "running", "跑 verify：构建和测试", at)
+                    fo.put("ci", "running", "跑自动检查：构建和测试", at)
                     fo.open("ci", "work", at)
             elif e.get("state") == "done" and A[s]["status"] in ("running", "fixing"):
                 # still at work: on the stage it had begun before this one, else on the next one
@@ -660,21 +655,25 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
             hand_at is not None and e["at"] > hand_at))]
         return ats[-1] if ats else None
 
-    for a in f.get("approvals") or []:
-        gates = GATES_OF.get(str(a.get("kind") or ""), ())
-        for g in gates:
+    # each kind's last word (one per PLAN unit), oldest first; one the events already folded past is not said again
+    # (an approved DESIGN under a later PLAN request), so a gate's history stays in time order with no repeats
+    for a in sorted(f.get("approvals") or [], key=lambda x: _first(x.get("at"), now)):
+        at = _first(a.get("at"), now)
+        for g in GATES_OF.get(str(a.get("kind") or ""), ()):
             if a.get("state") == "pending":
                 # a line to type only on this machine's own run: after the hand-over the runner's approvals are answered
                 # on the MR (the bridge brings the answer back), never typed here
                 A[g]["line"] = a.get("line") if hand_at is None else None
-                if A[g]["status"] != "awaiting_approval":
-                    fo.put(g, "awaiting_approval", "等%s批准%s" % (you if hand_at is None else "人在 MR 上",
-                                                              GATE_KIND_LABEL.get(a["kind"], "")), _first(a.get("at"), now),
-                           _who(you) if hand_at is None else "product" if a.get("kind") == "RELEASE" else "people")
+            if A[g]["since"] is not None and at < A[g]["since"]:
+                continue
+            if a.get("state") == "pending" and A[g]["status"] != "awaiting_approval":
+                fo.put(g, "awaiting_approval", "等%s批准%s" % (you if hand_at is None else "人在 MR 上",
+                                                          GATE_KIND_LABEL.get(a["kind"], "")), at,
+                       _who(you) if hand_at is None else "product" if a.get("kind") == "RELEASE" else "people")
             elif a.get("state") == "stale" and A[g]["status"] != "merged":
-                fo.put(g, "stalled", "文件改过了：要重新请求批准", _first(a.get("at"), now))
+                fo.put(g, "stalled", "文件改过了：要重新请求批准", at)
             elif a.get("state") == "approved" and A[g]["status"] in ("waiting", "awaiting_approval"):
-                fo.put(g, "merged", "已批准", _first(a.get("at"), now))
+                fo.put(g, "merged", "已批准", at)
     if state == "local" and not hand_at:
         s = local[-1] if local else None
         pend = any(a.get("state") == "pending" for a in f.get("approvals") or [])
@@ -819,14 +818,14 @@ def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str,
         r = rounds[-1]
         res = r.get("results") or []
         if not res:
-            cell("verify", "verify", "verify", "自动检查", "pass" if r.get("ok") else "fail", r["at"], r["text"], "ci")
+            cell("verify", "verify", "自动检查", "自动检查", "pass" if r.get("ok") else "fail", r["at"], r["text"], "ci")
         seen: dict[str, int] = {}
         for name, ok in res:
             n = seen[name] = seen.get(name, 0) + 1
             cell("verify-%s-%d" % (name, n), "verify", name, "自动检查：%s" % name, "pass" if ok else "fail", r["at"],
-                 "通过" if ok else "没过：在会话里看 verify 的输出", "ci")
+                 "通过" if ok else "没过：在会话里看自动检查的输出", "ci")
     else:
-        cell("verify", "verify", "verify", "自动检查", "skip", None, "还没跑过 verify（构建和测试阶段跑）", "ci", later="自动检查")
+        cell("verify", "verify", "自动检查", "自动检查", "skip", None, "还没跑过自动检查（构建和测试阶段跑）", "ci", later="自动检查")
     # the hand-over: the bridge and the signer (not on the way of a repo done only here, or of one done here and merged)
     if not local_only and not (hand_at is None and merged_at is not None):
         cell("bridge", "handover", "桥", "桥核对交接", "pass" if A["handover"]["status"] == "merged" else
@@ -896,7 +895,7 @@ def _facts(fo: _Fold, f: dict[str, Any], evs: list[dict[str, Any]], row: dict[st
         A[g]["facts"] = [x for x in ("请求批准 %d 次" % len(reqs) if reqs else "", "退回 %d 次" % len(backs) if backs else "",
                                      "批准的那一行由人在会话里自己打" if A[g]["line"] else "") if x]
     rounds = [e for e in evs if e["kind"] == "verify"]
-    A["ci"]["facts"] = [x for x in ("verify %d 次" % len(rounds) if rounds else "",
+    A["ci"]["facts"] = [x for x in ("自动检查 %d 次" % len(rounds) if rounds else "",
                                     "没过 %d 次" % sum(1 for r in rounds if not r.get("ok")) if any(not r.get("ok") for r in rounds) else "",
                                     rounds[-1]["text"] if rounds else "") if x]
     A["handover"]["facts"] = [x for x in ("MR !%s" % (row.get("mr") or {}).get("iid") if row.get("mr") else "",

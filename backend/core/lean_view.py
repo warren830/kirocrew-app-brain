@@ -38,11 +38,22 @@ PASSED_OVER = "Lean 没记这一步，直接往后做了"
 APPROVAL_EVENTS = ("APPROVAL_REQUESTED", "APPROVED", "REJECTED", "APPROVAL_REFUSED")
 KIND_LABEL = {"REQUIREMENTS": "需求", "DESIGN": "设计", "INCEPTION": "需求和设计", "PLAN": "代码生成计划",
               "RELEASE": "发布"}
+# Lean's BLOCKED gates (aidlc_lean.py block()) and tools, in words
+BLOCK_GATE = {"records": "记录文件只能由 Lean 自己写", "protected": "受保护的文件", "danger": "危险命令", "intent": "还没选需求",
+              "contract": "别的团队的文件：要先开变更请求", "verify": "还没过自动检查", "requirements": "需求还没批",
+              "design": "设计还没批", "inception": "需求和设计还没批", "ideation": "构思还没批", "released": "已经发布了"}
+BLOCK_TOOL = {"fs_write": "写文件", "write": "写文件", "execute_bash": "跑命令", "shell": "跑命令", "bash": "跑命令"}
+BLOCKED = "Lean 拦下了一个不该做的改动"
 CHECKBOX_RE = re.compile(rb"(?m)^([ \t]*[-*] )\[[xX ]\]")
 PLAN_RE = re.compile(r"/construction/plans/[^/]+-code-generation-plan\.md$")
 
 Reader = Callable[[str], Optional[bytes]]   # repo-relative path -> bytes or None
 Lister = Callable[[str], list]              # repo-relative prefix -> repo-relative paths
+
+
+def block_rule(gate: Any) -> str:
+    """Which of Lean's rules a BLOCKED record broke, in words."""
+    return BLOCK_GATE.get(str(gate or ""), "它的规则不让")
 
 
 def epoch(ts: Any) -> float | None:
@@ -311,14 +322,14 @@ def stage_events(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
             kind = str(d.get("kind") or "")
             verb = {"APPROVAL_REQUESTED": "请求批准", "APPROVED": "批准", "REJECTED": "驳回",
                     "APPROVAL_REFUSED": "审批口令没被接受"}[ev]
-            out.append({"at": at, "kind": "approval", "label": "%s %s" % (verb, KIND_LABEL.get(kind, kind)),
+            out.append({"at": at, "kind": "approval", "label": verb + KIND_LABEL.get(kind, kind),
                         "detail": ("sha %s" % str(d.get("sha256"))[:8]) if d.get("sha256") else (d.get("check") or None),
                         "who": None, "src": src})
         elif ev == "BLOCKED":
-            out.append({"at": at, "kind": "blocked", "label": "Lean 拦下（%s）" % (d.get("gate") or "?"),
+            out.append({"at": at, "kind": "blocked", "label": "%s：%s" % (BLOCKED, block_rule(d.get("gate"))),
                         "detail": str(d.get("path") or d.get("tool") or "")[:120] or None, "who": None, "src": src})
         elif ev == "VERIFY":
-            out.append({"at": at, "kind": "verify", "label": "verify %s" % ("通过" if d.get("ok") else "没过"),
+            out.append({"at": at, "kind": "verify", "label": "自动检查%s" % ("通过" if d.get("ok") else "没过"),
                         "detail": None, "who": None, "src": src})
         elif ev in ("SESSION_START", "HUMAN_TURN"):
             out.append({"at": at, "kind": "session", "label": "会话开始" if ev == "SESSION_START" else "人发了一条消息",

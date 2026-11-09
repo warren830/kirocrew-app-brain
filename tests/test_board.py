@@ -355,7 +355,7 @@ def test_a_design_lean_skipped_is_not_needed_and_the_wall_says_what_is_still_to_
     w = b["checks"]
     assert (w["passed"], w["failed"], w["total"], w["todo"]) == (2, 0, 2, ["发布审批"])
     assert b["accept"]["checks"] == "目前 2 项都过 · 还剩 发布审批"
-    assert "verify 通过（1 项）" in [e["text"] for e in b["events"] if e["kind"] == "verify"]
+    assert "自动检查通过（1 项）" in [e["text"] for e in b["events"] if e["kind"] == "verify"]
 
 
 def merged_trace(merged_at, window_end):
@@ -487,3 +487,26 @@ def test_the_replay_says_what_the_session_is_doing_while_it_works():
     assert "在做：需求分析" in running[running.index("在做：逆向工程") + 1:]
     assert not [d for d in running if d.startswith("做完")]
     assert not [x for x in local["facts"] if x.startswith("Lean")]
+
+
+def test_a_gate_history_stays_in_time_order_with_no_repeats_under_a_later_plan():
+    """Measured on PAY-3's replay: the approved DESIGN was said again at its own time after a later PLAN request, so
+    设计审批 read 已批准 during the first plan's wait, and the second plan's wait was listed twice."""
+    d, p1, p2 = T + 1 * H, T + 2 * H, T + 5 * H
+    req = lambda at, kind, h, **u: ev(at, "APPROVAL_REQUESTED", kind=kind, sha256=h * 64, **u)  # noqa: E731
+    ok = lambda at, kind, h, **u: ev(at, "APPROVED", kind=kind, sha256=h * 64, **u)  # noqa: E731
+    evs = [req(T + 30 * M, "DESIGN", "a"), ok(d, "DESIGN", "a"), req(p1 - 20 * M, "PLAN", "b", unit="export"),
+           ok(p1, "PLAN", "b", unit="export"), req(p2, "PLAN", "c", unit="api")]
+    approvals = [{"kind": k, "unit": u, "state": st, "sha8": h * 8, "at": at, "line": line, "path": None}
+                 for k, u, st, h, at, line in (("DESIGN", None, "approved", "a", d, None),
+                                               ("PLAN", "export", "approved", "b", p1, None),
+                                               ("PLAN", "api", "pending", "c", p2, "approve PLAN cccccccc"))]
+    b = snapshot(facts(evs, approvals=approvals),
+                 row_of("local", "you", "等你批准 api 的代码生成计划：读完再在会话里自己打那一行", do="approve"), now=p2 + H)
+    design = actor(b, "design")
+    h = design["history"]
+    assert [x["at"] for x in h] == sorted(x["at"] for x in h)
+    assert len({(x["at"], x["status"]) for x in h}) == len(h)
+    assert (h[-1]["status"], h[-1]["at"], design["line"]) == ("awaiting_approval", p2, "approve PLAN cccccccc")
+    during_first_plan = [x for x in h if x["at"] <= p1 - 10 * M][-1]
+    assert during_first_plan["status"] == "awaiting_approval"

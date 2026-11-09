@@ -104,7 +104,8 @@ def test_team_states_from_the_ledger():
              ({"state": "dispatched"}, [{"id": "D-5", "state": "delivered", "kind": "clarify"}], None, "running", "runner"),
              ({"state": "dispatched"}, [], waiting, "parked", "bridge"),
              ({"state": "send_unknown", "slot": "run-pay-1-1"}, [], None, "running", "people"),
-             ({"state": "failed"}, [], None, "rejected", "people"), ({"state": "closed"}, [], None, "merged", "nobody")]
+             ({"state": "failed"}, [], None, "rejected", "people"), ({"state": "closed"}, [], None, "closed", "nobody"),
+             ({"state": "merged"}, [{"id": "D-2", "state": "delivered", "kind": "acceptance"}], None, "merged", "nobody")]
     for run_row, decs, park, want, who in cases:
         r = row()
         deliveries.team_classify(r, run_row, decs, park)
@@ -115,6 +116,9 @@ def test_team_states_from_the_ledger():
     r = row()
     deliveries.team_classify(r, {"state": "dispatched"}, [{"id": "D-5", "state": "refused"}], None)
     assert "签名服务不签" in r["waits"]["text"] and "D-5" in r["waits"]["text"]
+    r = row()
+    deliveries.team_classify(r, {"state": "merged"}, [], None)
+    assert (r["state_label"], r["waits"]["text"]) == ("已合并", "MR 已合并，运行结束")    # not 「运行机在跑」
     r = row()
     deliveries.team_classify(r, {"state": "signing", "run_id": "RUN-PAY-1-1"}, [], None)
     assert "签接手合同" in r["waits"]["text"] and "RUN-PAY-1-1" in r["waits"]["text"]
@@ -304,6 +308,27 @@ def test_commit_dates_and_how_a_run_was_merged_in_the_timeline():
     assert any(i["detail"] == "%s （a new way）" % ("3" * 12) for i in detail.trace_timeline(t))
 
 
+def test_the_timeline_says_what_happened_in_words_never_the_record_codes():
+    """REST-29: no 「verify 通过」, 「park：clarify（waiting）」, 「Lean 拦下（inception）」, 「D-1 delivered」 or 「桥：bridge
+    accepted」 on 需求详情's timeline; the board's words for the same records."""
+    detail, lv = mod("detail"), mod("lean_view")
+    t = {"checks": {"verify": [{"at": "2026-11-09T01:00:00Z", "ok": False}]},
+         "stages": [{"id": "functional-design/refund-api", "state": "done", "at": "2026-11-09T00:05:00Z"}],
+         "actions": {"blocked": [{"at": "2026-11-09T00:10:00Z", "gate": "inception", "path": "src/pay/api.py"}],
+                     "questions": [{"at": "2026-11-09T00:20:00Z", "kind": "clarify", "status": "waiting"},
+                                   {"at": "2026-11-09T00:30:00Z", "kind": "clarify", "status": "answered"}],
+                     "handovers": [{"at": "2026-11-09T02:00:00Z", "kind": "bridge accepted", "run_id": "RUN-PAY-1-1"}]},
+         "decisions": [{"source": "bridge", "id": "D-1", "state": "delivered", "at": "2026-11-09T03:00:00Z", "choice": "A"}]}
+    labels = [i["label"] for i in detail.trace_timeline(t)]
+    assert labels == ["功能设计：完成（refund-api）", "Lean 拦下了一个不该做的改动：需求和设计还没批", "停下问人：澄清", "澄清的问题回答了，接着做", "自动检查没过",
+                      "桥接手了", "D-1 回答了，桥签好送回运行机"]
+    ledger = [{"event": "BLOCKED", "data": {"gate": "records", "path": "aidlc-docs/x/audit.md"}, "ts": "2026-11-09T00:00:00Z"},
+              {"event": "APPROVED", "data": {"kind": "REQUIREMENTS"}, "ts": "2026-11-09T00:01:00Z"},
+              {"event": "VERIFY", "data": {"ok": True}, "ts": "2026-11-09T00:02:00Z"}]
+    assert [i["label"] for i in lv.stage_events(ledger)] == ["Lean 拦下了一个不该做的改动：记录文件只能由 Lean 自己写", "批准需求",
+                                                             "自动检查通过"]
+
+
 def test_evaluate_notes_say_which_runs_wait_for_their_merge():
     """brain-kit 72b278e: an unmerged run whose acceptance was rejected is autonomy's "wrong_open" (it waits for its
     merge and 14 days); one already in delivery's wrong_open is not listed twice."""
@@ -429,6 +454,21 @@ def test_todo_lists_what_waits_for_you_the_way_the_rows_say_it():
     assert [(i["kind"], i["key"], i["text"]) for i in got["items"]] == [("reply", "PAY-1", "下一步是发布"),
                                                                       ("start", "PAY-2", "已认领，还没开工")]
     assert got["items"][0]["session"] == sess and got["items"][0]["since"] == 9.0 and got["items"][1]["since"] == 5.0
+
+
+def test_team_todo_says_a_runner_question_as_the_detail_does_its_kind_in_words():
+    """Team 待办's question cards said 「design」 / 「acceptance」: the ledger has no kind_label. They are the ones
+    需求详情 shows for the same decisions (detail.ledger_questions)."""
+    todo, detail = mod("todo"), mod("detail")
+    url = "https://gl.example/grp/repo/-/merge_requests/5"
+    decs = [{"id": "D-2", "kind": "design", "state": "open", "created": "2026-11-09T01:00:00Z", "run_id": "RUN-PAY-4-1"},
+            {"id": "D-3", "kind": "acceptance", "state": "open", "lean_request": "RELEASE 0c9a7e21", "run_id": "RUN-PAY-4-1"}]
+    row = {"repo": "runner", "key": "PAY-4", "title": "对账单按商户拆分", "state": "parked", "mr": {"url": url},
+           "updated_at": 5.0, "waits": deliveries.waits("people", "answer", "等人在 MR 上回答 D-2（设计）")}
+    got = todo.build([{"row": row, "decisions": decs, "mr_url": url}], team=True, crew_rows=[])["items"]
+    assert [(i["kind"], i["title"], i["question"]["kind_label"]) for i in got] == [
+        ("question", "对账单按商户拆分", "设计"), ("acceptance", "对账单按商户拆分", "验收")]
+    assert [i["question"] for i in got] == detail.ledger_questions(decs, url)
 
 
 def test_the_eval_queue_says_what_people_did_in_words():

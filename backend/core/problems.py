@@ -66,13 +66,14 @@ class Rule:
     (groups, level) when the words depend on the level (brain doctor says some lines at OK or FAIL); *runner*: it
     matters only to a repo handed to the team runner (*local*: the todo for a local-only one); *search*: found
     anywhere in the line, not only at its start; *level*: the level the app says it at, whatever brain-kit said (a
-    note brain-kit warns about that needs nothing done)."""
+    note brain-kit warns about that needs nothing done); *cmd*: the command that does the 做什么 in a terminal, kept
+    with the raw (细节), never in the 做什么 line."""
 
     def __init__(self, rx: str, text: Any, todo: Any = "", fix: str | None = None, *, runner: bool = False,
-                 local: Any = "", search: bool = False, level: str | None = None) -> None:
+                 local: Any = "", search: bool = False, level: str | None = None, cmd: str = "") -> None:
         self.rx = re.compile(rx, re.S)
         self.text, self.todo, self.fix = text, todo, fix
-        self.runner, self.local, self.search, self.level = runner, local, search, level
+        self.runner, self.local, self.search, self.level, self.cmd = runner, local, search, level, cmd
 
     def match(self, s: str) -> "re.Match | None":
         return self.rx.search(s) if self.search else self.rx.match(s)
@@ -158,12 +159,13 @@ RULES: list[Rule] = [
          "点「%s」：会补上它" % FIX_BUTTON["kit"], "kit"),
     Rule(r"^(?P<dir>\S+?)/ is git-ignored", lambda g, lv: ("%s/ 不进 git" % g["dir"]) if lv == "OK" else
          ("%s/ 没被 git 忽略" % g["dir"]), "需求材料不能进 git：点「%s」，会把它加进 .gitignore" % FIX_BUTTON["kit"], "kit"),
-    Rule(r"^cannot fetch origin/(?P<b>\S+): Brain freshness unknown$", "取不到 origin/{b}：不知道 Brain 是不是最新",
+    Rule(r"^cannot fetch origin/(?P<b>\S+): Brain freshness unknown$", "取不到远端的 {b}：不知道 Brain 是不是最新",
          "检查网络或登录（比如 mwinit），再检查一次"),
-    Rule(r"^Brain vs origin/(?P<b>\S+): same$", "Brain 和 origin/{b} 一样"),
-    Rule(r"^Brain vs origin/(?P<b>\S+): differs", "Brain 和 origin/{b} 不一样", "在这个目录里 git pull（或 rebase）"),
-    Rule(r"^no origin remote: Brain freshness not checked$", "没有 origin：没查 Brain 是不是最新",
-         "要推送和开 MR 时再加：git remote add origin <地址>"),
+    Rule(r"^Brain vs origin/(?P<b>\S+): same$", "Brain 和远端 {b} 上的一样"),
+    Rule(r"^Brain vs origin/(?P<b>\S+): differs", "Brain 和远端 {b} 上的不一样",
+         "把远端 {b} 的新提交拉进这个仓库（合并或 rebase 都行）", cmd="git pull"),
+    Rule(r"^no origin remote: Brain freshness not checked$", "没有远端：没查 Brain 是不是最新",
+         "只在本机做就不用管；要推送和开 MR 时，再给这个仓库加上远端地址", cmd="git remote add origin <地址>"),
     Rule(r"^(?P<tool>kiro-cli|kirocrew) not found on PATH$", "PATH 里找不到 {tool}",
          lambda g, lv: "app 自己会去 ~/.local/bin 找它，一般不用管" if g["tool"] == "kirocrew" else
          "装上 kiro-cli，或者把它加进 PATH"),
@@ -179,7 +181,7 @@ RULES: list[Rule] = [
          lambda g, lv: "点「%s」：只补上缺的（%s），别的 hook 和设置都不动" % (FIX_BUTTON["agent"], _hook_names(g["t"])),
          "agent"),
     Rule(r"^KiroCrew brain-dev\.json has no (?P<f>.+?) \(", "brain-dev.json 没有 {f}",
-         "在终端里跑 brain crew-agent --force 补上（你自己的设置都留着）"),
+         "让 brain-kit 在终端里补上缺的设置（你自己的设置都留着）", cmd="brain crew-agent --force"),
     Rule(r"^KiroCrew brain-dev uses your own (?P<f>.+?) \(", "brain-dev 用的是你自己的 {f}"),
     Rule(r"^~/\.kiro/agents/brain-dev\.json is not valid JSON", "brain-dev.json 不是合法的 JSON",
          "自己修好或删掉 ~/.kiro/agents/brain-dev.json（这里不会覆盖它）"),
@@ -234,7 +236,8 @@ def row(level: Any, raw: Any, *, repo: str | None = None, team: bool | None = No
         fix = r.fix if level_now != "OK" else None
         if fix in ("kit", "me") and not repo:
             fix = None
-        return mk(level_now, text, todo, fix, repo, s)
+        more = r.cmd and level_now != "OK" and r.cmd not in s       # brain-kit's words may name it already
+        return mk(level_now, text, todo, fix, repo, "%s\n在终端里：%s" % (s, r.cmd) if more else s)
     return fallback(lv, s, repo=repo)
 
 
@@ -355,8 +358,9 @@ def engine(be: str | None, why: str = "", detail: str = "") -> dict[str, Any]:
     if be is None:
         if why == "no_kirocrew":
             return mk("WARN", "找不到 kirocrew 命令", "看不了引擎设置：确认 ~/.local/bin/kirocrew 在（KiroCrew 装好了）")
-        return mk("WARN", "kirocrew config get 跑不了", "看不了引擎设置：在终端里试试 kirocrew config get agent.acp_backend",
-                  raw=detail)
+        return mk("WARN", "读不了 KiroCrew 的引擎设置", "确认 KiroCrew 装好了、在终端里能用，再检查一次",
+                  raw="%s\n在终端里：kirocrew config get agent.acp_backend" % detail if detail else
+                  "在终端里：kirocrew config get agent.acp_backend")
     if be in ("kas", ""):
         return mk("OK", "KiroCrew 引擎：%s" % (be or "默认（kas）"))
     return mk("WARN", "KiroCrew 引擎是 %s，不是 kas" % be, "点「%s」：Lean 的 hook 只在 kas（v3）上测过。KiroCrew "
@@ -374,10 +378,12 @@ def crew_timeout(seconds: int) -> dict[str, Any]:
 # ---- brain lint (brainkit/brainlint.py): "<where>: <message>" ------------------------------------------------------ #
 
 LINT_WHERE = re.compile(r"^(?P<where>\S+?(?::\d+)?(?: \([^)]*\))?): (?P<msg>.+)$", re.S)
+# an entry id from before brain-kit's <side>-<KEY>-<n>: brain lint warns about each one, and there is nothing to change
+LEGACY_ID = re.compile(r"^legacy sequential id (?P<id>\S+);")
+LEGACY_SHOWN = 8
 LINT_RULES: list[tuple[re.Pattern, str, str]] = [(re.compile(rx, re.S), t, d) for rx, t, d in (
     (r"^id (?P<id>\S+) already used at (?P<at>\S+)", "条目号 {id} 重复了", "给后来的那条换一个号"),
-    (r"^bad id '?(?P<id>.+?)'? \(want", "条目号 {id} 不对", "条目号要像 T-OMS-12-1"),
-    (r"^legacy sequential id (?P<id>\S+);", "{id} 是旧式条目号", "不用改；新条目用 <字母>-<需求号>-<n>"),
+    (r"^bad id '?(?P<id>.+?)'? \(want", "条目号 {id} 不对", "改成 字母-需求号-序号，比如 {example}"),
     (r"^entry (?P<id>\S+) has no text$", "条目 {id} 没有正文", "写上正文，或者撤回它"),
     (r"^type must be one of (?P<types>.+) \((?P<file>\w+)\)$", "类型不对：{file} 里只能用 {types}", "改成其中一个"),
     (r"^side must be one of (?P<s>.+)$", "side 不对：只能是 {s}", "改成其中一个"),
@@ -451,22 +457,62 @@ def where_text(where: str, brain_dir: str = "brain") -> str:
     return where
 
 
-def lint(level: Any, raw: Any, *, brain_dir: str = "brain", repo: str | None = None) -> dict[str, Any]:
-    """One of brain lint's errors (FAIL) or warnings (WARN), "<where>: <message>", as a CheckRow: 「brain/TECH.md 第
-    12 行：条目号 T-1 重复了」. One nobody mapped: 「…：格式不对」 (an error) / 「…：要看一眼」 (a warning)."""
-    lv = norm_level(level)
+def _lint_parts(raw: Any) -> tuple[str, str, str]:
+    """(the line on one line, its <where>, its <message>)."""
     s = " ".join(str(raw or "").split())
     m = LINT_WHERE.match(s)
-    where, msg = (m.group("where"), m.group("msg")) if m else ("", s)
+    return (s, m.group("where"), m.group("msg")) if m else (s, "", s)
+
+
+def id_example(prefix: str = "") -> str:
+    """A new entry id in the repo's own keys: P-PAY-3-1 (side letter, requirement key, its n-th entry)."""
+    return "P-%s-3-1" % (prefix or "PAY")
+
+
+def legacy_ids(ids: list[str], raws: list[str], *, prefix: str = "", repo: str | None = None) -> dict[str, Any]:
+    """The entry ids from before the side-key-n scheme, all in one quiet note: nothing is wrong, nothing to do."""
+    shown = "、".join(ids[:LEGACY_SHOWN]) + (" 等 %d 条" % len(ids) if len(ids) > LEGACY_SHOWN else " ")
+    return mk("OK", "%s是旧式条目号，不用改。新条目的编号是 字母-需求号-序号，比如 %s" % (shown, id_example(prefix)),
+              repo=repo, raw="\n".join(raws))
+
+
+def lint(level: Any, raw: Any, *, brain_dir: str = "brain", repo: str | None = None, prefix: str = "") -> dict[str, Any]:
+    """One of brain lint's errors (FAIL) or warnings (WARN), "<where>: <message>", as a CheckRow: 「brain/TECH.md 第
+    12 行：条目号 T-1 重复了」. One nobody mapped: 「…：格式不对」 (an error) / 「…：要看一眼」 (a warning). A legacy id
+    is the quiet note legacy_ids makes. *prefix*: the repo's requirement prefix, for the id example."""
+    lv = norm_level(level)
+    s, where, msg = _lint_parts(raw)
+    old = LEGACY_ID.match(msg)
+    if old:
+        return legacy_ids([old.group("id")], [s], prefix=prefix, repo=repo)
     for rx, text, todo in LINT_RULES:
         hit = rx.match(msg)
         if hit:
             g = {k: (v or "") for k, v in hit.groupdict().items()}
             t = text.format(**g)
-            return mk(lv, "%s：%s" % (where_text(where, brain_dir), t) if where else t, todo.format(**g), None, repo, s)
+            return mk(lv, "%s：%s" % (where_text(where, brain_dir), t) if where else t,
+                      todo.format(example=id_example(prefix), **g), None, repo, s)
     t = "格式不对" if lv == "FAIL" else "要看一眼"
     return mk(lv, "%s：%s" % (where_text(where, brain_dir), t) if where else GENERIC_TEXT[lv],
               "看下面 brain lint 的原话" if lv != "OK" else "", None, repo, s)
+
+
+def lint_rows(errors: Iterable[Any], warnings: Iterable[Any], *, brain_dir: str = "brain", repo: str | None = None,
+              prefix: str = "", limit: int = 100) -> dict[str, list[dict[str, Any]]]:
+    """brain lint's whole answer as the Brain page's rows: the errors (FAIL), then the warnings (WARN), the legacy ids
+    among them gathered into one quiet note at the end (an OK row: brain-kit warns about each one, a person has
+    nothing to do about any)."""
+    warns, ids, raws = [], [], []
+    for w in warnings:
+        s, _, msg = _lint_parts(w)
+        old = LEGACY_ID.match(msg)
+        if old:
+            ids.append(old.group("id"))
+            raws.append(s)
+        else:
+            warns.append(lint("WARN", w, brain_dir=brain_dir, repo=repo, prefix=prefix))
+    return {"errors": [lint("FAIL", e, brain_dir=brain_dir, repo=repo, prefix=prefix) for e in errors][:limit],
+            "warnings": warns[:limit] + ([legacy_ids(ids, raws, prefix=prefix, repo=repo)] if ids else [])}
 
 
 # ---- why a hand-over was not taken: the bridge's verify (bridge/handoff.py) and the signer ----------------------- #

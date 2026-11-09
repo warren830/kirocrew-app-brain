@@ -104,3 +104,28 @@ def test_reflect_says_brainkit_in_chinese_and_any_other_english_points_to_the_de
         "D-3 被否了（凭证 V-1a2b），可是没有一条纠正或「又出现」的提议提到它"
     assert bv.reflect_says("T-PAY-2-1 只加来源，不改文字") == "T-PAY-2-1 只加来源，不改文字"
     assert bv.reflect_says("a sentence nobody translated") == "brain-kit 说了一句这里还没翻译的话：原话在「细节」里"
+
+
+def test_brain_kit_failing_to_read_the_use_is_said_in_words_its_own_in_raw(tmp_path, home, monkeypatch):
+    """REST-29: 「Brain 用量读不出来」 says what still shows; brain-kit's exception is kept for 细节, not in the sentence."""
+    repo = make_project(tmp_path)
+    brain(repo, "entry", "add", "TECH", "pitfall", "--key", "PAY-9", "--src", "D-1", "--text", "对账文件按自然日切分。")
+    sh("git", "-C", repo, "add", "-A")
+    sh("git", "-C", repo, "commit", "-qm", "brain entry")
+    svc = make_service(tmp_path, [repo])
+
+    def broken(*a, **k):
+        raise RuntimeError("usage.collect: cannot read runs/PAY-1/run.json at refs/heads/main")
+
+    async def go():
+        await svc.start()
+        try:
+            monkeypatch.setattr(mod("bk").m("usage"), "collect", broken)
+            return await svc.brain("r1")
+        finally:
+            await svc.stop()
+
+    view = run(go())
+    assert view["error"] == mod("brainview").NO_USAGE and "run.json" not in view["error"]
+    assert view["raw"] == "usage.collect: cannot read runs/PAY-1/run.json at refs/heads/main"
+    assert [e["id"] for f in view["files"] for s in f["sections"] for e in s["entries"]] == ["T-PAY-9-1"]

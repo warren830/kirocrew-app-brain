@@ -250,8 +250,10 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
         row["waits"] = waits(who, do, text, **kw)
 
     row["open_questions"] = [d["id"] for d in open_d]
+    if st == "merged":
+        return put("merged", "nobody", "none", "MR 已合并，运行结束")
     if st == "closed":
-        return put("merged", "nobody", "none", "MR 已合并或关闭，运行结束")
+        return put("closed", "nobody", "none", "MR 关了，运行结束")
     if st == "failed":
         return put("rejected", "people", "redo_handoff", "工作区没建成，要人看一下", where="mr")
     if st == "signing":
