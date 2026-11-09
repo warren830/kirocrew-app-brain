@@ -160,6 +160,9 @@ export interface Requirement {
   /** its repo has no remote: it is done only on this machine, never handed over (no runner, no MR). The backend
    * always sends it */
   local_only?: boolean
+  /** its brain-dev session on this machine (KiroCrew's chat URL: 打开会话), null when there is none. The backend always
+   * sends it */
+  session_url?: string | null
 }
 
 // ---------------------------------------------------------------- GET /status

@@ -53,7 +53,7 @@
     "path": "/Users/alice/workplace/shop-web",
     "name": "shop-web",
     "ok": false,
-    "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用",
+    "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
     "kit": null,
     "pending": null,
     "me": null,
@@ -222,7 +222,8 @@
      "src/refund/",
      "src/export/csv.py"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-3-7f3a"
    },
    {
     "repo": "r1",
@@ -283,7 +284,8 @@
      "src/refund/ledger.py",
      "src/statement/"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r1",
@@ -341,7 +343,8 @@
     "expected_paths": [
      "src/callback/"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r1",
@@ -395,7 +398,8 @@
     "expected_paths": [
      "web/refund/"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-7-2b9f"
    },
    {
     "repo": "r1",
@@ -443,7 +447,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r1",
@@ -495,7 +500,8 @@
     "expected_paths": [
      "src/refund/id.py"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-2-1c4e"
    },
    {
     "repo": "r1",
@@ -526,7 +532,7 @@
     "stage": null,
     "waits": {
      "who": "you",
-     "text": "认领了，还没开工",
+     "text": "已认领，还没开工",
      "line": null,
      "raw": "",
      "do": "start",
@@ -543,7 +549,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r1",
@@ -593,7 +600,8 @@
     "expected_paths": [
      "src/refund/stats/"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-1-3d8e"
    },
    {
     "repo": "r3",
@@ -643,7 +651,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r3",
@@ -693,7 +702,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r3",
@@ -743,7 +753,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r3",
@@ -793,7 +804,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r3",
@@ -841,7 +853,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r3",
@@ -891,7 +904,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r3",
@@ -941,7 +955,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r3",
@@ -991,7 +1006,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r3",
@@ -1041,7 +1057,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r3",
@@ -1095,7 +1112,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    {
     "repo": "r4",
@@ -1145,7 +1163,8 @@
     "expected_paths": [
      "tools/price"
     ],
-    "local_only": true
+    "local_only": true,
+    "session_url": "/chat?sid=brain-TOOL-1-5a2c"
    }
   ],
   "overlaps": [
@@ -1276,7 +1295,7 @@
      "intent": "261105-merchant-split",
      "reasons": [
       "验收被驳回 1 次",
-      "判断点之外有人介入 2 次（push_after_handover）"
+      "判断点之外有人介入 2 次（交接后推代码）"
      ]
     }
    ],
@@ -1305,7 +1324,7 @@
   "errors": [
    {
     "repo": "r2",
-    "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用"
+    "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
    }
   ],
   "cto": {
@@ -1624,7 +1643,8 @@
        "src/refund/",
        "src/export/csv.py"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-3-7f3a"
      },
      {
       "repo": "r1",
@@ -1685,7 +1705,8 @@
        "src/refund/ledger.py",
        "src/statement/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -1743,7 +1764,8 @@
       "expected_paths": [
        "src/callback/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -1797,7 +1819,8 @@
       "expected_paths": [
        "web/refund/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-7-2b9f"
      },
      {
       "repo": "r1",
@@ -1845,7 +1868,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -1897,7 +1921,8 @@
       "expected_paths": [
        "src/refund/id.py"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-2-1c4e"
      },
      {
       "repo": "r1",
@@ -1928,7 +1953,7 @@
       "stage": null,
       "waits": {
        "who": "you",
-       "text": "认领了，还没开工",
+       "text": "已认领，还没开工",
        "line": null,
        "raw": "",
        "do": "start",
@@ -1945,7 +1970,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -1995,7 +2021,8 @@
       "expected_paths": [
        "src/refund/stats/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-1-3d8e"
      },
      {
       "repo": "r3",
@@ -2045,7 +2072,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -2095,7 +2123,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -2145,7 +2174,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -2195,7 +2225,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -2243,7 +2274,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -2293,7 +2325,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -2343,7 +2376,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -2393,7 +2427,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -2443,7 +2478,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -2497,7 +2533,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r4",
@@ -2547,7 +2584,8 @@
       "expected_paths": [
        "tools/price"
       ],
-      "local_only": true
+      "local_only": true,
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
      }
     ],
     "overlaps": [
@@ -2678,7 +2716,7 @@
        "intent": "261105-merchant-split",
        "reasons": [
         "验收被驳回 1 次",
-        "判断点之外有人介入 2 次（push_after_handover）"
+        "判断点之外有人介入 2 次（交接后推代码）"
        ]
       }
      ],
@@ -2707,7 +2745,7 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
      }
     ],
     "cto": {
@@ -3024,7 +3062,8 @@
        "src/refund/",
        "src/export/csv.py"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-3-7f3a"
      },
      {
       "repo": "r1",
@@ -3085,7 +3124,8 @@
        "src/refund/ledger.py",
        "src/statement/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -3143,7 +3183,8 @@
       "expected_paths": [
        "src/callback/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -3197,7 +3238,8 @@
       "expected_paths": [
        "web/refund/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-7-2b9f"
      },
      {
       "repo": "r1",
@@ -3245,7 +3287,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -3297,7 +3340,8 @@
       "expected_paths": [
        "src/refund/id.py"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-2-1c4e"
      },
      {
       "repo": "r1",
@@ -3328,7 +3372,7 @@
       "stage": null,
       "waits": {
        "who": "you",
-       "text": "认领了，还没开工",
+       "text": "已认领，还没开工",
        "line": null,
        "raw": "",
        "do": "start",
@@ -3345,7 +3389,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -3395,7 +3440,8 @@
       "expected_paths": [
        "src/refund/stats/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-1-3d8e"
      }
     ],
     "overlaps": [
@@ -3526,7 +3572,7 @@
        "intent": "261105-merchant-split",
        "reasons": [
         "验收被驳回 1 次",
-        "判断点之外有人介入 2 次（push_after_handover）"
+        "判断点之外有人介入 2 次（交接后推代码）"
        ]
       }
      ],
@@ -3819,7 +3865,7 @@
        "intent": "261105-merchant-split",
        "reasons": [
         "验收被驳回 1 次",
-        "判断点之外有人介入 2 次（push_after_handover）"
+        "判断点之外有人介入 2 次（交接后推代码）"
        ]
       }
      ],
@@ -3848,7 +3894,7 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
      }
     ],
     "cto": {
@@ -4002,7 +4048,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -4052,7 +4099,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -4102,7 +4150,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -4152,7 +4201,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -4200,7 +4250,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -4250,7 +4301,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -4300,7 +4352,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -4350,7 +4403,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -4400,7 +4454,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -4454,7 +4509,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      }
     ],
     "overlaps": [],
@@ -4575,7 +4631,7 @@
        "intent": "261105-merchant-split",
        "reasons": [
         "验收被驳回 1 次",
-        "判断点之外有人介入 2 次（push_after_handover）"
+        "判断点之外有人介入 2 次（交接后推代码）"
        ]
       }
      ],
@@ -4881,7 +4937,8 @@
       "expected_paths": [
        "tools/price"
       ],
-      "local_only": true
+      "local_only": true,
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
      }
     ],
     "overlaps": [],
@@ -4996,7 +5053,7 @@
        "intent": "261105-merchant-split",
        "reasons": [
         "验收被驳回 1 次",
-        "判断点之外有人介入 2 次（push_after_handover）"
+        "判断点之外有人介入 2 次（交接后推代码）"
        ]
       }
      ],
@@ -5179,7 +5236,8 @@
        "src/refund/",
        "src/export/csv.py"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-3-7f3a"
      },
      {
       "repo": "r1",
@@ -5240,7 +5298,8 @@
        "src/refund/ledger.py",
        "src/statement/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -5298,7 +5357,8 @@
       "expected_paths": [
        "src/callback/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -5352,7 +5412,8 @@
       "expected_paths": [
        "web/refund/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-7-2b9f"
      },
      {
       "repo": "r1",
@@ -5400,7 +5461,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -5452,7 +5514,8 @@
       "expected_paths": [
        "src/refund/id.py"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-2-1c4e"
      },
      {
       "repo": "r1",
@@ -5483,7 +5546,7 @@
       "stage": null,
       "waits": {
        "who": "you",
-       "text": "认领了，还没开工",
+       "text": "已认领，还没开工",
        "line": null,
        "raw": "",
        "do": "start",
@@ -5500,7 +5563,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -5550,7 +5614,8 @@
       "expected_paths": [
        "src/refund/stats/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-1-3d8e"
      },
      {
       "repo": "r3",
@@ -5600,7 +5665,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -5650,7 +5716,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -5700,7 +5767,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -5750,7 +5818,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -5798,7 +5867,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -5848,7 +5918,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -5898,7 +5969,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -5948,7 +6020,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -5998,7 +6071,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -6052,7 +6126,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r4",
@@ -6102,7 +6177,8 @@
       "expected_paths": [
        "tools/price"
       ],
-      "local_only": true
+      "local_only": true,
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
      }
     ],
     "overlaps": [
@@ -6187,7 +6263,7 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
      }
     ],
     "cto": {
@@ -6344,7 +6420,8 @@
        "src/refund/",
        "src/export/csv.py"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-3-7f3a"
      },
      {
       "repo": "r1",
@@ -6405,7 +6482,8 @@
        "src/refund/ledger.py",
        "src/statement/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -6463,7 +6541,8 @@
       "expected_paths": [
        "src/callback/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -6517,7 +6596,8 @@
       "expected_paths": [
        "web/refund/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-7-2b9f"
      },
      {
       "repo": "r1",
@@ -6565,7 +6645,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -6617,7 +6698,8 @@
       "expected_paths": [
        "src/refund/id.py"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-2-1c4e"
      },
      {
       "repo": "r1",
@@ -6648,7 +6730,7 @@
       "stage": null,
       "waits": {
        "who": "you",
-       "text": "认领了，还没开工",
+       "text": "已认领，还没开工",
        "line": null,
        "raw": "",
        "do": "start",
@@ -6665,7 +6747,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r1",
@@ -6715,7 +6798,8 @@
       "expected_paths": [
        "src/refund/stats/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-1-3d8e"
      }
     ],
     "overlaps": [
@@ -6967,7 +7051,7 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
      }
     ],
     "cto": {
@@ -7121,7 +7205,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -7171,7 +7256,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -7221,7 +7307,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -7271,7 +7358,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -7319,7 +7407,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -7369,7 +7458,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -7419,7 +7509,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -7469,7 +7560,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -7519,7 +7611,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      },
      {
       "repo": "r3",
@@ -7573,7 +7666,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
      }
     ],
     "overlaps": [],
@@ -7791,7 +7885,8 @@
       "expected_paths": [
        "tools/price"
       ],
-      "local_only": true
+      "local_only": true,
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
      }
     ],
     "overlaps": [],
@@ -8054,7 +8149,7 @@
      "session": null,
      "since": 1794128400.0,
      "kind": "start",
-     "text": "认领了，还没开工"
+     "text": "已认领，还没开工"
     },
     {
      "repo": "r1",
@@ -8169,7 +8264,7 @@
      "session": null,
      "since": 1794128400.0,
      "kind": "start",
-     "text": "认领了，还没开工"
+     "text": "已认领，还没开工"
     },
     {
      "repo": "r1",
@@ -8258,7 +8353,8 @@
     "expected_paths": [
      "src/refund/id.py"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-2-1c4e"
    },
    "branch": "ai/alice/PAY-2-refund-id",
    "base": "main",
@@ -9966,7 +10062,8 @@
      "src/refund/",
      "src/export/csv.py"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-3-7f3a"
    },
    "branch": "ai/alice/PAY-3-refund-export",
    "base": "main",
@@ -10990,7 +11087,8 @@
      "src/refund/ledger.py",
      "src/statement/"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/carol/PAY-4-merchant-split",
    "base": "main",
@@ -12005,7 +12103,8 @@
     "expected_paths": [
      "src/callback/"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/alice/PAY-5-callback-retry",
    "base": "main",
@@ -13237,7 +13336,8 @@
     "expected_paths": [
      "web/refund/"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-7-2b9f"
    },
    "branch": "ai/alice/PAY-7-refund-reason",
    "base": "main",
@@ -14157,7 +14257,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": null,
    "base": "main",
@@ -14522,7 +14623,7 @@
     "stage": null,
     "waits": {
      "who": "you",
-     "text": "认领了，还没开工",
+     "text": "已认领，还没开工",
      "line": null,
      "raw": "",
      "do": "start",
@@ -14539,7 +14640,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": null,
    "base": "main",
@@ -14548,7 +14650,7 @@
    "live": false,
    "person": {
     "status": "awaiting_approval",
-    "doing": "认领了，还没开工",
+    "doing": "已认领，还没开工",
     "owner": "alice",
     "me": true
    },
@@ -14923,7 +15025,8 @@
     "expected_paths": [
      "src/refund/stats/"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-1-3d8e"
    },
    "branch": "ai/alice/PAY-1-refund-stats",
    "base": "main",
@@ -15758,7 +15861,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/erin/ORD-1-order-1",
    "base": "main",
@@ -17041,7 +17145,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/dave/ORD-2-order-2",
    "base": "main",
@@ -18409,7 +18514,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/erin/ORD-3-order-3",
    "base": "main",
@@ -19803,7 +19909,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/dave/ORD-4-order-4",
    "base": "main",
@@ -21113,7 +21220,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/erin/ORD-5-order-5",
    "base": "main",
@@ -22044,7 +22152,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/dave/ORD-6-order-6",
    "base": "main",
@@ -23498,7 +23607,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/erin/ORD-7-order-7",
    "base": "main",
@@ -24781,7 +24891,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/dave/ORD-8-order-8",
    "base": "main",
@@ -26228,7 +26339,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/erin/ORD-9-order-9",
    "base": "main",
@@ -27609,7 +27721,8 @@
     "overlap": [],
     "open_questions": [],
     "expected_paths": [],
-    "local_only": false
+    "local_only": false,
+    "session_url": null
    },
    "branch": "ai/erin/ORD-10-wecom-push",
    "base": "main",
@@ -28537,7 +28650,8 @@
     "expected_paths": [
      "tools/price"
     ],
-    "local_only": true
+    "local_only": true,
+    "session_url": "/chat?sid=brain-TOOL-1-5a2c"
    },
    "branch": "ai/alice/TOOL-1-price-import",
    "base": "main",
@@ -29141,7 +29255,8 @@
      "src/refund/",
      "src/export/csv.py"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-3-7f3a"
    },
    "where_label": "本机的工作目录",
    "run": {

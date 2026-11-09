@@ -131,6 +131,29 @@ function boardFor(path: string): ReqBoard {
   return clone(b)
 }
 
+/** cto.weekly once the times are moved to now: the backend's buckets again (deliveries.cto_numbers: the last 12 weeks,
+ * from Monday, UTC), made from the moved merges, so a week holds exactly the merges its rows show. */
+function rebucket(o: Overview): Overview {
+  const monday = (t: number) => new Date((t - ((new Date(t * 1000).getUTCDay() + 6) % 7) * 86400) * 1000).toISOString().slice(0, 10)
+  const now = Date.now() / 1000
+  const weeks = Array.from({ length: 12 }, (_, i) => monday(now - 7 * 86400 * (11 - i)))
+  const by = new Map(weeks.map((w) => [w, { week: w, unattended: 0, people: 0, local: 0, pending: 0 }]))
+  const judged = new Set<string>()
+  for (const r of o.cto.runs) {
+    if (!r.merged_at) continue
+    judged.add(`${r.repo}/${r.key}`)
+    const w = by.get(monday(r.merged_at))
+    if (w) w[r.how] += 1
+  }
+  for (const r of o.rows) {
+    const at = r.waits.since ?? r.updated_at
+    const w = at ? by.get(monday(at)) : undefined
+    if (r.state === 'merged' && !judged.has(`${r.repo}/${r.key}`) && w) w.pending += 1
+  }
+  o.cto.weekly = weeks.map((w) => by.get(w)!)
+  return o
+}
+
 /** 交付总览 as the backend made it for that repo (or 全部), with or without brainkit.evaluate. */
 function overview(path: string): Overview {
   const repo = new URL(path, location.origin).searchParams.get('repo') ?? 'all'
@@ -152,7 +175,7 @@ setApiRoutes({
   [`GET ${API}/settings`]: () => clone(settings),
   [`GET ${API}/crew`]: () => ({ ...status().crew }),
   [`GET ${API}/todo`]: () => shift({ ...todo(), team: flags.has('team') }),
-  [`GET ${API}/overview*`]: (_b, path) => shift(overview(path)),
+  [`GET ${API}/overview*`]: (_b, path) => rebucket(shift(overview(path))),
   [`POST ${API}/settings`]: (body) => {
     settings = { ...settings, ...clone(body as Partial<Settings>) }
     return { ok: true, settings: clone(settings), status: status() }

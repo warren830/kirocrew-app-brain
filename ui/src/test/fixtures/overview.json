@@ -52,7 +52,8 @@
         "src/refund/",
         "src/export/csv.py"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-3-7f3a"
     },
     {
       "repo": "r1",
@@ -113,7 +114,8 @@
         "src/refund/ledger.py",
         "src/statement/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
     },
     {
       "repo": "r1",
@@ -171,7 +173,8 @@
       "expected_paths": [
         "src/callback/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
     },
     {
       "repo": "r1",
@@ -225,7 +228,8 @@
       "expected_paths": [
         "web/refund/"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-7-2b9f"
     },
     {
       "repo": "r1",
@@ -273,7 +277,8 @@
       "overlap": [],
       "open_questions": [],
       "expected_paths": [],
-      "local_only": false
+      "local_only": false,
+      "session_url": null
     },
     {
       "repo": "r1",
@@ -325,7 +330,8 @@
       "expected_paths": [
         "src/refund/id.py"
       ],
-      "local_only": false
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-2-1c4e"
     }
   ],
   "overlaps": [
@@ -456,7 +462,7 @@
         "intent": "261105-merchant-split",
         "reasons": [
           "验收被驳回 1 次",
-          "判断点之外有人介入 2 次（push_after_handover）"
+          "判断点之外有人介入 2 次（交接后推代码）"
         ]
       }
     ],
@@ -485,7 +491,7 @@
   "errors": [
     {
       "repo": "r2",
-      "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
     }
   ],
   "cto": {

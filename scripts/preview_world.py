@@ -54,6 +54,7 @@ T0 = 1794146400          # 2026-11-08 14:00 UTC: the fixtures' `at`
 M, H, D = 60, 3600, 86400
 GL = "https://gitlab.example.com"
 ME = "alice"
+NO_KIT = "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"     # service.reload_sync's words for a repo without it
 CFG = {"default_branch": "main", "handoff_label": "ai-handoff", "running_label": "ai-running",
        "rejected_label": "ai-handoff-rejected"}
 # what brainkit.trace says it could not read on a person's machine (its own words)
@@ -300,6 +301,7 @@ def classified(r: Req, row: dict, *, park: dict | None = None, mr: dict | None =
     got = deliveries.base_row(r.repo, f, local_only=local_only)
     deliveries.classify(got, f, mr=mr, slot=slot, cfg=CFG, me=ME, reflected=reflected, now=T0)
     row.update({k: got[k] for k in ("state", "state_label", "lean", "stage", "waits", "local_only")})
+    row["session_url"] = slot["url"] if slot else None
     row["summary"] = mrdesc_view.plain_line(row.get("summary"))     # what service._row shows of the 变更说明
     return row
 
@@ -336,6 +338,11 @@ def main() -> None:
     det = json.loads((FIX / "detail.json").read_text(encoding="utf-8"))
     status = json.loads((FIX / "status.json").read_text(encoding="utf-8"))
     rows = {r["key"]: r for r in ov["rows"]}
+    for q in ov["eval"]["queue"]:
+        q["reasons"] = [deliveries.acts_in_words(x) for x in q["reasons"]]
+    for e in ov["errors"] + [r_ for r_ in status["repos"] if r_.get("error")]:
+        if "还没装 brain-kit" in e["error"]:
+            e["error"] = NO_KIT
     tmpl = copy.deepcopy(rows["PAY-2"])
     boards: dict[str, dict] = {}
     details: dict[str, dict] = {}
@@ -357,12 +364,13 @@ def main() -> None:
     merged(p2, end, h, "D-2")
     p2.app.append({"at": iso(p2.merged_at + 15 * H), "label": "brain reflect --apply：成功", "detail": "brain/PAY-2-reflect-1"})
     p2.proposals = 1
-    row = classified(p2, rows["PAY-2"], reflected=True)
+    p2_sess = dict(det["sessions"][0], slot="brain-PAY-2-1c4e", url="/chat?sid=brain-PAY-2-1c4e", title="PAY-2 退款单号校验",
+                   credits=8.3, turns=19, busy=False, awaiting=False, last_activity=p2.hand_at)
+    row = classified(p2, rows["PAY-2"], reflected=True, slot=p2_sess)
     row.update(updated_at=p2.merged_at + 35 * M, credits=22.7)
     boards["r1/PAY-2"] = snapshot(p2, row, decisions=det["decisions"][:3], brain={"loaded": 12, "cited": ["P-PAY-2-1", "T-12"], "stale": [], "unknown": [], "proposals": 1},
                                   reflect=[("brain/PAY-2-reflect-1", p2.merged_at + 15 * H)],
-                                  sessions=[dict(det["sessions"][0], slot="brain-PAY-2-1c4e", url="/chat?sid=brain-PAY-2-1c4e", title="PAY-2 退款单号校验",
-                                                 credits=8.3, turns=19, busy=False, awaiting=False, last_activity=p2.hand_at),
+                                  sessions=[p2_sess,
                                             dict(det["sessions"][0], slot="brain-run-RUN-PAY-2-1", url="/chat?sid=brain-run-RUN-PAY-2-1", title="RUN-PAY-2-1",
                                                  agent="brain-run", kind="runner", credits=14.4, turns=41, busy=False, awaiting=False, last_activity=p2.merged_at)],
                                   mr_desc=mrdesc("PAY-2", row.get("summary") or "退款单号加上校验位，重复和非法单号在入口就拒掉"), credits=22.7)
@@ -445,11 +453,12 @@ def main() -> None:
     p7.handoff(t + 85 * M)
     why, raw = problems.reasons_text(["label 'ai-handoff' was added by bob, not by the branch owner alice"])
     p7.rejected(T0 - 5 * H - 30 * M, why)
-    row = classified(p7, rows["PAY-7"], mr={"state": "opened", "labels": ["ai-handoff-rejected"], "questions": [],
-                                            "rejected_reason": why, "rejected_raw": raw})
+    p7_sess = dict(det["sessions"][0], slot="brain-PAY-7-2b9f", url="/chat?sid=brain-PAY-7-2b9f", title="PAY-7 退款原因下拉框",
+                   credits=18.2, turns=27, busy=False, awaiting=False, last_activity=T0 - 5 * H)
+    row = classified(p7, rows["PAY-7"], slot=p7_sess, mr={"state": "opened", "labels": ["ai-handoff-rejected"], "questions": [],
+                                                          "rejected_reason": why, "rejected_raw": raw})
     boards["r1/PAY-7"] = snapshot(p7, row, decisions=det["decisions"][1:2], mr_desc=mrdesc("PAY-7", "退款时选原因，原因列表在后台维护"), credits=18.2,
-                                  sessions=[dict(det["sessions"][0], slot="brain-PAY-7-2b9f", url="/chat?sid=brain-PAY-7-2b9f", title="PAY-7 退款原因下拉框",
-                                                 credits=18.2, turns=27, busy=False, awaiting=False, last_activity=T0 - 5 * H)])
+                                  sessions=[p7_sess])
 
     # PAY-6: claimed, not started
     p6 = Req("r1", "PAY-6", "商户结算周报", "carol", "weekly-report", "", project="shop/shop-pay")
@@ -662,6 +671,10 @@ def main() -> None:
     tj["items"] = [i for i in tj["items"] if i["kind"] not in ("reply", "start")] + \
         [i for i in world_todo["ok"]["items"] if i["kind"] in ("reply", "start")][:2]
     (FIX / "todo.json").write_text(json.dumps(tj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    st = json.loads((FIX / "status.json").read_text(encoding="utf-8"))   # as read: the world changed its crew rows
+    for r_ in st["repos"]:
+        r_["error"] = NO_KIT if "还没装 brain-kit" in r_["error"] else r_["error"]
+    (FIX / "status.json").write_text(json.dumps(st, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (FIX / "board.json").write_text(json.dumps(boards["r1/PAY-3"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (FIX / "board-merged.json").write_text(json.dumps(boards["r1/PAY-2"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print("world: %d rows, %d boards; fixtures: overview.json, detail.json, todo.json, board.json, board-merged.json" % (

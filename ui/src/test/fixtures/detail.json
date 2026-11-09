@@ -50,7 +50,8 @@
       "src/refund/",
       "src/export/csv.py"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-3-7f3a"
   },
   "where_label": "本机的工作目录",
   "run": {
