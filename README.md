@@ -173,7 +173,7 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
   wrote" is check_answer's `edits`, made as brain-kit's own `collect` makes them: `DecisionLoop.reply_states` on the
   signer's ledger (each reply recorded at the signer's first sight with its text's hash) and GitLab GraphQL with the
   signer's own token (`GitLab.note_edits`: lastEditedBy, which an award emoji leaves empty and a text edit sets, as
-  measured on gitlab.aws.dev on 2026-11-09). A reply someone else edited never counts and, from an allowed person,
+  measured on a real GitLab on 2026-11-09). A reply someone else edited never counts and, from an allowed person,
   holds the round (a conflict: nothing signed); one its author fixed before the signer read it counts as it reads;
   one whose text changed after that never counts. When GraphQL does not answer, the signer answers nothing (the
   bridge asks again) and records nothing for that reply; brain-kit's own bridge records such a reply as "cannot tell"
@@ -309,7 +309,7 @@ empty folder, per repo and for every git the tests start, the app's clones too: 
 about 0.5 s a commit); `BRAIN_TEST_KEEP_HOOKS=1` keeps the hooks. The import tests use a bare repo as the remote, a
 fake ssh for the failures and a fake GitLab for the MR: no network. The fake GitLab (`tests/teamfix.py`) serves commits
 with their `parent_ids`, authors and committers from a bare repo, and GraphQL's edit marks as measured on
-gitlab.aws.dev (lastEditedBy for a text edit only); every hand-over in the tests is a real `brain handoff` commit, and
+a real GitLab (lastEditedBy for a text edit only); every hand-over in the tests is a real `brain handoff` commit, and
 the runner's commits are the bot account's.
 
 ## Not verified on a live Kiro Crew yet

@@ -5,7 +5,7 @@ own identities and ledger) and the bridge.json the app hosts, with brain-kit's s
 GitLab's notes, labels and MR versions are in memory; commits come from the bare repo (id and parent_ids, as GitLab's
 commits API shows them); authors come from the token (the bridge's, the signer's, a person's). A note can be edited
 (GitLab keeps its id and moves updated_at) or deleted, as whoever holds the account's token can on GitLab. GitLab
-GraphQL answers brain-kit's note_edits query (72b278e) as measured on gitlab.aws.dev on 2026-11-09: lastEditedAt follows
+GraphQL answers brain-kit's note_edits query (72b278e) as measured on a real GitLab on 2026-11-09: lastEditedAt follows
 updated_at (an untouched note: its creation time; an award emoji moves it too), lastEditedBy names the last editor of
 the text only (an award emoji leaves it empty).
 """
