@@ -420,6 +420,17 @@ function IdChips({ ids, onEntry, tone = 'idle' }: { ids: string[]; onEntry: (id:
 }
 
 /** The requirements to write back, the merged ones first (the usual time to write one back), else in the backend's order. */
+/** Where the preview read the run's decisions.md (brain-kit's 「<branch>:<path>」 for a branch, a path in a worktree):
+ * 「读的是 main 分支上的 runs/PAY-2/decisions.md」. */
+function SourceNote({ source }: { source: string }) {
+  const m = /^([^\s:]+):(\S.*)$/.exec(source)
+  return (
+    <p className="br-note" data-testid="reflect-source">
+      读的是 {m ? <>{m[1]} 分支上的 <span className="br-mono">{m[2]}</span></> : <span className="br-mono">{source}</span>}
+    </p>
+  )
+}
+
 const mergedFirst = (items: BrainView['reflect']) => [...items.filter((r) => r.state === 'merged'), ...items.filter((r) => r.state !== 'merged')]
 
 /** what to do about a withdraw candidate (an entry runs keep loading and never cite) */
@@ -673,7 +684,7 @@ function ReflectCard({ repo, branch, items, pick, onPick, onItem, onApplied, pos
       {preview.error && <p className="br-error" role="alert">{preview.error}</p>}
       {p && says && (
         <div className="bv-preview" data-testid="reflect-preview">
-          {p.source && <p className="br-note">读的是 <span className="br-mono">{p.source}</span></p>}
+          {p.source && <SourceNote source={p.source} />}
           {p.error && <p className="br-error br-pre" role="alert">{p.error}</p>}
           {p.problems.length > 0 && (
             <div data-testid="reflect-problems"><CheckRows rows={p.problems.map((x) => ({ level: 'FAIL', text: x }))} /></div>

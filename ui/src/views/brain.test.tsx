@@ -327,12 +327,13 @@ describe('Brain', () => {
 
   test('a preview with nothing new says only that: the proposals are in the Brain already', async () => {
     const { user } = setup({ repo: 'r1', reflect: 'PAY-5' }, { [`POST ${API}/brain/reflect/preview`]: (): ReflectPreview => ({ ...fx.reflect(), ops: [], gaps: [], warnings: [], substantive: false,
-      notes: ['第 27 行的提议 Brain 里已经有了（P-PAY-2-1），跳过'], raw: ['proposal at line 27: already in the Brain as P-PAY-2-1, skipped'] }) })
+      source: 'main:runs/PAY-2/decisions.md', notes: ['第 27 行的提议 Brain 里已经有了（P-PAY-2-1），跳过'], raw: ['proposal at line 27: already in the Brain as P-PAY-2-1, skipped'] }) })
     const card = await screen.findByRole('region', { name: '回写' })
     await user.click(within(card).getByRole('button', { name: '预览' }))
     const preview = await within(card).findByTestId('reflect-preview')
     expect(within(preview).getByTestId('reflect-nothing')).toHaveTextContent('这次的提议 Brain 里都有了（或者已经在别的回写分支上）：不用回写。')
     expect(preview).not.toHaveTextContent('补来源')
+    expect(within(preview).getByTestId('reflect-source')).toHaveTextContent('读的是 main 分支上的 runs/PAY-2/decisions.md')   // brain-kit's 「main:…」 in words
     expect(preview).toHaveTextContent('第 27 行的提议 Brain 里已经有了（P-PAY-2-1），跳过')
     expect(within(preview).getByText('proposal at line 27: already in the Brain as P-PAY-2-1, skipped').closest('details')).not.toHaveAttribute('open')
   })
