@@ -107,8 +107,10 @@ export const DETAIL_CSS = `
 .br-detail .br-stagecell.is-started { box-shadow: 0 0 0 2px color-mix(in srgb, var(--kt-run) 25%, transparent), 0 0 18px -6px var(--kt-run); }
 .br-detail .br-stage-n { font-size: .74em; font-weight: 800; color: var(--muted); }
 .br-detail .br-stage-label { font-size: .86em; font-weight: 750; color: var(--text-strong); line-height: 1.25; }
-.br-detail .br-stage-units { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
-.br-detail .br-stage-units .br-chip { font-size: .7em; padding: 0 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a unit's chip stays inside its tile (its state as a glyph, the words in its title): 11 tiles fit 1280 */
+.br-detail .br-stagecell { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.br-detail .br-stage-units { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; min-width: 0; }
+.br-detail .br-stage-units .br-chip { display: block; font-size: .7em; padding: 0 6px; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .br-detail .br-lean-sub { margin: 14px 0 6px; }
 .br-detail .br-approvals { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .br-detail .br-approval { display: grid; gap: 6px; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--kt-glass); }
@@ -876,7 +878,7 @@ function StageCell({ s, next }: { s: Stage; next: boolean }) {
         <span className="br-stage-units">
           {s.units.map((u) => {
             const um = STAGE_META[u.state] ?? STAGE_META.todo
-            return <span key={u.unit} className={`br-chip tone-${um.tone}`} title={um.label}>{u.unit} · {um.label}</span>
+            return <span key={u.unit} className={`br-chip tone-${um.tone}`} title={`${u.unit} · ${um.label}`}><span aria-hidden="true">{um.glyph}</span> {u.unit}<span className="br-sr"> · {um.label}</span></span>
           })}
         </span>
       )}
