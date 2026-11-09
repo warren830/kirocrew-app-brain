@@ -365,13 +365,18 @@ def brain_views(reqs: dict[str, list[Req]], rows: list[dict], said: dict[str, li
                      "created_at": iso(r.start_at or T0)}), encoding="utf-8")
                 d = top / "aidlc-docs" / r.intent
                 (d / "inception" / "requirements").mkdir(parents=True, exist_ok=True)
-                table = "".join("| %s | %s | %s | %s | %s | %s |\n" % (x["id"], x["date"], x["stage"], x["text"], x["why"],
-                                                                      " ".join([x["who"] or x["by"]] + x["cites"]))
-                                for x in said.get("%s/%s" % (rid, r.key)) or [])
+                rows_ = said.get("%s/%s" % (rid, r.key)) or []
+                # each citation once (brainkit.usage counts where an id is cited): Who as brain-kit writes it
+                table = "".join("| %s | %s | %s | %s | %s | %s |\n" % (
+                    x["id"], x["date"], x["stage"], x["text"], x["why"],
+                    "brain %s" % ", ".join(x["cites"]) if x["by"] == "brain" and x["cites"] else
+                    " ".join([x["who"] or x["by"]] + x["cites"])) for x in rows_)
                 (d / "decisions.md").write_text("# Decisions\n\n| ID | Date | Stage | Decision | Why | Who |\n|---|---|---|---|---|---|\n"
                                                 + table + "```brain-proposal\n```\n" * r.proposals, encoding="utf-8")
+                cited = {c for x in rows_ for c in x["cites"]}
                 (d / "inception" / "requirements" / "requirements.md").write_text(
-                    "# %s\n\n" % r.title + "".join("- 照 Brain 的 %s\n" % c for c in CITES.get(r.key, [])), encoding="utf-8")
+                    "# %s\n\n" % r.title + "".join("- 照 Brain 的 %s\n" % c for c in CITES.get(r.key, []) if c not in cited),
+                    encoding="utf-8")
 
             write_brain()
             git("add", "-A")
