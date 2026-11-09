@@ -40,8 +40,10 @@ def test_the_older_adapter_is_fail_for_a_team_repo_and_a_reminder_for_a_local_on
     assert team["text"] == local["text"] == ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）"
     assert (team["level"], local["level"], unknown["level"]) == ("FAIL", "WARN", "FAIL")
     assert team["fix"] == local["fix"] == "kit" and team["repo"] == REPO
-    assert "park.json" in team["todo"] and "点「重装 kit 文件」" in team["todo"]
-    assert local["todo"].startswith("只有把需求交给运行机时才要紧") and "点「重装 kit 文件」" in local["todo"]
+    assert "没法停下来问人" in team["todo"] and "点「重装 kit 文件」" in team["todo"]
+    # a repo done only here: what this machine's own sessions lack, never the runner's park.json
+    assert "不会拦下工具调用" in local["todo"] and "park.json" not in local["todo"] and "运行机" not in local["todo"]
+    assert "点「重装 kit 文件」" in local["todo"]
     assert team["raw"] == local["raw"] == OLDER                 # brain-kit's words, never dropped
 
 

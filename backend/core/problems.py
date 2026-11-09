@@ -91,12 +91,15 @@ def _tool(g: dict[str, str], level: str) -> str:
     return "%s %s" % (g["tool"], have)
 
 
+OLDER_REFUSES = "改了 kit 自己的文件（hook、brain-kit 的设置、检查规则）以后，它不会拦下工具调用"
+
+
 def _older_adapter(g: dict[str, str]) -> str:
     """What an older hook adapter cannot do (brain-kit cli.crew_hook_problem): before version 2 the run on the team
     runner cannot stop to ask a person; before 3 it lets tool calls on after the kit's own files were changed."""
     if int(g.get("have") or 0) < 2:
-        return "运行机上的 run 停下来问人时写不了 park.json"
-    return "改了 kit 自己的文件（.kiro/、.brain/kit.json、gates/）以后，它不会拦下工具调用"
+        return "运行机上的 run 没法停下来问人"
+    return OLDER_REFUSES
 
 
 def _hook_names(raw: str) -> str:
@@ -110,7 +113,8 @@ RULES: list[Rule] = [
     Rule(r"^(?P<path>\S+) is an older adapter \(version (?P<have>\d+), needs (?P<need>\d+)\)",
          "{path} 是旧版（第 {have} 版，要第 {need} 版）",
          lambda g, lv: _older_adapter(g) + "。" + REINSTALL, "kit", runner=True,
-         local=lambda g, lv: LOCAL_ONLY + "（%s）。要交的话点「%s」" % (_older_adapter(g), FIX_BUTTON["kit"])),
+         # this machine's KiroCrew sessions run the same adapter: what every older version lacks here too
+         local=lambda g, lv: "本机会话里也一样：%s。点「%s」" % (OLDER_REFUSES, FIX_BUTTON["kit"])),
     # cli.runner_kit_problems: Lean / the adapter only on this disk, not in git (worktrees are made from main)
     Rule(r"^(?P<path>\S+) is not committed: AI-DLC Lean;", "AI-DLC Lean 没提交到 git",
          "app 的工作目录从默认分支建，没提交的 Lean 不在里面。" + REINSTALL, "kit"),
