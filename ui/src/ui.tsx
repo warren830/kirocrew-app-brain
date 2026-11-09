@@ -154,9 +154,10 @@ export const TYPE_IT_YOURSELF = '在会话里自己打这一行。app 不会替�
 
 /**
  * The Lean approval line the person types themselves in the session: shown, 复制那一行 (the clipboard), 打开会话 (opens
- * the session; nothing is typed or sent there). *sessionUrl* null: no session to open.
+ * the session; nothing is typed or sent there). *sessionUrl* null: no session to open. *said*: the words beside it say
+ * already that the person types it, so the box does not say it again.
  */
-export function TypeLine({ line, sessionUrl }: { line: string; sessionUrl?: string | null }) {
+export function TypeLine({ line, sessionUrl, said }: { line: string; sessionUrl?: string | null; said?: boolean }) {
   const navigate = useNavigate()
   const [copied, setCopied] = useState<'' | 'ok' | 'fail'>('')
   const copy = async () => {
@@ -182,7 +183,7 @@ export function TypeLine({ line, sessionUrl }: { line: string; sessionUrl?: stri
         {copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
         {copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请手动选中这一行</span>}
       </div>
-      <p>{TYPE_IT_YOURSELF}</p>
+      {!said && <p>{TYPE_IT_YOURSELF}</p>}
     </div>
   )
 }
