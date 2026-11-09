@@ -27,12 +27,12 @@ bridge's KiroCrew surface (`adapter_create / set_project / send / slot / stop`).
 | **交付总览** | The sample's CTO view: one sentence and three numbers from brain-kit's eval (how many handed-over requirements ran unattended end to end, how often a person stepped in at the judgment points against outside them, credits per requirement), each with its small chart, and who settled the decisions (the funnel); 每周合并 (12 weeks, by how they were delivered, 图 / 表格); 需求流动, the kanban of what is in progress (columns 需求 → 设计 → 构建 → 交给运行机 → 发布 · 验收 → 已合并, lanes 等人批准 / 等人回答问题 / AI 在做（本机） / 运行机在做; a card opens the requirement's 需求看板); 交付清单, the ledger with the eval batch's summary rows. Every requirement: claimed, local, handed over, running on the runner, parked with D-n, waiting acceptance, merged; owner, the current Lean stage n/11 (`lean` and the row's `stage` text, e.g. `2/11 需求分析`, `11/11 发布（下一步）`, `11/11 发布（做完）`: the same stages the detail lists, null only before Lean recorded one), what it waits on (with the exact approval line; a hand-over that was pushed but whose MR carries no hand-over label says that nothing was handed over), the first line of its 变更说明 (`summary`, made in the background), credits, overlap warnings; Eval numbers, the runs Eval skipped and its notes (also the runs known wrong that wait for their merge: autonomy's `wrong_open`), and the low-score queue (复看队列); the decision funnel, with the decisions.md rows whose Who is not in the vocabulary (没归类) | git refs (`claim/*`, run branches, the default branch), worktree files, run.json, park.json, the Lean ledger; `brainkit.evaluate` when present; `brainkit.mrdesc`; the bridge ledger in team mode; the MR via GitLab (person's token) |
 | **需求看板** | One requirement as the sample's team board: the hero graph of who acts on it (you, the local `brain-dev` session, Lean's approvals REQUIREMENTS / DESIGN / RELEASE, the hand-over, the bridge, the signer, the runner session, the CI checks, the write-back into the Brain) with each one's state in colour, shape and words, the person's line to whoever waits on them, the run branch as a rail with its commits and the check ring; KPIs; 验收 (the 变更说明, the decisions and who made them, the checks, the one step a person takes: the line to type, the MR to answer on); 提交传送带 (commits, the hand-over, the merge); a lane per actor on one time axis; 检查墙 (Lean approvals, verify, the hand-over, the Brain and the repo's kit, after the merge); open questions; the event feed. Polled every 2 s. 回放 plays a finished requirement's trace (1× / 2× / 4×, scrubber; the URL says `replay=1`) | `GET /board/{repo}/{key}`: `backend/core/board.py` folds `brainkit.trace.build`, the Lean audit events, the run branch's commits, park.json, the MR and the app's sessions into one snapshot |
 | **需求详情** | The sample's 交付详情 layout: 周期, 时间花在哪, 成本, 检查; 价值流 (AI on this machine, the runner, waits for people, rework, with the key moments); Lean's 11 stages and approvals, Session notes, decisions with their Brain citations and who settled each (brain-kit's Who vocabulary: `agent` or a bot user, `brain <entry id>`, `check`, `<P-xxxx> <V-xxxxxxxxxx>`, `owner`; anything else is 没归类 and not shown, it may be a real name), parked questions and answers (MR link), the MR's 变更说明 (its first line, the whole Markdown folded, 复制 for the MR description), the run trace timeline (a commit's author date, and its commit date when it differs; how it was merged, in words), the sessions this app opened with their credits, Brain usage | `brainkit.trace.build` (else the Lean ledger, its audit files shown as `L-<6 hex>.jsonl` like brain-kit's), decisions.md, `sessions.slot_stats`; the 变更说明: `runs/<KEY>/MR.md` at the commit when the branch has it, else `brainkit.mrdesc.build` / `render` at that commit |
-| **开需求** | The way in five steps, then the form: repo, title, slug, key, expected paths (separated by commas, spaces or new lines); the five gates (consent, classification incl. 不确定, business keep/mask, exclude globs); 先检查 shows brain-kit's dry-run findings verbatim, and what may be a name or a password but may as well be a word (brain-kit's review findings, not masked, stopping nothing) once more per file under 请你确认; 开工 runs `brain start` and opens a `brain-dev` session in the run's own worktree | `brainkit.intake.package.build(dry_run=True)`, `bin/brain start` |
+| **开需求** | The way in five steps, then the form: repo, title, slug, key, expected paths (separated by commas, spaces or new lines); the five gates (consent, classification incl. 不确定, business keep/mask, exclude globs); 先检查 shows brain-kit's dry-run findings verbatim, and what may be a name or a password but may as well be a word (brain-kit's review findings, not masked, stopping nothing) once more per file under 请你确认; 认领人, the name brain-kit will claim it with (开工 waits for 「你的 GitLab 用户名」 when brain-kit would not know); 开工 runs `brain start` and opens a `brain-dev` session in the run's own worktree | `brainkit.intake.package.build(dry_run=True)`, `bin/brain start` |
 | **Brain** | Entries by file and section with type, sources, usage counts and withdraw candidates; lint; reflect preview, apply on a new branch (the reply names the branch and the worktree brain-kit wrote it in, `~/.brain/worktrees/<repo>/…`), apply and open the MR | `brainkit.entries`, `usage`, `brainlint`, `reflect`; `bin/brain reflect --apply [--push]` |
 | **待办** | Lean approvals pending (the line the person types in that session), D-n questions on the runner (link to the MR), runner questions stuck for good (the signer refused the answer, the question is void or could not be asked), the person's own clarify questions (answer here), acceptance, refused hand-overs, hand-overs pushed without their label (没交出去的交接), Kiro Crew problems | as above |
 | **运行机** (team mode) | The bridge ledger (questions in brain-kit's states, `asking`: a bridge posting it right now), what the bridge said about each labelled MR last round (接手了, 拒绝接手, 看过了, 标签刚被拿掉 = `unlabelled`, 正在别处签名 = `waiting`, 这一轮没查成), runs in brain-kit's states (`signing`: the run id reserved while the signer signs the contract), signature requests waiting for the signer, the ones it refused, and vouchers it has not answered yet (asked for again, the same voucher, next round) | the hosted bridge, the signer spool |
-| **导入仓库** | How a repo gets into the app (the bar's button, and every place that has no repo: 交付总览's empty state, 开需求, 设置's 仓库 card). 本机目录 or 克隆; 检查 (✓ / ! / ✗ with why and what to do); not installed: the kit.json form and 安装到新分支, then (optional, after a confirm) 推送并开 MR; 加入列表 | `/import/*` (backend/core/importer.py, installer.py), `imports.json` in the app's data dir |
-| **设置** | brain-kit checkout, work root, team mode; the repos with 移出列表 (the app's list only) and 导入仓库; Kiro Crew checks with their fixes (and, per repo, Lean's lean.json leaving `runs/**` out of its code fingerprint; an old hook adapter, which matters only for a repo that hands over to the team runner: ! there, not 有问题, with 重装到新分支) | `settings.json` in the app's data dir |
+| **导入仓库** | How a repo gets into the app (the bar's button, and every place that has no repo: 交付总览's empty state, 开需求, 设置's 仓库 card). 本机目录 or 克隆; 检查 (✓ / ! / ✗ with why and what to do, 你是谁 among them); not installed: the kit.json form and 安装, by default in place on the checkout's branch (usable at once), or on a new branch for an MR when that is the better way (each way one line, the recommended one marked); 推送 / 推送并开 MR only after a confirm; a branch install's 合并到 main and 拉取; 加入列表 | `/import/*` (backend/core/importer.py, installer.py, inplace.py, landing.py), `imports.json` / `upgrades.json` in the app's data dir |
+| **设置** | brain-kit checkout, work root, team mode; the repos with 移出列表 (the app's list only), 导入仓库 and, per repo, 你是谁 (the name brain-kit goes by there, or 「你的 GitLab 用户名」 / 「你的名字」 when it would not know); Kiro Crew checks with their fixes (and, per repo, Lean's lean.json leaving `runs/**` out of its code fingerprint; an old hook adapter, which matters only for a repo that hands over to the team runner: ! there, not 有问题, with 重装 kit 文件) | `settings.json` in the app's data dir |
 
 Every view uses the sample's components: cards, state chips, role icons, the progress as segments and charts, and
 empty states that say what to do. Above every view (but 开需求 and 设置, which list them themselves) KiroCrew's failing
@@ -54,10 +54,16 @@ string with the paths separated by commas, spaces or new lines (`"calc.py,tests"
 the repo. `POST /brain/reflect/apply` answers `{ok, output, branch, worktree}`. `POST /settings` takes any part of the
 settings: a key left out keeps its value (the 设置 form sends no `repos`; the list is changed by `POST /import/add`
 and `POST /repos/remove` only). The import routes: `GET /import/defaults`, `POST /import/inspect {path}` (read only),
-`POST /import/clone {url, parent, name}`, `POST /import/install {path, branch, kit}` and `POST /import/upgrade {path,
-branch?}` (the 'kit' fix below; all three answer `{job}`; `GET /import/jobs/{id}` until it is not running), `POST
-/import/commit {path, purpose?}`, `POST /import/publish {path, branch, target, remote_url, confirm: true, purpose?}`
-(`purpose`: `install`, the default, or `upgrade`), `POST /import/add {path}`, `POST /repos/remove {path}`. Every
+`POST /import/choices {path, purpose?}` (where an install or a kit update goes: `inplace` or `branch`, each with one
+line, the recommended one, and why a way cannot be taken), `POST /import/clone {url, parent, name}`, `POST
+/import/install {path, mode?, branch?, kit}` and `POST /import/upgrade {path, mode?, branch?}` (the 'kit' fix below;
+all three answer `{job}`; `GET /import/jobs/{id}` until it is not running; no `mode`: the recommended one), `POST
+/import/commit {path, purpose?}`, `POST /import/publish {path, branch, target, remote_url, confirm: true, purpose?}`,
+`POST /import/push {path, branch, remote_url, confirm: true}` (the checkout's branch after an install in place or a
+local merge), `POST /import/merge {path, confirm?, purpose?}` (「合并到 main」: a fast-forward; `confirm: true` for a
+repo with a remote), `POST /import/pull {path}` (「拉取」: `git pull --ff-only`), `POST /import/add {path}`, `POST
+/repos/remove {path}` (`purpose`: `install`, the default, or `upgrade`); and `POST /me/name {path, name}` (`git
+config brain.user <name>` in that repo, brain-kit's USER_RE). Every
 check row (`CheckRow`) is said in plain short Chinese with a 做什么 line, its fix and brain-kit's own words (`raw`,
 shown folded): `backend/core/problems.py`.
 
@@ -75,21 +81,36 @@ shown folded): `backend/core/problems.py`.
    Crew checks (with their fix buttons), already in the list. Each row says why and what to do.
 4. **Already installed**: **加入列表**. That is all.
 5. **Not installed**: check the kit.json values `brain install` asks you to check (key prefix, tracker, GitLab base and
-   project, prefilled from origin, default branch, team), then **安装到新分支**. The app makes branch `brain/install`
-   (you can rename it) from `origin/<default branch>` in its own worktree, `<work root>/<repo>/_brain-install`; your
-   checkout, its branch, index and files are not touched. There it runs brain-kit's `brain install`, writes the values
-   into `.brain/kit.json`, runs `brain doctor --offline`, lists the changed files and commits them with your own git
-   identity. Your git hooks run on that commit (nothing is bypassed): if one says no, the page shows what it said;
-   fix it and click **再提交一次**.
-6. **推送并开 MR** (optional): the page first says exactly which branch goes where (`brain/install` → origin's URL,
-   the MR `brain/install` → `main` on the GitLab project); after **确定推送** the branch is pushed (no force) and the MR
-   opened with your GitLab token (`$GITLAB_TOKEN` or `~/.brain/gitlab-token`, as the app reads MRs), its description a
-   list of what the install adds. Without a token or a GitLab project: the exact `git push` / `glab mr create`
-   commands and GitLab's new-MR link.
-7. **加入列表**: the repo is in the list right away. Until the install branch is merged and pulled into your checkout it
-   shows as 「安装在 brain/install 分支上，合并后生效」 (with the MR link, or the way back to 导入仓库), not as an
-   error; after the merge it says 「已经合并到 origin/main：这个目录还没更新」 until you `git pull`, and becomes usable
-   by itself within a minute after that. The install worktree can then be removed (`git worktree remove …`).
+   project, prefilled from origin, default branch, team), then **安装**. Where it goes:
+   - **直接装在 <当前分支>** (the default, the way brain-kit's own CLI is used): `brain install` in your checkout, the
+     values into `.brain/kit.json`, `brain doctor --offline`, and one commit on the branch you are on, with your own
+     git identity and hooks, of exactly the files the install wrote: your own uncommitted changes are neither
+     committed nor touched (`git commit --only` of those paths). Usable at once: nothing waits. It is refused, with
+     one line why, when the checkout is on no branch, in the middle of a merge, rebase or cherry-pick, or has
+     uncommitted changes in a file `brain install` writes (`.gitignore`, `AGENTS.md`, `.kiro/…`, `.brain/…`,
+     `aidlc-docs/…`, the Brain): then only the new branch is offered. It never pushes by itself: a repo with a remote
+     gets a **推送** button that first says which branch goes where.
+   - **装到新分支，开 MR 给团队看** (recommended for a repo with a remote, offered when the checkout has uncommitted
+     changes): branch `brain/install` (you can rename it) from `origin/<default branch>` in its own worktree,
+     `<work root>/<repo>/_brain-install`; your checkout is not touched. The same install, doctor and commit there.
+   Your git hooks run on the commit (nothing is bypassed): if one says no, the page shows what it said; fix it and
+   click **再提交一次**.
+6. **推送并开 MR** (a new branch, optional): the page first says exactly which branch goes where (`brain/install` →
+   origin's URL, the MR `brain/install` → `main` on the GitLab project); after **确定推送** the branch is pushed (no
+   force) and the MR opened with your GitLab token (`$GITLAB_TOKEN` or `~/.brain/gitlab-token`, as the app reads MRs),
+   its description a list of what the install adds. Without a token or a GitLab project: the exact `git push` / `glab
+   mr create` commands and GitLab's new-MR link.
+7. **A branch install's way forward** (in 导入仓库, and on the repo's row in 设置 and 交付总览): **合并到 main**, a
+   fast-forward (`git merge --ff-only`) when your checkout is clean, on the default branch, and the default branch is
+   still where the install branch started (else one line why: e.g. it moved on, so install in place instead); then the
+   install worktree (`git worktree remove`, never forced) and the merged branch go. A repo without a remote is never
+   shown as waiting for a merge: its row says 「还没合进 main」 with that button. With an open MR its link comes first
+   (merging there is the team's way); a local merge in a repo with a remote asks first that the remote does not have it
+   until you push, and is offered in 导入仓库 only (its 推送 stays on the page). After the MR was merged on GitLab:
+   **拉取** (`git pull --no-rebase --ff-only`, no prompt, a time limit) when the checkout is clean and on the default
+   branch. **加入列表** works before all that: the repo shows what it waits for, not an error. The background check
+   (every 30 s) clears an install record nothing waits for any more (kit.json on the default branch in the checkout,
+   the install branch or worktree gone); it deletes nothing on disk.
 8. **移出列表** (设置 → 仓库) takes a repo off the app's list only: no file, branch or worktree changes.
 
 ## How it works
@@ -129,11 +150,12 @@ shown folded): `backend/core/problems.py`.
   (`mrdesc.write_problem`: lean.json `fingerprint_exclude`) and (d46765f) when the committed adapter is too old for the
   team runner (`crew_hook_problem`). Those two matter to the runner only: FAIL for a repo handed to it (kit.json
   `bridge_user`, or a requirement with a hand-over), a reminder (WARN, no 待办 item) for a local-only one; not
-  committed is FAIL everywhere. Their fix ('kit') is `POST /import/upgrade`: like 安装到新分支, a new branch
-  (`brain/upgrade-kit`, -2 … when taken) from the default branch in its own worktree, `brain install` there (kit.json
-  kept, the kit files refreshed, runs/** added to lean.json), `brain doctor`, the person's commit (their hooks), then
-  推送并开 MR with `purpose: upgrade`; nothing to change takes the branch and worktree back. Its records are
-  `upgrades.json`, apart from the install's.
+  committed is FAIL everywhere. Their fix ('kit', 重装 kit 文件) is `POST /import/upgrade`, where 安装 goes: in place
+  by default (`brain install` in the checkout, kit.json kept, the kit files refreshed, runs/** added to lean.json,
+  `brain doctor`, the person's commit of only those paths on their branch; 推送 when asked), or a new branch
+  (`brain/upgrade-kit`, -2 … when taken) from the default branch in its own worktree, the same there, then 推送并开 MR
+  with `purpose: upgrade` (or 合并到 main without a remote); nothing to change takes back what it wrote. Its records
+  are `upgrades.json`, apart from the install's.
 - **Team mode** hosts brain-kit's own `bridge.handoff.Bridge` (poll → dispatch → watch → collect → reconcile) and
   `bridge.runnerd.once` as a background task (`on_startup` / `on_shutdown`): bridge.json is read by brain-kit's
   `load_bridge_config`, and the bridge runs with `signer=` brain-kit's `sign.SpoolSigner` (bridge.json's `signer`
@@ -163,10 +185,20 @@ shown folded): `backend/core/problems.py`.
   (unless you set your own `core.sshCommand`) and in a session of its own, so nothing can wait for a password; ssh-agent
   and git's credential helpers still work. A clone URL with a user name or password in it is refused. brain-kit's
   `brain install` / `brain doctor` run as commands from the configured checkout. A failed install takes back its
-  worktree and branch; the commit uses your identity and hooks. Clones and installs are background jobs (never on the
-  event loop): the page polls their steps. `imports.json` keeps what was installed where (branch, worktree, commit,
-  pushed, MR), so a listed repo without kit.json in its checkout is pending when its install branch has one (or the
-  default branch has it and the checkout was not pulled yet); the background loop looks at pending repos every 30 s.
+  worktree and branch (in place: the files it wrote that were clean before, nothing else); the commit uses your identity
+  and hooks. Clones and installs are background jobs (never on the event loop): the page polls their steps.
+  `imports.json` keeps what was installed on a branch (branch, worktree, commit, pushed, MR), so a listed repo without
+  kit.json in its checkout is pending when its install branch has one (or the default branch has it and the checkout
+  was not pulled yet); an install in place is recorded only while a hook keeps it from being committed. The background
+  loop looks at pending repos every 30 s and clears the records nothing waits for (`landing.sweep`).
+- **你是谁** (`identity.py`): the name brain-kit goes by in a repo, by brain-kit's own rule (`cli._me`), without asking
+  GitLab: a GitLab token with kit.json's `gitlab.base` (GitLab's username); `$BRAIN_USER`, else `git config
+  brain.user`; else, in a repo without GitLab, the login name when the loaded brain-kit falls back to it (91e2fee and
+  later; 48b6b97 does not, and the page asks for 「你的名字」 there); with GitLab and none of these, brain-kit refuses
+  ("who are you?") and the page asks for 「你的 GitLab 用户名」, prefilled with the login name. Saving runs `git config
+  brain.user <name>` in that repo (lowercased, brain-kit's USER_RE, no shell). The same name decides which
+  requirements are yours in 需求详情 and 待办. brain-kit's "who are you?" from `brain start` is said in Chinese, with the
+  input as its fix.
 - **A hand-over without its label** (person mode): run.json has the hand-over, the branch tip is the hand-over commit
   (one commit on top of `handoff.local_head`), and the MR at that tip carries none of the hand-over, running or
   rejected labels. Nothing was handed over (`brain handoff` exits 1 then, 72b278e): the row says so and 待办 lists it.
@@ -238,13 +270,13 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
 
 ## Install (a person's machine)
 
-1. **brain-kit** checkout (`72b278e` or newer). In each project brain-kit is installed by the app's 导入仓库 (on a new
-   branch, see above), or by hand: `brain install <repo> --prefix PAY`, then commit `.kiro/`, `.brain/`,
-   `aidlc-docs/`, `brain/`, `AGENTS.md` (since 48b6b97 it also adds `runs/**` to `aidlc-docs/lean.json`
-   `fingerprint_exclude`: review and commit that too, or `brain handoff` refuses and the Kiro Crew check lists the
-   repo). On this machine: `git config brain.user <gitlab user>`, the GitLab token in
-   `~/.brain/gitlab-token` (`chmod 600`), `git config brain.intake <brain-intake clone>` (see brain-kit's
-   `docs/安装和使用.md`).
+1. **brain-kit** checkout (`72b278e` or newer). In each project brain-kit is installed by the app's 导入仓库 (in place
+   on the checkout's branch by default, or on a new branch: see above), or by hand: `brain install <repo> --prefix
+   PAY`, then commit `.kiro/`, `.brain/`, `aidlc-docs/`, `brain/`, `AGENTS.md` (since 48b6b97 it also adds `runs/**`
+   to `aidlc-docs/lean.json` `fingerprint_exclude`: review and commit that too, or `brain handoff` refuses and the
+   Kiro Crew check lists the repo). On this machine: the GitLab token in `~/.brain/gitlab-token` (`chmod 600`), `git
+   config brain.intake <brain-intake clone>` (see brain-kit's `docs/安装和使用.md`). Your name per repo (`git config
+   brain.user`, only where brain-kit cannot tell) is asked for in the app.
 2. **Trust the app yourself**: Kiro Crew settings → trusted apps → add `brain` (`agent.apps_trusted`). Kiro Crew
    refuses to enable an untrusted third-party app; the install script does not trust it for you.
 3. **Install**: `scripts/dev-install.sh --consent-session-approval` (builds the UI with node 22+, installs or updates
@@ -300,7 +332,9 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
 | `backend/core/problems.py` | Every check row in plain Chinese: brain-kit's crewcheck, doctor, lint and refusals mapped to a sentence, 做什么 and a fix |
 | `backend/core/mrdesc_view.py` | The 变更说明 at a commit (MR.md, else brain-kit's mrdesc), its first line, the cache and its background maker |
 | `backend/core/intake.py`, `crewcheck.py`, `brainview.py` | 开需求, the Kiro Crew checks and fixes, Brain and reflect |
-| `backend/core/importer.py`, `installer.py` | 导入仓库: path checks, 检查, 克隆, the install records and background jobs; 安装到新分支 (worktree, `brain install`, kit.json, `brain doctor`, commit), 推送并开 MR |
+| `backend/core/importer.py`, `installer.py` | 导入仓库: path checks, 检查, 克隆, where an install goes (`choices`), the install records and background jobs; 安装到新分支 (worktree, `brain install`, kit.json, `brain doctor`, commit), 推送并开 MR |
+| `backend/core/inplace.py`, `landing.py` | 直接装 (in the checkout, on its branch, only the install's paths committed; 推送 when asked); a branch install's 合并到 main, 拉取 and the background sweep of stale records |
+| `backend/core/identity.py` | 你是谁: the name brain-kit goes by in a repo, and `git config brain.user` from 「你的 GitLab 用户名」 |
 | `backend/core/team/` | Team mode: the hosted bridge (`bridgehost.py`: brain-kit's Bridge and SpoolSigner, its poll loop with each MR's result, the spool view for the page), the KiroCrew adapter |
 | `backend/core/gateway.py`, `sessions.py`, `httpkit.py`, `store.py` | Kept from the sample (see above) |
 | `signer/` | The separate signer (brain-kit's rules, its own ledger; the service half of brain-kit's spool protocol), its example config and systemd unit |
@@ -335,7 +369,8 @@ about 0.5 s a commit); `BRAIN_TEST_KEEP_HOOKS=1` keeps the hooks. The import tes
 fake ssh for the failures and a fake GitLab for the MR: no network. The fake GitLab (`tests/teamfix.py`) serves commits
 with their `parent_ids`, authors and committers from a bare repo, and GraphQL's edit marks as measured on
 gitlab.aws.dev (lastEditedBy for a text edit only); every hand-over in the tests is a real `brain handoff` commit, and
-the runner's commits are the bot account's.
+the runner's commits are the bot account's. The 你是谁 tests run against the checkout as it is (48b6b97: no name
+without GitLab) and against a copy of it with brain-kit 91e2fee's login-name rule applied (`tests/test_identity.py`).
 
 ## Not verified on a live Kiro Crew yet
 
@@ -345,4 +380,5 @@ credits in `turn_stats`; the bridge's runner sessions; the `kirocrew config set`
 the dashboard; the signer against a real GitLab (MR versions, note ids, GraphQL's lastEditedBy through its own
 token) and as another OS user behind the spool; the 变更说明 of a real run (brain-kit 48b6b97's MR.md in the hand-over
 commit) on the page; 导入仓库 against a real GitLab (a clone over SSH and its failure texts, the push, the MR opened
-with a real token) and its long jobs behind the gateway.
+with a real token, a protected default branch refusing 推送 after an install in place, 拉取 from it) and its long jobs
+behind the gateway.

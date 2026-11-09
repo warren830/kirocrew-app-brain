@@ -120,7 +120,16 @@ Lean timeline follow them when trace is missing), `decisions.USER` (the MR reade
     default_branch, gitlab.base / project: `kit_data`, checked with `config.validate`), runs `brain doctor --offline`,
     reads `git status` for the changed files and commits. Wanted: `brain install --branch NAME [--worktree DIR]
     [--tracker none|jira] [--jira BASE] [--gitlab BASE PROJECT] [--default-branch B] [--commit] --json` →
-    `{branch, worktree, kit, files, doctor: [{level, text}], commit}`; and kit.json values as flags at least.
+    `{branch, worktree, kit, files, doctor: [{level, text}], commit}`; and kit.json values as flags at least. Installs
+    now go in place by default (in the checkout, on its branch): the app commits only the paths the install wrote,
+    found by `git status` before and after within what `brain install` writes (brain-kit's `kit/` and Lean's, `.brain`,
+    `aidlc-docs/lean.json`, `aidlc-docs/audit`, the Brain, `AGENTS.md`, `.gitignore`). Wanted with `--json`: the list
+    of paths it wrote (`files`), so nothing has to be guessed.
+34. **Who the person is, as data** (new, 91e2fee). The app shows the name brain-kit goes by in each repo and asks for
+    「你的 GitLab 用户名」 where brain-kit would refuse. It copies `cli._me`'s rule (a token with gitlab.base; BRAIN_USER;
+    git config brain.user; the login name without GitLab) and tells 91e2fee from 48b6b97 by `cli._login_name`
+    being there. Wanted: a public `identity(repo, cfg, ask_gitlab=False) -> {name, source, needs}` (no GitLab call
+    unless asked), and the "who are you?" errors as a BrainError subclass (`NoIdentity`, with `gitlab_base`).
 
 
 ### Nice-to-have
@@ -153,7 +162,8 @@ Lean timeline follow them when trace is missing), `decisions.USER` (the MR reade
 
 ## Note for the next brain-kit
 
-The app's tests pass against a clean checkout of 48b6b97 and against the working tree at the time of writing. The
+The app's tests pass against a clean checkout of 48b6b97 and against the working tree at the time of writing; the
+identity tests also against a copy of 48b6b97 with 91e2fee's login-name rule applied. The
 fake GitLab serves GraphQL's edit marks the way they were measured on gitlab.aws.dev (lastEditedBy only for a text
 edit) and the edit of a note by its own author (48b6b97's 变更说明 comment); the runner's test commits are now really
 the bot account's (they were the test person's), which 72b278e's hand-over rule reads. Run the app's tests again
