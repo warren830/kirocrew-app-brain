@@ -125,7 +125,8 @@ def test_an_installed_repo_is_one_click_inspect_then_add(tmp_path, home):
         == ["OK"] * 10, got["checks"]
     assert c["branch"]["why"] == "在 main 上" and c["default"]["why"].startswith("main")
     assert c["kit"]["why"] == "装了，已提交（.brain/kit.json）" and c["listed"]["why"] == "还不在列表里"
-    assert c["origin"]["level"] == "WARN" and "git remote add origin" in c["origin"]["todo"]
+    # a repo done only on this machine: no origin is no warning (UI问题清单 #5)
+    assert c["origin"]["level"] == "OK" and c["origin"]["why"].startswith("没有 origin：这个仓库只在本机做")
     assert got["kit"]["state"] == "checkout" and got["kit"]["values"]["req_prefix"] == "PAY"
     assert any(r["text"].startswith("KiroCrew 引擎") for r in got["crew"]["rows"])   # crewcheck's rows for it
     assert added["ok"] and added["id"] == "r1" and added["status"]["repos"][0]["ok"] is True
