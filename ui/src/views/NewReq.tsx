@@ -8,16 +8,18 @@
  *   2 文档过五关  the documents and the files left out, then the five gates as five cards whose state shows (green:
  *              done, magenta: waits for you, red: stopped, the check's or this repo's rule). Without documents they are
  *              one line. Gate 2 says up front when the repo takes no confidential material (kit.json
- *              intake.allow_confidential). 「先检查（不写入）」 runs the gates as a dry run (POST /intake/check); its
- *              answer: what stops it said as what to do on this page (the field it names marked), the counts, a card
- *              per file (what was found and what happened to it), 请你确认, brain-kit's own words folded under 细节.
+ *              intake.allow_confidential), and a refused pick says what this repo refuses. 「先检查」 runs the gates as a
+ *              dry run (POST /intake/check: nothing claimed, no document taken in); its answer: what stops it said as
+ *              what to do on this page (the field it names marked), the counts, a card per file (what was found and
+ *              what happened to it), 请你确认 by file name, brain-kit's own words folded under 细节.
  *   3 开工      the session options, 「开工」 (POST /intake/start), big, with why it is off next to it: KiroCrew cannot
  *              open the session (a ✗ above), the default branch not on origin yet (推送 right there), the form, a check
  *              of exactly what the form says now. The answer: a success card (branch, worktree) saying what happens in
  *              the session, with 打开会话, 需求看板, 需求详情; a failure says why in words and what to do.
  *
  * KiroCrew's failing or doubtful checks are listed above the form with their fix buttons: /status has them at once,
- * GET /crew checks again. Without a usable repo there is no form: 导入仓库, or the way forward of a repo on its way.
+ * GET /crew checks again. Without a usable repo there is no form: 导入仓库, or the way forward of a repo on its way;
+ * without brain-kit none can be used, and the one way forward is its place in 设置 (去填位置, as the banner says).
  */
 import { useState, type ReactNode } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
@@ -26,7 +28,7 @@ import { lines, splitPaths } from '../format'
 import { KEY_RE, type NewEntry } from '../nav'
 import type { Tone } from '../styles'
 import { CLASS_LABEL, type CheckRow, type Classification, type CrewChecks, type IntakeBody, type IntakeCheck, type IntakeNext, type MeNameResult, type StartBody, type StartResult } from '../types'
-import { CheckRows, Flow, Icon, ImportCta, MeLine, PendingRepo, PushBox, RoleIcon, repoLabel, type FlowStep } from '../ui'
+import { CheckRows, Flow, Icon, ImportCta, MeLine, PendingRepo, PushBox, RoleIcon, brainkitProblem, repoLabel, type FlowStep } from '../ui'
 import { ACT, CLASS_NAME } from '../vocab'
 import type { ViewProps } from './props'
 
@@ -40,6 +42,9 @@ export const HERO_TEXT = `${HERO_HEAD}；团队仓库做完可以交给运行机
 /** a repo without a remote is done only on this machine: no word of the runner */
 export const HERO_LOCAL = `${HERO_HEAD}，做完在这台机器上发布、合并。`
 export const NO_CONFIDENTIAL = '这个仓库不收机密材料：机密、绝密和「不确定」的文档，要先请产品写一份脱敏摘要，交摘要。'
+export const NO_SECRET = '绝密材料不收：先请产品写一份脱敏摘要，交摘要。'
+export const CHECK_HINT = '只检查：不认领，文档也不收进任何地方。'
+export const CREW_OK = 'KiroCrew 的检查都过了：开工以后能开会话。'
 export const STARTED_NEXT = '打开会话：AI 先写需求文档；写好会请你批准（待办和需求看板会提醒，批准那一行要你在会话里自己打）。'
 const CLASSES = Object.keys(CLASS_LABEL) as Classification[]
 
@@ -59,6 +64,22 @@ const GATE_META: Record<GateState, { tone: Tone; glyph: string }> = {
 function gateOf(line: string): number | null {
   const m = /^\s*(?:第\s*(\d)\s*关|门\s*(\d))/.exec(line)
   return m ? Number(m[1] ?? m[2]) : null
+}
+
+/** Why gate 2 refuses *c* in this repo, '' when it takes it: 绝密 never (brain-kit's rule); 机密 and 不确定 (taken
+ * as 机密) when the repo's kit.json does not allow confidential material. */
+export function classRefusal(c: Classification, allowConfidential: boolean): string {
+  if (c === 'secret') return NO_SECRET
+  if (allowConfidential || (c !== 'confidential' && c !== 'unsure')) return ''
+  return `这个仓库不收机密材料（你选的是「${c === 'unsure' ? '不确定' : '机密'}」）：先请产品写一份脱敏摘要，交摘要。`
+}
+
+/** What a person checks in a 请你确认 line: the quoted words (「对接人：张三李四」); else the line without its document
+ * code (「D01 」) and without brain-kit's explanation in brackets, which REVIEW_HINT says once. */
+export function reviewWords(text: string): string {
+  const quotes = [...text.matchAll(/「([^」]*)」/g)].map((m) => `「${m[1]}」`)
+  if (quotes.length) return quotes.join('、')
+  return text.replace(/^\s*D\d+\s+/, '').replace(/（[^）]*）/g, '').trim()
 }
 
 /** The 英文短名 a title suggests: its English words, else req-<the key's number>. */
@@ -107,7 +128,9 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
   const keyValue = claimed || (keyEdited ? key : nextKey)
   const slugValue = slugEdited ? slug : slugFrom(title, keyValue)
   const tracker = info?.tracker || picked?.kit?.tracker || 'none'
-  const refusedClasses: Classification[] = info && info.allow_confidential === false ? ['confidential', 'secret', 'unsure'] : ['secret']
+  // an older backend does not say: brain-kit's own rule only (绝密)
+  const allowConfidential = info?.allow_confidential !== false
+  const refusedClasses = CLASSES.filter((k) => classRefusal(k, allowConfidential))
 
   const body: IntakeBody = {
     repo, key: keyValue.trim(), slug: slugValue.trim(), title: title.trim(), docs: lines(docs), consent, classification, business, exclude: lines(exclude),
@@ -138,12 +161,14 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
   // KiroCrew's doubtful rows for this requirement: the machine's, and the chosen repo's own (another repo's stay in 设置)
   const crewData = crew.data ?? props.status?.crew ?? null
   const repoPath = picked?.path
-  const crewRows = crewData?.rows.filter((r) => (r.level === 'FAIL' || r.level === 'WARN') && (!r.repo || r.repo === repoPath)) ?? []
+  const doubtful = (rows: CheckRow[]) => rows.filter((r) => (r.level === 'FAIL' || r.level === 'WARN') && (!r.repo || r.repo === repoPath))
+  const crewRows = crewData ? doubtful(crewData.rows) : []
   const crewBad = crewRows.some((r) => r.level === 'FAIL')
   const crewFix = crewRows.filter((r) => r.level === 'FAIL').map(fixOfRow).find(Boolean)
+  // the card above goes once this requirement's rows are fine (another repo's stay in 设置): say so where it was
   const onFixed = (rows: CrewChecks['rows']) => {
     if (crew.data) crew.set({ ...crew.data, rows })
-    setCrewOk(rows.some((r) => r.level === 'FAIL' || r.level === 'WARN') ? '' : 'KiroCrew 的检查都过了。')
+    setCrewOk(doubtful(rows).length ? '' : CREW_OK)
     props.reloadStatus()
   }
 
@@ -161,9 +186,9 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
           : keyBad ? '需求号的格式不对'
             : me?.ask ? `先在上面「${me.label}」旁点「保存」${me.suggest ? `（确认是 ${me.suggest}）` : ''}`
               : started?.ok ? '已经开工了'
-                : info?.push ? `先推送 ${info.push.branch}：开工从 origin 上的 ${info.push.branch} 建分支，那里还没有 brain-kit`
+                : info?.push ? `先推送 ${info.push.branch}：开工从远端的 ${info.push.branch} 建分支，那里还没有 brain-kit`
                   : openSession && crewBad ? `KiroCrew 这边有问题，开不了会话：先点上面的${crewFix ? `「${crewFix}」` : '修复按钮'}，或者不勾「开工后开会话」`
-                    : classRefused ? NO_CONFIDENTIAL
+                    : classRefused ? classRefusal(classification, allowConfidential)
                       : noDocs ? ''
                         : !checked ? '有文档：先检查一遍（不写入）'
                           : checked.print !== print ? '表单改过了：再检查一遍'
@@ -208,11 +233,29 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
   if (props.status && repos.length === 0) {
     const waiting = props.status.repos.filter((r) => r.pending)
     const broken = props.status.repos.filter((r) => !r.ok && !r.pending)
+    const kit = props.status.brainkit
+    const kitFix = kit.ok ? null : brainkitProblem(kit.error, kit.path)
     return (
       <main className="kt-root br-view nr-root" data-testid="br-new">
         <style>{NR_CSS}</style>
         {props.status.repos.length === 0 ? (
           <ImportCta title="开需求之前，先导入一个仓库" punch="导入以后，就能在这里认领需求、开工。" onImport={() => props.go({ kind: 'import' })} />
+        ) : kitFix ? (
+          <section className="br-card nr-sec" aria-label="还没有能用的仓库" data-testid="no-usable-repo">
+            <header className="nr-head">
+              <RoleIcon role="blocked" size={20} className="nr-bad-icon" />
+              <h3>开不了需求：app 读不了 brain-kit</h3>
+              <small>{props.status.repos.map((r) => r.name).join('、')} 都在等它</small>
+            </header>
+            <p className="nr-kit-todo" data-testid="no-kit-todo">
+              <b>做什么</b>{kitFix.kind === 'missing' ? '先在设置里写对 brain-kit 的位置，点「保存」，这些仓库就能用了' : kitFix.todo}
+            </p>
+            <div className="br-row">
+              <button type="button" className="br-btn is-primary" onClick={() => props.go({ kind: 'settings' })}>
+                <RoleIcon role="settings" size={15} />{kitFix.kind === 'missing' ? '去填位置' : '去设置'}
+              </button>
+            </div>
+          </section>
         ) : (
           <section className="br-card nr-sec" aria-label="还没有能用的仓库" data-testid="no-usable-repo">
             <header className="nr-head">
@@ -233,7 +276,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
                   <b>{r.name}</b>
                   <span className="br-chip tone-bad">用不了</span>
                   <span className="br-small">{r.error}</span>
-                  <button type="button" className="br-btn is-small" onClick={() => props.go({ kind: 'import', path: r.path })}>去导入仓库检查</button>
+                  <button type="button" className="br-btn is-small nr-waiting-go" onClick={() => props.go({ kind: 'import', path: r.path })}>去导入仓库检查</button>
                 </li>
               ))}
             </ul>
@@ -388,9 +431,9 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
 
               <div className="nr-go-row">
                 <button type="button" className={`br-btn${needCheck ? ' is-primary' : ''}`} disabled={!canCheck} onClick={() => void runCheck()}>
-                  <RoleIcon role="lint" size={16} />{check.busy ? '正在检查…' : '先检查（不写入）'}
+                  <RoleIcon role="lint" size={16} />{check.busy ? '正在检查…' : '先检查'}
                 </button>
-                {checked && checked.print !== print && <span className="br-hint">表单改过了，这次检查不算数了。</span>}
+                <span className="br-hint">{checked && checked.print !== print ? '表单改过了，这次检查不算数了。' : CHECK_HINT}</span>
               </div>
               {check.error && <p className="br-error" role="alert">{check.error}</p>}
               {checked && <CheckResult c={checked.result} stale={checked.print !== print} />}
@@ -471,6 +514,9 @@ function Gate({ n, icon, title, state, word, children }: { n: number; icon: stri
 function CheckResult({ c, stale }: { c: IntakeCheck; stale: boolean }) {
   const passed = c.ok && c.blocking.length === 0 && !c.error
   const raw = [...(c.blocking_raw ?? []), ...c.findings]
+  // by the file's name, as its card above says it (not brain-kit's line with the document's code); an older backend: its lines
+  const byFile = (c.files ?? []).filter((f) => f.review)
+  const review: [string, string][] = byFile.length ? byFile.map((f) => [f.name, reviewWords(f.review)]) : c.review.map((r) => ['', reviewWords(r)])
   return (
     <div className={`nr-result${stale ? ' is-stale' : ''}`} data-testid="check-result">
       {c.error ? <p className="br-error br-pre" role="alert">{c.error}</p> : (
@@ -511,10 +557,10 @@ function CheckResult({ c, stale }: { c: IntakeCheck; stale: boolean }) {
           ))}
         </ul>
       )}
-      {c.review.length > 0 && (
+      {review.length > 0 && (
         <div className="nr-review" data-testid="review">
           <span className="nr-review-head"><i aria-hidden="true">!</i><b className="br-strong">请你确认</b></span>
-          <ul>{c.review.map((r, i) => <li key={i}>{r}</li>)}</ul>
+          <ul>{review.map(([name, words], i) => <li key={i}>{name && <b>{name}：</b>}{words}</li>)}</ul>
           <p>{REVIEW_HINT}</p>
         </div>
       )}
@@ -616,6 +662,9 @@ const NR_CSS = `
   border: 1px solid var(--border); background: var(--kt-glass); }
 .nr-waiting > li > b { color: var(--text-strong); }
 .nr-waiting > li > :nth-child(n+3) { grid-column: 1 / -1; }
+.nr-waiting > li > .nr-waiting-go { justify-self: start; }
+.nr-kit-todo { margin: 0; }
+.nr-kit-todo b { color: var(--muted); font-weight: 650; margin-right: .5em; }
 
 /* the fields: a grid of six columns */
 .nr-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px 16px; align-items: start; }
@@ -704,6 +753,7 @@ const NR_CSS = `
 .nr-review-head i { font-style: normal; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; font-weight: 900; font-size: .85em;
   color: var(--kt-warn); border: 2px solid var(--kt-warn); background: color-mix(in srgb, var(--kt-warn) 14%, transparent); }
 .nr-review ul { margin: 0; padding-left: 1.3em; color: var(--text-strong); }
+.nr-review li b { font-weight: 700; }
 .nr-review p { margin: 0; font-size: .86em; color: var(--muted); }
 .nr-raw pre { white-space: pre-wrap; word-break: break-word; max-height: 16em; overflow: auto; }
 
