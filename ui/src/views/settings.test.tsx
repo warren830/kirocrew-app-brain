@@ -307,6 +307,12 @@ describe('设置', () => {
     expect(waiting).toHaveTextContent('等 brain-kit')
     expect(waiting).toHaveTextContent('brain-kit 没装载：先在最上面写对 brain-kit 的位置，这个仓库就能读了')
     expect(within(waiting).queryByRole('button', { name: /去检查|去装/ })).toBeNull()
+    expect(within(waiting).getByTestId('repo-waits-kit').parentElement?.children).toHaveLength(1)   // one line, no gap before its colon
+    // nor can one without brain-kit be installed now: no 去装 to a page that cannot install it
+    const bare = screen.getByRole('region', { name: '仓库' }).querySelector<HTMLElement>('li[data-repo="r2"]') as HTMLElement
+    expect(bare).toHaveTextContent('还没装 brain-kit：先在最上面写对 brain-kit 的位置，才能装')
+    expect(bare).not.toHaveTextContent('在「导入仓库」里检查它')
+    expect(within(bare).queryByRole('button', { name: /去检查|去装/ })).toBeNull()
     unmount()
     const old = fx.status()
     old.brainkit = { ...old.brainkit, ok: false, error: 'brain-kit 太旧（没有 sign.SpoolSigner）：要 72b278e 或更新的版本' }

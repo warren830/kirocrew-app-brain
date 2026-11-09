@@ -126,7 +126,7 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
             <div className="br-field">
               <label htmlFor="set-work">每个需求的工作目录放在哪</label>
               <input id="set-work" type="text" className="br-mono" value={form.work_root} onChange={(e) => edit({ work_root: e.target.value })} />
-              <p className="br-hint">要在 ~/workplace 或 ~/workspace 下面：KiroCrew 只让 agent 在那里干活。</p>
+              <p className="br-hint">要在 ~/workplace 或 ~/workspace 下面：KiroCrew 的会话只能在这两个目录里干活。</p>
             </div>
           </div>
           <fieldset className={`br-fieldset st-team${form.team.enabled ? ' is-on' : ''}`}>
@@ -181,7 +181,7 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
       {status && <StatCards status={status} onTeam={() => go({ kind: 'team' })} />}
       <div className="st-main">
         <div className="st-col">
-          {status && <ReposCard repos={status.repos} onImport={onImport} onRemoved={setStatus} onChanged={reloadStatus} />}
+          {status && <ReposCard repos={status.repos} kitOk={status.brainkit.ok} onImport={onImport} onRemoved={setStatus} onChanged={reloadStatus} />}
           {formCard}
         </div>
         <div className="st-col">
@@ -272,8 +272,9 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
   )
 }
 
-function ReposCard({ repos, onImport, onRemoved, onChanged }: {
+function ReposCard({ repos, kitOk, onImport, onRemoved, onChanged }: {
   repos: RepoInfo[]
+  kitOk: boolean
   onImport: (path?: string) => void
   onRemoved: (s: Status) => void
   onChanged: () => void
@@ -295,7 +296,7 @@ function ReposCard({ repos, onImport, onRemoved, onChanged }: {
         </div>
       ) : (
         <ul className="st-repos">
-          {repos.map((r) => <RepoRow key={r.path} r={r} onImport={onImport} onRemoved={onRemoved} onChanged={onChanged} />)}
+          {repos.map((r) => <RepoRow key={r.path} r={r} kitOk={kitOk} onImport={onImport} onRemoved={onRemoved} onChanged={onChanged} />)}
         </ul>
       )}
     </section>
@@ -303,9 +304,11 @@ function ReposCard({ repos, onImport, onRemoved, onChanged }: {
 }
 
 /** One repo of the list: whether the app can use it, why not, what waits (the install branch), and 「移出列表」 after a
- * confirm that says what it does (the app's list only: no file, branch or worktree changes). */
-function RepoRow({ r, onImport, onRemoved, onChanged }: {
+ * confirm that says what it does (the app's list only: no file, branch or worktree changes). Without brain-kit
+ * (*kitOk* false) nothing can be read or installed: its place, at the top, is the one thing to do. */
+function RepoRow({ r, kitOk, onImport, onRemoved, onChanged }: {
   r: RepoInfo
+  kitOk: boolean
   onImport: (path?: string) => void
   onRemoved: (s: Status) => void
   onChanged: () => void
@@ -319,6 +322,7 @@ function RepoRow({ r, onImport, onRemoved, onChanged }: {
   }
   const { word, tone } = repoWord(r)
   const state = r.ok ? 'ok' : r.pending ? 'wait' : tone === 'idle' ? 'idle' : 'bad'
+  const waitsForKit = !kitOk && tone === 'idle'
   return (
     <li className={`st-repo is-${state}`} data-repo={r.id}>
       <div className="st-repo-top">
@@ -344,10 +348,14 @@ function RepoRow({ r, onImport, onRemoved, onChanged }: {
       )}
       {r.error && (
         <div className="st-repo-why">
-          <span className={tone === 'bad' ? 'br-bad-text' : 'br-dim'}>{r.error}</span>
-          {/没装载/.test(r.error)
-            ? <span className="br-dim">：先在最上面写对 brain-kit 的位置，这个仓库就能读了</span>
-            : <button type="button" className="br-btn is-small" onClick={() => onImport(r.path)}>{tone === 'idle' ? '去装' : '去检查'}</button>}
+          {waitsForKit || /没装载/.test(r.error)
+            ? <span className="br-dim" data-testid="repo-waits-kit">{word === '没装' ? '还没装 brain-kit：先在最上面写对 brain-kit 的位置，才能装' : 'brain-kit 没装载：先在最上面写对 brain-kit 的位置，这个仓库就能读了'}</span>
+            : (
+              <>
+                <span className={tone === 'bad' ? 'br-bad-text' : 'br-dim'}>{r.error}</span>
+                <button type="button" className="br-btn is-small" onClick={() => onImport(r.path)}>{tone === 'idle' ? '去装' : '去检查'}</button>
+              </>
+            )}
         </div>
       )}
       {r.pending && <PendingRepo repo={r} onOpen={() => onImport(r.path)} onDone={onChanged} />}

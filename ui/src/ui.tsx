@@ -411,7 +411,7 @@ export function KitFix({ repo, label = KIT_FIX_LABEL, onDone, onHold }: { repo: 
           {commit?.ok && !inplace && r.remote_url && !pub.result?.ok && (
             asking ? (
               <div className="br-confirm" role="group" aria-label="确认推送">
-                <p>会把分支 <code>{r.branch}</code> 推到 origin（<code>{r.remote_url}</code>）{r.gitlab_project ? <>，在 <code>{r.gitlab_project}</code> 上开 MR：<code>{r.branch}</code> → <code>{r.target}</code></> : ''}。</p>
+                <p>会把分支 <code>{r.branch}</code> 推到远端（<code>{r.remote_url}</code>）{r.gitlab_project ? <>，在 <code>{r.gitlab_project}</code> 上开 MR：<code>{r.branch}</code> → <code>{r.target}</code></> : ''}。</p>
                 <div className="br-row">
                   <button type="button" className="br-btn is-small is-primary" disabled={pub.busy}
                     onClick={() => void pub.run({ path: repo, branch: r.branch, target: r.target, remote_url: r.remote_url, confirm: true, purpose: 'upgrade' }).then(() => setAsking(false))}>
@@ -490,12 +490,12 @@ export function PushBox({ path, branch, remoteUrl, target, onDone, onLater }: {
         <span className="br-row">
           <button type="button" className="br-btn is-small is-primary" onClick={() => setAsking(true)}><Icon name="Upload" size={13} />{r ? '再推一次' : `推送 ${branch}`}</button>
           {onLater && <button type="button" className="br-btn is-small" onClick={onLater}>先不推送</button>}
-          <span className="br-hint">推送以后才算数：开工从 origin 上的 {target || branch} 建分支，那里现在还没有它。</span>
+          <span className="br-hint">推送以后才算数：开工从远端的 {target || branch} 建分支，那里现在还没有它。</span>
         </span>
       )}
       {asking && (
         <div className="br-confirm" role="group" aria-label="确认推送" data-testid="push-confirm">
-          <p>会把分支 <code>{branch}</code> 推到 origin（<code>{remoteUrl}</code>），不强推。</p>
+          <p>会把分支 <code>{branch}</code> 推到远端（<code>{remoteUrl}</code>），不强推。</p>
           {team && <p className="br-warn-text" data-testid="push-team">这会直接改团队的 {branch}，没有 MR 评审；{branch} 受保护时推不上去，就改用「装到新分支，开 MR 给团队看」。</p>}
           <div className="br-row">
             <button type="button" className="br-btn is-small is-primary" disabled={push.busy} onClick={() => void send()}>{push.busy ? '正在推送…' : '确定推送'}</button>
