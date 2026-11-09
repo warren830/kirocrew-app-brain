@@ -171,7 +171,7 @@ export function ActorGraph({ board, lay, focus, onActor, flashes, reducedMotion,
           )
         })()}
       </div>
-      <Legend />
+      <Legend handover={board.actors.some((a) => (a.key === 'handover' || a.key === 'signer') && a.status !== 'skipped')} />
     </div>
   )
 }
@@ -529,7 +529,8 @@ const LEGEND: { status: Actor['status'] | 'other'; text: string }[] = [
   { status: 'skipped', text: '这次不需要' },
 ]
 
-function Legend() {
+/** *handover*: the way has a hand-over (a repo done only here has none, so its particle is not explained) */
+function Legend({ handover }: { handover: boolean }) {
   return (
     <div className="kt-legend" role="note" aria-label="图例">
       {LEGEND.map((l) => (
@@ -539,7 +540,7 @@ function Legend() {
         </span>
       ))}
       <span className="kt-legend-sep" aria-hidden="true" />
-      <span className="kt-legend-item is-p-handoff"><b aria-hidden="true" />交接 · 签名</span>
+      {handover && <span className="kt-legend-item is-p-handoff"><b aria-hidden="true" />交接 · 签名</span>}
       <span className="kt-legend-item is-p-merge"><b aria-hidden="true" />批准 · 回答</span>
       <span className="kt-legend-item is-p-pass"><b aria-hidden="true" />检查全过</span>
       <span className="kt-legend-item is-p-fail"><b aria-hidden="true" />退回 / 拦下 / 没过</span>
