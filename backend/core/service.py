@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from . import bk, brainview, crewcheck, deliveries, detail, intake, lean_view, mrdesc_view, mrinfo
+from . import bk, brainview, crewcheck, deliveries, detail, importer, intake, lean_view, mrdesc_view, mrinfo
 from . import settings as settings_mod
 from . import todo as todo_mod
 from .constants import APP_NAME, APP_ROOT, KEY_RE, LOCAL_AGENT, LOCAL_FOLDER, REPO_ID_RE, TICK_S, VERSION
@@ -80,6 +80,10 @@ class Service:
         self.mr = mrinfo.MrCache()
         self.repos: dict[str, Repo] = {}
         self.repo_errors: dict[str, tuple[str, str]] = {}
+        # listed repos whose brain-kit is on its way (the install branch, merged but not pulled): (path, state)
+        self.repo_pending: dict[str, tuple[str, dict[str, Any]]] = {}
+        self.imports = importer.Records(self.data_dir / "imports.json")   # what 导入仓库 installed where
+        self.jobs = importer.Jobs(now)                                      # clone / install in the background
         self.crew: dict[str, Any] = {"rows": [], "fix": {"agent": False, "engine": False}, "checked_at": None}
         self.team: Any = None
         self._tasks: list[asyncio.Task] = []
@@ -133,16 +137,27 @@ class Service:
         bk.unload()
 
     def reload_sync(self) -> None:
-        """brain-kit from settings.brainkit, then the repos (their kit.json through brain-kit)."""
+        """brain-kit from settings.brainkit, then the repos (their kit.json through brain-kit). A repo whose checkout
+        has no kit.json yet but whose brain-kit is on its way (the install branch 导入仓库 made, or merged and not
+        pulled yet) is pending, with what to do; one without any is an error that says where to install it."""
         bk.load(self.settings["brainkit"])
-        self.repos, self.repo_errors = {}, {}
+        self.repos, self.repo_errors, self.repo_pending = {}, {}, {}
+        records = self.imports.all()
+        token = None
         for i, path in enumerate(self.settings["repos"], 1):
             rid = "r%d" % i
             try:
-                if not bk.ok():
-                    raise RuntimeError("brain-kit 没装载")
                 if not os.path.isdir(path):
                     raise RuntimeError("找不到这个目录")
+                if not os.path.isfile(os.path.join(path, importer.KIT)):
+                    token = self._token_present() if token is None else token
+                    pend = importer.pending_state(path, records.get(path), token=token)
+                    if pend:
+                        self.repo_pending[rid] = (path, pend)
+                        continue
+                    raise RuntimeError("还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装到一个新分支上")
+                if not bk.ok():
+                    raise RuntimeError("brain-kit 没装载")
                 cfg = bk.m("config").load(path)
                 self.repos[rid] = Repo(rid, path, cfg)
             except Exception as exc:  # noqa: BLE001
@@ -839,14 +854,16 @@ class Service:
             rid = "r%d" % i
             r = self.repos.get(rid)
             if r is not None:
-                g = r.cfg.get("gitlab") or {}
                 repos.append({"id": rid, "path": r.path, "name": r.name, "ok": True, "error": "",
-                              "kit": {"tracker": r.cfg["tracker"], "req_prefix": r.cfg["req_prefix"],
-                                      "default_branch": r.cfg["default_branch"], "gitlab_base": str(g.get("base") or ""),
-                                      "gitlab_project": str(g.get("project") or "")}})
+                              "kit": importer.kit_view(r.cfg), "pending": None})
+            elif rid in self.repo_pending:
+                p, pend = self.repo_pending[rid]
+                repos.append({"id": rid, "path": p, "name": os.path.basename(p), "ok": False, "error": "", "kit": None,
+                              "pending": pend})
             else:
                 p, err = self.repo_errors.get(rid, (path, "没装载"))
-                repos.append({"id": rid, "path": p, "name": os.path.basename(p), "ok": False, "error": err, "kit": None})
+                repos.append({"id": rid, "path": p, "name": os.path.basename(p), "ok": False, "error": err, "kit": None,
+                              "pending": None})
         todo = await self.todo()
         token = await asyncio.to_thread(self._token_present)
         me = await asyncio.to_thread(self.me)
@@ -862,6 +879,10 @@ class Service:
         return {**self.settings, "team": dict(self.settings["team"])}
 
     async def save_settings(self, body: Any) -> dict[str, Any]:
+        """Check, save atomically, reload. A key the body leaves out keeps its value (the 设置 form sends no repos: the
+        list is changed by 导入仓库 and 移出列表 only)."""
+        if isinstance(body, dict):
+            body = {**self.settings_view(), **body}
         clean, probs = settings_mod.check(body)
         if probs:
             raise AppError("；".join(probs), "invalid_settings")
@@ -879,6 +900,176 @@ class Service:
                 t._brain_team = True  # type: ignore[attr-defined]
                 self._tasks.append(t)
         return {"ok": True, "settings": self.settings_view(), "status": await self.status()}
+
+    # ---- 导入仓库 ------------------------------------------------------------------------------------- #
+
+    @staticmethod
+    def _fail(exc: "importer.ImportFail") -> AppError:
+        return AppError(str(exc), exc.code, exc.status)
+
+    async def import_defaults(self) -> dict[str, Any]:
+        token = await asyncio.to_thread(self._token_present)
+        return {"clone_parent": importer.default_parent(self.settings["work_root"]), "work_root": self.settings["work_root"],
+                "branch": importer.DEFAULT_BRANCH, "token": token, "brainkit_ok": bk.ok()}
+
+    async def import_inspect(self, body: dict[str, Any]) -> dict[str, Any]:
+        """检查: read only (see importer.inspect)."""
+        token = await asyncio.to_thread(self._token_present)
+        got = await asyncio.to_thread(importer.inspect, body.get("path"), listed=list(self.settings["repos"]),
+                                      records=self.imports, token=token)
+        return scrub_tree(got, self.scrub)
+
+    def _start_job(self, kind: str, target: str, steps: tuple, work: Callable[[Callable[..., None]], Any],
+                   after: Callable[[Any], Any] | None = None) -> str:
+        """A clone or an install in a worker thread (never on the event loop); its steps and result in self.jobs."""
+        try:
+            jid = self.jobs.start(kind, target, steps)
+        except importer.ImportFail as exc:
+            raise self._fail(exc)
+
+        def step(sid: str, state: str, detail: str = "") -> None:
+            self.jobs.step(jid, sid, state, detail)
+
+        async def go() -> None:
+            try:
+                res = await asyncio.to_thread(work, step)
+                if after is not None:
+                    try:
+                        await after(res)
+                    except Exception:  # noqa: BLE001 - the job itself is done
+                        self.log.exception("brain: after the %s job", kind)
+                self.jobs.finish(jid, result=res)
+            except importer.ImportFail as exc:
+                self.jobs.finish(jid, result=exc.result, error=str(exc))
+            except Exception as exc:  # noqa: BLE001 - said on the page; the traceback goes to the log only
+                self.log.exception("brain: %s job failed", kind)
+                self.jobs.finish(jid, error="出错了：%s" % str(exc).split("\n", 1)[0][:300])
+
+        self.jobs.tasks[jid] = asyncio.get_running_loop().create_task(go())
+        return jid
+
+    def import_job(self, jid: str) -> dict[str, Any]:
+        got = self.jobs.view(jid)
+        if got is None:
+            raise AppError("没有这个任务（app 重开过？重新检查一下）", "no_job", 404)
+        return scrub_tree(got, self.scrub)
+
+    async def wait_job(self, jid: str) -> dict[str, Any]:
+        """The job's end (tests, and any caller that wants it)."""
+        task = self.jobs.tasks.get(jid)
+        if task is not None:
+            await task
+        return self.import_job(jid)
+
+    async def import_clone(self, body: dict[str, Any]) -> dict[str, Any]:
+        try:
+            plan = await asyncio.to_thread(importer.clone_plan, body.get("url"), body.get("parent"), body.get("name"),
+                                           self.settings["work_root"])
+        except importer.ImportFail as exc:
+            raise self._fail(exc)
+        jid = self._start_job("clone", plan["dest"], importer.CLONE_STEPS, lambda step: importer.clone(plan, step))
+        return {"job": self.import_job(jid)}
+
+    async def _import_top(self, raw: Any) -> str:
+        """The repo top level a request names (checked like 检查 does)."""
+        def find() -> str:
+            real = importer.clean_dir(raw)
+            try:
+                return importer.locate(real)["top"]
+            except importer.NotARepo as exc:
+                raise importer.ImportFail("%s：%s" % (exc, exc.todo), "not_a_repo")
+        try:
+            return await asyncio.to_thread(find)
+        except importer.ImportFail as exc:
+            raise self._fail(exc)
+
+    async def import_install(self, body: dict[str, Any]) -> dict[str, Any]:
+        """安装到新分支 (see importer.install), in the background; the page follows the job."""
+        top = await self._import_top(body.get("path"))
+        try:
+            kit = importer.check_kit(body.get("kit"))
+            branch = await asyncio.to_thread(importer.check_branch, body.get("branch"))
+        except importer.ImportFail as exc:
+            raise self._fail(exc)
+        work_root = self.settings["work_root"]
+
+        async def after(_res: Any) -> None:
+            if top in self.settings["repos"]:   # a listed repo that was not installed: now it is pending
+                await asyncio.to_thread(self.reload_sync)
+
+        jid = self._start_job("install", top, importer.INSTALL_STEPS,
+                              lambda step: importer.install(top, kit, branch, work_root, self.imports, step), after)
+        return {"job": self.import_job(jid)}
+
+    async def import_commit(self, body: dict[str, Any]) -> dict[str, Any]:
+        """再提交一次: the install's commit after a hook said no (the hooks run again)."""
+        top = await self._import_top(body.get("path"))
+        try:
+            got = await asyncio.to_thread(importer.commit, top, self.imports)
+        except importer.ImportFail as exc:
+            raise self._fail(exc)
+        if got["ok"] and top in self.settings["repos"]:
+            await asyncio.to_thread(self.reload_sync)
+        return scrub_tree(got, self.scrub)
+
+    async def import_publish(self, body: dict[str, Any]) -> dict[str, Any]:
+        """推送并开 MR: only with the branch, remote and target the person confirmed on the page."""
+        top = await self._import_top(body.get("path"))
+        confirm = {k: body.get(k) for k in ("branch", "target", "remote_url")}
+        try:
+            got = await asyncio.to_thread(importer.publish, top, self.imports, confirm, transport=self.transport)
+        except importer.ImportFail as exc:
+            raise self._fail(exc)
+        if top in self.settings["repos"]:
+            await asyncio.to_thread(self.reload_sync)
+        return scrub_tree(got, self.scrub)
+
+    async def import_add(self, body: dict[str, Any]) -> dict[str, Any]:
+        """加入列表: through save_settings (checked, saved atomically, reloaded). A repo whose brain-kit is only on the
+        install branch is added too and shows as pending; one without brain-kit anywhere is refused."""
+        top = await self._import_top(body.get("path"))
+        rid = importer.listed_id(top, self.settings["repos"])
+        if rid:
+            return {"ok": True, "id": rid, "text": "已经在列表里了（%s）" % rid, "status": await self.status()}
+        token = await asyncio.to_thread(self._token_present)
+
+        def state() -> tuple[bool, dict[str, Any] | None, str]:
+            if os.path.isfile(os.path.join(top, importer.KIT)):
+                if not bk.ok():
+                    return False, None, "brain-kit 没装载：先在设置里写对它的位置"
+                try:
+                    bk.m("config").load(top)
+                except Exception as exc:  # noqa: BLE001
+                    return False, None, "kit.json 有问题：%s。改好再加" % str(exc).split("\n", 1)[0][:200]
+                return True, None, ""
+            pend = importer.pending_state(top, self.imports.get(top), token=token)
+            return (True, pend, "") if pend else (False, None, "这个仓库还没装 brain-kit：先检查它，装到一个新分支上")
+
+        ok, pend, why = await asyncio.to_thread(state)
+        if not ok:
+            raise AppError(why, "not_installed", 409)
+        if len(self.settings["repos"]) >= settings_mod.MAX_REPOS:
+            raise AppError("最多 %d 个仓库：先移出一个" % settings_mod.MAX_REPOS, "too_many", 409)
+        saved = await self.save_settings({**self.settings_view(), "repos": list(self.settings["repos"]) + [top]})
+        rid = importer.listed_id(top, self.settings["repos"]) or ""
+        text = "加入了（%s）" % rid + ("：%s" % pend["text"] if pend else "")
+        return {"ok": True, "id": rid, "text": text, "status": saved["status"]}
+
+    async def repo_remove(self, body: dict[str, Any]) -> dict[str, Any]:
+        """移出列表: the app's list only. No file, branch or worktree is touched; a folder that is gone can be removed."""
+        raw = body.get("path")
+        if not isinstance(raw, str) or not raw.strip() or importer.CTRL_RE.search(raw):
+            raise AppError("写要移出的仓库目录", "invalid_path")
+        p = os.path.expanduser(raw.strip())
+        if not os.path.isabs(p):
+            raise AppError("仓库目录要写绝对路径", "invalid_path")
+        real = os.path.realpath(p)
+        repos = list(self.settings["repos"])
+        hit = next((r for r in repos if r == p or r == real or os.path.realpath(r) == real), None)
+        if hit is None:
+            raise AppError("列表里没有这个仓库：%s" % raw.strip(), "not_listed", 404)
+        saved = await self.save_settings({**self.settings_view(), "repos": [r for r in repos if r != hit]})
+        return {"ok": True, "text": "从列表里移出了 %s（文件、分支都没动）" % os.path.basename(hit), "status": saved["status"]}
 
     # ---- team mode ------------------------------------------------------------------------------------ #
 

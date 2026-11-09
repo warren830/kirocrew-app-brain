@@ -7,6 +7,7 @@ import itertools
 import json
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -120,11 +121,46 @@ def sh(*cmd: str, cwd: Any = None, check: bool = True, env: dict | None = None) 
     return p
 
 
+KEEP_HOOKS = os.environ.get("BRAIN_TEST_KEEP_HOOKS") == "1"
+
+
+def no_hooks_config(path: Path) -> str:
+    """Config lines for a throwaway test repo (brain-kit's tests/helpers.py does the same): no hooks (a machine-wide
+    core.hooksPath such as a secret scanner costs about 0.5 s per commit; these repos hold made-up data and are deleted
+    after the test) and no background maintenance. BRAIN_TEST_KEEP_HOOKS=1 keeps the hooks."""
+    if KEEP_HOOKS:
+        return ""
+    empty = Path(path) / ".git" / "no-hooks"
+    empty.mkdir(parents=True, exist_ok=True)
+    return "[core]\n\thooksPath = %s\n[maintenance]\n\tauto = false\n[gc]\n\tauto = 0\n" % str(empty).replace("\\", "/")
+
+
+NO_HOOKS_KEYS: list[str] = []
+
+
+def no_hooks_env() -> None:
+    """The same for every git the tests start, the app's own included (the bare origins, the app's clones and
+    worktrees): core.hooksPath at an empty folder through GIT_CONFIG_COUNT (git's -c). A test that needs a hook drops
+    these with monkeypatch (NO_HOOKS_KEYS). BRAIN_TEST_KEEP_HOOKS=1 keeps the hooks."""
+    if KEEP_HOOKS or NO_HOOKS_KEYS:
+        return
+    empty = tempfile.mkdtemp(prefix="brain-test-no-hooks-")
+    n = int(os.environ.get("GIT_CONFIG_COUNT") or 0)
+    for i, (k, v) in enumerate((("core.hooksPath", empty), ("maintenance.auto", "false"), ("gc.auto", "0"))):
+        os.environ["GIT_CONFIG_KEY_%d" % (n + i)] = k
+        os.environ["GIT_CONFIG_VALUE_%d" % (n + i)] = v
+        NO_HOOKS_KEYS.extend(["GIT_CONFIG_KEY_%d" % (n + i), "GIT_CONFIG_VALUE_%d" % (n + i)])
+    os.environ["GIT_CONFIG_COUNT"] = str(n + 3)
+    NO_HOOKS_KEYS.append("GIT_CONFIG_COUNT")
+
+
 def git_repo(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     sh("git", "init", "-q", "-b", "main", path)
     for k, v in (("user.name", "t"), ("user.email", "t@example.com"), ("commit.gpgsign", "false")):
         sh("git", "-C", path, "config", k, v)
+    with open(Path(path) / ".git" / "config", "a", encoding="utf-8") as f:
+        f.write(no_hooks_config(path))
     return path
 
 

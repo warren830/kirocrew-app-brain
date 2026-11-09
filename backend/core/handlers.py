@@ -119,6 +119,40 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
     async def team(request: Any) -> Any:
         return kit.json(await svc.team_view())
 
+    # 导入仓库: every path in a body is checked by the service (absolute, a real directory, no planted symlink)
+    async def import_defaults(request: Any) -> Any:
+        return kit.json(await svc.import_defaults())
+
+    async def import_inspect(request: Any) -> Any:
+        return kit.json(await svc.import_inspect(await kit.body(request)))
+
+    async def import_clone(request: Any) -> Any:
+        return kit.json(await svc.import_clone(await kit.body(request)))
+
+    async def import_install(request: Any) -> Any:
+        return kit.json(await svc.import_install(await kit.body(request)))
+
+    async def import_job(request: Any) -> Any:
+        jid = str(request.match_info.get("job", ""))
+        if not re.fullmatch(r"[0-9a-f]{12}", jid):
+            raise AppError("没有这个任务", "no_job", 404)
+        return kit.json(svc.import_job(jid))
+
+    async def import_commit(request: Any) -> Any:
+        return kit.json(await svc.import_commit(await kit.body(request)))
+
+    async def import_publish(request: Any) -> Any:
+        body = await kit.body(request)
+        if body.get("confirm") is not True:
+            raise AppError("推送要你先确认：哪个分支推到哪里", "not_confirmed")
+        return kit.json(await svc.import_publish(body))
+
+    async def import_add(request: Any) -> Any:
+        return kit.json(await svc.import_add(await kit.body(request)))
+
+    async def repo_remove(request: Any) -> Any:
+        return kit.json(await svc.repo_remove(await kit.body(request)))
+
     async def team_loop(request: Any) -> Any:
         return kit.json(await svc.team_loop())
 
@@ -143,4 +177,13 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
         AppRoute("GET", "/todo", kit.guarded(todo)),
         AppRoute("GET", "/team", kit.guarded(team)),
         AppRoute("POST", "/team/loop", kit.guarded(team_loop)),
+        AppRoute("GET", "/import/defaults", kit.guarded(import_defaults)),
+        AppRoute("POST", "/import/inspect", kit.guarded(import_inspect)),
+        AppRoute("POST", "/import/clone", kit.guarded(import_clone)),
+        AppRoute("POST", "/import/install", kit.guarded(import_install)),
+        AppRoute("GET", "/import/jobs/{job}", kit.guarded(import_job)),
+        AppRoute("POST", "/import/commit", kit.guarded(import_commit)),
+        AppRoute("POST", "/import/publish", kit.guarded(import_publish)),
+        AppRoute("POST", "/import/add", kit.guarded(import_add)),
+        AppRoute("POST", "/repos/remove", kit.guarded(repo_remove)),
     ]
