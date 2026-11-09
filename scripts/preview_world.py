@@ -501,6 +501,9 @@ def snapshot(r: Req, row: dict, *, park: dict | None = None, sessions: list | No
 
 def main() -> None:
     ov = json.loads((FIX / "overview.json").read_text(encoding="utf-8"))
+    ov["eval"]["raw"] = ""                                             # deliveries.evaluate: brain-kit's own words
+    for r_ in ov["funnel"]["rows"]:                                    # who settled them, in vocab.ts's words
+        r_["label"] = deliveries.CAT_LABEL.get(r_["id"], r_["label"])
     det = json.loads((FIX / "detail.json").read_text(encoding="utf-8"))
     status = json.loads((FIX / "status.json").read_text(encoding="utf-8"))
     rows = {r["key"]: r for r in ov["rows"]}
@@ -509,18 +512,42 @@ def main() -> None:
     for e in ov["errors"] + [r_ for r_ in status["repos"] if r_.get("error")]:
         if "还没装 brain-kit" in e["error"]:
             e["error"] = NO_KIT
+    # each row's 变更说明 first line (service._row: mrdesc_view.plain_line of it): the requirement's own
+    first = {"PAY-2": "退款单号加上校验位，重复和非法单号在入口就拒掉。", "PAY-4": "对账单按商户拆成一户一份，大商户按小时切。",
+             "PAY-5": "退款回调失败自动重试，第 6 次转人工处理。", "PAY-7": "退款时选原因，原因列表在后台维护。"}
+    for k, line in first.items():
+        rows[k]["summary"] = line
     tmpl = copy.deepcopy(rows["PAY-2"])
     boards: dict[str, dict] = {}
     details: dict[str, dict] = {}
     runs: list[dict] = []
     reqs: dict[str, list[Req]] = {"r1": [], "r3": [], "r4": []}      # every requirement's records, by repo
 
-    def mrdesc(key: str, first: str) -> dict:
+    def mrdesc(r: Req, first: str) -> dict:
+        """The requirement's own 变更说明 in brain mr-desc's layout, from its records: what it did (its commits), its
+        checks (Lean's verify), what is not there yet."""
+        verify = [e for e in r.events if e["event"] == "VERIFY"]
+        done = [c["subject"].split("：", 1)[-1] for c in r.commits if c["by"] in ("person", "bot") and not c["records_only"]
+                and not c["subject"].endswith("hand off to team runner")]
+        checks = ("verify %s：%s。" % ("通过" if verify[-1]["data"]["ok"] else "没过", "、".join(
+            x["cmd"] for x in verify[-1]["data"]["results"]))) if verify else "还没跑 verify。"
+        text = "\n".join([
+            "## %s · %s" % (r.key, r.title), "", "**一句话**：%s" % first,
+            "（分支 `%s`；负责人 %s；intent `%s`）" % (r.branch, r.owner, r.intent), "", "### 做了什么 / 没做什么"]
+            + ["- %s" % x for x in done[-4:] or ["还没有代码提交"]] + ["", "### 验收标准和证据", checks, "", "### 还没有"]
+            + (["- 还没合并"] if not r.merged_at else ["- 合并后 14 天还在观察"] if not (r.after14 or {}).get("window_closed") else [])
+            + ["", "---", "由 `brain mr-desc` 从记录生成（run.json、Lean 记录、git），别手改。重新生成：`brain mr-desc %s --write`。" % r.key, ""])
         m = copy.deepcopy(det["mr_desc"])
-        m["text"] = m["text"].replace("PAY-3", key)
-        m["text"] = m["text"].replace(det["mr_desc"]["first"] or "", first)
-        m.update(first=first, source="file", path="runs/%s/MR.md" % key, ref=sha(key, "ref")[:12])
+        m.update(text=text, first=first, source="file", path="runs/%s/MR.md" % r.key, ref=sha(r.key, "ref")[:12])
         return m
+
+    def decisions(r: Req, rows: list[tuple]) -> list[dict]:
+        """The requirement's own decisions.md rows (detail.decisions' shape): (stage, decision, why, who, by, cites)."""
+        day = iso(r.start_at or T0)[:10]
+        return [{"id": "D-%d" % i, "date": day, "stage": st, "text": text, "why": why, "who": who, "by": by,
+                 "cites": list(cites), "vouchers": ["V-%s" % sha(r.key, i)[:10]] if by == "person" else [],
+                 "src": "aidlc-docs/%s/decisions.md#L%d" % (r.intent, 7 + i)}
+                for i, (st, text, why, who, by, cites) in enumerate(rows, 1)]
 
     # ---------------------------------------------------------------- shop-pay
     # PAY-2: merged, the whole way (a design sent back, a question on the MR, a red verify, the acceptance, the write-back)
@@ -536,12 +563,15 @@ def main() -> None:
                    credits=8.3, turns=19, busy=False, awaiting=False, last_activity=p2.hand_at)
     row = classified(p2, rows["PAY-2"], reflected=True, slot=p2_sess)
     row.update(updated_at=p2.merged_at + 35 * M, credits=22.7)
-    boards["r1/PAY-2"] = snapshot(p2, row, decisions=det["decisions"][:3], brain={"loaded": 12, "cited": ["P-PAY-2-1", "T-12"], "stale": [], "unknown": [], "proposals": 1},
+    p2_decisions = decisions(p2, [("requirements", "退款单号按 RF + 9 位校验，旧的 7 位也认", "回答了澄清问题 D-1", "P-1A2B", "person", []),
+                                  ("application-design", "重复和非法单号在入口直接拒", "下游对账按单号去重", None, "agent", ["T-12"]),
+                                  ("code-generation", "校验写成纯函数，接口和批量导入共用", "照 Brain 的约定", "P-7", "brain", ["P-7"])])
+    boards["r1/PAY-2"] = snapshot(p2, row, decisions=p2_decisions, brain={"loaded": 12, "cited": ["P-PAY-2-1", "T-12"], "stale": [], "unknown": [], "proposals": 1},
                                   reflect=[("brain/PAY-2-reflect-1", p2.merged_at + 15 * H)],
                                   sessions=[p2_sess,
                                             dict(det["sessions"][0], slot="brain-run-RUN-PAY-2-1", url="/chat?sid=brain-run-RUN-PAY-2-1", title="RUN-PAY-2-1",
                                                  agent="brain-run", kind="runner", credits=14.4, turns=41, busy=False, awaiting=False, last_activity=p2.merged_at)],
-                                  mr_desc=mrdesc("PAY-2", row.get("summary") or "退款单号加上校验位，重复和非法单号在入口就拒掉"), credits=22.7)
+                                  mr_desc=mrdesc(p2, first["PAY-2"]), credits=22.7)
     runs.append({"key": "PAY-2", "repo": "r1", "how": "people", "beyond": ["回答问题"], "at_points": 5, "outside": 0, "credits": 22.7, "merged_at": p2.merged_at})
 
     # PAY-3: on this machine, two units: refund-export's code written yesterday; the session sat quiet overnight until
@@ -598,14 +628,15 @@ def main() -> None:
     reqs["r1"].append(p4)
     row = classified(p4, rows["PAY-4"], park=p4_park, mr={"state": "opened", "labels": ["ai-running"], "questions": [
         {"id": "D-2", "kind": "design", "state": "open", "lean_request": None, "at": iso(T0 - 3 * H)}]})
-    boards["r1/PAY-4"] = snapshot(p4, row, park=p4_park, decisions=det["decisions"][1:3],
+    boards["r1/PAY-4"] = snapshot(p4, row, park=p4_park, decisions=decisions(p4, [
+                                      ("application-design", "按商户拆成一户一份", "财务按商户对账", None, "agent", ["T-12"])]),
                                   questions=[{"source": "mr", "id": "D-2", "kind": "design", "kind_label": "设计", "question": "按商户拆分时，一个商户一天超过 10 万行要不要再按小时切？",
                                               "options": [{"id": "A", "text": "按小时切成多份"}, {"id": "B", "text": "一份，压缩成 zip"}], "recommend": "A",
                                               "lean_request": None, "refs": ["D01#S002"], "state": "open", "answer": None, "answerer": None, "voucher_id": None,
                                               "mr_url": "%s/shop/shop-pay/-/merge_requests/41" % GL, "at": T0 - 3 * H, "answerable_here": False, "answer_via": None}],
                                   sessions=[dict(det["sessions"][0], slot="brain-run-RUN-PAY-4-1", url="/chat?sid=brain-run-RUN-PAY-4-1", title="RUN-PAY-4-1", agent="brain-run",
                                                  kind="runner", credits=6.1, turns=17, busy=False, awaiting=False, last_activity=T0 - 3 * H)],
-                                  mr_desc=mrdesc("PAY-4", "对账单按商户拆成一户一份，大商户按小时切"), credits=None)
+                                  mr_desc=mrdesc(p4, first["PAY-4"]), credits=None)
     runs.append({"key": "PAY-4", "repo": "r1", "how": "pending", "beyond": [], "at_points": 2, "outside": 0, "credits": None, "merged_at": None})
 
     # PAY-5: waits for its acceptance on the MR (D-3)
@@ -623,7 +654,9 @@ def main() -> None:
                                   questions=[{"source": "mr", "id": "D-3", "kind": "acceptance", "kind_label": "验收", "question": "验收：回调失败后最多重试 5 次、间隔翻倍，第 6 次转人工。",
                                               "options": [], "recommend": None, "lean_request": "RELEASE 0c9a7e21", "refs": [], "state": "open", "answer": None, "answerer": None,
                                               "voucher_id": None, "mr_url": "%s/shop/shop-pay/-/merge_requests/44" % GL, "at": T0 - 1 * D - 1 * H, "answerable_here": False, "answer_via": None}],
-                                  decisions=det["decisions"][:2], mr_desc=mrdesc("PAY-5", row.get("summary") or "退款回调失败自动重试，第 6 次转人工处理"), credits=31.0,
+                                  decisions=decisions(p5, [("requirements", "失败后最多重试 5 次，间隔翻倍", "回调方限流", "P-1A2B", "person", []),
+                                                          ("code-generation", "第 6 次失败转人工队列", "照 TECH 的约定", "T-PAY-2-1", "brain", ["T-PAY-2-1"])]),
+                                  mr_desc=mrdesc(p5, first["PAY-5"]), credits=31.0,
                                   sessions=[dict(det["sessions"][0], slot="brain-run-RUN-PAY-5-1", url="/chat?sid=brain-run-RUN-PAY-5-1", title="RUN-PAY-5-1", agent="brain-run",
                                                  kind="runner", credits=24.2, turns=52, busy=False, awaiting=False, last_activity=T0 - 1 * D - 1 * H)])
     runs.append({"key": "PAY-5", "repo": "r1", "how": "pending", "beyond": [], "at_points": 2, "outside": 0, "credits": 31.0, "merged_at": None})
@@ -640,12 +673,15 @@ def main() -> None:
     p7.handoff(t + 85 * M)
     reqs["r1"].append(p7)
     why, raw = problems.reasons_text(["label 'ai-handoff' was added by bob, not by the branch owner alice"])
-    p7.rejected(T0 - 5 * H - 30 * M, why)
+    p7_refused = p7.hand_at + 25 * M        # the bridge's next round after the hand-over
+    p7.rejected(p7_refused, why)
     p7_sess = dict(det["sessions"][0], slot="brain-PAY-7-2b9f", url="/chat?sid=brain-PAY-7-2b9f", title="PAY-7 退款原因下拉框",
                    credits=18.2, turns=27, busy=False, awaiting=False, last_activity=T0 - 5 * H)
     row = classified(p7, rows["PAY-7"], slot=p7_sess, mr={"state": "opened", "labels": ["ai-handoff-rejected"], "questions": [],
-                                                          "rejected_reason": why, "rejected_raw": raw})
-    boards["r1/PAY-7"] = snapshot(p7, row, decisions=det["decisions"][1:2], mr_desc=mrdesc("PAY-7", "退款时选原因，原因列表在后台维护"), credits=18.2,
+                                                          "rejected_reason": why, "rejected_raw": raw,
+                                                          "rejected_at": iso(p7_refused)})
+    boards["r1/PAY-7"] = snapshot(p7, row, decisions=decisions(p7, [("requirements", "原因列表在后台维护，页面只读", "运营要自己加原因", None, "agent", [])]),
+                                  mr_desc=mrdesc(p7, first["PAY-7"]), credits=18.2,
                                   sessions=[p7_sess])
 
     # PAY-6: claimed, not started
@@ -684,7 +720,7 @@ def main() -> None:
                summary="按退款原因汇总金额和笔数，给运营看哪类退款最多（规模小）。", sessions=1, expected_paths=["src/refund/stats/"], overlap=[],
                worktree="/Users/alice/workplace/brain-app/shop-pay/refund-stats")
     extra_rows.append(classified(p1, row, slot=p1_sess))
-    boards["r1/PAY-1"] = snapshot(p1, row, sessions=[p1_sess], credits=9.8, mr_desc=mrdesc("PAY-1", row["summary"]))
+    boards["r1/PAY-1"] = snapshot(p1, row, sessions=[p1_sess], credits=9.8, mr_desc=mrdesc(p1, row["summary"]))
 
     # ---------------------------------------------------------------- shop-order: ten weeks of deliveries, and one running now
     order_rows = []
@@ -720,7 +756,7 @@ def main() -> None:
         r.proposals = 1 if key == "ORD-9" else i % 2      # ORD-9: merged 3 days ago, its knowledge not written back yet
         reqs["r3"].append(r)
         order_rows.append(classified(r, row, reflected=bool(i % 2 and ago_d > 5)))
-        boards["r3/%s" % key] = snapshot(r, row, credits=cr, mr_desc=mrdesc(key, "%s：做完了，合并进 main" % title),
+        boards["r3/%s" % key] = snapshot(r, row, credits=cr, mr_desc=mrdesc(r, "%s：做完了，合并进 main" % title),
                                          brain={"loaded": 8 + i, "cited": ["T-ORD-%d-1" % max(1, i)], "stale": [], "unknown": [], "proposals": r.proposals},
                                          reflect=[("brain/%s-reflect-1" % key, r.merged_at + 20 * H)] if i % 2 and ago_d > 5 else [])
         n_hum = sum(1 for h in r.humans if h["judgment_point"])
@@ -747,7 +783,7 @@ def main() -> None:
     boards["r3/ORD-10"] = snapshot(r, row, credits=7.4, sessions=[dict(det["sessions"][0], slot="brain-run-RUN-ORD-10-1", url="/chat?sid=brain-run-RUN-ORD-10-1",
                                                                        title="RUN-ORD-10-1", agent="brain-run", kind="runner", credits=7.4, turns=21, busy=True,
                                                                        awaiting=False, last_activity=T0 - 1 * M)],
-                                   mr_desc=mrdesc("ORD-10", "订单状态变化时推送到企业微信，失败自动重试"))
+                                   mr_desc=mrdesc(r, "订单状态变化时推送到企业微信，失败自动重试"))
     runs.append({"key": "ORD-10", "repo": "r3", "how": "pending", "beyond": [], "at_points": 2, "outside": 0, "credits": 7.4, "merged_at": None})
 
     # ---------------------------------------------------------------- shop-tools: local only, the AI at work now
@@ -804,9 +840,16 @@ def main() -> None:
         mine = [p_ for p_ in parts if p_[0] in ids] if evaluated else []
         o["cto"] = deliveries.cto_numbers(mine, o["rows"], available=evaluated, now=T0, names=names, repos=len(ids),
                                           local_repos=sum(1 for x in ids if x in local))
+        keys = {r_["key"] for r_ in o["rows"]}
+        if "r1" not in ids:     # brainkit.evaluate's numbers and the decisions here are shop-pay's: not this repo's
+            o["eval"]["metrics"] = [dict(m, value=None) for m in o["eval"]["metrics"]]
+            o["eval"]["notes"] = []
+            o["funnel"] = dict(deliveries.funnel_app([], {"asked": 0, "answered": 0, "delivered": 0}), source="evaluate")
+        o["eval"]["queue"] = [q for q in o["eval"]["queue"] if q["key"] in keys]
+        o["eval"]["skipped"] = [x for x in o["eval"]["skipped"] if x["key"] in keys]
         if not evaluated:
-            o["eval"] = {"available": False, "error": "brain-kit 还没有 evaluate 模块", "ref": None, "metrics": [], "queue": [],
-                         "skipped": [], "notes": []}
+            o["eval"] = {"available": False, "error": deliveries.NO_EVALUATE, "raw": "", "ref": None, "metrics": [],
+                         "queue": [], "skipped": [], "notes": []}
             o["funnel"] = deliveries.funnel_app([dict(d_, key="PAY-3") for d_ in det["decisions"]] if "r1" in ids else [],
                                                 {"asked": 0, "answered": 0, "delivered": 0})
             return o
@@ -827,7 +870,7 @@ def main() -> None:
     entries = [{"row": r_, "facts": facts.get(r_["key"], {}), "own": r_["owner"] == ME, "has_session": r_["key"] in sessions,
                 "can_post": False, "mr": None,
                 "session": {k: sessions[r_["key"]][k] for k in ("slot", "title", "url")} if r_["key"] in sessions else None}
-               for r_ in all_rows if r_["state"] not in ("merged", "closed")]
+               for r_ in all_rows if r_["state"] != "closed" and (r_["state"] != "merged" or r_["waits"]["who"] == "you")]
     crew_fail = {"level": "FAIL", "text": "没有 ~/.kiro/agents/brain-dev.json", "todo": "点「装上 brain-dev」：app 装上 brain-kit 带的那一份",
                  "fix": "agent", "repo": None, "raw": ""}
     world_todo = {"ok": todo.build(entries, team=False, crew_rows=[]), "crewfail": todo.build(entries, team=False, crew_rows=[crew_fail])}
@@ -887,6 +930,7 @@ def main() -> None:
     st = json.loads((FIX / "status.json").read_text(encoding="utf-8"))   # as read: the world changed its crew rows
     for r_ in st["repos"]:
         r_["error"] = NO_KIT if "还没装 brain-kit" in r_["error"] else r_["error"]
+    st["counts"]["todo"] = len(tj["items"])                             # /status counts the very list /todo answers
     (FIX / "status.json").write_text(json.dumps(st, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (FIX / "board.json").write_text(json.dumps(boards["r1/PAY-3"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (FIX / "board-merged.json").write_text(json.dumps(boards["r1/PAY-2"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

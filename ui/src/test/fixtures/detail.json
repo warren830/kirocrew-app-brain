@@ -33,7 +33,8 @@
       "raw": "",
       "do": "approve",
       "since": 1794146040.0,
-      "where": "session"
+      "where": "session",
+      "review": false
     },
     "summary": "退款单可以导出成 CSV，给财务对账用（规模中）。",
     "credits": 12.4,

@@ -35,7 +35,8 @@
         "raw": "",
         "do": "approve",
         "since": 1794146040.0,
-        "where": "session"
+        "where": "session",
+        "review": false
       },
       "summary": "退款单可以导出成 CSV，给财务对账用（规模中）。",
       "credits": 12.4,
@@ -89,9 +90,10 @@
         "raw": "",
         "do": "answer",
         "since": 1794135600.0,
-        "where": "mr"
+        "where": "mr",
+        "review": false
       },
-      "summary": "退款到账后给商户发通知（规模小）。",
+      "summary": "对账单按商户拆成一户一份，大商户按小时切。",
       "credits": null,
       "updated_at": 1794135600,
       "mr": {
@@ -133,17 +135,17 @@
         "stage_label": "发布",
         "stage_n": 11,
         "stage_state": "started",
-        "done": 7,
+        "done": 10,
         "total": 11,
         "done_n": 4,
-        "skipped_n": 3,
+        "skipped_n": 6,
         "next": {
           "id": "release",
           "label": "发布",
           "n": 11
         }
       },
-      "stage": "做完 4 · 跳过 3 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
       "waits": {
         "who": "product",
         "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -151,9 +153,10 @@
         "raw": "",
         "do": "accept",
         "since": 1794056400.0,
-        "where": "mr"
+        "where": "mr",
+        "review": false
       },
-      "summary": "周报加上退款金额一栏（规模小）。",
+      "summary": "退款回调失败自动重试，第 6 次转人工处理。",
       "credits": 31.0,
       "updated_at": 1794052800,
       "mr": {
@@ -192,27 +195,28 @@
         "stage_label": "发布",
         "stage_n": 11,
         "stage_state": "todo",
-        "done": 7,
+        "done": 10,
         "total": 11,
         "done_n": 4,
-        "skipped_n": 3,
+        "skipped_n": 6,
         "next": {
           "id": "release",
           "label": "发布",
           "n": 11
         }
       },
-      "stage": "做完 4 · 跳过 3 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
       "waits": {
         "who": "you",
         "text": "接手被拒：标签是 bob 打的，不是负责人 alice",
         "line": null,
         "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
         "do": "redo_handoff",
-        "since": null,
-        "where": "session"
+        "since": 1794129840.0,
+        "where": "session",
+        "review": false
       },
-      "summary": "退款超过一万要两人复核（规模中）。",
+      "summary": "退款时选原因，原因列表在后台维护。",
       "credits": 18.2,
       "updated_at": 1794128400,
       "mr": {
@@ -265,7 +269,8 @@
         "raw": "",
         "do": "start",
         "since": 1793973600.0,
-        "where": "app"
+        "where": "app",
+        "review": false
       },
       "summary": null,
       "credits": null,
@@ -296,13 +301,13 @@
         "stage_label": "发布",
         "stage_n": 11,
         "stage_state": "done",
-        "done": 8,
+        "done": 11,
         "total": 11,
         "done_n": 5,
-        "skipped_n": 3,
+        "skipped_n": 6,
         "next": null
       },
-      "stage": "做完 5 · 跳过 3 · 全部做完",
+      "stage": "做完 5 · 跳过 6 · 全部做完",
       "waits": {
         "who": "nobody",
         "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -310,9 +315,10 @@
         "raw": "",
         "do": "watch",
         "since": 1793661540.0,
-        "where": null
+        "where": null,
+        "review": false
       },
-      "summary": "对账单按自然日切分（规模小）。",
+      "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
       "credits": 22.7,
       "updated_at": 1793663640,
       "mr": {
@@ -356,27 +362,27 @@
       },
       {
         "id": "check",
-        "label": "确定性检查",
+        "label": "检查定的",
         "count": 5
       },
       {
         "id": "brain",
-        "label": "Brain 条目（引用）",
+        "label": "照 Brain",
         "count": 3
       },
       {
         "id": "agent",
-        "label": "agent 自己定（权限内）",
+        "label": "AI 自己定的",
         "count": 1
       },
       {
         "id": "unclassified",
-        "label": "没归类（Who 不是规定的写法）",
+        "label": "没归类",
         "count": 1
       },
       {
         "id": "unknown",
-        "label": "看不出（Who 空着）",
+        "label": "看不出是谁定的",
         "count": 1
       }
     ],
@@ -475,7 +481,8 @@
     "notes": [
       "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
       "PAY-2：已知交付有问题，14 天还没满，先不算"
-    ]
+    ],
+    "raw": ""
   },
   "counts": {
     "claimed": 1,
