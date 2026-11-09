@@ -39,7 +39,7 @@
      "name": "alice",
      "source": "git",
      "gitlab": "https://gitlab.example.com",
-     "text": "alice（git config brain.user）",
+     "text": "alice（这个仓库里记下的名字）",
      "ask": false,
      "label": "",
      "why": "",
@@ -80,7 +80,7 @@
      "text": "",
      "ask": true,
      "label": "你的 GitLab 用户名",
-     "why": "这个仓库用 GitLab：认领的分支 ai/<名字>/… 和交接都按这个名字认人，要和你在 GitLab 上的用户名一样",
+     "why": "这个仓库用 GitLab：认领和交接都按这个名字认人，要和你在 GitLab 上的用户名一样",
      "suggest": "alice",
      "error": ""
     },
@@ -135,7 +135,7 @@
     {
      "level": "WARN",
      "text": ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）",
-     "todo": "只有把需求交给运行机时才要紧（运行机靠新版停下来问人）。要交的话点「修复」：重装 brain-kit",
+     "todo": "运行机上的 run 停下来问人时写不了 park.json。点「重装 kit 文件」：重装 brain-kit 并提交（默认直接在当前分支上，团队仓库可以选新分支开 MR）",
      "fix": "kit",
      "repo": "/Users/alice/workplace/shop-tools",
      "raw": ".kiro/brain/lean-hook.py is an older adapter (version 0, needs 2): the team runner could not write runs/<KEY>/park.json, its only way to ask a person, before the Lean approvals; run `brain install` and commit it on main through an MR"
@@ -150,7 +150,7 @@
   "me": {
    "user": "alice",
    "token": true,
-   "how": "GitLab token（有）；alice（git config brain.user）"
+   "how": "GitLab token（有）；alice（这个仓库里记下的名字）"
   },
   "team": {
    "enabled": false,
