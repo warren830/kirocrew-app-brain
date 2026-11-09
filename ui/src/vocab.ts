@@ -90,6 +90,7 @@ export const WHERE_NAME: Record<string, string> = {
  * added by the view */
 export const DECIDED_BY: Record<string, string> = {
   agent: 'AI 自己定的', person: '人', check: '检查定的', brain: '照 Brain', bridge: '桥记下的', unclassified: '没归类',
+  unknown: '看不出是谁定的',
 }
 
 /** what a check of the wall is about (CheckCell.group) */

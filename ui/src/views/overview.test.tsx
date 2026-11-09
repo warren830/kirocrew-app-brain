@@ -8,7 +8,7 @@ import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import { apiCalls, apiError, navigations } from '../test/stubs/app-sdk'
 import type { Overview, Requirement, Status } from '../types'
-import { OverviewView, WHO_VOCAB, plainSummary } from './Overview'
+import { OverviewView, plainSummary } from './Overview'
 import type { ViewProps } from './props'
 
 function props(over: Partial<ViewProps> = {}): ViewProps {
@@ -27,11 +27,11 @@ function localWorld(): { ov: Overview; status: Status } {
   status.repos = status.repos.map((r) => ({ ...r, remote: false }))
   const base = ov.rows[0]
   const lean = { stage: 'release', stage_label: '发布', stage_n: 11, stage_state: 'todo' as const, done: 10, total: 11, done_n: 4, skipped_n: 6, next: { id: 'release', label: '发布', n: 11 } }
-  const reply = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'ychchen', state: 'local', state_label: '本地开发中', lean, stage: '11/11 发布（下一步）', overlap: [], open_questions: [], mr: null, local_only: true,
-    waits: { who: 'you', text: '会话空着：轮到你回话', line: null, raw: '', do: 'reply', since: ov.at - 11 * 3600 - 120, where: 'session' } })
+  const reply = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'ychchen', state: 'local', state_label: '本地开发中', lean, stage: '做完 4 · 跳过 6 · 下一步：发布', overlap: [], open_questions: [], mr: null, local_only: true,
+    waits: { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: ov.at - 11 * 3600 - 120, where: 'session' } })
   const claim = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'ychchen', state: 'claimed', state_label: '已认领', summary: null, credits: null, updated_at: null, overlap: [], open_questions: [], mr: null, local_only: true,
     lean: { stage: null, stage_label: null, stage_n: null, stage_state: null, done: 0, total: 11, done_n: 0, skipped_n: 0, next: null }, stage: null,
-    waits: { who: 'you', text: '认领了，还没开工', line: null, raw: '', do: 'start', since: ov.at - 3 * 3600, where: 'app' } })
+    waits: { who: 'you', text: '已认领，还没开工', line: null, raw: '', do: 'start', since: ov.at - 3 * 3600, where: 'app' } })
   ov.rows = [reply('DEMO-1', '计算器减法'), claim('DEMO-2', 'AGENTS.md 缺仓库简介'), reply('DEMO-3', '计算器乘法'), claim('DEMO-4', 'add 的测试'), claim('DEMO-5', '仓库说明')]
   ov.overlaps = [{ keys: ['DEMO-1', 'DEMO-3'], paths: ['calc.py'] }]
   ov.cto = { ...ov.cto, unattended: [0, 0], runs: [{ key: 'DEMO-1', repo: 'r1', how: 'local', beyond: [], at_points: 1, outside: 0, credits: 49.8, merged_at: null }, { key: 'DEMO-3', repo: 'r1', how: 'local', beyond: [], at_points: 1, outside: 0, credits: 37, merged_at: null }],
@@ -47,9 +47,9 @@ describe('交付总览', () => {
     const c = fx.overview().cto
     const hero = await screen.findByTestId('ov-hero')
     expect(within(hero).getByRole('heading', { level: 2 })).toHaveTextContent(c.sentence)
-    expect(hero).toHaveTextContent('数字来自 brain-kit 的评估（读的是 main）和这个 app 开的会话')
+    expect(hero).toHaveTextContent('数字来自 brain-kit 的评估（读的是远端的 main 分支）和这个 app 开的会话')
     expect(hero).not.toHaveTextContent('只算交接过') // 人介入 counts the local requirements too: the page does not say otherwise
-    expect(hero).not.toHaveTextContent('origin/')
+    expect(hero).not.toHaveTextContent(/origin\/|refs\/|分支 分支/)
     const cards = within(screen.getByTestId('ov-cards')).getAllByRole('article').map((a) => a.getAttribute('aria-label'))
     expect(cards).toEqual(['无人值守', '人介入', '每个需求的 credits', '决定 · 谁定的'])
     expect(screen.getByTestId('ov-unattended')).toHaveTextContent(/^0\/1$/)
@@ -57,11 +57,17 @@ describe('交付总览', () => {
     expect(screen.getByRole('article', { name: '人介入' })).toHaveTextContent('5 次落在判断点上（批准、驳回、回答），0 次在判断点之外 · 本机做的也算')
     expect(screen.getByTestId('ov-credits')).toHaveTextContent(/^21\.1$/)
     expect(screen.getByRole('article', { name: '每个需求的 credits' })).toHaveTextContent('有 credits 的 4 个需求，合计 84.3')
+    expect(screen.getByRole('article', { name: '每个需求的 credits' })).not.toHaveTextContent('token')
     expect(screen.getByRole('img', { name: '评估过的需求，按交付方式：无人值守 0，有人插手 1，只在本机 0，还没评 2' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: '人介入：判断点上 5 次，判断点之外 0 次' })).toBeInTheDocument()
     const notes = screen.getByText('口径').closest('details') as HTMLDetailsElement
     expect(notes.open).toBe(false)
-    expect(notes).toHaveTextContent(WHO_VOCAB)
+    // how 「谁定的」 is written: what to type for each, typed as brain-kit reads it
+    const syntax = within(notes).getByTestId('who-syntax')
+    expect(syntax).toHaveTextContent('「人」写 <化名> <凭证号> 或 owner')
+    expect(syntax).toHaveTextContent('「AI 自己定的」写 agent')
+    expect(within(syntax).getByText('brain <条目号>').tagName).toBe('CODE')
+    expect(notes).not.toHaveTextContent('token')
     expect(screen.queryByText('实测 · brain-kit')).toBeNull()
   })
 
@@ -123,10 +129,10 @@ describe('交付总览', () => {
     expect(cardOf(flow, 'DEMO-5')).toBeInTheDocument() // three in a cell, none hidden behind 「+1 个」
     // the first screen: what waits on the person, the longest wait first, each with its one step
     const yours = screen.getByTestId('your-turn')
-    expect(yours).toHaveTextContent('5 件 · 等回话 2 · 等开工 3')
+    expect(yours).toHaveTextContent('5 个需求 · 等回话 2 · 等开工 3')
     expect(Array.from(yours.querySelectorAll('li')).map((li) => li.dataset.key)).toEqual(['DEMO-1', 'DEMO-3', 'DEMO-2', 'DEMO-4', 'DEMO-5'])
     const demo2 = yours.querySelector('li[data-key="DEMO-2"]') as HTMLElement
-    expect(demo2).toHaveTextContent('认领了，还没开工已等 3 小时')
+    expect(demo2).toHaveTextContent('已认领，还没开工已等 3 小时')
     await user.click(within(demo2).getByRole('button', { name: '去开工 ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'new', repo: 'r1', key: 'DEMO-2', title: 'AGENTS.md 缺仓库简介' })
     await user.click(within(cardOf(flow, 'DEMO-1')).getByRole('button', { name: '去回话 ↗' }))
@@ -149,7 +155,7 @@ describe('交付总览', () => {
     const want: Record<string, [string, string]> = {
       'PAY-3': ['构建', 'you'], // the PLAN approval the person types
       'PAY-4': ['交给运行机', 'people'], // parked on D-2, the product answers on the MR
-      'PAY-5': ['发布验收', 'you'],
+      'PAY-5': ['发布验收', 'people'], // the product accepts it on the MR
       'PAY-7': ['交给运行机', 'you'], // a refused hand-over to redo
       'PAY-6': ['需求', 'people'], // claimed by carol, not started
     }
@@ -161,13 +167,36 @@ describe('交付总览', () => {
     }
     expect(within(flow).getAllByTestId('flow-card')).toHaveLength(5)
     expect(flow.querySelector('[data-col="已合并"] [data-key="PAY-2"]')).toHaveTextContent('退款单号校验')
-    expect(within(flow).getByTestId('flow-stats')).toHaveTextContent('进行中 5 个·轮到你 3（等批准 1 · 等验收 1 · 要重做交接 1）·等别人 2·AI 在本机做 0·运行机在跑 0')
-    expect(cardOf(flow, 'PAY-4')).toHaveTextContent('停在 D-2：等产品在 MR 上回答')
+    expect(within(flow).getByTestId('flow-stats')).toHaveTextContent('进行中 5 个·轮到你 2（等批准 1 · 要重做交接 1）·等别人 3·AI 在本机做 0·运行机在跑 0')
+    expect(cardOf(flow, 'PAY-4')).toHaveTextContent('等产品在 MR 上回答 D-2（设计）')
     expect(cardOf(flow, 'PAY-4')).toHaveTextContent('carol · 等产品')
     expect(cardOf(flow, 'PAY-6')).toHaveTextContent('等 carol')
     expect(within(cardOf(flow, 'PAY-4')).queryByRole('button')).toBeNull() // not the person's turn: no step
-    expect(within(cardOf(flow, 'PAY-5')).getByRole('button', { name: '去验收 ↗' })).toBeInTheDocument()
+    expect(cardOf(flow, 'PAY-5')).toHaveTextContent('alice · 等产品')
+    expect(within(cardOf(flow, 'PAY-5')).queryByRole('button')).toBeNull()
     expect(within(cardOf(flow, 'PAY-7')).getByRole('button', { name: '改好后重新交接 ↗' })).toBeInTheDocument()
+  })
+
+  test('a merge whose new knowledge waits on you is your turn everywhere: 轮到你, the repo pill, and its card in 已合并 with 回写 Brain', async () => {
+    const user = userEvent.setup()
+    const ov = fx.overview()
+    const merged = ov.rows.find((r) => r.key === 'PAY-2')!
+    merged.updated_at = ov.at - 30 * 86400   // older than 已合并's 14 days: it stays while it waits on you
+    merged.waits = { who: 'you', text: '已合并，有 1 条新知识等你回写 Brain', line: null, raw: '', do: 'write_back', since: ov.at - 2 * 86400, where: 'app' }
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    const p = props()
+    render(<OverviewView entry={{}} {...p} />)
+    const yours = await screen.findByTestId('your-turn')
+    expect(yours).toHaveTextContent('3 个需求')
+    expect(within(yours).getByRole('button', { name: '回写 Brain ↗' })).toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: '仓库' })).getByRole('button', { name: /^shop-pay/ })).toHaveTextContent('进行中 5 · 轮到你 3')
+    const flow = screen.getByTestId('flow')
+    expect(within(flow).getByTestId('flow-stats')).toHaveTextContent('轮到你 2（等批准 1 · 要重做交接 1）·等别人 3·AI 在本机做 0·运行机在跑 0·已合并、等你回写 Brain 1')
+    const card = flow.querySelector('[data-col="已合并"] [data-key="PAY-2"]') as HTMLElement
+    expect(card).toHaveTextContent('已等 2 天')
+    await user.click(within(card).getByRole('button', { name: '回写 Brain ↗' }))
+    expect(p.go).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', reflect: 'PAY-2' })
+    expect(p.go).toHaveBeenCalledTimes(1)
   })
 
   test('a column, a lane and 「+N 个」 filter the ledger, with a ✕ to drop it', async () => {
@@ -184,7 +213,7 @@ describe('交付总览', () => {
     expect(screen.getByTestId('ledger-pick')).toHaveTextContent('需求流动 · 「构建」这一列里「轮到你」')
     expect(keysOf(table)).toEqual(['PAY-3', 'PAY-8', 'PAY-9', 'PAY-10'])
     await user.click(within(flow).getByRole('button', { name: /^轮到你$/ }))
-    expect(keysOf(table)).toEqual(['PAY-3', 'PAY-8', 'PAY-9', 'PAY-10', 'PAY-7', 'PAY-5'])
+    expect(keysOf(table)).toEqual(['PAY-3', 'PAY-8', 'PAY-9', 'PAY-10', 'PAY-7'])
     await user.click(within(flow).getByRole('button', { name: /^交给运行机/ }))
     expect(keysOf(table)).toEqual(['PAY-4', 'PAY-7'])
     await user.click(screen.getByRole('button', { name: /^不按「需求流动/ }))
@@ -250,10 +279,13 @@ describe('交付总览', () => {
     expect(within(pay3).getByText(fx.overview().rows[0].waits.text)).toHaveClass('br-strong') // it waits on you
     expect(within(within(pay3).getByTestId('line-copy')).getByText('approve PLAN 5d1e7a90')).toBeInTheDocument()
     expect(within(pay3).getByRole('button', { name: '复制那一行' })).toBeInTheDocument()
+    await userEvent.setup().click(within(pay3).getByRole('button', { name: '打开会话' }))
+    expect(navigations).toEqual(['/chat?sid=brain-PAY-3-7f3a'])
+    expect(within(screen.getByTestId('your-turn')).getByRole('button', { name: '打开会话' })).toBeInTheDocument()
     expect(within(pay3).getByRole('button', { name: '去批准 ↗' })).toBeInTheDocument()
     expect(pay3).toHaveTextContent('12.4')
     expect(pay3).toHaveTextContent('和 PAY-4 重叠')
-    expect(within(pay3).getByTestId('row-summary')).toHaveTextContent(/^退款单可以导出成 CSV，给财务对账用（规模：中）。$/)
+    expect(within(pay3).getByTestId('row-summary')).toHaveTextContent(/^退款单可以导出成 CSV，给财务对账用（规模中）。$/)
     expect(within(rowOf(table, 'PAY-6')).queryByTestId('row-summary')).toBeNull()
     const pay4 = rowOf(table, 'PAY-4')
     expect(pay4).toHaveTextContent('D-2 待答')
@@ -273,7 +305,7 @@ describe('交付总览', () => {
     const s = plainSummary('给 `calc.py` 加乘法 `multiply(a, b)`，返回 `a * b`（D01#S002 · 097f2e9e）（规模 small）。现在：Lean 在「构建测试」做完，在本地开发（还没交接）。')
     expect(s.parts).toEqual([
       { code: false, text: '给 ' }, { code: true, text: 'calc.py' }, { code: false, text: ' 加乘法 ' }, { code: true, text: 'multiply(a, b)' },
-      { code: false, text: '，返回 ' }, { code: true, text: 'a * b' }, { code: false, text: '（规模：小）。' },
+      { code: false, text: '，返回 ' }, { code: true, text: 'a * b' }, { code: false, text: '（规模小）。' },
     ])
     expect(s.ids).toBe('D01#S002 · 097f2e9e')
   })
@@ -283,10 +315,11 @@ describe('交付总览', () => {
     render(<OverviewView entry={{}} {...props()} />)
     const table = await screen.findByTestId('req-table')
     const cell = (key: string) => within(rowOf(table, key)).getByTestId('lean-cell')
-    expect(cell('PAY-3')).toHaveTextContent(/^做完 8 · 下一步：代码生成$/)
-    expect(within(cell('PAY-3')).getByRole('img')).toHaveAccessibleName('做完 8 · 下一步：代码生成')
-    expect(cell('PAY-7')).toHaveTextContent(/^做完 9 · 下一步：构建和测试$/)
-    expect(cell('PAY-2')).toHaveTextContent(/^全部做完$/)
+    expect(cell('PAY-3')).toHaveTextContent(/^做完 2 · 跳过 4 · 下一步：代码生成$/)
+    expect(within(cell('PAY-3')).getByRole('img')).toHaveAccessibleName('做完 2 · 跳过 4 · 下一步：代码生成')
+    expect(within(cell('PAY-3')).getByText('下一步：代码生成')).toHaveClass('br-nw') // never broken inside a stage name
+    expect(cell('PAY-7')).toHaveTextContent(/^做完 4 · 跳过 3 · 下一步：发布$/)
+    expect(cell('PAY-2')).toHaveTextContent(/^全部做完（跳过 3）$/)
     expect(cell('PAY-6')).toHaveTextContent(/^还没开工$/)
   })
 
@@ -338,7 +371,7 @@ describe('交付总览', () => {
     expect(screen.getByTestId('ledger-count')).toHaveTextContent('共 1 个')
     const pills = screen.getByRole('navigation', { name: '仓库' })
     expect(within(pills).getByRole('button', { name: /^全部/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(pills).getByRole('button', { name: /^shop-pay/ })).toHaveTextContent('shop-pay进行中 5 · 轮到你 3')
+    expect(within(pills).getByRole('button', { name: /^shop-pay/ })).toHaveTextContent('shop-pay进行中 5 · 轮到你 2')
     // a repo that cannot be read cannot be picked, and says why in the banner's words
     expect(within(pills).getByRole('button', { name: /^shop-web/ })).toBeDisabled()
     expect(within(pills).getByRole('button', { name: /^shop-web/ })).toHaveTextContent('还没装')
@@ -376,17 +409,31 @@ describe('交付总览', () => {
 
   test('从远端取最新 posts each repo with a remote to /refresh, says what it did and reads the overview again', async () => {
     const user = userEvent.setup()
-    installFixtureRoutes({ [`POST ${API}/refresh`]: () => ({ ok: true, text: 'shop-pay：取到 3 个新分支' }) })
+    installFixtureRoutes({ [`POST ${API}/refresh`]: () => ({ ok: true, text: '已经从远端取到最新。', raw: '' }) })
     render(<OverviewView entry={{}} {...props()} />)
     await screen.findByTestId('req-table')
     const before = apiCalls.filter((c) => c.path.startsWith(`${API}/overview`)).length
     await user.click(screen.getByRole('button', { name: '从远端取最新' }))
-    expect(await screen.findByText('shop-pay：取到 3 个新分支')).toBeInTheDocument()
+    expect(await screen.findByTestId('refresh-result')).toHaveTextContent(/^已经从远端取到最新。$/)
     expect(apiCalls.filter((c) => c.method === 'POST')).toEqual([{ method: 'POST', path: `${API}/refresh`, body: { repo: 'r1' } }])
     await waitFor(() => expect(apiCalls.filter((c) => c.path.startsWith(`${API}/overview`)).length).toBeGreaterThan(before))
   })
 
-  test('a refresh that fails shows the backend’s error and what to do', async () => {
+  test('a fetch git could not do says why and what to do; git’s own words are folded under 细节', async () => {
+    const user = userEvent.setup()
+    const raw = "fatal: unable to access 'https://gitlab.example.com/shop/shop-pay.git/': Could not resolve host: gitlab.example.com"
+    installFixtureRoutes({ [`POST ${API}/refresh`]: () => ({ ok: false, text: '从远端取最新没成功：连不上远端：检查网络或 VPN，再点一次。', raw }) })
+    render(<OverviewView entry={{}} {...props()} />)
+    await screen.findByTestId('req-table')
+    await user.click(screen.getByRole('button', { name: '从远端取最新' }))
+    const said = await screen.findByTestId('refresh-result')
+    expect(said).toHaveTextContent('从远端取最新没成功：连不上远端：检查网络或 VPN，再点一次。')
+    const folded = within(said).getByText('细节').closest('details') as HTMLDetailsElement
+    expect(folded.open).toBe(false)
+    expect(folded).toHaveTextContent(raw)
+  })
+
+  test('a refresh the app could not ask for shows the error and what to do', async () => {
     const user = userEvent.setup()
     installFixtureRoutes({ [`POST ${API}/refresh`]: () => { throw apiError(502, 'git_failed', 'git fetch 失败：连不上 gitlab.example.com') } })
     render(<OverviewView entry={{}} {...props()} />)
@@ -405,7 +452,7 @@ describe('交付总览', () => {
     const p = props()
     render(<OverviewView entry={{}} {...p} />)
     const batch = await screen.findByTestId('eval-batch')
-    expect(batch).toHaveTextContent('这一批：main 分支上已经有记录的需求 · 不跟着交付清单的筛选变')
+    expect(batch).toHaveTextContent('这一批：远端的 main 分支上已经有记录的需求 · 不跟着交付清单的筛选变')
     expect(batch.querySelector('[data-metric="autonomy"]')).toHaveTextContent(/^自主度2\/3交接以后没人插手、交付也正确的$/)
     expect(batch.querySelector('[data-metric="autonomy"]')).toHaveAttribute('title', fx.overview().eval.metrics[0].rule)
     expect(batch.querySelector('[data-metric="staleness"]')).toHaveTextContent(/^过时与冲突2/)
@@ -451,7 +498,8 @@ describe('交付总览', () => {
     expect(card).toHaveTextContent('人定了 4 个 · 数字来自 brain-kit 的评估 · 没合并的需求也算')
     expect(Array.from(card.querySelectorAll('[data-row]')).map((r) => r.getAttribute('data-row'))).toEqual(['person', 'check', 'brain', 'unclassified', 'unknown'])
     expect(card.querySelector('[data-row="person"]')).toHaveTextContent(/^人4$/)
-    expect(within(card).getByRole('img', { name: /^决定：人 4，确定性检查 5，/ })).toBeInTheDocument()
+    expect(within(card).getByRole('img', { name: /^决定：人 4，检查定的 5，照 Brain 3，AI 自己定的 0，/ })).toBeInTheDocument()
+    expect(card).not.toHaveTextContent(/agent|Who/) // the app's words for who decided, as 需求详情 says them
     expect(within(card).queryByTestId('funnel-questions')).toBeNull() // a person's machine: always 0, not shown
     unmount()
     const s = fx.status()
@@ -468,7 +516,7 @@ describe('交付总览', () => {
     const list = await screen.findByTestId('funnel-unclassified')
     expect(list).toHaveTextContent('没归类 1 个，去改「谁定的」那一格：PAY-4 D-3 ↗')
     expect(within(list).getByRole('button', { name: 'PAY-4 D-3 ↗' })).toHaveAttribute('title', `在 ${fx.overview().funnel.unclassified[0].src}`)
-    expect(within(screen.getByTestId('ov-cards')).queryByText(WHO_VOCAB)).toBeNull()
+    expect(within(screen.getByTestId('ov-cards')).queryByTestId('who-syntax')).toBeNull()
     await user.click(within(list).getByRole('button', { name: 'PAY-4 D-3 ↗' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-4', from: 'overview' })
     unmount()
