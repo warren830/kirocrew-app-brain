@@ -14,10 +14,11 @@ import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from '../src/main'
 import { FIXTURE_AT, clone, fx } from '../src/test/data'
+import world from './world.json'
 import { API, fixtureRoutes } from '../src/test/routes'
 import { StubApiError, setApiRoutes, setNavigateHook } from '../src/test/stubs/app-sdk'
 import type {
-  CrewFixBody, ImportInspect, ImportJob, IntakeBody, ReflectApplyBody, ReflectApplyResult, RepoInfo, RequirementDetail, Settings, StartBody, Status,
+  CrewFixBody, ImportInspect, ImportJob, IntakeBody, Overview, ReflectApplyBody, ReflectApplyResult, ReqBoard, RepoInfo, RequirementDetail, Settings, StartBody, Status,
 } from '../src/types'
 
 const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'norepos', 'light'] as const
@@ -54,10 +55,13 @@ function shift<T>(x: T): T {
 
 let settings: Settings = fx.settings()
 let crewFixed = false
-let repos: RepoInfo[] = flags.has('norepos') ? [] : fx.status().repos
+/** The world the preview shows (scripts/preview_world.py made it with the backend's own board.py and cto_numbers):
+ * four repos, seventeen requirements in every state, each with its board. */
+const W = world as unknown as { status: Status; overview: Overview; boards: Record<string, ReqBoard>; details: Record<string, RequirementDetail> }
+let repos: RepoInfo[] = flags.has('norepos') ? [] : clone(W.status.repos)
 
 function status(): Status {
-  const s = fx.status()
+  const s = clone(W.status)
   s.repos = clone(repos)
   if (flags.has('team')) {
     s.app.team = true
@@ -66,46 +70,75 @@ function status(): Status {
   if (flags.has('nokit')) {
     s.brainkit = { ...s.brainkit, ok: false, version: null, error: `${settings.brainkit} 里没有 brainkit/` }
   }
-  if (flags.has('crewfail') && !crewFixed) s.crew.rows = [{ level: 'FAIL', text: '找不到 brain-dev agent：~/.kiro/agents/brain-dev.json 不存在' }, ...s.crew.rows]
-  if (crewFixed) s.crew.rows = s.crew.rows.map((r) => ({ ...r, level: 'OK' as const }))
+  if (flags.has('crewfail') && !crewFixed) s.crew.rows = [{ level: 'FAIL', text: '没有 ~/.kiro/agents/brain-dev.json', todo: '点「装上 brain-dev」：app 装上 brain-kit 带的那一份', fix: 'agent', repo: null, raw: '' }, ...s.crew.rows]
+  if (crewFixed) s.crew.rows = s.crew.rows.map((r) => (r.fix === 'agent' || r.fix === 'engine' ? { ...r, level: 'OK' as const, todo: '', fix: null } : r))
+  s.counts.todo = fx.todo().items.length
   s.team.enabled = s.team.enabled || settings.team.enabled
   return shift(s)
 }
 
-const WHERE: Record<string, string> = { worktree: '本机的工作目录', branch: '远端的运行分支', main: '默认分支', runner: '运行机的工作目录', claim: '只有认领分支' }
+const WHERE: Record<string, string> = { worktree: '这台机器的工作区', branch: '运行分支（没在这台机器上检出）', main: '默认分支（已合并）', runner: '运行机工作区', claim: '只有认领' }
+const reqOf = (path: string) => {
+  const [repo, key] = path.split('?')[0].split('/').slice(-2).map(decodeURIComponent)
+  return { repo, key, id: `${repo}/${key}` }
+}
 
-/** The detail fixture is PAY-3's; any other key of the overview gets a detail made from its row. */
+/** A requirement's 需求详情: PAY-3's is the fixture; any other is made from its board (the same records). */
 function detailFor(path: string): RequirementDetail {
-  const key = decodeURIComponent(path.split('/').pop() ?? '')
+  const { key, id } = reqOf(path)
+  if (W.details[id]) return clone(W.details[id])
+  const b = W.boards[id]
+  if (!b) throw new StubApiError(404, { error: `没有这个需求：${key}`, code: 'not_found' })
   const d = fx.detail()
-  if (key === d.row.key) return d
-  const row = fx.overview().rows.find((r) => r.key === key)
-  if (!row) throw new StubApiError(404, { error: `没有这个需求：${key}`, code: 'not_found' })
+  const row = b.row
   const n = row.lean.stage_n ?? 0
-  const finished = row.state === 'merged' || row.lean.stage_state === 'done' || row.lean.stage_state === 'skipped'
-  const current = row.lean.stage_state === 'todo' ? 'todo' : 'started'
+  const finished = row.state === 'merged'
   d.row = row
   d.where_label = WHERE[row.where] ?? row.where
-  d.claim = d.claim && { ...d.claim, owner: row.owner, title: row.title }
-  d.run = row.intent && d.run ? { ...d.run, owner: row.owner, branch: row.branch, intent: row.intent, handoff: row.run_ids.length ? { requested_at: d.run.created_at, by: row.owner } : null } : null
-  d.lean.stages = d.lean.stages.map((s) => ({ ...s, state: s.n < n || finished ? 'done' : s.n === n ? current : 'todo', units: s.n < n ? s.units.map((u) => ({ ...u, state: 'done' as const })) : [] }))
-  d.lean.approvals = n > 2 ? d.lean.approvals.filter((a) => a.state !== 'pending') : []
-  d.lean.status = n ? d.lean.status : null
-  d.lean.next = n ? d.lean.next : []
+  d.claim = d.claim && { ...d.claim, owner: row.owner, title: row.title, created_at: new Date((b.started_at ?? b.at) * 1000).toISOString() }
+  d.run = row.intent && d.run ? { ...d.run, owner: row.owner, branch: row.branch, intent: row.intent, created_at: new Date((b.started_at ?? b.at) * 1000).toISOString(),
+    handoff: b.belt.some((x) => x.kind === 'handover') ? { requested_at: new Date(b.belt.find((x) => x.kind === 'handover')!.at * 1000).toISOString(), by: row.owner } : null } : null
+  // the construction stages run per unit: this requirement's one unit (its slug), on the stages it has reached
+  const unit = (row.branch ?? '').split('/').pop()?.replace(/^[A-Z]+-\d+-/, '') || row.key.toLowerCase()
+  d.lean.stages = d.lean.stages.map((s) => ({ ...s, state: finished || s.n <= row.lean.done ? 'done' : s.n === n ? (row.lean.stage_state === 'todo' ? 'todo' : 'started') : 'todo',
+    units: s.units.length && (finished || s.n <= n) ? [{ unit, state: (finished || s.n < n ? 'done' : 'started') as 'done' | 'started' }] : [] }))
+  d.lean.approvals = b.actors.filter((a) => ['req', 'design', 'release'].includes(a.key) && a.status !== 'waiting' && a.status !== 'skipped').map((a) => ({
+    kind: a.key === 'req' ? 'REQUIREMENTS' : a.key === 'design' ? 'DESIGN' : 'RELEASE', state: a.status === 'merged' ? 'approved' as const : a.status === 'fixing' ? 'rejected' as const : 'pending' as const,
+    sha8: (a.history[a.history.length - 1]?.at ?? 0).toString(16).slice(-8), at: a.since, line: a.line, path: `aidlc-docs/${row.intent}/${a.key}.md` }))
+  d.lean.status = n ? `${row.stage ?? ''} · ${row.waits.text}` : null
+  d.lean.next = []
   d.lean.open_questions = []
-  d.questions = fx.todo().items.filter((i) => i.key === key && i.question).map((i) => i.question!)
-  d.decisions = n ? d.decisions.slice(0, 2) : []
-  d.sessions = row.sessions ? d.sessions.map((s) => ({ ...s, slot: `brain-${key}-1`, url: `/chat?sid=brain-${key}-1`, title: `${key} ${row.title}`, awaiting: false, credits: row.credits })) : []
-  d.timeline.items = d.timeline.items.slice(0, n ? 3 : 1)
-  d.credits.total = row.credits
-  d.brain = n ? d.brain : { loaded: null, cited: [], stale: [], unknown: [], proposals: null }
-  d.mr_desc = row.summary
-    ? {
-        ...d.mr_desc, first: row.summary, source: row.run_ids.length ? 'file' : 'records', path: `runs/${key}/MR.md`,
-        text: d.mr_desc.text.split('PAY-3').join(key).split('退款单导出 CSV').join(row.title).replace(/\*\*一句话\*\*：.*\n/, `**一句话**：${row.summary}\n`),
-      }
-    : { available: true, text: '', first: null, source: null, path: null, ref: null, error: '还没有 run（只有认领）：开工以后才有变更说明' }
+  d.questions = b.questions
+  d.decisions = b.decisions
+  d.sessions = b.sessions
+  d.timeline = { source: 'trace', items: b.events.map((e) => ({ at: new Date(e.at * 1000).toISOString(), kind: (({ request: 'approval', approve: 'approval', reject: 'approval', refused: 'approval', commit: 'commit', handover: 'handover', accepted: 'handover', rejected: 'handover', signed: 'handover', question: 'question', answer: 'decision', verify: 'verify', merge: 'merge', blocked: 'blocked', stage: 'stage', session: 'session' } as Record<string, string>)[e.kind] ?? 'app') as RequirementDetail['timeline']['items'][number]['kind'], label: e.text, detail: null, who: null, src: e.src })), missing: b.missing, error: '' }
+  d.credits = b.credits
+  d.brain = b.brain
+  d.mr_desc = b.mr_desc
   return d
+}
+
+function boardFor(path: string): ReqBoard {
+  const { key, id } = reqOf(path)
+  const b = W.boards[id]
+  if (!b) throw new StubApiError(404, { error: `没有这个需求：${key}`, code: 'not_found' })
+  return clone(b)
+}
+
+function overview(path: string): Overview {
+  const o = clone(W.overview)
+  const repo = new URL(path, location.origin).searchParams.get('repo') ?? 'all'
+  if (repo !== 'all') {
+    o.rows = o.rows.filter((r) => r.repo === repo)
+    o.cto.runs = o.cto.runs.filter((r) => r.repo === repo)
+    o.overlaps = o.overlaps.filter((x) => o.rows.some((r) => r.key === x.keys[0]))
+  }
+  o.errors = repos.filter((r) => !r.ok && !r.pending && (repo === 'all' || r.id === repo)).map((r) => ({ repo: r.id, error: r.error }))
+  if (flags.has('noeval')) {
+    o.eval = { available: false, error: 'brain-kit 还没有 evaluate 模块', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
+    o.cto = { ...o.cto, available: false, unattended: null, stepped_in: null, runs: [], sentence: o.cto.credits.per_req !== null ? `每个需求平均 ${o.cto.credits.per_req} credits。` : o.cto.sentence }
+  }
+  return o
 }
 
 const routes = fixtureRoutes()
@@ -113,14 +146,11 @@ setApiRoutes({
   ...Object.fromEntries(Object.entries(routes).map(([k, h]) => [k, (...a: Parameters<typeof h>) => shift(h(...a))])),
   [`GET ${API}/status`]: () => status(),
   [`GET ${API}/requirements/*`]: (_b, path) => shift(detailFor(path)),
+  [`GET ${API}/board/*`]: (_b, path) => shift(boardFor(path)),
   [`GET ${API}/settings`]: () => clone(settings),
   [`GET ${API}/crew`]: () => ({ ...status().crew }),
   [`GET ${API}/todo`]: () => shift({ ...fx.todo(), team: flags.has('team') }),
-  [`GET ${API}/overview*`]: () => {
-    const o = shift(fx.overview())
-    if (flags.has('noeval')) o.eval = { available: false, error: '', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
-    return o
-  },
+  [`GET ${API}/overview*`]: (_b, path) => shift(overview(path)),
   [`POST ${API}/settings`]: (body) => {
     settings = { ...settings, ...clone(body as Partial<Settings>) }
     return { ok: true, settings: clone(settings), status: status() }
