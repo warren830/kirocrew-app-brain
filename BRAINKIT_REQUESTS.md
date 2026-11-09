@@ -114,6 +114,13 @@ Lean timeline follow them when trace is missing), `decisions.USER` (the MR reade
     size, then `cat-file`), cuts it like the bridge's `description_note` (60000 characters) and makes it inert, and it
     takes the first line from render()'s `**一句话**：` line. Wanted: `mrdesc.committed(repo, cfg, key, ref) -> text or
     None` (the safe read, inert and cut), and `one_line` in build()'s data (render's first line as data).
+32. **`brain install` on a new branch, with JSON out** (new, the app's 导入仓库). The app copies the flow: a worktree
+    of a new branch (`brain/install`) from `origin/<default branch>`, `brain install <worktree> --prefix … --team …`,
+    then it writes the rest of the values `brain install` asks you to check into kit.json itself (tracker, jira.base,
+    default_branch, gitlab.base / project: `kit_data`, checked with `config.validate`), runs `brain doctor --offline`,
+    reads `git status` for the changed files and commits. Wanted: `brain install --branch NAME [--worktree DIR]
+    [--tracker none|jira] [--jira BASE] [--gitlab BASE PROJECT] [--default-branch B] [--commit] --json` →
+    `{branch, worktree, kit, files, doctor: [{level, text}], commit}`; and kit.json values as flags at least.
 
 
 ### Nice-to-have
@@ -139,6 +146,10 @@ Lean timeline follow them when trace is missing), `decisions.USER` (the MR reade
     closed). Wanted: public tuples `DECISION_STATES`, `RUN_STATES` and `HANDOFF_RESULTS`.
 20. **Kit and identities caching.** Still the same: a change on main or in brain-authz needs a restart of the app's
     bridge and of the signer. A TTL would be enough.
+33. **`brain doctor --offline` says "no origin remote"** (new). With `--offline` (no fetch) and an origin that is there,
+    doctor still prints `WARN no origin remote: Brain freshness not checked`; the app shows doctor's rows verbatim
+    after an install, so the person reads that the repo has no origin. Wanted: `WARN offline: Brain freshness not
+    checked` (and the origin check apart from the fetch).
 
 ## Note for the next brain-kit
 
