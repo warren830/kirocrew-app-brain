@@ -26,6 +26,7 @@
         "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
         "line": "approve PLAN 5d1e7a90"
       },
+      "summary": "退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。",
       "credits": 12.4,
       "updated_at": 1794146040,
       "mr": null,
@@ -66,6 +67,7 @@
         "text": "停在 D-2：等产品在 MR 上回答",
         "line": null
       },
+      "summary": "退款到账后给商户发通知（规模 S）。现在：Lean 在「代码生成」进行中，已交给团队运行机，等人在 MR 上回答澄清问题。",
       "credits": null,
       "updated_at": 1794135600,
       "mr": {
@@ -114,6 +116,7 @@
         "text": "等你验收：在 MR 上回答 D-3",
         "line": null
       },
+      "summary": "周报加上退款金额一栏（规模 S）。现在：Lean 在「发布」进行中，已交给团队运行机，等人在 MR 上回答验收问题。",
       "credits": 31.0,
       "updated_at": 1794052800,
       "mr": {
@@ -159,6 +162,7 @@
         "text": "接手被拒：run.json 的 brain_commit 不在 main 上，先 rebase 到最新的 main 再交接",
         "line": null
       },
+      "summary": "退款超过一万要两人复核（规模 M）。现在：Lean 在「构建测试」做完，已交给团队运行机。",
       "credits": 18.2,
       "updated_at": 1794128400,
       "mr": {
@@ -200,6 +204,7 @@
         "text": "已认领，还没开工",
         "line": null
       },
+      "summary": null,
       "credits": null,
       "updated_at": 1793973600,
       "mr": null,
@@ -235,6 +240,7 @@
         "text": "已合并",
         "line": null
       },
+      "summary": "对账单按自然日切分（规模 S）。现在：Lean 在「发布」做完，已交给团队运行机，RELEASE 已批。",
       "credits": 22.7,
       "updated_at": 1793800800,
       "mr": {

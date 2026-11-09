@@ -2,7 +2,8 @@
  * 开需求: claim a requirement and start it. Repo, title, slug, key (prefilled from GET /intake/next), the paths it is
  * expected to change, and its documents through the five gates. 「先检查（不写入）」 runs the gates as a dry run
  * (POST /intake/check); 「开工」 (POST /intake/start) is on only after a check that stopped nothing, of exactly what
- * the form says now. Without documents there is nothing to check.
+ * the form says now. Without documents there is nothing to check. What brain-kit could not tell from a plain word (a
+ * name or a password?) is listed under 「请你确认」: not masked, and not stopping the start.
  *
  * KiroCrew's failing or doubtful checks (GET /crew) are listed above the form with their fix buttons: a start that
  * opens a session needs them.
@@ -17,6 +18,8 @@ import { CheckRows, Icon } from '../ui'
 import type { ViewProps } from './props'
 
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,39}$/
+export const REVIEW_HINT = '这些没打码，也不拦开工：可能是人名或密码，也可能只是普通的词。是人名或密码的话，先改原文，再检查一遍。'
+export const GATE45 = '个人信息打码：证件号、电话、卡号、邮箱在整份材料里都打码；标签后面、姓名列里的人名只在找到的地方打码；看不准是人名（或密码）还是普通词的不打码，列在「请你确认」里。密钥打码，私钥和云访问密钥整份不收。'
 const CLASSES = Object.keys(CLASS_LABEL) as Classification[]
 
 export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
@@ -205,7 +208,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
           </fieldset>
           <fieldset className="br-fieldset">
             <legend>第 4、5 关：自动</legend>
-            <p className="br-note">个人信息一律打码；密钥打码，私钥和云访问密钥整份不收。</p>
+            <p className="br-note">{GATE45}</p>
           </fieldset>
           <div className="br-field">
             <label htmlFor="new-exclude">不收这些文件（glob，一行一个）</label>
@@ -245,13 +248,23 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
   )
 }
 
-/** A dry run's answer: brain-kit's findings verbatim, the gates that would stop (red), the files refused, the summary. */
+/**
+ * A dry run's answer: 请你确认 (brain-kit's review findings, per file), brain-kit's findings verbatim, the gates that
+ * would stop (red), the files refused, the summary.
+ */
 function CheckResult({ c }: { c: IntakeCheck }) {
   const extraBlocking = c.blocking.filter((b) => !c.findings.includes(b))
   const passed = c.ok && c.blocking.length === 0 && !c.error
   return (
     <div className="br-stack" data-testid="check-result">
       {c.error && <p className="br-error br-pre" role="alert">{c.error}</p>}
+      {c.review.length > 0 && (
+        <div className="br-stack" style={{ gap: 4 }} data-testid="review">
+          <b className="br-strong">请你确认</b>
+          <ul className="br-list br-warn-text">{c.review.map((r, i) => <li key={i}>{r}</li>)}</ul>
+          <p className="br-hint">{REVIEW_HINT}</p>
+        </div>
+      )}
       {(c.findings.length > 0 || extraBlocking.length > 0) && (
         <div className="br-findings" data-testid="findings">
           {c.findings.map((l, i) => <div key={`f${i}`} className={c.blocking.includes(l) ? 'is-blocking' : undefined}>{l}</div>)}

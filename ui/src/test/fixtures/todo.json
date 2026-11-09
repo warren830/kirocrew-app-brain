@@ -137,6 +137,19 @@
       "since": 1794128400
     },
     {
+      "kind": "handoff_unlabelled",
+      "repo": "r1",
+      "key": "PAY-9",
+      "title": "退款失败重试",
+      "text": "推上去了，但 MR 上没有交接标签 ai-handoff：什么也没交出去。看一眼 MR，再在分支上跑一次 brain handoff",
+      "line": null,
+      "approval": null,
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/52",
+      "question": null,
+      "session": null,
+      "since": 1794128400
+    },
+    {
       "kind": "crew",
       "repo": "",
       "key": "",

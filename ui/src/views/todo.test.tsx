@@ -24,12 +24,16 @@ describe('待办', () => {
     renderTodo()
     await screen.findByRole('region', { name: 'Lean 审批' })
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(
-      ['Lean 审批', '运行机上的问题', '本地澄清', '等验收', '接手被拒', 'KiroCrew 的问题'])
-    expect(screen.getAllByTestId('todo-item')).toHaveLength(6)
+      ['Lean 审批', '运行机上的问题', '本地澄清', '等验收', '接手被拒', '没交出去的交接', 'KiroCrew 的问题'])
+    expect(screen.getAllByTestId('todo-item')).toHaveLength(7)
     expect(screen.queryByText(TEAM_SENTENCE)).toBeNull()
     expect(group('接手被拒')).toHaveTextContent('run.json 的 brain_commit 不在 main 上')
     expect(within(group('接手被拒')).getByRole('link', { name: '看 MR' })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/46')
     expect(within(group('等验收')).getByRole('link', { name: '去 MR 上验收' })).toHaveAttribute('target', '_blank')
+    // pushed, but the MR carries no hand-over label (brain handoff exits 1 then): nothing was handed over
+    const unlabelled = group('没交出去的交接')
+    expect(unlabelled).toHaveTextContent('MR 上没有交接标签 ai-handoff：什么也没交出去')
+    expect(within(unlabelled).getByRole('link', { name: '看 MR' })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/52')
     expect(badges).toEqual([]) // the shell sets the badge from /status, not this view
   })
 

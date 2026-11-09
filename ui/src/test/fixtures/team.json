@@ -18,6 +18,7 @@
       "merged": 3
     },
     "decisions": {
+      "asking": 1,
       "open": 1,
       "answered": 1,
       "delivered": 4,
@@ -69,6 +70,35 @@
       "slot": null,
       "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/37",
       "updated": "2026-11-06T10:00:00+08:00"
+    }
+  ],
+  "handovers": [
+    {
+      "project": "shop/shop-pay",
+      "iid": 48,
+      "sha": "9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d",
+      "result": "waiting",
+      "error": "",
+      "at": 1794146350,
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/48"
+    },
+    {
+      "project": "shop/shop-pay",
+      "iid": 52,
+      "sha": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+      "result": "unlabelled",
+      "error": "",
+      "at": 1794146350,
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/52"
+    },
+    {
+      "project": "shop/shop-pay",
+      "iid": 53,
+      "sha": "2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c",
+      "result": "error",
+      "error": "the signer did not answer handoff-RUN-PAY-9-1-0a1b2c3d4e5f within 30s",
+      "at": 1794146350,
+      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/53"
     }
   ],
   "signer": {

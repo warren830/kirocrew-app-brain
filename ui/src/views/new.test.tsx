@@ -5,7 +5,7 @@ import { apiCalls, apiError, navigations } from '../test/stubs/app-sdk'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import type { IntakeCheck } from '../types'
-import { NewView } from './NewReq'
+import { GATE45, NewView, REVIEW_HINT } from './NewReq'
 
 function setup(routes: Parameters<typeof installFixtureRoutes>[0] = {}) {
   installFixtureRoutes({
@@ -92,6 +92,32 @@ describe('开需求', () => {
     expect(navigations).toEqual(['/chat?sid=brain-PAY-8-2c9d'])
     await user.click(within(out).getByRole('button', { name: '看这个需求' }))
     expect(props.go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-8' })
+  })
+
+  test('what may be a name or a password is listed under 请你确认 (not masked, not stopping 开工); the gate 4 rule says so', async () => {
+    const { user } = setup()
+    expect(screen.getByText(GATE45)).toBeInTheDocument()
+    expect(GATE45).toContain('请你确认')
+    await fillBasics(user)
+    await fillGates(user)
+    await user.click(checkBtn())
+    const review = await screen.findByTestId('review')
+    expect(within(review).getByText('请你确认')).toBeInTheDocument()
+    const [item] = fx.intakeCheck().review
+    expect(within(review).getByText(item)).toHaveTextContent('D01 结算周报需求.docx：请你确认 1 处')
+    expect(review).toHaveTextContent('「对接人：张三李四」')
+    expect(review).toHaveTextContent(REVIEW_HINT)
+    expect(within(screen.getByTestId('findings')).getByText(fx.intakeCheck().findings[0])).toBeInTheDocument() // verbatim too
+    expect(startBtn()).toBeEnabled()
+  })
+
+  test('a check without review findings shows no 请你确认', async () => {
+    const { user } = setup({ [`POST ${API}/intake/check`]: (): IntakeCheck => ({ ...fx.intakeCheck(), review: [] }) })
+    await fillBasics(user)
+    await fillGates(user)
+    await user.click(checkBtn())
+    await screen.findByTestId('findings')
+    expect(screen.queryByTestId('review')).toBeNull()
   })
 
   test('a check that a gate would stop keeps 开工 off and shows the blocking line in red', async () => {

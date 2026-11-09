@@ -1,12 +1,13 @@
 /**
- * 运行机 (team mode only): the bridge loop's status, the ledger's counts, the runs (brain-kit's run states) with their
- * MRs, and the signer's pending and refused requests and the vouchers it has not answered yet (asked for again next
+ * 运行机 (team mode only): the bridge loop's status, the ledger's counts, what the bridge said about each labelled MR
+ * in the last round (accepted, rejected, seen, unlabelled, waiting), the runs (brain-kit's run states) with their MRs,
+ * and the signer's pending and refused requests and the vouchers it has not answered yet (asked for again next
  * round). 「现在跑一轮」 runs one bridge loop now (POST /team/loop).
  */
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
 import { ago, fmtIso } from '../format'
-import type { RunState, TeamLoopResult, TeamStatus, TeamView } from '../types'
+import type { HandoverResult, RunState, TeamHandover, TeamLoopResult, TeamStatus, TeamView } from '../types'
 import { ExtLink, Icon, LoadState, questionMeta } from '../ui'
 import type { Tone } from '../styles'
 import type { ViewProps } from './props'
@@ -30,6 +31,17 @@ export const RUN_STATE: Record<RunState, { label: string; tone: Tone }> = {
 export const runStateMeta = (state: string) => RUN_STATE[state as RunState] ?? { label: state, tone: 'idle' as Tone }
 
 const HANDOFF_STATE: Record<string, string> = { checking: '在检查', accepted: '已接手', rejected: '拒绝接手' }
+
+/** What brain-kit's bridge said about a labelled MR in the last round (Bridge.process), in words. */
+export const HANDOVER_RESULT: Record<HandoverResult, { label: string; tone: Tone; hint: string }> = {
+  accepted: { label: '接手了', tone: 'ok', hint: '' },
+  rejected: { label: '拒绝接手', tone: 'bad', hint: '原因在 MR 上（AI 接手被拒）' },
+  seen: { label: '看过了', tone: 'idle', hint: '这个提交和这次打标签以前检查过，结果在账本里' },
+  unlabelled: { label: '标签刚被拿掉', tone: 'warn', hint: '最新的标签事件拿掉了交接标签（brain handoff 重打标签时会这样）：下一轮再看' },
+  waiting: { label: '正在别处签名', tone: 'hand', hint: '这份交接的合同正在别处签（另一个桥进程，或停下的桥留下的占位）：下一轮再看' },
+  error: { label: '这一轮没查成', tone: 'warn', hint: '下一轮再试' },
+}
+export const handoverMeta = (result: string) => HANDOVER_RESULT[result as HandoverResult] ?? { label: result, tone: 'idle' as Tone, hint: '' }
 
 /** A ledger count's state in words: runs by run state, decisions by question state, hand-overs by their own. */
 const ledgerLabel = (k: keyof TeamView['ledger'], state: string) =>
@@ -99,6 +111,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
               </div>
             ))}
           </section>
+          <Handovers rows={data.handovers} />
           <section className="br-card" aria-label="运行">
             <header><h2>运行</h2><span className="br-dim br-small">{data.runs.length} 个</span></header>
             {data.runs.length === 0 ? <p className="br-note">还没有运行。</p> : (
@@ -171,6 +184,31 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
         </>
       )}
     </main>
+  )
+}
+
+function Handovers({ rows }: { rows: TeamHandover[] }) {
+  return (
+    <section className="br-card" aria-label="交接" data-testid="handovers">
+      <header><h2>交接</h2><span className="br-dim br-small">上一轮看到的打着交接标签的 MR</span></header>
+      {rows.length === 0 ? <p className="br-note">上一轮没有打着交接标签的 MR。</p> : (
+        <ul className="br-plain">
+          {rows.map((h) => {
+            const m = handoverMeta(h.result)
+            return (
+              <li key={`${h.project}!${h.iid}`} className="br-stack" style={{ gap: 2 }} data-result={h.result}>
+                <span className="br-row">
+                  <ExtLink href={h.mr_url}>{h.project}!{h.iid}</ExtLink>
+                  {h.sha && <code className="br-dim">{h.sha.slice(0, 12)}</code>}
+                  <span className={`br-chip tone-${m.tone}`}>{m.label}</span>
+                </span>
+                {(h.error || m.hint) && <span className="br-hint br-pre">{h.error || m.hint}</span>}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
   )
 }
 

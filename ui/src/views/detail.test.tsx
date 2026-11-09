@@ -6,7 +6,7 @@ import { apiCalls, apiError, navigations } from '../test/stubs/app-sdk'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import { TYPE_IT_YOURSELF } from '../ui'
-import { DetailView } from './Detail'
+import { DetailView, MR_DESC_COPY_HINT } from './Detail'
 import type { ViewProps } from './props'
 
 const LINE = 'approve PLAN 5d1e7a90'
@@ -63,6 +63,38 @@ describe('需求详情', () => {
     expect(navigations).toEqual(['/chat?sid=brain-PAY-3-7f3a'])
     expect(window.location.search).toBe('?sid=brain-PAY-3-7f3a')
     noLineSent()
+  })
+
+  test('the 变更说明: its first line, the whole text folded, 复制 copies the text brain-kit made inert', async () => {
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '变更说明' })
+    const m = fx.detail().mr_desc
+    expect(within(card).getByTestId('mr-desc-first')).toHaveTextContent(m.first as string)
+    expect(card).toHaveTextContent('由记录生成 · 提交 7d2c9e4a1b30（分支上还没有 runs/PAY-3/MR.md）')
+    expect(within(card).getByTestId('mr-desc-text').textContent).toBe(m.text)
+    expect(within(card).getByTestId('mr-desc-text').closest('details')).not.toBeNull()   // folded
+    fireEvent.click(within(card).getByRole('button', { name: '复制' }))
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(m.text))
+    expect(await within(card).findByText('已复制')).toBeInTheDocument()
+    expect(card).toHaveTextContent(MR_DESC_COPY_HINT)
+    expect(apiCalls.filter((c) => c.method !== 'GET')).toEqual([])          // copying sends nothing
+  })
+
+  test('the 变更说明 from runs/<KEY>/MR.md says so; without one, the reason and no 复制', async () => {
+    const d = fx.detail()
+    d.mr_desc = { ...d.mr_desc, source: 'file' }
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d })
+    const { unmount } = render(<DetailView entry={{ repo: 'r1', key: 'PAY-3' }} status={fx.status()} go={vi.fn()} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} pollMs={60_000} />)
+    expect(await screen.findByRole('region', { name: '变更说明' })).toHaveTextContent('runs/PAY-3/MR.md · 提交 7d2c9e4a1b30')
+    unmount()
+    const none = fx.detail()
+    none.mr_desc = { available: true, text: '', first: null, source: null, path: null, ref: null, error: '还没有 run（只有认领）：开工以后才有变更说明' }
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => none })
+    render(<DetailView entry={{ repo: 'r1', key: 'PAY-3' }} status={fx.status()} go={vi.fn()} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} pollMs={60_000} />)
+    const card = await screen.findByRole('region', { name: '变更说明' })
+    expect(card).toHaveTextContent('开工以后才有变更说明')
+    expect(within(card).queryByRole('button', { name: '复制' })).toBeNull()
+    expect(within(card).queryByTestId('mr-desc-text')).toBeNull()
   })
 
   test('the answer form is there only for a question that may be answered here; it posts the answer', async () => {

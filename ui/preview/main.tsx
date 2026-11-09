@@ -93,6 +93,12 @@ function detailFor(path: string): RequirementDetail {
   d.timeline.items = d.timeline.items.slice(0, n ? 3 : 1)
   d.credits.total = row.credits
   d.brain = n ? d.brain : { loaded: null, cited: [], stale: [], unknown: [], proposals: null }
+  d.mr_desc = row.summary
+    ? {
+        ...d.mr_desc, first: row.summary, source: row.run_ids.length ? 'file' : 'records', path: `runs/${key}/MR.md`,
+        text: d.mr_desc.text.split('PAY-3').join(key).split('退款单导出 CSV').join(row.title).replace(/\*\*一句话\*\*：.*\n/, `**一句话**：${row.summary}\n`),
+      }
+    : { available: true, text: '', first: null, source: null, path: null, ref: null, error: '还没有 run（只有认领）：开工以后才有变更说明' }
   return d
 }
 

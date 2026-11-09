@@ -1,6 +1,7 @@
 /**
- * 交付总览: every requirement — where it is, what it waits on, its Lean stage, its credits and MR — with the repo
- * and state filters (in the URL), the overlap warnings, the eval card and the decision funnel. Polls /overview.
+ * 交付总览: every requirement — where it is, what it waits on, its Lean stage, its credits and MR, the first line of its
+ * 变更说明 — with the repo and state filters (in the URL), the overlap warnings, the eval card and the decision funnel.
+ * Polls /overview.
  */
 import { useMemo, useState } from 'react'
 import { useAppApi } from '@kirocrew/app-sdk'
@@ -125,6 +126,7 @@ function Row({ r, at, showRepo, repoName, onOpen }: { r: Requirement; at: number
           {r.overlap.length > 0 && <span className="br-chip tone-warn" title="和这些需求要改同一处">和 {r.overlap.join('、')} 重叠</span>}
         </div>
         <div>{r.title}</div>
+        {r.summary && <div className="br-hint" data-testid="row-summary" title="变更说明的第一行（brain mr-desc）">{r.summary}</div>}
       </td>
       <td>{r.owner ?? <span className="br-dim">—</span>}</td>
       <td><StateChip state={r.state} label={r.state_label} /></td>

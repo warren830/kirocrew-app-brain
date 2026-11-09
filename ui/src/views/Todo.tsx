@@ -1,6 +1,7 @@
 /**
  * 待办: what waits on the person, grouped by kind. A Lean approval shows its line to type in the session (the app
- * never sends it); a question on the team runner is answered on its MR; a local clarify question may be answered here.
+ * never sends it); a question on the team runner is answered on its MR; a local clarify question may be answered here;
+ * a hand-over that was pushed but carries no label on its MR (nothing handed over) says what to do.
  * Polls GET /todo every 10 s. The sidebar badge and the tab's count come from /status (the app shell).
  */
 import { useNavigate } from '@kirocrew/app-sdk'
@@ -19,6 +20,7 @@ const GROUPS: [TodoKind, string][] = [
   ['clarify', '本地澄清'],
   ['acceptance', '等验收'],
   ['handoff_rejected', '接手被拒'],
+  ['handoff_unlabelled', '没交出去的交接'],
   ['crew', 'KiroCrew 的问题'],
 ]
 

@@ -1,8 +1,9 @@
 /**
  * 需求详情: one requirement. Header (state, owner, branch, intent, worktree, MR, credits, what it waits on), Lean progress
  * (stages, per-unit chips, approvals; a pending approval's line is shown to be typed in the session by the person),
- * Session notes, decisions (their Brain cites open the Brain view), questions and answers (the answer form only where
- * the person may answer here), the timeline, the sessions this app opened, and what the run used of the Brain.
+ * Session notes, the MR's 变更说明 (brain mr-desc: its first line, the whole text folded, 复制), decisions (their Brain
+ * cites open the Brain view), questions and answers (the answer form only where the person may answer here), the
+ * timeline, the sessions this app opened, and what the run used of the Brain.
  * Polls GET /requirements/{repo}/{key} every 5 s.
  */
 import { useState } from 'react'
@@ -11,7 +12,7 @@ import { POLL_MS, paths, usePoll, useAction } from '../api'
 import { ago, fmtCredits, fmtIso, fmtTime, isoDay } from '../format'
 import { ENTRY_RE, fileOfEntry, type ItemEntry, type ItemFrom } from '../nav'
 import type {
-  Decision, OpenSessionBody, OpenSessionResult, Question, RequirementDetail, SessionRow, Stage, TimelineItem, TimelineKind,
+  Decision, MrDesc, OpenSessionBody, OpenSessionResult, Question, RequirementDetail, SessionRow, Stage, TimelineItem, TimelineKind,
 } from '../types'
 import {
   APPROVAL_META, AnswerForm, ExtLink, Icon, LoadState, MrLink, STAGE_META, StateChip, TypeLine, isOpenQuestion, questionMeta,
@@ -148,6 +149,7 @@ export function DetailView({ entry, onBack, ...props }: { entry: ItemEntry; onBa
             <LeanCard x={x} sessionUrl={live?.url ?? null} />
             <NotesCard x={x} />
           </div>
+          <MrDescCard m={x.mr_desc} />
           <DecisionsCard decisions={x.decisions} repo={entry.repo} go={props.go} />
           <section className="br-card" aria-label="问题和回答">
             <header><h3>问题和回答</h3><span className="br-dim br-small">{x.questions.length} 个</span></header>
@@ -319,6 +321,57 @@ function NotesCard({ x }: { x: RequirementDetail }) {
           <ul className="br-list">{open_questions.map((n, i) => <li key={i}>{n}</li>)}</ul>
         </div>
       )}
+    </section>
+  )
+}
+
+export const MR_DESC_COPY_HINT = '复制的是 brain-kit 处理过的文字：贴进 GitLab 的 MR 描述里，@ 提到人、HTML、图片、快捷命令、像批准或回答的行都不会生效。'
+
+/** Where a 变更说明 comes from, in words. */
+export function mrDescSource(m: MrDesc): string {
+  if (m.source === 'file') return `${m.path ?? 'MR.md'} · 提交 ${m.ref ?? '?'}`
+  if (m.source === 'records') return `由记录生成 · 提交 ${m.ref ?? '?'}（分支上还没有 ${m.path ?? 'MR.md'}）`
+  return ''
+}
+
+/**
+ * The MR's 变更说明 (brain mr-desc): its first line, the whole Markdown folded, and 复制 (the clipboard: for the MR
+ * description). Text only, never rendered as HTML.
+ */
+export function MrDescCard({ m }: { m: MrDesc }) {
+  const [copied, setCopied] = useState<'' | 'ok' | 'fail'>('')
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(m.text)
+      setCopied('ok')
+    } catch {
+      setCopied('fail')
+    }
+  }
+  const from = mrDescSource(m)
+  return (
+    <section className="br-card" aria-label="变更说明" data-testid="mr-desc">
+      <header>
+        <h3>变更说明</h3>
+        {from && <span className="br-dim br-small">{from}</span>}
+        <span className="br-grow" />
+        {m.text && (
+          <button type="button" className="br-btn is-small" onClick={() => void copy()}>
+            <Icon name="Copy" size={13} />复制
+          </button>
+        )}
+      </header>
+      {m.error && <p className="br-note">{m.error}</p>}
+      {m.first && <p className="br-strong" style={{ margin: 0 }} data-testid="mr-desc-first">{m.first}</p>}
+      {m.text && (
+        <details>
+          <summary>看全文（Markdown）</summary>
+          <pre className="br-findings" data-testid="mr-desc-text">{m.text}</pre>
+        </details>
+      )}
+      {copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
+      {copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请展开全文手动选中</span>}
+      {m.text && <p className="br-hint">{MR_DESC_COPY_HINT}</p>}
     </section>
   )
 }

@@ -58,6 +58,8 @@ export const QUESTION_STATE: Record<string, { label: string; tone: Tone }> = {
   invalid: { label: '无效', tone: 'bad' },
   closed: { label: '已关闭', tone: 'idle' },
   posting: { label: '正在发到 MR', tone: 'wait' },
+  // brain-kit 72b278e: one bridge process is posting it right now (another one waits)
+  asking: { label: '正在发到 MR', tone: 'wait' },
   delivery_unknown: { label: '送没送到不清楚', tone: 'warn' },
   void: { label: '作废', tone: 'bad' },
   refused: { label: '签名服务拒签', tone: 'bad' },

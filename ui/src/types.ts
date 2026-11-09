@@ -93,6 +93,9 @@ export interface Requirement {
    * (todo), 「11/11 发布（做完）」 (done or skipped); null when Lean recorded no stage */
   stage: string | null
   waits: Waits
+  /** the first line of its 变更说明 (brain mr-desc's 一句话, from runs/<KEY>/MR.md or the run's records at the commit
+   * the row is read at); null before it has a run, while it is being made, or when brain-kit cannot make one */
+  summary: string | null
   /** credits of the Kiro Crew sessions this app opened for it (null: none known). KiroCrew reports credits only. */
   credits: number | null
   /** latest activity we know of (commit, Lean event, session) */
@@ -130,7 +133,7 @@ export interface Status {
     version: string | null
     error: string
     /** optional brain-kit modules: true when importable */
-    modules: { trace: boolean; evaluate: boolean; golden: boolean; intents: boolean }
+    modules: { trace: boolean; evaluate: boolean; golden: boolean; intents: boolean; mrdesc: boolean }
   }
   repos: RepoInfo[]
   crew: { rows: CheckRow[]; fix: { agent: boolean; engine: boolean }; checked_at: number | null }
@@ -285,9 +288,9 @@ export interface Question {
   recommend: string | null
   lean_request: string | null
   refs: string[]
-  /** park.json: waiting | answered; on the MR / in brain-kit's ledger: posting | open | answered | delivered |
-   * delivery_unknown | refused (the signer would not sign it) | stale (a new push) | void (not bound to its push and
-   * park.json) | invalid | closed */
+  /** park.json: waiting | answered; on the MR / in brain-kit's ledger: posting | asking (a bridge is posting it right
+   * now) | open | answered | delivered | delivery_unknown | refused (the signer would not sign it) | stale (a new push)
+   * | void (not bound to its push and park.json) | invalid | closed */
   state: string
   answer: string | null
   answerer: string | null
@@ -330,6 +333,27 @@ export interface SessionRow {
   error: string | null
 }
 
+/**
+ * The MR's 变更说明 (brain-kit's `brain mr-desc`): runs/<KEY>/MR.md as committed when the branch has it, else made from
+ * the run's records at that commit. Always from a commit (`ref`), never from uncommitted files. The text is made inert
+ * by brain-kit (no @mention, HTML, image, quick action, approval or answer line acts when it is pasted into GitLab).
+ */
+export interface MrDesc {
+  /** brain-kit's mrdesc module is there */
+  available: boolean
+  /** Markdown; '' when there is none (error says why) */
+  text: string
+  /** its first line (the 一句话) */
+  first: string | null
+  /** file: runs/<KEY>/MR.md as committed; records: made from the run's records */
+  source: 'file' | 'records' | null
+  /** runs/<KEY>/MR.md */
+  path: string | null
+  /** the commit it was read at (12 hex) */
+  ref: string | null
+  error: string
+}
+
 export interface RequirementDetail {
   row: Requirement
   where_label: string
@@ -358,6 +382,7 @@ export interface RequirementDetail {
   sessions: SessionRow[]
   credits: { total: number | null; note: string }
   brain: { loaded: number | null; cited: string[]; stale: string[]; unknown: string[]; proposals: number | null }
+  mr_desc: MrDesc
 }
 
 // ---------------------------------------------------------------- POST /requirements/{repo}/{key}/session, /answer
@@ -412,6 +437,10 @@ export interface IntakeCheck {
   sources: number
   /** brain-kit's findings, verbatim, one line each */
   findings: string[]
+  /** brain-kit's 请你确认 parts of the findings, one per file (「file：请你确认 N 处（…）：「quote」…」): what may be a name or
+   * a password but may as well be a word. Not masked and not stopping anything: if it is one, change the document
+   * and check again */
+  review: string[]
   /** gates that would stop the start, verbatim */
   blocking: string[]
   refused: { id: string; name: string; reason: string }[]
@@ -511,7 +540,8 @@ export interface ReflectApplyResult {
 
 // ---------------------------------------------------------------- GET /todo
 
-export type TodoKind = 'lean_approval' | 'question' | 'clarify' | 'acceptance' | 'handoff_rejected' | 'crew'
+/** handoff_unlabelled: pushed, but its MR carries no hand-over label (nothing was handed over) */
+export type TodoKind = 'lean_approval' | 'question' | 'clarify' | 'acceptance' | 'handoff_rejected' | 'handoff_unlabelled' | 'crew'
 export interface TodoItem {
   kind: TodoKind
   repo: string
@@ -555,12 +585,32 @@ export interface TeamRun {
   mr_url: string | null
   updated: string | null
 }
+/**
+ * What brain-kit's bridge said about one MR with the hand-over label in the last round (Bridge.process): accepted,
+ * rejected, seen (that head and label event were checked before), unlabelled (the newest label event takes the label
+ * off, as `brain handoff` does while it labels again), waiting (this very hand-over is being signed elsewhere), error
+ * (it could not be checked this round: error says why). Another value is shown as it is.
+ */
+export type HandoverResult = 'accepted' | 'rejected' | 'seen' | 'unlabelled' | 'waiting' | 'error'
+export interface TeamHandover {
+  project: string
+  iid: number
+  sha: string
+  result: HandoverResult
+  error: string
+  /** epoch seconds */
+  at: number
+  mr_url: string | null
+}
+
 export interface TeamView {
   status: TeamStatus
   /** state → count: runs by RunState, decisions by question state (open, answered, delivered, refused, void …),
    * hand-overs by checking / accepted / rejected */
   ledger: { runs: Record<string, number>; decisions: Record<string, number>; handoffs: Record<string, number> }
   runs: TeamRun[]
+  /** the labelled MRs of the last round (none before the first round) */
+  handovers: TeamHandover[]
   signer: {
     /** signature requests waiting for the signer */
     pending: { req_id: string; kind: string; run_id: string; since: string | null }[]

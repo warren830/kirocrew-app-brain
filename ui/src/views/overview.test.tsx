@@ -25,6 +25,9 @@ describe('交付总览', () => {
     expect(within(pay3).getByText('approve PLAN 5d1e7a90')).toHaveClass('br-mono')
     expect(pay3).toHaveTextContent('12.4')
     expect(pay3).toHaveTextContent('和 PAY-4 重叠')
+    // the first line of its 变更说明 (brain mr-desc); none for a claim without a run
+    expect(within(pay3).getByTestId('row-summary')).toHaveTextContent(fx.overview().rows[0].summary as string)
+    expect(within(table.querySelector('tr[data-key="PAY-6"]') as HTMLElement).queryByTestId('row-summary')).toBeNull()
     const pay4 = table.querySelector('tr[data-key="PAY-4"]') as HTMLElement
     expect(pay4).toHaveTextContent('D-2 待答')
     const mr = within(pay4).getByRole('link', { name: /!41/ })

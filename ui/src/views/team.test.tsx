@@ -6,7 +6,7 @@ import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import { apiCalls, navigations } from '../test/stubs/app-sdk'
 import type { ViewProps } from './props'
-import { RUN_STATE, TeamPage, runStateMeta } from './Team'
+import { HANDOVER_RESULT, RUN_STATE, TeamPage, handoverMeta, runStateMeta } from './Team'
 
 function teamStatus() {
   const s = fx.status()
@@ -49,13 +49,37 @@ describe('运行机', () => {
     const ledger = screen.getByRole('region', { name: '账本' })
     const line = (k: string) => Array.from(ledger.querySelectorAll(`[data-ledger="${k}"] .br-tag`)).map((t) => t.textContent)
     expect(line('runs')).toEqual(['签名中 1', '已派给会话 2', '已合并 3'])
-    expect(line('decisions')).toEqual(['已发出，等回答 1', '已收到回答，等桥签名送回 1', '已送回 4', '签名服务拒签 1', '作废 1'])
+    // brain-kit 72b278e: asking, a bridge posting the question right now
+    expect(line('decisions')).toEqual(['正在发到 MR 1', '已发出，等回答 1', '已收到回答，等桥签名送回 1', '已送回 4', '签名服务拒签 1', '作废 1'])
     expect(line('handoffs')).toEqual(['已接手 4', '拒绝接手 1'])
     expect(ledger.querySelector('[data-ledger="runs"] .br-tag')).toHaveAttribute('title', 'signing')
     // every run state of brain-kit has words
     expect(Object.keys(RUN_STATE).sort()).toEqual(['closed', 'dispatched', 'failed', 'merged', 'ready', 'send_unknown', 'signing', 'spooled'])
     expect(runStateMeta('send_unknown')).toEqual({ label: '送没送到不清楚', tone: 'warn' })
     expect(runStateMeta('signing').label).toBe('签名中')
+  })
+
+  test('what the bridge said about each labelled MR last round: waiting and unlabelled are looked at again next round', async () => {
+    installFixtureRoutes()
+    const { unmount } = render(<TeamPage {...props()} />)
+    const ho = await screen.findByRole('region', { name: '交接' })
+    const item = (r: string) => ho.querySelector(`[data-result="${r}"]`) as HTMLElement
+    expect(item('waiting')).toHaveTextContent('正在别处签名')
+    expect(item('waiting')).toHaveTextContent('下一轮再看')
+    expect(item('waiting')).toHaveTextContent('9c1d2e3f4a5b')
+    expect(within(item('waiting')).getByRole('link', { name: /shop\/shop-pay!48/ })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/48')
+    expect(item('unlabelled')).toHaveTextContent('标签刚被拿掉')
+    expect(item('unlabelled')).toHaveTextContent('brain handoff 重打标签')
+    expect(item('error')).toHaveTextContent('这一轮没查成')
+    expect(item('error')).toHaveTextContent('the signer did not answer')      // its error instead of the hint
+    expect(Object.keys(HANDOVER_RESULT).sort()).toEqual(['accepted', 'error', 'rejected', 'seen', 'unlabelled', 'waiting'])
+    expect(handoverMeta('later')).toEqual({ label: 'later', tone: 'idle', hint: '' })
+    unmount()
+    const tv = fx.team()
+    tv.handovers = []
+    installFixtureRoutes({ [`GET ${API}/team`]: () => tv })
+    render(<TeamPage {...props()} />)
+    expect(await screen.findByRole('region', { name: '交接' })).toHaveTextContent('上一轮没有打着交接标签的 MR')
   })
 
   test('the vouchers the signer did not answer last round are listed (asked for again next round); none, no heading', async () => {

@@ -24,6 +24,7 @@
       "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
       "line": "approve PLAN 5d1e7a90"
     },
+    "summary": "退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。",
     "credits": 12.4,
     "updated_at": 1794146040,
     "mr": null,
@@ -478,5 +479,14 @@
       "T-PAY-9-1"
     ],
     "proposals": 1
+  },
+  "mr_desc": {
+    "available": true,
+    "text": "## PAY-3 · 退款单导出 CSV\n\n**一句话**：退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。\n（分支 `ai/alice/PAY-3-refund-export`；负责人 alice；intent `261107-refund-export`）\n\n### 做了什么 / 没做什么\n- 不做：不做 Excel 导出\n- 代码计划：refund-api 做完 3/5 步\n\n### 验收标准和证据\n还没跑 verify。\n\n| AC | 要求 | 测试 | 结果 |\n|---|---|---|---|\n| AC-1 | 选一段日期 → 下载这段时间的退款单 CSV | `tests/test_export.py::test_range` | 还没跑 verify |\n\n### 关键决定\n| ID | 决定 | 为什么 | 谁定的 | Brain |\n|---|---|---|---|---|\n| D-2 | 退款单号按 RF+9 位 | 见 T-PAY-1-2 | agent（agent 自己定的） | T-PAY-1-2 |\n\n### 怎么审\n1. 先看 AC-1 的测试 `tests/test_export.py::test_range`；它的边界是 agent 自己定的（D-2）\n\n### 还没有\n- 还没跑 verify\n\n---\n由 `brain mr-desc` 从记录生成（run.json、Lean 记录、git），别手改。重新生成：`brain mr-desc PAY-3 --write`。\n",
+    "first": "退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。",
+    "source": "records",
+    "path": "runs/PAY-3/MR.md",
+    "ref": "7d2c9e4a1b30",
+    "error": ""
   }
 }

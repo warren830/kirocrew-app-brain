@@ -13,7 +13,8 @@
       "trace": true,
       "evaluate": true,
       "golden": false,
-      "intents": true
+      "intents": true,
+      "mrdesc": true
     }
   },
   "repos": [
