@@ -15,7 +15,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, usePoll, useAction } from '../api'
 import { PERSON, todoLeft, whoWord } from '../board/format'
-import { isReview } from '../board/next'
+import { isReview, REVIEW_SENDS } from '../board/next'
 import { RoleIcon } from '../board/RoleIcon'
 import { Hit, Mini } from '../cto/charts'
 import { ago, fmtCredits, fmtIso, fmtSpan, fmtTime, isoDay } from '../format'
@@ -30,7 +30,7 @@ import {
 } from '../vocab'
 import { Inline } from './Markdown'
 import type { ViewProps } from './props'
-import { EntryChip, MrDescCard, QuestionCard, ReviewButton, useCopy } from './Question'
+import { EntryChip, MrDescCard, QuestionCard, ReviewButton, ReviewSay, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
 import { NotFound, ReqSwitch } from './ReqSwitch'
 
@@ -46,7 +46,7 @@ const KIND_META: Record<TimelineKind, { icon: string; label: string }> = {
   question: { icon: 'question', label: '问题' },
   decision: { icon: 'req', label: '决定' },
   blocked: { icon: 'blocked', label: '拦下' },
-  verify: { icon: 'ci', label: '验证' },
+  verify: { icon: 'ci', label: '自动检查' },
   merge: { icon: 'merge', label: '合并' },
   session: { icon: 'laptop', label: '会话' },
   app: { icon: 'brain', label: 'app' },
@@ -209,6 +209,8 @@ interface Now {
   choices: string
   /** a refused hand-over: how to hand it over again, as the board's step says it (its reason line is the text already) */
   how: string | null
+  /** Lean's next step is its review in a new session, and the line 开审查会话 says to it */
+  review: { say: string | null } | null
 }
 
 /** 此刻: one judgment (the backend's waits) with where to take the step. */
@@ -227,14 +229,18 @@ function nowOf(x: RequirementDetail, board: ReqBoard | null, live: SessionRow | 
     question: open?.id ?? null,
     choices: open?.options.length ? `选 ${open.options.map((o) => o.id).join(' / ')}` : 'approve / reject',
     how: step === 'redo_handoff' && board?.row.waits.do === 'redo_handoff' ? board.accept.step.text.split('\n').filter((l) => l && !l.startsWith('接手被拒')).join(' ') || null : null,
+    review: step === 'reply' ? reviewOf(x, board) : null,
   }
 }
 
 /** Lean's next step when it is a review in a new session (the session that wrote the code may not review it), and
- * the line Lean wrote to say to that session. */
-function reviewOf(next: string[]): { say: string | null } | null {
-  const n = next[0] ?? ''
-  if (!isReview(n)) return null
+ * the line 开审查会话 says to that session: the backend's (waits.review, 验收's line). An older backend said it only in
+ * words; Lean's next note had the line. */
+function reviewOf(x: RequirementDetail, board: ReqBoard | null): { say: string | null } | null {
+  const w = x.row.waits
+  if (w.review !== undefined) return w.review ? { say: board?.accept.step.line ?? null } : null
+  const n = x.lean.next[0] ?? ''
+  if (!isReview(n)) return isReview(w.text) ? { say: null } : null
   const m = /说[:：]\s*「([^」]+)」/.exec(n)
   return { say: m ? m[1] : null }
 }
@@ -272,7 +278,7 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
   const live = x ? x.sessions.find((s) => s.kind === 'local' && !s.error) ?? null : null
   const toBoard = (more: Partial<BoardEntry> = {}) => props.go({ kind: 'board', repo: entry.repo, key: entry.key, from: 'item', ...more })
   // 回交付总览: back when that is where it was opened from (its filters kept), else a move there
-  const toOverview = entry.from === 'overview' && onBack ? onBack : () => props.go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) })
+  const back = onBack ? { name: from, go: onBack } : { name: VIEW_NAME.overview, go: () => props.go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) }) }
   return (
     <main className="kt-root br-view cto-root cto-item br-detail" data-testid="br-detail">
       <style>{DETAIL_CSS}</style>
@@ -291,7 +297,7 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{from}</button>}
         </div>
       </div>
-      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} onOverview={toOverview} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
+      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} backName={back.name} onBack={back.go} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
       {x && (
         <Page x={x} board={board} live={live} entry={entry} props={props} opened={opened} localOnly={x.row.local_only ?? repoInfo?.remote === false}
           onOpened={(r) => { setOpened(r); after() }} after={after} toBoard={toBoard} />
@@ -489,9 +495,7 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
 }) {
   const navigate = useNavigate()
   const line = useCopy(now.line ?? '')
-  // Lean's next note says the line to say; without it, the waits' words still tell a review is next
-  const review = now.do === 'reply' ? reviewOf(x.lean.next) ?? (isReview(now.text) ? { say: null } : null) : null
-  const say = useCopy(review?.say ?? '')
+  const review = now.review
   const mine = now.who === 'you'
   const person = !['agent', 'runner', 'bridge', 'nobody'].includes(now.who)
   const waited = person && now.since ? fmtSpan(at - now.since) : null
@@ -535,15 +539,8 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
       if (review) {
         body = (
           <>
-            <p>Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审{review.say ? '，对它说：' : '。'}</p>
-            {review.say && (
-              <div className="br-now-say" data-testid="now-say">
-                <code>{review.say}</code>
-                <button type="button" className="kt-btn is-small" onClick={() => void say.copy()}><Icon name="Copy" size={13} />复制那一句</button>
-                {say.copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
-                {say.copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请手动选中</span>}
-              </div>
-            )}
+            <p>Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审。{REVIEW_SENDS}。</p>
+            {review.say && <ReviewSay say={review.say} />}
           </>
         )
         acts = <><ReviewButton repo={repo} reqKey={reqKey} liveSlot={live?.slot ?? null} worktree={x.row.worktree} />{openSession}</>
@@ -751,7 +748,7 @@ function ChecksCard({ board, localOnly, sent, blocked, onBoard }: {
   const ok = !!w && w.total > 0 && w.passed === w.total && !todo.length && !waiting.length
   const say = !w ? '看板的数据还没来'
     : w.total === 0 && !todo.length ? '还没有检查结果'
-      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed} 项都过`, waiting.length ? `${board && PERSON.has(board.row.waits.who) ? whoWord(board.row.waits.who, board.person.owner) : '等人'}：${waiting.join('、')}` : '',
+      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed === 1 ? '1 项过了' : `${w.passed} 项都过`}`, waiting.length ? `${board && PERSON.has(board.row.waits.who) ? whoWord(board.row.waits.who, board.person.owner) : '等人'}：${waiting.join('、')}` : '',
         watching.length ? `观察中：${watching.join('、')}` : '', todo.length ? `还剩 ${todo.join('、')}` : '']
         .filter(Boolean).join(' · ')
   return (
@@ -1099,9 +1096,8 @@ const PSEUDONYM = /^[A-Z]-[0-9A-F]{4,}$/
 
 /** An item of the timeline in words: the app's own records said plainly (no slot ids, commands or flags). */
 function itemText(it: TimelineItem): { label: string; detail: string | null; title: string | null } {
-  const reflect = /^brain reflect --apply( --push)?：(.+)$/.exec(it.label)
-  if (reflect) return { label: `回写 Brain${reflect[1] ? '并推送' : ''}：${reflect[2]}`, detail: it.detail ? `分支 ${it.detail}` : null, title: it.label }
-  if (it.label === '开了 brain-dev 会话') return { label: it.label, detail: it.detail?.includes('信任') ? '工具调用不用逐个批准' : null, title: it.detail }
+  // the write-back's detail is the branch it wrote
+  if (it.kind === 'app' && it.label.startsWith('回写 Brain') && it.detail) return { label: it.label, detail: `分支 ${it.detail}`, title: null }
   if (it.kind === 'commit' && it.detail && /^[0-9a-f]{7,40}$/.test(it.detail)) return { label: it.label, detail: it.detail.slice(0, 8), title: it.detail }
   if (it.detail && /^claim\/\S+ 推到 origin$/.test(it.detail)) return { label: it.label, detail: '认领推到了远端', title: it.detail }
   return { label: it.label, detail: it.detail ? it.detail.replace(/^工作区 /, '工作目录 ') : null, title: null }

@@ -143,8 +143,8 @@ function LanesAxis({ board, ax }: { board: ReqBoard; ax: Axis }) {
 
 const MARK_TITLE: Record<string, string> = {
   commit: '提交', approved: '批准', rejected: '退回', request: '请求批准', refused: '口令没被接受', blocked: 'Lean 拦下',
-  handover: '交接', accepted: '桥接手', signed: '签名', question: '问人', answer: '回答', 'verify-ok': 'verify 通过',
-  'verify-fail': 'verify 没过', reflect: '回写', session: '会话',
+  handover: '交接', accepted: '桥接手', signed: '签名', question: '问人', answer: '回答', 'verify-ok': '自动检查通过',
+  'verify-fail': '自动检查没过', reflect: '回写', session: '会话',
 }
 
 function spanWord(kind: string, wait: string) {
@@ -285,8 +285,8 @@ function Work({ a, board }: { a: Actor; board: ReqBoard }) {
       )}
       {commits.length > 0 && <Changes commits={commits} />}
       {verify.length > 0 && (
-        <div className="kt-owned" aria-label="verify 的结果">
-          <span className="kt-dim">verify</span>
+        <div className="kt-owned" aria-label="自动检查的结果">
+          <span className="kt-dim">自动检查</span>
           {verify.map((c) => <span key={c.id} className={`kt-owned-case is-${c.status}`} title={c.detail}>{c.label} {c.status === 'pass' ? '✓' : '✕'}</span>)}
         </div>
       )}
@@ -345,7 +345,11 @@ function Changes({ commits }: { commits: BeltItem[] }) {
           {show.map((f) => (
             <li key={f.path} title={`${f.path}  +${f.added} −${f.removed}`}>
               <span className={`kt-file-st is-${f.status}`}>{f.status}</span>
-              <span className="kt-file-path kt-mono">{f.path}</span>
+              {/* a narrow lane cuts the directory, never the file's own name */}
+              <span className="kt-file-path kt-mono is-split">
+                <span className="kt-file-dir">{f.path.slice(0, f.path.lastIndexOf('/') + 1)}</span>
+                <span className="kt-file-base">{f.path.slice(f.path.lastIndexOf('/') + 1)}</span>
+              </span>
               <span className="kt-file-bar" aria-hidden="true">
                 <i className="kt-bar-add" style={{ width: `${(f.added / scale) * 100}%` }} />
                 <i className="kt-bar-del" style={{ width: `${(f.removed / scale) * 100}%` }} />

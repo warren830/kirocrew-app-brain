@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MutableRefObject } from 'react'
 import type { Actor, ReqBoard, WaitDo } from '../types'
-import { DO_NAME } from '../vocab'
+import { ACT, DO_NAME } from '../vocab'
 import { Engine, type Item } from './engine'
 import { LIVE, WORKING, actorLabel, actorMeta, clip, fmtCredits, fmtWhen, isFinal, localOnly, waitsOnMe, whoWord } from './format'
 import { useLatest } from './hooks'
@@ -21,7 +21,7 @@ import { NODE_H, NODE_W, ORCH_BOX, ROSTER, anchorBox, commandPath, headX, partic
 import { Overlay } from './overlay'
 import { RoleGlyph, RoleIcon } from './RoleIcon'
 import { NodeCard } from './NodeCard'
-import { actorDo } from './next'
+import { actorDo, reviewNext } from './next'
 
 export type FlashMap = Record<string, { n: number; tone: string }>
 
@@ -144,7 +144,7 @@ export function ActorGraph({ board, lay, focus, onActor, flashes, reducedMotion,
                 mine={mine} who={who} onHover={(on) => hover(on ? a.key : null, on ? 300 : 250)} />
             })}
             {!quiet && mine && board.actors.filter((a) => a.status === 'awaiting_approval' && lay.nodes.get(a.key)).map((a) => (
-              <WaitChip key={`wait-${a.key}`} a={a} d={actorDo(a, board)} box={lay.nodes.get(a.key)!} onAct={onAct} />
+              <WaitChip key={`wait-${a.key}`} a={a} d={actorDo(a, board)} review={a.key === 'local' && reviewNext(board.row.waits)} box={lay.nodes.get(a.key)!} onAct={onAct} />
             ))}
           </g>
           <g className="kt-particles" aria-hidden="true" ref={particlesRef} />
@@ -500,9 +500,10 @@ function textWidthPx(t: string): number {
   return w
 }
 
-/** Under an actor that waits for the person: the step, named as everywhere (vocab DO_NAME); it takes them there. */
-function WaitChip({ a, d, box, onAct }: { a: Actor; d: WaitDo; box: NodeBox; onAct?: (key: string, d: WaitDo) => void }) {
-  const text = `✋ ${DO_NAME[d] || DO_NAME.answer}`
+/** Under an actor that waits for the person: the step, named as everywhere (vocab DO_NAME; a reply that is Lean's review
+ * in a new session is 开审查会话, as the step strip says); it takes them there. */
+function WaitChip({ a, d, review, box, onAct }: { a: Actor; d: WaitDo; review: boolean; box: NodeBox; onAct?: (key: string, d: WaitDo) => void }) {
+  const text = `✋ ${review && d === 'reply' ? ACT.review : DO_NAME[d] || DO_NAME.answer}`
   const go = () => onAct?.(a.key, d)
   return (
     <g className={`kt-gate-chip${onAct ? '' : ' is-static'}`} transform={`translate(${box.x},${box.y + NODE_H / 2 + 22})`} role={onAct ? 'button' : undefined}

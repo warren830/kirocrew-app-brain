@@ -157,6 +157,22 @@ export function MrDescCard({ m, bare = false }: { m: MrDesc; bare?: boolean }) {
   return <section className="br-card" aria-label="变更说明" data-testid="mr-desc">{body}</section>
 }
 
+/** The line 开审查会话 says to the new session (Lean's own words, English), folded: to copy for a session opened by hand. */
+export function ReviewSay({ say }: { say: string }) {
+  const c = useCopy(say)
+  return (
+    <details className="br-raw" data-testid="review-say">
+      <summary>细节：{ACT.review}对新会话说的那一句</summary>
+      <div className="br-now-say">
+        <code>{say}</code>
+        <button type="button" className="kt-btn is-small" onClick={() => void c.copy()}><Icon name="Copy" size={13} />复制那一句</button>
+        {c.copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
+        {c.copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请手动选中</span>}
+      </div>
+    </details>
+  )
+}
+
 /** 开审查会话: a new brain-dev session in the worktree that reviews the code (POST …/session {review}). */
 export function ReviewButton({ repo, reqKey, liveSlot, worktree }: { repo: string; reqKey: string; liveSlot: string | null; worktree: string | null }) {
   const api = useAppApi()

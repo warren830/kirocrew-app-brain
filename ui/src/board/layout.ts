@@ -97,7 +97,7 @@ export interface GraphLayout {
 export const PHASES: ReadonlyArray<{ key: string; n: string; title: string; sub: string; short: string }> = [
   { key: 'local', n: '1', title: '本机 · Lean', sub: 'brain-dev 会话 · 需求和设计审批', short: '本机' },
   { key: 'runner', n: '2', title: '交给运行机', sub: '交接 · 桥核对 · 签名 · 运行机做', short: '运行机' },
-  { key: 'check', n: '3', title: '检查 · 验收', sub: 'verify · 发布审批 · 验收', short: '检查' },
+  { key: 'check', n: '3', title: '检查 · 验收', sub: '自动检查 · 发布审批 · 验收', short: '检查' },
   { key: 'land', n: '4', title: '回写', sub: '合并以后 · 回写 Brain', short: '回写' },
 ]
 /** A folded phase's band. */

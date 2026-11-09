@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { fx } from '../test/data'
 import type { BeltItem, BoardEvent, ReqBoard } from '../types'
-import { diffBoards } from './diff'
+import { diffBoards, maxSeq } from './diff'
 
-// board.json (PAY-3): 21 events, the code-generation plan (PLAN) waits for the owner's approval
+// board.json (PAY-3): the code-generation plan (PLAN) waits for the owner's approval. N is the seq of the first event
+// the next poll brings.
 const REQ = 'r1/PAY-3'
 const AT = 1794146400
+const N = maxSeq(fx.board()) + 1
 const QUIET = { req: REQ, first: true, fresh: [], items: [], flashes: [], flips: [], belt: [], actors: [], announce: null }
 const NOTHING = { ...QUIET, first: false }
 
 function ev(over: Partial<BoardEvent> & Pick<BoardEvent, 'kind'>): BoardEvent {
-  return { seq: 22, at: AT, from: null, to: null, text: '', detail: false, src: null, ...over }
+  return { seq: N, at: AT, from: null, to: null, text: '', detail: false, src: null, ...over }
 }
 
 /** The next snapshot: a fresh copy of board.json with *change* made to it. */
@@ -46,7 +48,7 @@ describe('diffBoards: history, nothing animates', () => {
   })
 
   it('events that went backwards (a restart)', () => {
-    expect(diffBoards(fx.board(), after((b) => void (b.events = b.events.slice(0, 20))))).toEqual(QUIET)
+    expect(diffBoards(fx.board(), after((b) => void (b.events = b.events.slice(0, N - 2))))).toEqual(QUIET)
   })
 })
 
@@ -56,19 +58,19 @@ describe('diffBoards: one poll', () => {
   })
 
   it('only events after the last seen seq are fresh, in seq order', () => {
-    const next = after((b) => b.events.push(ev({ seq: 23, at: AT + 1, kind: 'stage', from: 'local', to: 'local' }), ev({ kind: 'stage', from: 'local', to: 'local' })))
-    expect(diffBoards(fx.board(), next).fresh.map((e) => e.seq)).toEqual([22, 23])
+    const next = after((b) => b.events.push(ev({ seq: N + 1, at: AT + 1, kind: 'stage', from: 'local', to: 'local' }), ev({ kind: 'stage', from: 'local', to: 'local' })))
+    expect(diffBoards(fx.board(), next).fresh.map((e) => e.seq)).toEqual([N, N + 1])
   })
 
   it('a fresh approval is a comet from 你 to its approval, with its word', () => {
     const d = diffBoards(fx.board(), after((b) => b.events.push(ev({ kind: 'approve', from: 'person', to: 'design', text: '你批准了代码生成计划' }))))
-    expect(d.items).toEqual([{ key: `${REQ}#22`, t: AT, kind: 'approve', from: 'orch', to: 'design', tone: 'pass', shape: 'comet', prio: 3, label: '批准' }])
+    expect(d.items).toEqual([{ key: `${REQ}#${N}`, t: AT, kind: 'approve', from: 'orch', to: 'design', tone: 'pass', shape: 'comet', prio: 3, label: '批准' }])
     expect(d.flashes).toEqual([])
   })
 
   it('a Lean stage is a spark on its node', () => {
     const d = diffBoards(fx.board(), after((b) => b.events.push(ev({ kind: 'stage', from: 'local', to: 'local', text: '做完「代码生成（refund-api）」' }))))
-    expect(d.items).toEqual([{ key: `${REQ}#22`, t: AT, kind: 'stage', from: 'local', to: 'local', tone: 'tool', shape: 'spark', prio: 0 }])
+    expect(d.items).toEqual([{ key: `${REQ}#${N}`, t: AT, kind: 'stage', from: 'local', to: 'local', tone: 'tool', shape: 'spark', prio: 0 }])
   })
 
   it('an event with no place on the graph is fresh but flies nothing', () => {
@@ -81,21 +83,21 @@ describe('diffBoards: one poll', () => {
 
   it('a 退回 bounces to its approval and flashes it red', () => {
     const d = diffBoards(fx.board(), after((b) => b.events.push(ev({ kind: 'reject', from: 'person', to: 'design', text: '你退回了代码生成计划' }))))
-    expect(d.items).toEqual([{ key: `${REQ}#22`, t: AT, kind: 'reject', from: 'orch', to: 'design', tone: 'bounce', shape: 'comet', prio: 3, label: '退回' }])
-    expect(d.flashes).toEqual([{ key: `${REQ}#22`, target: 'design', tone: 'bad', kind: 'reject' }])
+    expect(d.items).toEqual([{ key: `${REQ}#${N}`, t: AT, kind: 'reject', from: 'orch', to: 'design', tone: 'bounce', shape: 'comet', prio: 3, label: '退回' }])
+    expect(d.flashes).toEqual([{ key: `${REQ}#${N}`, target: 'design', tone: 'bad', kind: 'reject' }])
   })
 
   it('a blocked tool call is a cross on the node it happened on, which flashes red', () => {
     const d = diffBoards(fx.board(), after((b) => b.events.push(ev({ kind: 'blocked', from: 'local', to: 'local', text: 'Lean 拦下了写 src/refund/api.py' }))))
-    expect(d.items).toEqual([{ key: `${REQ}#22`, t: AT, kind: 'blocked', from: 'local', to: 'local', tone: 'danger', shape: 'cross', prio: 2 }])
-    expect(d.flashes).toEqual([{ key: `${REQ}#22`, target: 'local', tone: 'bad', kind: 'blocked' }])
+    expect(d.items).toEqual([{ key: `${REQ}#${N}`, t: AT, kind: 'blocked', from: 'local', to: 'local', tone: 'danger', shape: 'cross', prio: 2 }])
+    expect(d.flashes).toEqual([{ key: `${REQ}#${N}`, target: 'local', tone: 'bad', kind: 'blocked' }])
   })
 
   it('a failed verify flies from the run branch to the checks with its score and flashes them red', () => {
     const d = diffBoards(fx.board(), after((b) => b.events.push(ev({ kind: 'verify', from: 'branch', to: 'checks', text: 'verify 没过：pytest' }))))
     // board.json has one verify cell, not passed yet
-    expect(d.items).toEqual([{ key: `${REQ}#22`, t: AT, kind: 'verify', from: 'run', to: 'tests', tone: 'fail', shape: 'comet', prio: 3, label: '0/1' }])
-    expect(d.flashes).toEqual([{ key: `${REQ}#22`, target: 'tests', tone: 'bad', kind: 'verify' }])
+    expect(d.items).toEqual([{ key: `${REQ}#${N}`, t: AT, kind: 'verify', from: 'run', to: 'tests', tone: 'fail', shape: 'comet', prio: 3, label: '0/1' }])
+    expect(d.flashes).toEqual([{ key: `${REQ}#${N}`, target: 'tests', tone: 'bad', kind: 'verify' }])
   })
 
   it('a passing verify is green, carries the score, and flashes nothing red', () => {
@@ -111,23 +113,23 @@ describe('diffBoards: one poll', () => {
   it('an event more than lateS older than the snapshot is fresh but does not fly or flash', () => {
     const reject = (at: number) => ev({ at, kind: 'reject', from: 'person', to: 'design', text: '你退回了代码生成计划' })
     const late = diffBoards(fx.board(), after((b) => b.events.push(reject(AT - 31))), { at: AT, lateS: 30 })
-    expect(late.fresh.map((e) => e.seq)).toEqual([22])
+    expect(late.fresh.map((e) => e.seq)).toEqual([N])
     expect(late.items).toEqual([])
     expect(late.flashes).toEqual([])
     const justInTime = diffBoards(fx.board(), after((b) => b.events.push(reject(AT - 30))), { at: AT, lateS: 30 })
-    expect(justInTime.items.map((i) => i.key)).toEqual([`${REQ}#22`])
+    expect(justInTime.items.map((i) => i.key)).toEqual([`${REQ}#${N}`])
     expect(justInTime.flashes).toHaveLength(1)
   })
 
   it('over max items the most important stay, in the order they happened', () => {
     const next = after((b) => b.events.push(
-      ev({ seq: 22, at: AT, kind: 'commit', from: 'local', to: 'branch', text: '提交 1a2b3c4d：PAY-3：导出' }), // prio 2
-      ev({ seq: 23, at: AT + 1, kind: 'stage', from: 'local', to: 'local', text: '做完「代码生成」' }), // prio 0
-      ev({ seq: 24, at: AT + 2, kind: 'approve', from: 'person', to: 'design', text: '你批准了代码生成计划' }), // prio 3
+      ev({ seq: N, at: AT, kind: 'commit', from: 'local', to: 'branch', text: '提交 1a2b3c4d：PAY-3：导出' }), // prio 2
+      ev({ seq: N + 1, at: AT + 1, kind: 'stage', from: 'local', to: 'local', text: '做完「代码生成」' }), // prio 0
+      ev({ seq: N + 2, at: AT + 2, kind: 'approve', from: 'person', to: 'design', text: '你批准了代码生成计划' }), // prio 3
     ))
     const d = diffBoards(fx.board(), next, { max: 2 })
     expect(d.fresh).toHaveLength(3)
-    expect(d.items.map((i) => [i.key, i.prio])).toEqual([[`${REQ}#22`, 2], [`${REQ}#24`, 3]])
+    expect(d.items.map((i) => [i.key, i.prio])).toEqual([[`${REQ}#${N}`, 2], [`${REQ}#${N + 2}`, 3]])
   })
 
   it('the merge flashes every merged actor and the run branch green, once', () => {
@@ -180,8 +182,8 @@ describe('diffBoards: what the live region says', () => {
 
   it('the latest loud event, in its own words', () => {
     const next = after((b) => b.events.push(
-      ev({ seq: 22, kind: 'question', from: 'local', to: 'person', text: '停下问你：导出的时区' }),
-      ev({ seq: 23, at: AT + 1, kind: 'request', from: 'local', to: 'design', text: '请你批准代码生成计划（PLAN · 9c0ffee1）' }),
+      ev({ seq: N, kind: 'question', from: 'local', to: 'person', text: '停下问你：导出的时区' }),
+      ev({ seq: N + 1, at: AT + 1, kind: 'request', from: 'local', to: 'design', text: '请你批准代码生成计划（PLAN · 9c0ffee1）' }),
     ))
     expect(diffBoards(fx.board(), next).announce).toBe('请你批准代码生成计划（PLAN · 9c0ffee1）')
   })
@@ -190,8 +192,8 @@ describe('diffBoards: what the live region says', () => {
     const calm = diffBoards(fx.board(), after((b) => b.events.push(ev({ kind: 'approve', from: 'person', to: 'design', text: '你批准了代码生成计划' }))))
     expect(calm.announce).toBe('你批准了代码生成计划')
     const both = diffBoards(fx.board(), after((b) => b.events.push(
-      ev({ seq: 22, kind: 'approve', from: 'person', to: 'design', text: '你批准了代码生成计划' }),
-      ev({ seq: 23, at: AT + 1, kind: 'question', from: 'local', to: 'person', text: '停下问你：导出的时区' }),
+      ev({ seq: N, kind: 'approve', from: 'person', to: 'design', text: '你批准了代码生成计划' }),
+      ev({ seq: N + 1, at: AT + 1, kind: 'question', from: 'local', to: 'person', text: '停下问你：导出的时区' }),
     )))
     expect(both.announce).toBe('停下问你：导出的时区；你批准了代码生成计划')
   })
@@ -207,8 +209,8 @@ describe('diffBoards: what the live region says', () => {
 
   it('nothing for events nobody needs to be told about', () => {
     const next = after((b) => b.events.push(
-      ev({ seq: 22, kind: 'stage', from: 'local', to: 'local', text: '做完「代码生成」' }),
-      ev({ seq: 23, at: AT + 1, kind: 'commit', from: 'local', to: 'branch', text: '提交 1a2b3c4d：PAY-3：导出' }),
+      ev({ seq: N, kind: 'stage', from: 'local', to: 'local', text: '做完「代码生成」' }),
+      ev({ seq: N + 1, at: AT + 1, kind: 'commit', from: 'local', to: 'branch', text: '提交 1a2b3c4d：PAY-3：导出' }),
     ))
     const d = diffBoards(fx.board(), next)
     expect(d.fresh).toHaveLength(2)

@@ -30,7 +30,7 @@ import { EventFeed } from './EventFeed'
 import { BOARD_EXTRA_CSS } from './extra'
 import { WORKING } from './format'
 import { NextStep } from './NextStep'
-import { openHere } from './next'
+import { openHere, reviewNext } from './next'
 import { Intro, Kpis, TopBar } from './Header'
 import { ClockContext, useReducedMotion, type SnapshotClock } from './hooks'
 import { Lanes } from './Lanes'
@@ -158,11 +158,13 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
   const me = status?.repos.find((r) => r.id === entry.repo)?.me?.name ?? null
   const startable = !!board && entry.repo !== 'runner' && (board.person.me || !board.person.owner || !me)
   const toStart = () => go({ kind: 'new', repo: entry.repo, key: entry.key, ...(board?.row.title ? { title: board.row.title } : {}) })
-  // a node that waits for the person: the session for what is said or approved there, the step strip for the rest
+  // a node that waits for the person: the session for what is said or approved there, the step strip for the rest (a
+  // review is not said in the session that wrote the code: the strip has 开审查会话)
   const onAct = useCallback((key: string, d: WaitDo) => {
     const a = board?.actors.find((x) => x.key === key)
     const url = a?.session?.url ?? board?.actors.find((x) => x.key === 'local')?.session?.url
-    if ((d === 'reply' || d === 'tool') && url) return navigate(url)
+    const review = !!board && reviewNext(board.row.waits)
+    if (((d === 'reply' && !review) || d === 'tool') && url) return navigate(url)
     if (d === 'write_back') return toBrain()
     rootRef.current?.querySelector(d === 'accept' && !rootRef.current?.querySelector('#br-next') ? '#br-accept' : '#br-next')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
     setFocus(key)
@@ -191,7 +193,8 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
         </div>
         {live.missing && !board
           ? <NotFound repoName={status?.repos.find((r) => r.id === entry.repo)?.name ?? (entry.repo === 'runner' ? '运行机' : null)} reqKey={entry.key}
-              onOverview={() => go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) })} testId="br-board-missing" />
+              backName={onBack ? fromName : VIEW_NAME.overview} onBack={onBack ?? (() => go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) }))}
+              testId="br-board-missing" />
           : <LoadState loading={live.loading} error={live.error} has={!!board} />}
         {board && lay && (
           <>

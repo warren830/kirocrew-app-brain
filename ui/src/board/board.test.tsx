@@ -59,14 +59,14 @@ describe('需求看板', () => {
     expect(kpis.getByTestId('br-checks-counter')).toHaveTextContent('2/4')
     expect(kpis.getByTestId('br-checks-say')).toHaveTextContent('1 项没过')
     const lean = kpis.getByText('AI-DLC Lean').parentElement as HTMLElement
-    expect(lean).toHaveAccessibleName('AI-DLC Lean：做完 2 · 跳过 4 · 下一步：代码生成')
-    expect(within(lean).getByTestId('br-lean-counter')).toHaveTextContent('2做完 · 跳过 4')
+    expect(lean).toHaveAccessibleName('AI-DLC Lean：做完 4 · 跳过 4 · 下一步：代码生成')
+    expect(within(lean).getByTestId('br-lean-counter')).toHaveTextContent('4做完 · 跳过 4')
     expect(lean).toHaveTextContent('下一步：代码生成')
-    expect(lean).toHaveTextContent('批准 2退回 0拦下 1')
-    // the person's acts: 2 approvals, and the answer they decided (D-3) counts as a judgment point too
+    expect(lean).toHaveTextContent('批准 3退回 0拦下 1')
+    // the person's acts: 3 approvals, and the answer they decided (D-3) counts as a judgment point too
     const people = kpis.getByText('人介入').parentElement as HTMLElement
-    expect(people).toHaveTextContent('3次')
-    expect(people).toHaveTextContent('判断点上 3（审批 2 · 回答 1） · 判断点之外 0')
+    expect(people).toHaveTextContent('4次')
+    expect(people).toHaveTextContent('判断点上 4（审批 3 · 回答 1） · 判断点之外 0')
     // 1 of the 10 actors is through (需求审批); 本机会话, 设计审批 and the question answerable here wait for the person
     expect(kpis.getByTestId('br-steps-counter')).toHaveTextContent(`1/${b.actors.length}`)
     expect(kpis.getByText('· 3 个等你', { exact: false })).toBeInTheDocument()
@@ -130,7 +130,7 @@ describe('需求看板', () => {
     expect(within(card).getByTestId('accept-first')).toHaveTextContent(b.mr_desc.first as string)
     // the same sentence as the counter's, not a second count
     expect(within(card).getByTestId('accept-checks')).toHaveTextContent('1 项没过')
-    expect(card).toHaveTextContent('人 1Brain 条目（引用） 2没归类（「谁定的」没按规定写） 1')
+    expect(card).toHaveTextContent('人 1照 Brain 2没归类（「谁定的」没按规定写） 1')
     expect(card).not.toHaveTextContent('Who')
     expect(card).toHaveTextContent('金额列带币种，单独一列 currency（一位组员）')
     expect(card).not.toHaveTextContent('P-1A2B')
@@ -298,20 +298,20 @@ describe('需求看板', () => {
     const groups = within(wall).getAllByRole('group')
     const present = CELL_GROUPS.filter((g) => b.checks.cells.some((c) => c.group === g.key))
     expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(present.map((g) => g.label))
-    expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['Lean 审批', 'verify', '交接', 'Brain 和仓库'])
+    expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['Lean 审批', '自动检查', '交接', 'Brain 和仓库'])
     present.forEach((g, i) => {
       const cells = within(groups[i]).getAllByTestId('kt-cell')
       expect(cells.map((c) => [c.dataset.case, c.dataset.status])).toEqual(b.checks.cells.filter((c) => c.group === g.key).map((c) => [c.id, c.status]))
     })
     // nothing hovered: the one that failed
     const inspect = within(wall).getByTestId('kt-inspect')
-    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、verify · 没过的是 引用')
+    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、自动检查 · 没过的是 引用')
     const plan = b.checks.cells.find((c) => c.id === 'gate-PLAN')!
     const cell = within(wall).getByRole('button', { name: `${plan.name}：等你，${plan.detail}` })
     fireEvent.focus(cell)
     expect(inspect).toHaveTextContent(`✋ ${plan.name}${plan.detail}`)
     fireEvent.blur(cell)
-    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、verify · 没过的是 引用')
+    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、自动检查 · 没过的是 引用')
   })
 
   test('the event feed: the trace newest first; Lean 细节 hides the many quiet steps', async () => {
@@ -449,6 +449,12 @@ describe('需求看板', () => {
     fireEvent.click(within(card).getByRole('button', { name: '回交付总览' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'overview', repo: 'r1' })
     expect(boardCalls({ repo: 'r1', key: 'PAY-9' })).toHaveLength(1)
+    cleanup()
+    // opened from 待办: back there, as the crumb says
+    const back = vi.fn()
+    renderBoard({ repo: 'r1', key: 'PAY-9', from: 'todo' }, {}, back)
+    fireEvent.click(within(await screen.findByRole('region', { name: '没有这个需求' })).getByRole('button', { name: '回待办' }))
+    expect(back).toHaveBeenCalledTimes(1)
   })
 
   test('a backend without the /board route (a 404 without an error body) is the same missing state', async () => {
@@ -478,7 +484,7 @@ const H = 3600
 function idle(): ReqBoard {
   const b = fx.board()
   const since = b.at - 11 * H - 30 * 60
-  b.row.waits = { who: 'you', text: '会话空着：轮到你回话', line: null, raw: '', do: 'reply', since, where: 'session' }
+  b.row.waits = { who: 'you', text: '会话空着：轮到你回话', line: null, raw: '', do: 'reply', since, where: 'session', review: false }
   b.row.lean = { ...b.row.lean, stage: 'release', stage_label: '发布', stage_n: 11, stage_state: 'todo', done: 10, done_n: 4, skipped_n: 6, next: { id: 'release', label: '发布', n: 11 } }
   b.accept.step = { text: '构建和测试做完了，下一步是发布：在会话里让它接着做', who: '你', line: null, mr_url: null, session_url: '/chat?sid=brain-PAY-3-7f3a' }
   b.questions = []
@@ -633,16 +639,33 @@ describe('需求看板 · 轮到谁、做什么', () => {
     expect(strip).not.toHaveTextContent('已经等了')
   })
 
-  test('an idle session whose Lean says a review in a new session comes next: that step, 开审查会话 right there', async () => {
+  test('an idle session whose next step is Lean’s review in a new session: that step, 开审查会话 right there, the line it says folded', async () => {
+    const said = 'Review intent 261107-refund-export against its requirements, design and plans, using the diff, and write construction/build-and-test/review.md.'
     const b = idle()
-    b.row.waits = { ...b.row.waits, text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）' }
-    b.accept.step = { ...b.accept.step, line: '接着做下一步：发布' }
+    b.row.waits = { ...b.row.waits, text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', review: false }
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    await loaded()
+    // the backend's judgment, not the words
+    expect(within(region('你要做的一步')).queryByRole('button', { name: '开审查会话' })).toBeNull()
+    cleanup()
+    b.row.waits.review = true
+    b.accept.step = { ...b.accept.step, line: said }
     installFixtureRoutes({ ...boardRoute(() => structuredClone(b)), [`POST ${API}/requirements/r1/PAY-3/session`]: () => ({ ok: true, slot: 'brain-PAY-3-r2', url: '/chat?sid=brain-PAY-3-r2' }) })
     renderBoard()
     await loaded()
     const strip = region('你要做的一步')
     expect(strip).toHaveTextContent('先开一个新会话做审查（这个会话写了代码，不能自己审）')
+    expect(strip).toHaveTextContent('开审查会话会把 Lean 的审查要求发给新会话')
     expect(within(strip).queryByTestId('type-line')).toBeNull()
+    const fold = within(strip).getByTestId('review-say')
+    expect(fold.tagName).toBe('DETAILS')
+    expect(fold).toHaveTextContent(`细节：开审查会话对新会话说的那一句${said}`)
+    fireEvent.click(within(fold).getByRole('button', { name: '复制那一句' }))
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(said))
+    // the chip under the session names the same step and brings the strip, not the session that wrote the code
+    fireEvent.click(within(screen.getByTestId('kt-graph')).getByRole('button', { name: '本机会话：开审查会话' }))
+    expect(navigations).toEqual([])
     fireEvent.click(within(strip).getByRole('button', { name: '开审查会话' }))
     await waitFor(() => expect(apiCalls.find((c) => c.method === 'POST')).toMatchObject({ body: { trust: true, kickoff: true, review: true } }))
     await waitFor(() => expect(navigations).toEqual(['/chat?sid=brain-PAY-3-r2']))
@@ -721,37 +744,38 @@ describe('需求看板 · 轮到谁、做什么', () => {
   })
 
   test('the lanes show what each one changed: the files and their lines, the commits', async () => {
-    const b = fx.board()
-    const [records, skeleton, csv] = b.belt
-    records.changes = [{ path: 'aidlc-docs/261107-refund-export/aidlc-state.md', added: 12, removed: 0, status: 'A' }]
-    skeleton.changes = [
-      { path: 'src/export/__init__.py', added: 4, removed: 0, status: 'A' }, { path: 'src/export/api.py', added: 60, removed: 0, status: 'A' },
-      { path: 'tests/test_export_api.py', added: 40, removed: 0, status: 'A' }, { path: 'src/refund/routes.py', added: 9, removed: 3, status: 'M' },
-    ]
-    csv.changes = [
-      { path: 'src/export/csv.py', added: 120, removed: 0, status: 'A' }, { path: 'src/export/api.py', added: 18, removed: 6, status: 'M' },
-      { path: 'tests/test_export_csv.py', added: 8, removed: 9, status: 'M' },
-    ]
-    installFixtureRoutes(boardRoute(() => structuredClone(b)))
-    renderBoard()
-    await loaded()
-    const lane = screen.getAllByTestId('kt-lane').find((l) => l.dataset.role === 'local') as HTMLElement
-    const changes = within(lane).getByTestId('kt-changes')
-    // a file two commits changed is one row, its lines summed
-    expect(changes.querySelector('.kt-files-head')).toHaveTextContent('改动+271−187 个文件 · 提交 3 次')
-    expect(changes.querySelector('.kt-files li .kt-file-path')).toHaveTextContent('src/export/csv.py')
-    expect(changes).toHaveTextContent('还有 2 个文件')
-    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent('d98cdc55PAY-3：CSV 字段和金额格式')
-  })
-
-  test('a backend that read no files: each commit says how many files it changed', async () => {
     installFixtureRoutes()
     renderBoard()
     await loaded()
     const lane = screen.getAllByTestId('kt-lane').find((l) => l.dataset.role === 'local') as HTMLElement
     const changes = within(lane).getByTestId('kt-changes')
-    expect(changes.querySelector('.kt-files-head')).toHaveTextContent(/^改动提交 3 次$/)
-    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent('e7e3cc10PAY-3：需求初稿2 个文件 · 只改记录')
+    const head = changes.querySelector('.kt-files-head') as HTMLElement
+    expect(head.querySelector('.kt-add')).toHaveTextContent(/^\+323$/)
+    expect(head.querySelector('.kt-del')).toHaveTextContent(/^−21$/)
+    expect(head).toHaveTextContent('7 个文件 · 提交 4 次')
+    // a file two commits changed is one row, its lines summed; the biggest first, five shown
+    const rows = Array.from(changes.querySelectorAll<HTMLElement>('.kt-files li:not(.kt-more)'))
+    expect(rows.map((r) => r.querySelector('.kt-file-path')!.textContent)).toEqual([
+      'aidlc-docs/261107-refund-export/audit.md', 'aidlc-docs/261107-refund-export/inception/application-design/application-design.md',
+      'src/refund/api.py', 'tests/test_refund.py', 'src/refund/jobs.py',
+    ])
+    expect(rows[0]).toHaveTextContent('+104 −14')
+    expect(rows[3]).toHaveTextContent('+31 −7')
+    expect(changes).toHaveTextContent('还有 2 个文件')
+    // the newest commits, newest first
+    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent(/^61ddbc30PAY-3：refund-api 的代码计划193239b7PAY-3：refund-export：分批写 CSV93b2dea5PAY-3：导出接口的骨架还有 1 次提交/)
+  })
+
+  test('a backend that read no files: each commit says how many files it changed', async () => {
+    const b = fx.board()
+    for (const x of b.belt) delete x.changes
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    await loaded()
+    const lane = screen.getAllByTestId('kt-lane').find((l) => l.dataset.role === 'local') as HTMLElement
+    const changes = within(lane).getByTestId('kt-changes')
+    expect(changes.querySelector('.kt-files-head')).toHaveTextContent(/^改动提交 4 次$/)
+    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent('61ddbc30PAY-3：refund-api 的代码计划1 个文件 · 只改记录')
   })
 
   test('small words: one credits number everywhere, 运行记录里的合计 without sessions; +N for more Brain entries; one verify round is said, not drawn', async () => {
@@ -769,7 +793,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     expect(region('验收')).toHaveTextContent('花了多少37.0 credits · 运行记录里的合计')
     expect(within(graph).getByTestId('kt-roster')).toHaveTextContent('+2 条')
     expect(region('检查墙').querySelector('.kt-spark')).toBeNull()
-    expect(region('检查墙')).toHaveTextContent('verify 跑了 1 次：3 项过了')
+    expect(region('检查墙')).toHaveTextContent('自动检查跑了 1 次：3 项过了')
     const first = within(region('验收')).getByTestId('accept-first')
     expect(first).toHaveTextContent('给 calc.py 加乘法')
     expect(within(first).getByText('calc.py').tagName).toBe('CODE')

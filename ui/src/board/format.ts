@@ -60,7 +60,7 @@ export const EVENT_META: Record<BoardEventKind, { icon: string; label: string; t
   signed: { icon: '🔏', label: '签名', tone: 'handoff' },
   question: { icon: '❓', label: '问人', tone: 'approve' },
   answer: { icon: '💬', label: '回答', tone: 'ok' },
-  verify: { icon: '🧪', label: 'verify', tone: 'info' },
+  verify: { icon: '🧪', label: '自动检查', tone: 'info' },
   merge: { icon: '⤵️', label: '合并', tone: 'ok' },
   reflect: { icon: '📚', label: '回写 Brain', tone: 'ok' },
   session: { icon: '💻', label: '会话', tone: 'run' },
@@ -153,7 +153,7 @@ export function eventTouches(e: { from: string | null; to: string | null }, key:
 /** The cell groups of the check wall, in wall order. */
 export const CELL_GROUPS: { key: string; label: string }[] = [
   { key: 'gate', label: 'Lean 审批' },
-  { key: 'verify', label: 'verify' },
+  { key: 'verify', label: '自动检查' },
   { key: 'handover', label: '交接' },
   { key: 'brain', label: 'Brain 和仓库' },
   { key: 'after', label: '合并以后' },
@@ -207,25 +207,30 @@ export function leanOf(l: LeanSummary): LeanNow {
 
 const STAGES = Object.entries(STAGE_NAME)
 
-/** Lean's progress as its stage events tell it up to *t* (回放): a stage done or skipped (each unit's counts once). */
+/** Lean's progress as its stage events tell it up to *t* (回放), read the way the backend reads Lean's ledger
+ * (backend/core/lean_view.py stages, summary), so the replay ends on the live board's numbers: each stage's state from
+ * the latest word on each of its units (any started: started; all skipped: skipped; else done); a stage Lean went past
+ * without a word (a later one is recorded) is skipped; the next is the furthest started, else the first left to do. */
 export function leanFromEvents(events: ReadonlyArray<{ kind: string; at: number; text: string }>, t: number, total = 11): LeanNow {
-  const done = new Set<string>()
-  const skipped = new Set<string>()
-  let open: string | null = null
+  const last = new Map<string, Map<string, string>>()
   for (const e of events) {
     if (e.kind !== 'stage' || e.at > t) continue
-    const m = /^(开始|做完|跳过)「([^」（]+)/.exec(e.text)
+    const m = /^(开始|做完|跳过)「([^」（]+)(?:（([^）]*)）)?」/.exec(e.text)
     if (!m) continue
-    const label = m[2]
-    if (m[1] === '开始') open = label
-    else (m[1] === '做完' ? done : skipped).add(label)
-    if (m[1] !== '开始' && open === label) open = null
+    const units = last.get(m[2]) ?? new Map<string, string>()
+    units.set(m[3] ?? '', m[1])
+    last.set(m[2], units)
   }
-  // the stage at work is the next one; else the first, in Lean's order, neither done nor skipped
-  const at = open !== null ? STAGES.findIndex(([, label]) => label === open) : -1
-  const i = at >= 0 ? at : STAGES.findIndex(([, label]) => !done.has(label) && !skipped.has(label))
+  const said = STAGES.map(([, label]) => {
+    const s = [...(last.get(label)?.values() ?? [])]
+    return !s.length ? 'todo' : s.includes('开始') ? 'started' : s.every((x) => x === '跳过') ? 'skipped' : 'done'
+  })
+  const end = said.reduce((n, s, i) => (s !== 'todo' ? i : n), -1)
+  const state = said.map((s, i) => (s === 'todo' && i < end ? 'skipped' : s))
+  const at = state.lastIndexOf('started')
+  const i = at >= 0 ? at : state.indexOf('todo')
   const next = i < 0 ? null : { id: STAGES[i][0], label: STAGES[i][1], n: i + 1 }
-  return { done_n: done.size, skipped_n: skipped.size, next, total, started: at >= 0 }
+  return { done_n: state.filter((s) => s === 'done').length, skipped_n: state.filter((s) => s === 'skipped').length, next, total, started: at >= 0 }
 }
 
 export interface ChecksSay {

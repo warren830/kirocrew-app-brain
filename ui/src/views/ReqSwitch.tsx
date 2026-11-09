@@ -59,14 +59,15 @@ export function ReqSwitch({ repo, reqKey, status, onPick, pollMs }: {
 }
 
 /** A requirement its repo does not have (需求详情, 需求看板): which repo, what may have happened, and what to do. */
-export function NotFound({ repoName, reqKey, onOverview, testId }: { repoName: string | null; reqKey: string; onOverview: () => void; testId: string }) {
+/** *backName* / *onBack*: the way back the crumb names (the view it was opened from, else 交付总览). */
+export function NotFound({ repoName, reqKey, backName, onBack, testId }: { repoName: string | null; reqKey: string; backName: string; onBack: () => void; testId: string }) {
   return (
     <section className="cto-card br-notfound" aria-label="没有这个需求" data-testid={testId}>
       <h3>{repoName ? `${repoName} 仓库里没有 ${reqKey}` : `没有找到 ${reqKey}`}</h3>
       <p className="cto-desc">它可能已经关闭，或者在别的仓库里。</p>
-      <p className="br-hint">做什么：在上面「切换需求」里换一个，或者回交付总览找。</p>
+      <p className="br-hint">做什么：在上面「切换需求」里换一个，或者回{backName}找。</p>
       <div className="br-row" style={{ marginTop: 10 }}>
-        <button type="button" className="kt-btn is-primary" onClick={onOverview}>回交付总览</button>
+        <button type="button" className="kt-btn is-primary" onClick={onBack}>回{backName}</button>
       </div>
     </section>
   )

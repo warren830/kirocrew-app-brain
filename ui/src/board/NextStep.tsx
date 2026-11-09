@@ -9,7 +9,7 @@ import { useNavigate } from '@kirocrew/app-sdk'
 import type { ReqBoard } from '../types'
 import { ExtLink, Icon, TYPE_IT_YOURSELF } from '../ui'
 import { ACT, DO_NAME } from '../vocab'
-import { QuestionCard, ReviewButton } from '../views/Question'
+import { QuestionCard, ReviewButton, ReviewSay } from '../views/Question'
 import { fmtSpan } from './format'
 import { useServerNow } from './hooks'
 import { nextOf, type Step } from './next'
@@ -121,6 +121,7 @@ function StepRow({ s, onBrain, onDetail, repo, reqKey, board }: { s: Step; onBra
         {s.hint && <p className="br-next-hint">{s.hint}</p>}
         {s.command && <Command cmd={s.command} />}
         {s.line && <LineRow line={s.line} session={s.session ?? null} />}
+        {s.say && <ReviewSay say={s.say} />}
         {s.raw && (
           <details className="br-raw">
             <summary>细节</summary>

@@ -35,15 +35,15 @@ export function CheckWall({ board, focus, onActor, flips, onSettings }: {
       </header>
       {w.history.length > 1 && (
         <div className="kt-spark-row">
-          <span title="每跑一次 verify 记一个点">verify 通过数</span>
+          <span title="每跑一次自动检查记一个点">自动检查通过数</span>
           <Sparkline history={w.history} />
         </div>
       )}
       {w.history.length === 1 && (
-        <p className="kt-dim br-small br-spark-one">verify 跑了 1 次：{w.history[0].passed} 项过了{w.history[0].failed ? `，${w.history[0].failed} 项没过` : ''}</p>
+        <p className="kt-dim br-small br-spark-one">自动检查跑了 1 次：{w.history[0].passed} 项过了{w.history[0].failed ? `，${w.history[0].failed} 项没过` : ''}</p>
       )}
       {w.cells.length === 0 ? (
-        <p className="kt-dim kt-wall-empty">还没有检查：开工以后，Lean 的审批和 verify 都会记在这里</p>
+        <p className="kt-dim kt-wall-empty">还没有检查：开工以后，Lean 的审批和自动检查都会记在这里</p>
       ) : (
         <div className="kt-wall-grid">
           {CELL_GROUPS.map((g) => {
@@ -121,7 +121,7 @@ export function Sparkline({ history }: { history: Wall['history'] }) {
   const last = history[history.length - 1]
   const area = `${d} V${H - 5} H${x(history[0].at).toFixed(1)} Z`
   return (
-    <svg className="kt-spark" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`verify 通过数：${history.map((h) => `${h.passed}/${h.passed + h.failed}`).join(' → ')}`}>
+    <svg className="kt-spark" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`自动检查通过数：${history.map((h) => `${h.passed}/${h.passed + h.failed}`).join(' → ')}`}>
       <line className="kt-spark-total" x1={0} x2={W} y1={y(max)} y2={y(max)} />
       <path className="kt-spark-area" d={area} />
       <path className="kt-spark-line" d={d} />

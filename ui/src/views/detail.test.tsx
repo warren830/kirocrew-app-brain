@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ItemEntry } from '../nav'
@@ -103,18 +103,23 @@ describe('需求详情', () => {
     noLineSent()
   })
 
-  test('此刻 when it is your turn and Lean’s next step is a review: what to say, 复制那一句, 开审查会话 opens a new session', async () => {
-    const said = '审查 intent 261107-refund-export：对照 requirements.md，把结果写进 review.md'
+  test('此刻 when it is your turn and Lean’s next step is a review: 开审查会话 opens a new session; the line it says folded, 复制那一句', async () => {
+    const said = 'Review intent 261107-refund-export against its requirements, design and plans, using the diff, and write construction/build-and-test/review.md.'
+    const b = fx.board()
+    b.accept.step = { ...b.accept.step, text: '会话空着，轮到你回话。\n先开一个新会话做审查（这个会话写了代码，不能自己审），审查写好再回这个会话接着发布', line: said }
     withDetail((d) => {
-      d.row.waits = { who: 'you', text: '会话空着：轮到你回话', line: null, raw: '', do: 'reply', since: AT - 11 * 3600, where: 'session' }
+      d.row.waits = { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: AT - 11 * 3600, where: 'session', review: true }
       d.sessions[0].awaiting = false
-      d.lean.next = [`owner 开一个新会话做审查（这个会话写了代码，不能自己审）。对新会话说：「${said}」。`, '回到这里读 review.md']
-    }, { [`POST ${API}/requirements/r1/PAY-3/session`]: () => ({ ok: true, slot: 'brain-PAY-3-rev1', url: '/chat?sid=brain-PAY-3-rev1' }) })
+    }, {
+      [`GET ${API}/board/*`]: () => structuredClone(b),
+      [`POST ${API}/requirements/r1/PAY-3/session`]: () => ({ ok: true, slot: 'brain-PAY-3-rev1', url: '/chat?sid=brain-PAY-3-rev1' }),
+    })
     renderDetail()
     const bar = await screen.findByRole('region', { name: '此刻' })
     await waitFor(() => expect(bar).toHaveTextContent('已等 11 小时'))
-    expect(bar).toHaveTextContent('Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审，对它说：')
-    expect(within(bar).getByTestId('now-say')).toHaveTextContent(said)
+    expect(bar).toHaveTextContent('Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审。开审查会话会把 Lean 的审查要求发给新会话。')
+    await waitFor(() => expect(within(bar).getByTestId('review-say')).toHaveTextContent(said))
+    expect(within(bar).getByTestId('review-say').tagName).toBe('DETAILS')
     fireEvent.click(within(bar).getByRole('button', { name: '复制那一句' }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(said))
     expect(within(bar).getByRole('button', { name: '打开会话' })).toBeInTheDocument()
@@ -127,8 +132,7 @@ describe('需求详情', () => {
   test('开审查会话 that only gets the old session back says so and stays here', async () => {
     const user = userEvent.setup()
     withDetail((d) => {
-      d.row.waits = { who: 'you', text: '会话空着：轮到你回话', line: null, raw: '', do: 'reply', since: null, where: 'session' }
-      d.lean.next = ['owner 开一个新会话做审查。对新会话说：「审查 intent 261107-refund-export」。']
+      d.row.waits = { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: null, where: 'session', review: true }
     }, { [`POST ${API}/requirements/r1/PAY-3/session`]: () => ({ ok: true, slot: 'brain-PAY-3-7f3a', url: '/chat?sid=brain-PAY-3-7f3a' }) })
     renderDetail()
     const bar = await screen.findByRole('region', { name: '此刻' })
@@ -190,7 +194,7 @@ describe('需求详情', () => {
     expect(within(bar).queryByRole('button')).toBeNull()
   })
 
-  test('此刻 when the waits say a review in a new session is next, without Lean’s note: 开审查会话 all the same', async () => {
+  test('an older backend without waits.review: its words still tell a review in a new session is next; 开审查会话 all the same', async () => {
     withDetail((d) => {
       d.row.waits = { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: AT - 3600, where: 'session' }
       d.sessions[0].awaiting = false
@@ -200,6 +204,7 @@ describe('需求详情', () => {
     const bar = await screen.findByRole('region', { name: '此刻' })
     expect(within(bar).getByRole('button', { name: '开审查会话' })).toBeInTheDocument()
     expect(bar).toHaveTextContent('Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审。')
+    expect(within(bar).queryByTestId('review-say')).toBeNull()
   })
 
   test('此刻 for a refused hand-over: what to do, 打开会话, the bridge’s own words folded under 细节', async () => {
@@ -264,17 +269,27 @@ describe('需求详情', () => {
     })
   })
 
-  test('a requirement that is not there: which repo, what to do, back to 交付总览; no HTTP code, no 需求看板', async () => {
+  test('a requirement that is not there: which repo, what to do, back where it was opened from (as the crumb); no HTTP code, no 需求看板', async () => {
     installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => { throw apiError(404, 'not_found', '没有这个需求') } })
-    const { go } = renderDetail({ repo: 'r1', key: 'PAY-99', from: 'todo' })
+    const { go, onBack } = renderDetail({ repo: 'r1', key: 'PAY-99', from: 'todo' })
     const card = await screen.findByRole('region', { name: '没有这个需求' })
     expect(card).toHaveTextContent('shop-pay 仓库里没有 PAY-99')
-    expect(card).toHaveTextContent('做什么：在上面「切换需求」里换一个，或者回交付总览找。')
+    expect(card).toHaveTextContent('做什么：在上面「切换需求」里换一个，或者回待办找。')
     expect(document.body).not.toHaveTextContent('404')
     expect(screen.queryByRole('button', { name: '需求看板 ↗' })).toBeNull()
-    fireEvent.click(within(card).getByRole('button', { name: '回交付总览' }))
-    expect(go).toHaveBeenCalledWith({ kind: 'overview', repo: 'r1' })
+    fireEvent.click(within(card).getByRole('button', { name: '回待办' }))
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(go).not.toHaveBeenCalled()
     expect(apiCalls.find((c) => !c.path.startsWith(`${API}/overview`))?.path).toBe(`${API}/requirements/r1/PAY-99`)
+    cleanup()
+    renderDetail({ repo: 'runner', key: 'PAY-99', from: 'team' })
+    expect(within(await screen.findByRole('region', { name: '没有这个需求' })).getByRole('button', { name: '回运行机' })).toBeInTheDocument()
+    cleanup()
+    // opened with no way back (a link): 交付总览
+    const go2 = vi.fn()
+    render(<DetailView entry={{ repo: 'r1', key: 'PAY-99' }} status={fx.status()} go={go2} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} pollMs={60_000} />)
+    fireEvent.click(within(await screen.findByRole('region', { name: '没有这个需求' })).getByRole('button', { name: '回交付总览' }))
+    expect(go2).toHaveBeenCalledWith({ kind: 'overview', repo: 'r1' })
   })
 
   test('another error answer still shows errorText', async () => {
@@ -609,18 +624,22 @@ describe('需求详情', () => {
     const { go } = renderDetail()
     const card = await screen.findByRole('region', { name: '价值流' })
     expect(apiCalls.map((c) => c.path).filter((p) => !p.startsWith(`${API}/overview`))).toEqual([`${API}/requirements/r1/PAY-3`, `${API}/board/r1/PAY-3`])
-    // board.json: the local session works, waits at the REQUIREMENTS and DESIGN approvals, works, then waits in the session
-    // (the question) and at the pending PLAN; the gaps after each approval have nothing recorded
-    const parts = ['AI 在本机做 31 分钟', '需求审批 21 分钟', 'AI 在本机做 44 分钟', '设计审批 25 分钟', 'AI 在本机做 25 小时 39 分', '会话等人 14 分钟', '设计审批 6 分钟']
+    // board.json: the local session works and waits at the approvals (the 设计审批 node also asks for each code-generation
+    // plan: the part says which), waits overnight for the person's reply, works, then waits in the session (the question)
+    // and at the second plan; the gaps after each approval have nothing recorded
+    const parts = [
+      'AI 在本机做 31 分钟', '需求审批 21 分钟', 'AI 在本机做 44 分钟', '设计审批 25 分钟', 'AI 在本机做 48 分钟', '代码生成计划审批 17 分钟',
+      'AI 在本机做 58 分钟', '会话等人 18 小时 56 分', 'AI 在本机做 4 小时 40 分', '会话等人 14 分钟', '代码生成计划审批 6 分钟',
+    ]
     const chart = within(card).getByRole('group', { name: /^价值流：/ })
     expect(chart).toHaveAttribute('aria-label', '价值流：' + parts.join('，'))
     const segs = within(chart).getAllByRole('button').filter((b) => parts.includes(b.getAttribute('aria-label')!))
     expect(segs.map((b) => b.getAttribute('aria-label'))).toEqual(parts)
     expect(card).toHaveTextContent('从开工到此刻，共 28 小时')
-    expect(chart).toHaveTextContent('25 小时 39 分')
-    // the moments: the start, the approvals and the question, not the requests, stages or commits
-    expect(within(chart).getAllByTestId('vs-moment')).toHaveLength(4)
-    for (const t of ['开工', '你批准了需求', '你批准了设计', '停下问你：澄清']) expect(chart).toHaveTextContent(t)
+    expect(chart).toHaveTextContent('18 小时 56 分')
+    // the moments: the start, the approvals, the reply and the question, not the requests, stages or commits
+    expect(within(chart).getAllByTestId('vs-moment')).toHaveLength(6)
+    for (const t of ['开工', '你批准了需求', '你批准了设计', '你批准了代码生成计划', '你在会话里回话了', '停下问你：澄清']) expect(chart).toHaveTextContent(t)
     expect(chart).not.toHaveTextContent('请你批准')
     // the legend lists only the parts there are
     expect(within(card).queryByText('运行机在做')).toBeNull()
@@ -647,10 +666,12 @@ describe('需求详情', () => {
     const card = await screen.findByRole('region', { name: '价值流' })
     fireEvent.click(within(within(card).getByRole('group', { name: '图或表格' })).getByRole('button', { name: '表格' }))
     const rows = within(within(card).getByRole('table', { name: '价值流的每一段' })).getAllByRole('row').slice(1)
-    expect(rows).toHaveLength(7)
+    expect(rows).toHaveLength(11)
+    expect(rows[0]).toHaveTextContent('AI（本机会话）31 分钟')
     expect(rows[1]).toHaveTextContent('需求审批人21 分钟批准')
     expect(rows[3]).toHaveTextContent('设计审批人25 分钟批准')
-    expect(rows[0]).toHaveTextContent('AI（本机会话）31 分钟')
+    expect(rows[5]).toHaveTextContent('代码生成计划审批人17 分钟批准')
+    expect(rows[7]).toHaveTextContent('会话等人人18 小时 56 分回答了')
   })
 
   test('a merged requirement: nothing after the merge counts (the write-back wait is not the delivery’s); ▶ 回放 ↗', async () => {
@@ -739,7 +760,7 @@ describe('需求详情', () => {
     renderDetail()
     const card = await screen.findByRole('article', { name: '检查' })
     // it waits on the person looking: 等你, as everywhere
-    await waitFor(() => expect(within(card).getByTestId('checks-say')).toHaveTextContent('没过：引用的 Brain 条目 · 等你：代码生成计划审批 · 还剩 发布审批、verify'))
+    await waitFor(() => expect(within(card).getByTestId('checks-say')).toHaveTextContent('没过：引用的 Brain 条目 · 等你：代码生成计划审批 · 还剩 发布审批、自动检查'))
     expect(card).toHaveTextContent('查的是：Lean 审批 · Brain')
     expect(card).toHaveClass('is-bad')
   })
@@ -756,6 +777,16 @@ describe('需求详情', () => {
     expect(card).not.toHaveClass('is-ok')
     fireEvent.click(within(card).getByRole('button', { name: '在需求看板的检查墙上看每一项' }))
     expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item', focus: 'checks' })
+  })
+
+  test('检查 with one check so far says it as the board does: 1 项过了, not 都过', async () => {
+    const b = fx.board()
+    b.checks.cells = b.checks.cells.filter((c) => c.id === 'gate-REQUIREMENTS' || c.status === 'skip')
+    b.checks = { ...b.checks, passed: 1, failed: 0, total: 1, todo: ['发布审批'] }
+    installFixtureRoutes({ [`GET ${API}/board/*`]: () => b })
+    renderDetail()
+    const card = await screen.findByRole('article', { name: '检查' })
+    await waitFor(() => expect(within(card).getByTestId('checks-say')).toHaveTextContent(/^目前 1 项过了 · 还剩 发布审批$/))
   })
 
   test('检查 after the merge: the 14 days are watched, not waited on', async () => {
@@ -811,21 +842,20 @@ describe('需求详情', () => {
   test('时间线: newest first, the app’s own records in words (no commands, slot ids, pseudonyms); unread sources only once handed over', async () => {
     withDetail((d) => {
       d.timeline.items.push(
-        { at: '2026-11-08T22:00:00+08:00', kind: 'app', label: 'brain reflect --apply：成功', detail: 'brain/PAY-3-reflect-1', who: null, src: 'app' },
-        { at: '2026-11-07T16:00:01+08:00', kind: 'app', label: '开了 brain-dev 会话', detail: 'brain-r1-pay-3-1-8efc，信任这个会话', who: null, src: 'app' },
+        { at: '2026-11-08T22:00:00+08:00', kind: 'app', label: '回写 Brain 并推送：成功', detail: 'brain/PAY-3-reflect-1', who: null, src: 'app' },
         { at: '2026-11-07T18:30:00+08:00', kind: 'human', label: '批准需求', detail: null, who: 'G-A29056', src: 'audit' },
       )
     })
     renderDetail()
     const tl = await screen.findByRole('region', { name: '时间线' })
     const items = within(tl).getAllByTestId('tl-item')
-    expect(items[0]).toHaveTextContent('回写 Brain：成功 · 分支 brain/PAY-3-reflect-1')
+    expect(items[0]).toHaveTextContent('回写 Brain 并推送：成功 · 分支 brain/PAY-3-reflect-1')
     expect(items[1]).toHaveTextContent('代码生成：refund-api 的计划写好了')
     expect(items.at(-1)).toHaveTextContent('认领')
     expect(tl).toHaveTextContent('最新的在上面 · brain-kit 记下的')
-    expect(tl).toHaveTextContent('开了 brain-dev 会话 · 工具调用不用逐个批准')
+    expect(tl).toHaveTextContent('开了本机会话 · 工具调用不用逐个批准')
     expect(items.at(-1)).toHaveTextContent('认领 · 认领推到了远端')
-    expect(tl).not.toHaveTextContent(/brain reflect|--apply|8efc|G-A29056|claim\/|origin/)
+    expect(tl).not.toHaveTextContent(/brain reflect|--apply|G-A29056|claim\/|origin/)
     expect(items.find((i) => i.textContent!.includes('批准需求'))!.title).toContain('化名 G-A29056')
     expect(tl).not.toHaveTextContent('读不到')   // a local run: the bridge's and the runner's records are not on its way
   })
