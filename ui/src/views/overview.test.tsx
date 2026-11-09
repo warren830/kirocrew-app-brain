@@ -527,7 +527,7 @@ describe('交付总览', () => {
     expect(within(list).getByRole('button', { name: 'PAY-4 D-3 ↗' })).toHaveAttribute('title', `在 ${fx.overview().funnel.unclassified[0].src}`)
     expect(within(screen.getByTestId('ov-cards')).queryByTestId('who-syntax')).toBeNull()
     await user.click(within(list).getByRole('button', { name: 'PAY-4 D-3 ↗' }))
-    expect(p.go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-4', from: 'overview' })
+    expect(p.go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-4', from: 'overview', decision: 'D-3' })
     unmount()
     const ov = fx.overview()
     ov.funnel.unclassified = []

@@ -191,6 +191,10 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
     const r = repoOfKey(key)
     if (r) (item ? toItem : toBoard)({ repo: r, key })
   }
+  const openDecision = (key: string, id: string) => {
+    const r = repoOfKey(key)
+    if (r) go({ kind: 'item', repo: r, key, from: 'overview', decision: id })
+  }
   const repoName = (id: string) => repos.find((x) => x.id === id)?.name
   const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
   // nothing here can be handed over: no origin to push to, or no GitLab for the bridge (the backend's local_only rule)
@@ -305,7 +309,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
                 </>
               )}
             </article>
-            <FunnelCard f={data.funnel} team={team} onKey={(k) => openKey(k, true)} />
+            <FunnelCard f={data.funnel} team={team} onDecision={openDecision} />
           </section>
 
           <WeeklyChart weeks={c.weekly} onWeek={(w) => filterTo({ id: `week:${w}`, label: `${slash(w)} 起的一周合并的`, keep: (r, run) => weekOf(r, run) === w })} />
@@ -525,7 +529,7 @@ function PeopleCard({ c, onPick }: { c: CtoNumbers; onPick: (p: LedgerPick) => v
   )
 }
 
-function FunnelCard({ f, team, onKey }: { f: Funnel; team: boolean; onKey: (key: string) => void }) {
+function FunnelCard({ f, team, onDecision }: { f: Funnel; team: boolean; onDecision: (key: string, id: string) => void }) {
   const people = f.rows.find((r) => r.id === 'person')?.count ?? 0
   // the app's words for who decided (需求详情's decisions say the same), not brain-kit's labels with agent / Who in them
   const rows = f.rows.map((r) => ({ ...r, label: DECIDED_BY[r.id] ?? r.label }))
@@ -548,7 +552,7 @@ function FunnelCard({ f, team, onKey }: { f: Funnel; team: boolean; onKey: (key:
         <div className="cto-foot" data-testid="funnel-unclassified">
           <span className="br-warn-text">没归类 {f.unclassified.length} 个，去改「谁定的」那一格：</span>
           {f.unclassified.slice(0, 3).map((u) => (
-            <button key={`${u.key}-${u.id}`} type="button" className="br-link" title={u.src ? `在 ${u.src}` : undefined} onClick={() => onKey(u.key)}>{u.key} {u.id} ↗</button>
+            <button key={`${u.key}-${u.id}`} type="button" className="br-link" title={u.src ? `在 ${u.src}` : undefined} onClick={() => onDecision(u.key, u.id)}>{u.key} {u.id} ↗</button>
           ))}
           {f.unclassified.length > 3 && <span className="cto-was">还有 {f.unclassified.length - 3} 个</span>}
           <span className="cto-was">写法见口径</span>
@@ -653,7 +657,7 @@ function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
         {r.summary && <Summary text={r.summary} />}
       </td>
       <td className="br-col-nowrap">
-        <StateChip state={r.state} label={r.state_label} />
+        <StateChip state={r.state} label={r.state_label} who={r.waits.who} />
         {r.updated_at !== null && <div className="cto-was">{ago(r.updated_at, at)}更新</div>}
       </td>
       <td><LeanProgress r={r} /></td>
