@@ -25,7 +25,8 @@ describe('待办', () => {
     await screen.findByRole('region', { name: 'Lean 审批' })
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(
       ['Lean 审批', '运行机上的问题', '本地澄清', '等验收', '接手被拒', '没交出去的交接', 'KiroCrew 的问题'])
-    expect(screen.getAllByTestId('todo-item')).toHaveLength(7)
+    // one card per item; KiroCrew's problems are its checks' rows, with their fixes
+    expect(screen.getAllByTestId('todo-item')).toHaveLength(6)
     expect(screen.queryByText(TEAM_SENTENCE)).toBeNull()
     expect(group('接手被拒')).toHaveTextContent('run.json 的 brain_commit 不在 main 上')
     expect(within(group('接手被拒')).getByRole('link', { name: '看 MR' })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/46')
@@ -37,13 +38,41 @@ describe('待办', () => {
     expect(badges).toEqual([]) // the shell sets the badge from /status, not this view
   })
 
+  test('the count as a card: one cell per item, and each kind with its count jumps to its group', async () => {
+    renderTodo()
+    const count = await screen.findByTestId('todo-count')
+    expect(count).toHaveTextContent('7件')
+    expect(within(count).getByRole('img')).toHaveAccessibleName('Lean 审批 1，运行机上的问题 1，本地澄清 1，等验收 1，接手被拒 1，没交出去的交接 1，KiroCrew 的问题 1')
+    expect(Array.from(count.querySelectorAll('.td-cells i')).map((i) => i.className)).toEqual(['is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-bad', 'is-warn', 'is-bad'])
+    const jumps = within(screen.getByRole('navigation', { name: '待办的种类' })).getAllByRole('button')
+    expect(jumps.map((b) => b.textContent)).toEqual(['Lean 审批 1', '运行机上的问题 1', '本地澄清 1', '等验收 1', '接手被拒 1', '没交出去的交接 1', 'KiroCrew 的问题 1'])
+    const scroll = vi.mocked(HTMLElement.prototype.scrollIntoView)
+    scroll.mockClear()
+    fireEvent.click(jumps[4])
+    expect(scroll.mock.contexts[0]).toBe(group('接手被拒'))
+  })
+
+  test('a card’s border says its state: magenta waits for you, red refused, yellow worth a look', async () => {
+    renderTodo()
+    await screen.findByRole('region', { name: 'Lean 审批' })
+    const card = (name: string) => within(group(name)).getByTestId('todo-item')
+    expect(card('Lean 审批')).toHaveClass('is-wait')
+    expect(card('本地澄清')).toHaveClass('is-wait')
+    expect(card('接手被拒')).toHaveClass('is-bad')
+    expect(card('没交出去的交接')).toHaveClass('is-warn')
+  })
+
   test('a key opens its 需求详情 from 待办; a crew item has no key', async () => {
     const { go } = renderTodo()
     await screen.findByRole('region', { name: '运行机上的问题' })
     fireEvent.click(within(group('运行机上的问题')).getByRole('button', { name: 'PAY-4' }))
     expect(go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-4', from: 'todo' })
+    // the second way: its 需求看板
+    fireEvent.click(within(group('接手被拒')).getByRole('button', { name: '看板' }))
+    expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-7', from: 'todo' })
     const crew = group('KiroCrew 的问题')
     expect(within(crew).queryByRole('button', { name: /^PAY-/ })).toBeNull()
+    expect(within(crew).queryByRole('button', { name: '看板' })).toBeNull()
     expect(crew).toHaveTextContent('brain-dev.json 缺 Lean 的 hook')
   })
 
@@ -101,15 +130,20 @@ describe('待办', () => {
     await screen.findByRole('region', { name: 'KiroCrew 的问题' })
     const crew = group('KiroCrew 的问题')
     expect(within(crew).queryByRole('button', { name: '把引擎换成 kas' })).toBeNull()
-    fireEvent.click(within(crew).getByRole('button', { name: '装上或补全 brain-dev 的 Lean hook' }))
+    fireEvent.click(within(crew).getByRole('button', { name: /brain-dev 的 Lean hook/ }))
     expect(await within(crew).findByText('已重装 brain-dev agent')).toBeInTheDocument()
     expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/crew/fix`, body: { what: 'agent' } })
     expect(reloadStatus).toHaveBeenCalled()
   })
 
-  test('nothing to do says so', async () => {
+  test('nothing to do says so, and what will show up here', async () => {
     installFixtureRoutes({ [`GET ${API}/todo`]: () => ({ items: [], team: false }) })
-    renderTodo()
-    expect(await screen.findByText('现在没有等你做的事。')).toBeInTheDocument()
+    const { go } = renderTodo()
+    const hero = await screen.findByTestId('todo-empty')
+    expect(within(hero).getByRole('heading', { name: '现在没有等你做的事' })).toBeInTheDocument()
+    expect(within(hero).getAllByRole('listitem').map((li) => li.querySelector('b')?.textContent)).toEqual(['1Lean 审批', '2澄清', '3交接', '4运行机的问题', '5验收'])
+    expect(screen.queryByTestId('todo-count')).toBeNull()
+    fireEvent.click(within(hero).getByRole('button', { name: '看交付总览' }))
+    expect(go).toHaveBeenCalledWith({ kind: 'overview' })
   })
 })

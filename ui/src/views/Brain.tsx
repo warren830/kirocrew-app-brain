@@ -1,16 +1,20 @@
 /**
  * Brain: the shared knowledge on the default branch (brain/PRODUCT.md, TECH.md, IMPROVEMENT.md, PROJECT.md) of one
- * repo, read from GET /brain. A tab per file, its sections and entries (text filter, type filter); the entry the URL
- * names (`id`) is picked out and scrolled to. Beside it: brain lint's findings, how useful the entries are (usage), and
- * reflect — a finished run's proposals previewed, then written to a new branch (and an MR) after a confirm step.
+ * repo, read from GET /brain, in the sample board's look. A header (the repo, the ref read, 重新读取); counter cards
+ * (条目 per file, 知识有用率, 重复纠正率, 撤回候选, 检查); the four files as tabs, each entry a card (type, side, rel,
+ * repeats, 撤回候选, sources, how often runs load and cite it), filtered by text and type; the entry the URL names (`id`)
+ * is picked out and scrolled to. Beside it brain lint's problems and what is never cited or keeps coming back; below,
+ * every run's use of the Brain, and 回写 (brain reflect) as steps: pick a run → 预览 → the changes → confirm → written
+ * on a new branch (and an MR). An empty Brain says what fills it.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppApi } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
+import { fmtRate } from '../format'
 import { useReducedMotion } from '../hooks'
 import { fileOfEntry, type BrainEntryRef, type BrainFile } from '../nav'
-import { STATE_LABEL, type BrainEntry, type BrainFileView, type BrainView, type ReflectApplyBody, type ReflectApplyResult, type ReflectPreview } from '../types'
-import { Icon, LoadState, Rate } from '../ui'
+import type { BrainEntry, BrainFileView, BrainView, CheckRow, ReflectApplyBody, ReflectApplyResult, ReflectPreview } from '../types'
+import { CheckRows, EmptyHero, Icon, ImportCta, Kpi, LoadState, RoleIcon, Segs, StateChip, type FlowStep } from '../ui'
 import type { ViewProps } from './props'
 
 const FILE_LABEL: Record<string, string> = { PRODUCT: '产品', TECH: '技术', IMPROVEMENT: '改进', PROJECT: '项目' }
@@ -19,12 +23,15 @@ export const TYPE_LABEL: Record<string, string> = {
 }
 const SIDE_LABEL: Record<string, string> = { product: '产品', builder: '开发', shared: '共用' }
 const REL_LABEL: Record<string, string> = { new: '新', same: '只加来源', 'adds-to': '补充', replaces: '取代', repeats: '又出现', withdraws: '撤回' }
+const REL_TONE: Record<string, string> = { new: 'ok', same: 'idle', 'adds-to': 'info', replaces: 'warn', repeats: 'warn', withdraws: 'bad' }
 const relLabel = (rel: string) => {
   const [head, ...rest] = rel.split(' ')
   return REL_LABEL[head] ? [REL_LABEL[head], ...rest].join(' ') : rel
 }
+const relTone = (rel: string) => REL_TONE[rel.split(' ')[0]] ?? 'idle'
 
 const hasEntry = (f: BrainFileView, id: string) => f.sections.some((s) => s.entries.some((e) => e.id === id))
+const entriesOf = (f: BrainFileView) => f.sections.flatMap((s) => s.entries)
 
 function matches(e: BrainEntry, text: string, type: string): boolean {
   if (type && e.type !== type) return false
@@ -32,6 +39,17 @@ function matches(e: BrainEntry, text: string, type: string): boolean {
   const t = text.toLowerCase()
   return [e.id, e.text, e.type, e.side, ...e.src].some((x) => x.toLowerCase().includes(t))
 }
+
+/** brain lint's findings as problem rows: the errors (FAIL), then the warnings (WARN). */
+const lintRows = (lint: BrainView['lint']): CheckRow[] => [...lint.errors, ...lint.warnings]
+
+/** What fills an empty Brain. */
+const FILL_FLOW: FlowStep[] = [
+  { icon: 'release', title: '做完一个需求', text: '运行写下 decisions.md' },
+  { icon: 'merge', title: '合并', text: '进默认分支' },
+  { icon: 'brain', title: '回写', text: 'brain reflect：预览，写进新分支' },
+  { icon: 'laptop', title: '下一次用上', text: '运行加载它，用上了就引用' },
+]
 
 export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewProps) {
   const api = useAppApi()
@@ -78,6 +96,7 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
     setId(eid)
     write({ file: f, id: eid })
   }
+  const openItem = (key: string) => props.go({ kind: 'item', repo, key, from: 'brain' })
 
   // the entry picked out is scrolled into view once (per id), once it is on the page
   const rootRef = useRef<HTMLElement | null>(null)
@@ -96,191 +115,349 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
       .map((s) => ({ title: s.title, entries: s.entries.filter((e) => e.id === id || matches(e, text.trim(), type)) }))
       .filter((s) => s.entries.length > 0)
   }, [file, id, text, type])
-  const total = file ? file.sections.reduce((n, s) => n + s.entries.length, 0) : 0
+  const total = file ? entriesOf(file).length : 0
   const showing = shown.reduce((n, s) => n + s.entries.length, 0)
   const idMissing = !!(id && data && !data.files.some((f) => hasEntry(f, id)))
+  const empty = !!data && data.files.every((f) => entriesOf(f).length === 0)
+  const lint = data ? lintRows(data.lint) : []
+
+  const reflect = data && (
+    <ReflectCard
+      key={repo}
+      repo={repo}
+      items={data.reflect}
+      pick={reflectKey}
+      onPick={(k) => {
+        setReflectPick(k)
+        write({ reflect: k })
+      }}
+      onItem={openItem}
+      onApplied={brain.reload}
+      post={{
+        preview: (key) => api.post<ReflectPreview>(paths.reflectPreview(), { repo, key }),
+        apply: (body) => api.post<ReflectApplyResult>(paths.reflectApply(), body),
+      }}
+    />
+  )
 
   return (
-    <main className="br-view" data-testid="br-brain" ref={rootRef}>
-      <div className="br-row">
-        <h2>Brain</h2>
-        <label className="br-row br-small" htmlFor="brain-repo" style={{ gap: 6 }}>
+    <main className="kt-root br-view bv-root" data-testid="br-brain" ref={rootRef}>
+      <style>{BV_CSS}</style>
+      <header className="bv-top">
+        <RoleIcon role="brain" size={26} className="bv-top-icon" />
+        <div className="br-view-head">
+          <h2>Brain</h2>
+          <p>仓库里的共享知识：运行加载它，用上了就引用</p>
+        </div>
+        <span className="br-grow" />
+        <label className="bv-repo" htmlFor="brain-repo">
           <span className="br-dim">仓库</span>
-          <select id="brain-repo" value={repo} onChange={(e) => pickRepo(e.target.value)}>
+          <select id="brain-repo" value={repo} onChange={(e) => pickRepo(e.target.value)} disabled={repos.length === 0}>
             {repos.map((r) => <option key={r.id} value={r.id}>{r.name}（{r.id}）</option>)}
           </select>
         </label>
-        {data?.ref && <span className="br-dim br-small">读的是 <span className="br-mono">{data.ref}</span></span>}
-        <span className="br-grow" />
-        <button type="button" className="br-btn is-small" onClick={brain.reload} disabled={!repo}>
-          <Icon name="RefreshCw" size={13} />重新读取
+        {data?.ref && <span className="bv-ref" title="读的是默认分支上的这个提交">读的是 <code>{data.ref}</code></span>}
+        <button type="button" className="br-btn" onClick={brain.reload} disabled={!repo}>
+          <Icon name="RefreshCw" size={14} />重新读取
         </button>
-      </div>
-      {props.status && repos.length === 0 && <div className="br-banner is-error" role="alert">没有能用的仓库：去设置里加一个。</div>}
+      </header>
+      {props.status && repos.length === 0 && (
+        <ImportCta title="还没有能用的仓库" onImport={() => props.go({ kind: 'import' })} />
+      )}
       <LoadState loading={brain.loading} error={brain.error} has={!!data} />
       {data?.error && <div className="br-banner is-error" role="alert">{data.error}</div>}
 
-      {data && (
+      {data && empty && (
         <>
-          <div className="br-files" role="group" aria-label="Brain 文件">
-            {data.files.map((f) => (
-              <button key={f.key} type="button" className="br-btn" aria-pressed={file?.key === f.key} onClick={() => pickFile(f.key as BrainFile)}>
-                {f.key} <span className="br-dim">{FILE_LABEL[f.key] ?? f.letter}</span> <b className="br-strong">{f.count}</b>
-              </button>
-            ))}
-          </div>
-
-          {file && (
-            <section className="br-card" aria-label={`${file.key}.md`}>
-              <header>
-                <h3>{file.key}.md</h3>
-                <span className="br-dim br-small">{SIDE_LABEL[file.side] ?? file.side} · 显示 {showing}/{total} 条</span>
-              </header>
-              <div className="br-row">
-                <label className="br-sr" htmlFor="brain-text">按文字筛</label>
-                <input id="brain-text" type="text" placeholder="按 id、文字、来源筛" value={text} onChange={(e) => setText(e.target.value)} />
-                <label className="br-sr" htmlFor="brain-type">按类型筛</label>
-                <select id="brain-type" value={type} onChange={(e) => setType(e.target.value)}>
-                  <option value="">全部类型</option>
-                  {file.types.map((t) => <option key={t} value={t}>{TYPE_LABEL[t] ?? t}（{t}）</option>)}
-                </select>
-              </div>
-              {idMissing && <p className="br-note">Brain 里没有 <span className="br-mono">{id}</span>：可能已经撤回、归档，或者写错了。</p>}
-              {shown.length === 0 && <p className="br-empty">{total ? '没有符合筛选的条目。' : '这个文件还没有条目。'}</p>}
-              {shown.map((s, i) => (
-                <div key={`${s.title}-${i}`} className="br-section">
-                  <h3>{s.title}</h3>
-                  {s.entries.map((e) => <EntryCard key={e.id} e={e} hl={e.id === id} />)}
-                </div>
-              ))}
-            </section>
-          )}
-
-          <div className="br-cards">
-            <LintCard lint={data.lint} />
-            <UsageCard usage={data.usage} onEntry={pickEntry} onItem={(key) => props.go({ kind: 'item', repo, key, from: 'brain' })} />
-          </div>
-          <ReflectCard
-            key={repo}
-            repo={repo}
-            items={data.reflect}
-            pick={reflectKey}
-            onPick={(k) => {
-              setReflectPick(k)
-              write({ reflect: k })
-            }}
-            onItem={(key) => props.go({ kind: 'item', repo, key, from: 'brain' })}
-            onApplied={brain.reload}
-            post={{
-              preview: (key) => api.post<ReflectPreview>(paths.reflectPreview(), { repo, key }),
-              apply: (body) => api.post<ReflectApplyResult>(paths.reflectApply(), body),
-            }}
+          <EmptyHero
+            testid="brain-empty"
+            title="Brain 还是空的"
+            text={['每个需求合并以后，在下面「回写」：brain reflect 把那次运行 decisions.md 里的提议写进 brain/ 的四个文件，写在一个新分支上（可以开 MR）。']}
+            punch="写进去的条目，下一次运行会加载；用上了就引用，这里都看得到。"
+            flow={FILL_FLOW}
           />
+          {lint.length > 0 && <LintCard rows={lint} />}
+          {reflect}
+        </>
+      )}
+
+      {data && !empty && (
+        <>
+          <BrainKpis data={data} lint={lint} onEntry={pickEntry} />
+          <div className="bv-main">
+            <div className="bv-col">
+              <div className="bv-tabs" role="group" aria-label="Brain 文件">
+                {data.files.map((f) => (
+                  <button key={f.key} type="button" className={`bv-tab is-${f.key}`} aria-pressed={file?.key === f.key} onClick={() => pickFile(f.key as BrainFile)}>
+                    <b className="bv-letter" aria-hidden="true">{f.letter}</b>
+                    <span className="bv-tab-name">{f.key} <small>{FILE_LABEL[f.key] ?? f.letter}</small></span>{' '}
+                    <span className="bv-tab-n">{f.count}</span>
+                  </button>
+                ))}
+              </div>
+
+              {file && (
+                <section className={`br-card bv-file is-${file.key}`} aria-label={`${file.key}.md`}>
+                  <header>
+                    <h3>{file.key}.md</h3>
+                    <span className="br-tag">{SIDE_LABEL[file.side] ?? file.side}</span>
+                    <span className="br-grow" />
+                    <span className="br-dim br-small">显示 {showing}/{total} 条</span>
+                  </header>
+                  <div className="bv-filter">
+                    <label className="bv-search" htmlFor="brain-text">
+                      <span className="br-sr">按文字筛</span>
+                      <Icon name="Search" size={14} />
+                      <input id="brain-text" type="text" placeholder="按 id、文字、来源筛" value={text} onChange={(e) => setText(e.target.value)} />
+                    </label>
+                    <TypeChips file={file} type={type} onType={setType} />
+                  </div>
+                  {idMissing && <p className="br-note">Brain 里没有 <span className="br-mono">{id}</span>：可能已经撤回、归档，或者写错了。</p>}
+                  {shown.length === 0 && <p className="br-empty">{total ? '没有符合筛选的条目。' : '这个文件还没有条目。'}</p>}
+                  {shown.map((s, i) => (
+                    <div key={`${s.title}-${i}`} className="bv-sec">
+                      <h4>{s.title} <span className="br-dim">{s.entries.length}</span></h4>
+                      <div className="bv-entries">
+                        {s.entries.map((e) => <EntryCard key={e.id} e={e} hl={e.id === id} />)}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              )}
+            </div>
+            <div className="bv-col">
+              <LintCard rows={lint} />
+              <UsageCard usage={data.usage} onEntry={pickEntry} />
+            </div>
+          </div>
+          <RunsCard runs={data.usage.runs} onEntry={pickEntry} onItem={openItem} />
+          {reflect}
         </>
       )}
     </main>
   )
 }
 
-function EntryCard({ e, hl }: { e: BrainEntry; hl: boolean }) {
+// ---------------------------------------------------------------- the counter cards
+
+function BrainKpis({ data, lint, onEntry }: { data: BrainView; lint: CheckRow[]; onEntry: (id: string) => void }) {
+  const total = data.files.reduce((n, f) => n + entriesOf(f).length, 0)
+  const candidates = data.files.flatMap(entriesOf).filter((e) => e.candidate)
+  const errors = lint.filter((r) => r.level === 'FAIL').length
+  const warns = lint.filter((r) => r.level === 'WARN').length
+  const u = data.usage
   return (
-    <article className={`br-entry${hl ? ' is-hl' : ''}`} data-entry-id={e.id} aria-current={hl ? 'true' : undefined} aria-label={e.id}>
-      <div className="br-row">
-        <b className="br-key">{e.id}</b>
-        <span className="br-chip tone-info" title={e.type}>{TYPE_LABEL[e.type] ?? e.type}</span>
-        <span className="br-tag">{SIDE_LABEL[e.side] ?? e.side}</span>
-        <span className="br-tag" title={e.rel}>{relLabel(e.rel)}</span>
-        {e.repeats > 0 && <span className={`br-chip tone-${e.repeats >= 2 ? 'bad' : 'warn'}`}>重复 {e.repeats} 次</span>}
-        {e.candidate && <span className="br-chip tone-warn" title="被够多的运行加载过，一次也没被引用">撤回候选</span>}
-      </div>
-      <p className="br-text">{e.text}</p>
-      <div className="br-row br-small br-dim">
-        {e.src.length > 0 && (
-          <span className="br-row" style={{ gap: 4 }}>
-            来源 {e.src.map((s) => <span key={s} className="br-tag br-mono">{s}</span>)}
-          </span>
+    <div className="br-kpis bv-kpis" role="group" aria-label="指标">
+      <Kpi label="条目" value={total} of="条" testid="kpi-entries">
+        <FileBar files={data.files} total={total} />
+      </Kpi>
+      <Kpi label="知识有用率" value={fmtRate(u.useful).pct} of={fmtRate(u.useful).frac} note="加载的条目里，用上的" testid="usage-useful">
+        <RateCells rate={u.useful} hit="pass" label="用上的" />
+      </Kpi>
+      <Kpi label="重复纠正率" value={fmtRate(u.repeat_rate).pct} of={fmtRate(u.repeat_rate).frac} note="同样的纠正又出现的" testid="usage-repeat">
+        <RateCells rate={u.repeat_rate} hit="fail" label="又出现的" />
+      </Kpi>
+      <Kpi label="撤回候选" value={candidates.length} of="条" testid="kpi-candidates"
+        note={candidates.length ? '加载够多次，从没被引用' : `没有 · 已归档 ${u.archived} · 已清除 ${u.purged}`}>
+        {candidates.length > 0 && <IdChips ids={candidates.map((e) => e.id)} onEntry={onEntry} tone="warn" />}
+      </Kpi>
+      <Kpi label="检查 · brain lint" value={errors} of="个错" tone={errors ? 'bad' : warns ? undefined : 'ok'} testid="kpi-lint"
+        note={errors || warns ? `${warns} 个提醒` : '全过'}>
+        {lint.length > 0 && (
+          <div className="kt-segs bv-cells" role="img" aria-label={`${errors} 个错，${warns} 个提醒`}>
+            {lint.map((r, i) => <i key={i} className={r.level === 'FAIL' ? 'is-fail' : 'is-warn'} title={r.text} />)}
+          </div>
         )}
-        <span>引用 {e.cites} 次（{e.runs} 次运行）· 被 {e.loaded_by} 次运行加载</span>
-      </div>
-    </article>
+      </Kpi>
+    </div>
   )
 }
 
-function LintCard({ lint }: { lint: BrainView['lint'] }) {
-  const clean = lint.errors.length === 0 && lint.warnings.length === 0
+/** The entries per file as one stacked bar, with its legend. */
+function FileBar({ files, total }: { files: BrainFileView[]; total: number }) {
   return (
-    <section className={`br-card${lint.errors.length ? ' is-bad' : ''}`} aria-label="检查">
-      <header><h3>检查（brain lint）</h3></header>
-      {clean && <p className="br-ok-text">没有问题。</p>}
-      {lint.errors.length > 0 && (
-        <ul className="br-list" data-testid="lint-errors">
-          {lint.errors.map((x, i) => <li key={i} className="br-bad-text br-pre">{x}</li>)}
-        </ul>
-      )}
-      {lint.warnings.length > 0 && (
-        <ul className="br-list" data-testid="lint-warnings">
-          {lint.warnings.map((x, i) => <li key={i} className="br-warn-text br-pre">{x}</li>)}
-        </ul>
-      )}
-    </section>
+    <>
+      <div className="bv-stack" role="img" aria-label={files.map((f) => `${f.key} ${entriesOf(f).length}`).join('，')}>
+        {files.map((f) => {
+          const n = entriesOf(f).length
+          return n > 0 ? <i key={f.key} className={`is-${f.key}`} style={{ flexGrow: n }} title={`${f.key} ${n} 条`} /> : null
+        })}
+        {total === 0 && <i className="is-none" />}
+      </div>
+      <div className="cto-legend bv-legend">
+        {files.map((f) => (
+          <span key={f.key}><i className={`cto-sw is-${f.key}`} aria-hidden="true" />{FILE_LABEL[f.key] ?? f.key} <b>{entriesOf(f).length}</b></span>
+        ))}
+      </div>
+    </>
+  )
+}
+
+/** a/b as cells (up to 40), else as a bar; *hit* says how the a are drawn. */
+function RateCells({ rate: [a, b], hit, label }: { rate: [number, number]; hit: 'pass' | 'fail'; label: string }) {
+  if (b <= 0) return <div className="kt-kpi-note">还没有数</div>
+  if (b <= 40) {
+    return <Segs label={`${a}/${b} ${label}`} cells={Array.from({ length: b }, (_, i) => ({ tone: i < a ? hit : 'idle' as const }))} />
+  }
+  return (
+    <div className={`bv-meter is-${hit}`} role="img" aria-label={`${a}/${b} ${label}`}>
+      <i style={{ width: `${Math.round((a / b) * 100)}%` }} />
+    </div>
   )
 }
 
 function IdChips({ ids, onEntry, tone = 'idle' }: { ids: string[]; onEntry: (id: string) => void; tone?: string }) {
   if (!ids.length) return <span className="br-dim">—</span>
   return (
-    <span className="br-row" style={{ gap: 4 }}>
-      {ids.map((x) => <button key={x} type="button" className={`br-chip tone-${tone}`} onClick={() => onEntry(x)}>{x}</button>)}
+    <span className="bv-ids">
+      {ids.map((x) => <button key={x} type="button" className={`br-chip tone-${tone}`} title="在 Brain 里看这一条" onClick={() => onEntry(x)}>{x}</button>)}
     </span>
   )
 }
 
-function UsageCard({ usage, onEntry, onItem }: { usage: BrainView['usage']; onEntry: (id: string) => void; onItem: (key: string) => void }) {
+// ---------------------------------------------------------------- the entries
+
+function TypeChips({ file, type, onType }: { file: BrainFileView; type: string; onType: (t: string) => void }) {
+  const all = entriesOf(file)
+  const present = file.types.filter((t) => all.some((e) => e.type === t))
+  const extra = Array.from(new Set(all.map((e) => e.type))).filter((t) => !present.includes(t))
+  const types = [...present, ...extra]
+  if (types.length < 2) return null
+  return (
+    <div className="bv-types" role="group" aria-label="按类型筛">
+      <button type="button" className="bv-type" aria-pressed={type === ''} onClick={() => onType('')}>全部 <b>{all.length}</b></button>
+      {types.map((t) => (
+        <button key={t} type="button" className="bv-type" aria-pressed={type === t} title={t} onClick={() => onType(type === t ? '' : t)}>
+          {TYPE_LABEL[t] ?? t} <b>{all.filter((e) => e.type === t).length}</b>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function EntryCard({ e, hl }: { e: BrainEntry; hl: boolean }) {
+  const used = e.loaded_by > 0 ? Math.min(1, e.runs / e.loaded_by) : 0
+  return (
+    <article className={`bv-entry${hl ? ' is-hl' : ''}${e.candidate ? ' is-cand' : ''}`} data-entry-id={e.id} aria-current={hl ? 'true' : undefined} aria-label={e.id}>
+      <div className="bv-entry-top">
+        <b className="br-key">{e.id}</b>
+        <span className="br-chip tone-info" title={e.type}>{TYPE_LABEL[e.type] ?? e.type}</span>
+        <span className="br-tag">{SIDE_LABEL[e.side] ?? e.side}</span>
+        {e.rel && e.rel !== 'new' && <span className="br-tag" title={e.rel}>{relLabel(e.rel)}</span>}
+        <span className="br-grow" />
+        {e.repeats > 0 && <span className={`br-chip tone-${e.repeats >= 2 ? 'bad' : 'warn'}`}>重复 {e.repeats} 次</span>}
+        {e.candidate && <span className="br-chip tone-warn" title="被够多的运行加载过，一次也没被引用">撤回候选</span>}
+      </div>
+      <p className="bv-text">{e.text}</p>
+      <div className="bv-entry-foot">
+        <span className="bv-use" title={`被 ${e.loaded_by} 次运行加载，其中 ${e.runs} 次引用了它（共引用 ${e.cites} 处）`}>
+          <span className={`bv-meter is-pass${e.candidate ? ' is-cand' : ''}`} aria-hidden="true"><i style={{ width: `${Math.round(used * 100)}%` }} /></span>
+          <span>{e.loaded_by ? <>{e.loaded_by} 次加载 · <b>{e.runs}</b> 次用上</> : '还没被加载过'}{e.cites > e.runs ? `（引用 ${e.cites} 处）` : ''}</span>
+        </span>
+        {e.src.length > 0 && (
+          <span className="bv-src">
+            <span className="br-dim">来源</span>{e.src.map((s) => <span key={s} className="br-tag br-mono">{s}</span>)}
+          </span>
+        )}
+      </div>
+    </article>
+  )
+}
+
+// ---------------------------------------------------------------- lint, usage, runs
+
+function LintCard({ rows }: { rows: CheckRow[] }) {
+  const errors = rows.filter((r) => r.level === 'FAIL').length
+  const warns = rows.filter((r) => r.level === 'WARN').length
+  return (
+    <section className={`br-card${errors ? ' is-bad' : rows.length ? '' : ' is-ok'}`} aria-label="检查" data-testid="lint">
+      <header>
+        <RoleIcon role="lint" size={18} />
+        <h3>检查</h3>
+        <span className="br-dim br-small">brain lint · 默认分支</span>
+        <span className="br-grow" />
+        {errors > 0 && <span className="br-chip tone-bad">{errors} 个错</span>}
+        {warns > 0 && <span className="br-chip tone-warn">{warns} 个提醒</span>}
+      </header>
+      <CheckRows rows={rows.length ? rows : [{ level: 'OK', text: '全过：没有问题' }]} />
+    </section>
+  )
+}
+
+function UsageCard({ usage, onEntry }: { usage: BrainView['usage']; onEntry: (id: string) => void }) {
   return (
     <section className="br-card" aria-label="用处">
-      <header><h3>用处</h3></header>
-      <dl className="br-facts">
-        <dt>知识有用率</dt>
-        <dd data-testid="usage-useful"><Rate value={usage.useful} /> <span className="br-hint">加载的条目里被引用的</span></dd>
-        <dt>重复纠正率</dt>
-        <dd data-testid="usage-repeat"><Rate value={usage.repeat_rate} /> <span className="br-hint">同样的纠正又出现的</span></dd>
-        <dt>归档</dt><dd>{usage.archived} 条</dd>
-        <dt>清除</dt><dd>{usage.purged} 条</dd>
-      </dl>
-      {usage.runs.length > 0 && (
+      <header>
+        <RoleIcon role="list" size={18} />
+        <h3>用处</h3>
+        <span className="br-grow" />
+        <span className="br-dim br-small">已归档 {usage.archived} · 已清除 {usage.purged}</span>
+      </header>
+      <div className="bv-block">
+        <b className="bv-block-h">又出现的纠正</b>
+        {usage.repeats_any.length === 0 ? <p className="br-empty">没有：同样的纠正没再出现过。</p> : (
+          <ul className="bv-repeats" data-testid="usage-repeats">
+            {usage.repeats_any.map(([x, n]) => (
+              <li key={x}>
+                <button type="button" className={`br-chip tone-${n >= 2 ? 'bad' : 'warn'}`} onClick={() => onEntry(x)}>{x}</button>
+                <span className="bv-rep-n" aria-hidden="true">{Array.from({ length: Math.min(n, 8) }, (_, i) => <i key={i} />)}</span>
+                <span>重复 {n} 次</span>
+                {n >= 2 && <span className="br-chip tone-bad kt-pill" title="同样的纠正出现两次以上：写成确定性检查（gate），别再靠 agent 记住">该改成 gate 了</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="bv-block">
+        <b className="bv-block-h">从没被引用</b>
+        <IdChips ids={usage.never_cited} onEntry={onEntry} />
+      </div>
+    </section>
+  )
+}
+
+function RunsCard({ runs, onEntry, onItem }: { runs: BrainView['usage']['runs']; onEntry: (id: string) => void; onItem: (key: string) => void }) {
+  return (
+    <section className="br-card" aria-label="每次运行的用处">
+      <header>
+        <RoleIcon role="laptop" size={18} />
+        <h3>每次运行</h3>
+        <span className="br-dim br-small">加载了几条，用上了哪些</span>
+      </header>
+      {runs.length === 0 ? <p className="br-empty">还没有运行记下它用了 Brain 的哪些条目。</p> : (
         <div className="br-scroll">
-          <table className="br-table" aria-label="每次运行">
-            <thead><tr><th>需求</th><th>intent</th><th className="is-num">加载</th><th>引用</th><th>过时</th><th>不认识</th></tr></thead>
+          <table className="cto-table bv-runs" aria-label="每次运行">
+            <thead><tr><th>需求</th><th>intent</th><th>加载 · 用上</th><th>引用</th><th>过时</th><th>不认识</th></tr></thead>
             <tbody>
-              {usage.runs.map((r) => (
-                <tr key={`${r.key}-${r.intent}`}>
-                  <td><button type="button" className="br-link br-key" onClick={() => onItem(r.key)}>{r.key}</button></td>
-                  <td className="br-mono">{r.intent}</td>
-                  <td className="is-num">{r.loaded ?? '—'}</td>
-                  <td><IdChips ids={r.cited} onEntry={onEntry} tone="ok" /></td>
-                  <td><IdChips ids={r.stale} onEntry={onEntry} tone="warn" /></td>
-                  <td><IdChips ids={r.unknown} onEntry={onEntry} tone="bad" /></td>
-                </tr>
-              ))}
+              {runs.map((r) => {
+                const hit = r.loaded ? Math.min(1, r.cited.length / r.loaded) : 0
+                return (
+                  <tr key={`${r.key}-${r.intent}`}>
+                    <td><button type="button" className="br-link br-key" onClick={() => onItem(r.key)}>{r.key}</button></td>
+                    <td className="br-mono br-dim">{r.intent}</td>
+                    <td>
+                      <span className="bv-load">
+                        <span className="bv-meter is-pass" aria-hidden="true"><i style={{ width: `${Math.round(hit * 100)}%` }} /></span>
+                        <span className="br-mono">{r.loaded ?? '—'} · {r.cited.length}</span>
+                      </span>
+                    </td>
+                    <td><IdChips ids={r.cited} onEntry={onEntry} tone="ok" /></td>
+                    <td><IdChips ids={r.stale} onEntry={onEntry} tone="warn" /></td>
+                    <td><IdChips ids={r.unknown} onEntry={onEntry} tone="bad" /></td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       )}
-      <div className="br-row"><span className="br-dim">从没被引用</span><IdChips ids={usage.never_cited} onEntry={onEntry} /></div>
-      {usage.repeats_any.length > 0 && (
-        <ul className="br-plain" data-testid="usage-repeats">
-          {usage.repeats_any.map(([x, n]) => (
-            <li key={x} className="br-row">
-              <button type="button" className="br-chip tone-idle" onClick={() => onEntry(x)}>{x}</button>
-              <span>重复 {n} 次</span>
-              {n >= 2 && <span className="br-chip tone-bad">该改成 gate 了</span>}
-            </li>
-          ))}
-        </ul>
-      )}
     </section>
   )
 }
+
+// ---------------------------------------------------------------- 回写 (brain reflect)
+
+type StepState = 'done' | 'now' | 'bad' | 'off' | undefined
 
 function ReflectCard({ repo, items, pick, onPick, onItem, onApplied, post }: {
   repo: string
@@ -296,20 +473,37 @@ function ReflectCard({ repo, items, pick, onPick, onItem, onApplied, post }: {
   const [confirm, setConfirm] = useState<boolean | null>(null) // the push the confirm step is about
   const p = preview.result && preview.result.key === pick ? preview.result : null
   const blocked = !p || p.problems.length > 0 || !!p.error || !p.substantive
+  const written = !!apply.result?.ok
   const doApply = async (push: boolean) => {
     if (!pick) return
     const r = await apply.run({ repo, key: pick, push })
     setConfirm(null)
     if (r) onApplied()
   }
+  const steps: [string, StepState][] = [
+    ['选一次运行', pick ? 'done' : 'now'],
+    ['预览', p ? 'done' : pick ? 'now' : undefined],
+    ['确认写入', written ? 'done' : !p ? undefined : !p.substantive && !p.error ? 'off' : blocked ? 'bad' : 'now'],
+    ['写在新分支上', written ? 'done' : apply.result ? 'bad' : undefined],
+  ]
+  const item = items.find((r) => r.key === pick)
   return (
-    <section className="br-card" aria-label="回收">
+    <section className={`br-card bv-reflect${written ? ' is-ok' : ''}`} aria-label="回写">
       <header>
-        <h3>回收（brain reflect）</h3>
-        <span className="br-hint">把一次运行 decisions.md 里的提议写进 Brain：先预览，再写进新分支。</span>
+        <RoleIcon role="brain" size={20} />
+        <h3>回写</h3>
+        <span className="br-dim br-small">brain reflect：把一次运行 decisions.md 里的提议写进 Brain，先预览，再写进新分支</span>
       </header>
-      {items.length === 0 ? <p className="br-empty">还没有能回收的运行（要有 decisions.md）。</p> : (
-        <div className="br-row">
+      <ol className="bv-steps" aria-label="回写的步骤">
+        {steps.map(([label, st], i) => (
+          <li key={label} className={st ? `is-${st}` : undefined} data-state={st}>
+            <i aria-hidden="true">{st === 'done' ? '✓' : st === 'bad' ? '✕' : st === 'off' ? '–' : i + 1}</i>
+            <span>{label}</span>
+          </li>
+        ))}
+      </ol>
+      {items.length === 0 ? <p className="br-empty">还没有能回写的运行：运行写下 decisions.md 以后，就会出现在这里。</p> : (
+        <div className="bv-pick">
           <label className="br-sr" htmlFor="reflect-key">选一个需求</label>
           <select id="reflect-key" value={pick ?? ''} onChange={(e) => {
             onPick(e.target.value)
@@ -317,36 +511,42 @@ function ReflectCard({ repo, items, pick, onPick, onItem, onApplied, post }: {
             apply.reset()
             setConfirm(null)
           }}>
-            {items.map((r) => <option key={r.key} value={r.key}>{r.key} · {r.title} · {STATE_LABEL[r.state] ?? r.state}</option>)}
+            {items.map((r) => <option key={r.key} value={r.key}>{r.key} · {r.title}</option>)}
           </select>
-          <button type="button" className="br-btn" disabled={!pick || preview.busy} onClick={() => {
+          {item && <StateChip state={item.state} />}
+          <button type="button" className="br-btn is-primary" disabled={!pick || preview.busy} onClick={() => {
             apply.reset()
             setConfirm(null)
             if (pick) void preview.run(pick)
           }}>
-            <Icon name="Eye" size={14} />{preview.busy ? '正在预览…' : '预览'}
+            <Icon name="Eye" size={14} />{preview.busy ? '正在预览…' : p ? '再预览一次' : '预览'}
           </button>
           {pick && <button type="button" className="br-link" onClick={() => onItem(pick)}>看需求详情</button>}
         </div>
       )}
       {preview.error && <p className="br-error" role="alert">{preview.error}</p>}
       {p && (
-        <div className="br-stack" data-testid="reflect-preview">
+        <div className="bv-preview" data-testid="reflect-preview">
           {p.source && <p className="br-note">读的是 <span className="br-mono">{p.source}</span></p>}
           {p.error && <p className="br-error br-pre" role="alert">{p.error}</p>}
+          {p.problems.length > 0 && (
+            <div data-testid="reflect-problems"><CheckRows rows={p.problems.map((x) => ({ level: 'FAIL', text: x }))} /></div>
+          )}
           {p.ops.length > 0 && (
             <div className="br-scroll">
-              <table className="br-table" aria-label="要写的改动">
-                <thead><tr><th>动作</th><th>目标</th><th>文件</th><th>类型</th><th>小节</th><th>来源</th><th>文字</th></tr></thead>
+              <table className="cto-table bv-ops" aria-label="要写的改动">
+                <thead><tr><th>动作</th><th>条目</th><th>写到</th><th>类型</th><th>来源</th><th>文字</th></tr></thead>
                 <tbody>
                   {p.ops.map((o, i) => (
                     <tr key={i}>
-                      <td><span className="br-tag">{relLabel(o.kind)}</span></td>
-                      <td className="br-mono">{o.target ?? '—'}</td>
-                      <td>{o.file ?? '—'}</td>
-                      <td>{o.type ? TYPE_LABEL[o.type] ?? o.type : '—'}</td>
-                      <td>{o.section ?? '—'}</td>
-                      <td>{o.src.length ? <span className="br-row" style={{ gap: 4 }}>{o.src.map((s) => <span key={s} className="br-tag br-mono">{s}</span>)}</span> : '—'}</td>
+                      <td><span className={`br-chip tone-${relTone(o.kind)}`} title={o.kind}>{relLabel(o.kind)}</span></td>
+                      <td className="br-mono">{o.target ?? <span className="br-dim">新条目</span>}</td>
+                      <td>
+                        {o.file ? <span className={`bv-filetag is-${o.file}`}>{o.file}</span> : <span className="br-dim">—</span>}
+                        {o.section && <span className="br-dim"> · {o.section}</span>}
+                      </td>
+                      <td>{o.type ? <span className="br-chip tone-info">{TYPE_LABEL[o.type] ?? o.type}</span> : <span className="br-dim">—</span>}</td>
+                      <td>{o.src.length ? <span className="bv-src">{o.src.map((s) => <span key={s} className="br-tag br-mono">{s}</span>)}</span> : '—'}</td>
                       <td className="br-pre">{o.text || <span className="br-dim">—</span>}</td>
                     </tr>
                   ))}
@@ -356,16 +556,15 @@ function ReflectCard({ repo, items, pick, onPick, onItem, onApplied, post }: {
           )}
           {p.ops.length === 0 && !p.error && <p className="br-empty">没有要写的改动。</p>}
           {p.gaps.length > 0 && (
-            <div>
-              <b className="br-strong">Brain 里缺的</b>
-              <ul className="br-list">{p.gaps.map((g, i) => <li key={i}><b>{g.title}</b> <span className="br-tag">{g.kind}</span> {g.what}</li>)}</ul>
+            <div className="bv-block">
+              <b className="bv-block-h">Brain 里缺的</b>
+              <ul className="bv-gaps">
+                {p.gaps.map((g, i) => <li key={i}><b>{g.title}</b><span className="br-tag">{g.kind}</span><span>{g.what}</span></li>)}
+              </ul>
             </div>
           )}
-          {p.notes.length > 0 && <ul className="br-list br-dim">{p.notes.map((x, i) => <li key={i}>{x}</li>)}</ul>}
-          {p.warnings.length > 0 && <ul className="br-list">{p.warnings.map((x, i) => <li key={i} className="br-warn-text">{x}</li>)}</ul>}
-          {p.problems.length > 0 && (
-            <ul className="br-list" data-testid="reflect-problems">{p.problems.map((x, i) => <li key={i} className="br-bad-text">{x}</li>)}</ul>
-          )}
+          {p.warnings.length > 0 && <CheckRows rows={p.warnings.map((x) => ({ level: 'WARN', text: x }))} />}
+          {p.notes.length > 0 && <ul className="br-list br-dim br-small">{p.notes.map((x, i) => <li key={i}>{x}</li>)}</ul>}
           {!p.substantive && !p.error && <p className="br-note">这次只是给已有条目加来源，不用开分支。</p>}
           <div className="br-row">
             <button type="button" className="br-btn" disabled={blocked || apply.busy} aria-pressed={confirm === false} onClick={() => setConfirm(false)}>
@@ -377,7 +576,7 @@ function ReflectCard({ repo, items, pick, onPick, onItem, onApplied, post }: {
           </div>
           {confirm !== null && !blocked && (
             <div className="br-confirm" role="group" aria-label="确认写入">
-              <p className="br-note" style={{ color: 'var(--text)' }}>
+              <p className="br-pre">
                 {confirm
                   ? `在 main 上开一个新分支写入 ${pick} 的 ${p.ops.length} 处改动，推到远端并开 MR。你现在的工作目录不动。`
                   : `在 main 上开一个新分支写入 ${pick} 的 ${p.ops.length} 处改动，只在本机，不推。你现在的工作目录不动。`}
@@ -392,8 +591,8 @@ function ReflectCard({ repo, items, pick, onPick, onItem, onApplied, post }: {
       )}
       {apply.error && <p className="br-error" role="alert">{apply.error}</p>}
       {apply.result && (
-        <div className="br-stack" data-testid="reflect-applied">
-          <p className={apply.result.ok ? 'br-ok-text' : 'br-error'} role="status">
+        <div className={`br-banner ${apply.result.ok ? 'is-ok' : 'is-error'} bv-applied`} data-testid="reflect-applied">
+          <p className={apply.result.ok ? 'br-strong' : 'br-error'} role="status">
             {apply.result.ok ? `写好了${apply.result.branch ? `：分支 ${apply.result.branch}` : ''}` : '没写成，看下面的输出。'}
           </p>
           {apply.result.worktree && <p className="br-note" data-testid="reflect-worktree">工作区：<span className="br-mono">{apply.result.worktree}</span></p>}
@@ -403,3 +602,118 @@ function ReflectCard({ repo, items, pick, onPick, onItem, onApplied, post }: {
     </section>
   )
 }
+
+// ---------------------------------------------------------------- styles
+
+const FILE_COLORS = (p: string, t: string, i: string, j: string) => `--bv-PRODUCT: ${p}; --bv-TECH: ${t}; --bv-IMPROVEMENT: ${i}; --bv-PROJECT: ${j};`
+
+const BV_CSS = `
+.bv-root { ${FILE_COLORS('#3987e5', '#9085e9', '#d95926', '#3ea37a')} }
+:root[data-mode="light"] .bv-root { ${FILE_COLORS('#2a78d6', '#6250d6', '#eb6834', '#1f8a5c')} }
+.bv-top { display: flex; align-items: center; gap: .6em 1em; flex-wrap: wrap; }
+.bv-top-icon { color: var(--accent); }
+.bv-top .br-view-head p { font-size: .93em; }
+.bv-repo { display: inline-flex; align-items: center; gap: .5em; font-size: .93em; }
+.bv-repo select { padding: .35em .7em; border-radius: .7em; }
+.bv-ref { font-size: .86em; color: var(--muted); padding: .2em .7em; border-radius: 999px; background: var(--kt-glass); border: 1px solid var(--border); }
+.bv-ref code { color: var(--text-strong); }
+.bv-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1200px) { .bv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bv-kpis .br-kpi-big { font-size: 2.6em; }
+.bv-stack { display: flex; gap: 2px; height: .8em; margin-top: .2em; border-radius: .3em; overflow: hidden; }
+.bv-stack i { flex: 1 1 0; min-width: .4em; background: var(--muted); }
+.bv-stack i.is-none { background: color-mix(in srgb, var(--muted) 22%, transparent); }
+.bv-stack i:last-child { border-radius: 0 .3em .3em 0; }
+.bv-root .is-PRODUCT { --bv-c: var(--bv-PRODUCT); } .bv-root .is-TECH { --bv-c: var(--bv-TECH); }
+.bv-root .is-IMPROVEMENT { --bv-c: var(--bv-IMPROVEMENT); } .bv-root .is-PROJECT { --bv-c: var(--bv-PROJECT); }
+.bv-stack i[class*="is-"]:not(.is-none), .bv-legend .cto-sw { background: var(--bv-c); }
+.bv-legend { margin-top: .3em; gap: .2em .9em; font-size: .86em; }
+.bv-legend b { color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.bv-cells i.is-warn { background: var(--kt-warn); }
+.bv-ids { display: inline-flex; flex-wrap: wrap; gap: .3em; }
+.bv-ids .br-chip { font-family: var(--mono, ui-monospace, monospace); font-size: .8em; padding: .1em .6em; }
+.bv-meter { display: inline-block; width: 5em; height: .55em; border-radius: .3em; overflow: hidden; vertical-align: middle;
+  background: color-mix(in srgb, var(--muted) 22%, transparent); }
+.bv-meter > i { display: block; height: 100%; border-radius: .3em; background: var(--kt-ok); }
+.bv-meter.is-fail > i { background: var(--kt-bad); }
+.br-kpi .bv-meter { width: 100%; height: .6em; margin-top: .2em; }
+.bv-meter.is-cand { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kt-warn) 70%, transparent); }
+
+.bv-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(22em, 30em); gap: var(--kit-gap-block, 16px); align-items: start; }
+@media (max-width: 1200px) { .bv-main { grid-template-columns: minmax(0, 1fr); } }
+.bv-col { display: grid; gap: var(--kit-gap-row, 12px); min-width: 0; align-content: start; }
+.bv-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6em; }
+@media (max-width: 800px) { .bv-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bv-tab { appearance: none; font: inherit; display: grid; grid-template-columns: 2.3em minmax(0, 1fr) auto; align-items: center; gap: .7em; padding: .6em .9em;
+  border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; text-align: left; }
+.bv-tab:hover { border-color: var(--border-strong); }
+.bv-tab[aria-pressed="true"] { border-color: var(--bv-c, var(--accent)); background: color-mix(in srgb, var(--bv-c, var(--accent)) 12%, var(--card));
+  box-shadow: 0 0 0 1px var(--bv-c, var(--accent)); }
+.bv-letter { display: grid; place-items: center; width: 2.3em; height: 2.3em; border-radius: .6em; font-weight: 850; color: #fff; background: var(--bv-c, var(--muted)); }
+.bv-tab-name { display: flex; flex-direction: column; font-weight: 750; color: var(--text-strong); letter-spacing: .02em; min-width: 0; }
+.bv-tab-name small { font-size: .82em; font-weight: 550; color: var(--muted); letter-spacing: 0; }
+.bv-tab-n { font-size: 1.6em; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-strong); }
+.bv-file { border-top: 3px solid var(--bv-c, var(--border)); }
+.bv-filter { display: flex; align-items: center; gap: .6em 1em; flex-wrap: wrap; }
+.bv-search { display: inline-flex; align-items: center; gap: .4em; padding: 0 .4em 0 .7em; border-radius: 10px; border: 1px solid var(--border-strong, var(--border));
+  background: var(--bg); color: var(--muted); flex: 0 1 22em; }
+.bv-search input { border: 0 !important; background: transparent !important; padding: .45em .2em !important; flex: 1; min-width: 0; outline: none; }
+.bv-search:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.bv-types { display: flex; flex-wrap: wrap; gap: .35em; }
+.bv-type { appearance: none; font: inherit; font-size: .86em; padding: .2em .8em; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; }
+.bv-type b { color: var(--muted); font-weight: 700; margin-left: .2em; }
+.bv-type:hover { border-color: var(--accent); }
+.bv-type[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text-strong); }
+.bv-type[aria-pressed="true"] b { color: var(--text-strong); }
+.bv-sec { display: grid; gap: .5em; }
+.bv-sec > h4 { margin: .4em 0 0; font-size: .93em; font-weight: 750; color: var(--text-strong); letter-spacing: .04em; }
+.bv-entries { display: grid; grid-template-columns: repeat(auto-fill, minmax(22em, 1fr)); gap: .7em; }
+.bv-entry { display: grid; gap: .5em; align-content: start; padding: .8em 1em; border-radius: var(--kit-r-cell, 10px); border: 1px solid var(--border);
+  background: var(--bg-elevated, var(--card)); scroll-margin: 6em; border-left: 3px solid var(--bv-c, var(--border)); }
+.bv-file .bv-entry { --bv-c: inherit; }
+.bv-entry.is-cand { border-color: color-mix(in srgb, var(--kt-warn) 50%, var(--border)); border-left-color: var(--kt-warn); border-style: dashed; border-left-style: solid; }
+.bv-entry.is-hl { border-color: var(--accent); border-left-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
+.bv-entry-top { display: flex; align-items: center; gap: .4em .5em; flex-wrap: wrap; }
+.bv-entry-top .br-chip, .bv-entry-top .br-tag { font-size: .8em; }
+.bv-text { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text-strong); line-height: 1.55; }
+.bv-entry-foot { display: flex; align-items: center; justify-content: space-between; gap: .4em 1em; flex-wrap: wrap; font-size: .82em; color: var(--muted); }
+.bv-use { display: inline-flex; align-items: center; gap: .5em; }
+.bv-use b { color: var(--text-strong); }
+.bv-src { display: inline-flex; align-items: center; gap: .3em; flex-wrap: wrap; }
+.bv-src .br-tag { font-size: .92em; padding: 0 .45em; }
+
+.bv-block { display: grid; gap: .45em; }
+.bv-block-h { font-size: .86em; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+.bv-repeats { list-style: none; margin: 0; padding: 0; display: grid; gap: .45em; }
+.bv-repeats li { display: flex; align-items: center; gap: .5em; flex-wrap: wrap; }
+.bv-repeats .br-chip { font-family: var(--mono, ui-monospace, monospace); font-size: .82em; }
+.bv-rep-n { display: inline-flex; gap: 2px; }
+.bv-rep-n i { width: .5em; height: .9em; border-radius: 2px; background: var(--kt-bad); }
+.bv-runs td { vertical-align: middle; }
+.bv-load { display: inline-flex; align-items: center; gap: .5em; white-space: nowrap; }
+
+.bv-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; counter-reset: s; }
+.bv-steps li { position: relative; display: flex; align-items: center; gap: .55em; padding: .5em .6em; font-weight: 650; color: var(--muted); }
+.bv-steps li:not(:last-child)::after { content: ''; flex: 1; height: 2px; margin: 0 .2em 0 .4em; border-radius: 1px; background: color-mix(in srgb, var(--muted) 30%, transparent); }
+.bv-steps li i { font-style: normal; flex: none; display: grid; place-items: center; width: 1.8em; height: 1.8em; border-radius: 50%; font-size: .86em; font-weight: 850;
+  border: 2px dashed color-mix(in srgb, var(--muted) 55%, transparent); color: var(--muted); }
+.bv-steps li span { white-space: nowrap; }
+.bv-steps li.is-done { color: var(--text); }
+.bv-steps li.is-done i { border: 2px solid var(--kt-ok-solid); background: var(--kt-ok-solid); color: #fff; }
+.bv-steps li.is-done::after { background: var(--kt-ok); }
+.bv-steps li.is-now { color: var(--text-strong); }
+.bv-steps li.is-now i { border: 2px solid var(--accent); background: var(--accent); color: var(--accent-fg, #fff); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+.bv-steps li.is-bad { color: var(--kt-bad); }
+.bv-steps li.is-bad i { border: 2px solid var(--kt-bad); color: var(--kt-bad); background: color-mix(in srgb, var(--kt-bad) 14%, transparent); }
+.bv-steps li.is-off { opacity: .6; }
+.bv-pick { display: flex; align-items: center; gap: .6em 1em; flex-wrap: wrap; padding: .7em .9em; border-radius: var(--kit-r-cell, 10px); background: var(--kt-glass); border: 1px solid var(--border); }
+.bv-pick select { min-width: 18em; }
+.bv-preview { display: grid; gap: .8em; }
+.bv-ops td { vertical-align: middle; }
+.bv-filetag { display: inline-flex; padding: 0 .5em; border-radius: 6px; font-size: .84em; font-weight: 750; color: #fff; background: var(--bv-c, var(--muted)); }
+.bv-gaps { list-style: none; margin: 0; padding: 0; display: grid; gap: .4em; }
+.bv-gaps li { display: flex; align-items: baseline; gap: .5em; flex-wrap: wrap; padding: .5em .8em; border-radius: var(--kit-r-cell, 10px);
+  border: 1px dashed color-mix(in srgb, var(--kt-warn) 55%, var(--border)); background: color-mix(in srgb, var(--kt-warn) 6%, transparent); }
+.bv-gaps b { color: var(--text-strong); }
+.bv-applied p { margin: 0; }
+`

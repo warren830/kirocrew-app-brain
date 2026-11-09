@@ -47,12 +47,18 @@ describe('运行机', () => {
     expect(chip('RUN-PAY-4-1')).toHaveClass('tone-run')
     expect(chip('RUN-PAY-2-1')).toHaveTextContent('已合并')
     const ledger = screen.getByRole('region', { name: '账本' })
-    const line = (k: string) => Array.from(ledger.querySelectorAll(`[data-ledger="${k}"] .br-tag`)).map((t) => t.textContent)
+    const line = (k: string) => Array.from(ledger.querySelectorAll(`[data-ledger="${k}"] .tm-leg`)).map((t) => t.textContent)
     expect(line('runs')).toEqual(['签名中 1', '已派给会话 2', '已合并 3'])
     // brain-kit 72b278e: asking, a bridge posting the question right now
     expect(line('decisions')).toEqual(['正在发到 MR 1', '已发出，等回答 1', '已收到回答，等桥签名送回 1', '已送回 4', '签名服务拒签 1', '作废 1'])
     expect(line('handoffs')).toEqual(['已接手 4', '拒绝接手 1'])
-    expect(ledger.querySelector('[data-ledger="runs"] .br-tag')).toHaveAttribute('title', 'signing')
+    expect(ledger.querySelector('[data-ledger="runs"] .tm-leg')).toHaveAttribute('title', 'signing')
+    // each count card: its total (hand-overs: taken of all) and a segment bar by state
+    expect(ledger.querySelector('[data-ledger="runs"]')).toHaveTextContent('运行6个')
+    expect(within(ledger.querySelector('[data-ledger="runs"]') as HTMLElement).getByRole('img')).toHaveAccessibleName('签名中 1，已派给会话 2，已合并 3')
+    expect(ledger.querySelector('[data-ledger="handoffs"]')).toHaveTextContent('交接4/5')
+    expect(ledger.querySelector('[data-ledger="signer"]')).toHaveTextContent('签名1等签名')
+    expect(ledger.querySelector('[data-ledger="signer"]')).toHaveTextContent('拒签 1 · 上一轮没等到 1')
     // every run state of brain-kit has words
     expect(Object.keys(RUN_STATE).sort()).toEqual(['closed', 'dispatched', 'failed', 'merged', 'ready', 'send_unknown', 'signing', 'spooled'])
     expect(runStateMeta('send_unknown')).toEqual({ label: '送没送到不清楚', tone: 'warn' })
@@ -71,7 +77,12 @@ describe('运行机', () => {
     expect(item('unlabelled')).toHaveTextContent('标签刚被拿掉')
     expect(item('unlabelled')).toHaveTextContent('brain handoff 重打标签')
     expect(item('error')).toHaveTextContent('这一轮没查成')
-    expect(item('error')).toHaveTextContent('the signer did not answer')      // its error instead of the hint
+    expect(item('error')).toHaveTextContent(fx.team().handovers.find((h) => h.result === 'error')!.error) // its error instead of the hint
+    expect(item('error')).not.toHaveTextContent('下一轮再试')
+    // on the conveyor: dashed (looked at again next round); the belt ends at the runner
+    expect(item('waiting')).toHaveClass('kt-belt-chip', 'is-pending')
+    expect(within(item('waiting')).getByText('正在别处签名')).toHaveClass('kt-pill', 'tone-hand')
+    expect(ho.querySelector('.kt-belt-end.is-head')).toHaveTextContent('运行机')
     expect(Object.keys(HANDOVER_RESULT).sort()).toEqual(['accepted', 'error', 'rejected', 'seen', 'unlabelled', 'waiting'])
     expect(handoverMeta('later')).toEqual({ label: 'later', tone: 'idle', hint: '' })
     unmount()
@@ -127,10 +138,15 @@ describe('运行机', () => {
     await waitFor(() => expect(p.reloadStatus).toHaveBeenCalled())
   })
 
-  test('not in team mode: it says so and asks for nothing', async () => {
+  test('not in team mode: it says so, how a runner works, the way to 设置, and asks for nothing', async () => {
     installFixtureRoutes()
-    render(<TeamPage {...props({ status: fx.status() })} />)
-    expect(screen.getByText(/这台机器没开团队模式/)).toBeInTheDocument()
+    const p = props({ status: fx.status() })
+    render(<TeamPage {...p} />)
+    const hero = screen.getByTestId('team-off')
+    expect(within(hero).getByText(/这台机器没开团队模式/)).toBeInTheDocument()
+    expect(within(hero).getAllByRole('listitem')).toHaveLength(5)
+    await userEvent.setup().click(within(hero).getByRole('button', { name: '去设置' }))
+    expect(p.go).toHaveBeenCalledWith({ kind: 'settings' })
     expect(apiCalls.filter((c) => c.path === `${API}/team`)).toHaveLength(0)
   })
 })

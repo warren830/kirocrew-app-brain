@@ -5,7 +5,7 @@ import { apiCalls, apiError, navigations } from '../test/stubs/app-sdk'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import type { IntakeCheck } from '../types'
-import { GATE45, NewView, REVIEW_HINT } from './NewReq'
+import { GATE4, GATE5, HERO_TEXT, NewView, REVIEW_HINT } from './NewReq'
 
 function setup(routes: Parameters<typeof installFixtureRoutes>[0] = {}) {
   installFixtureRoutes({
@@ -20,6 +20,8 @@ function setup(routes: Parameters<typeof installFixtureRoutes>[0] = {}) {
 
 const PATHS = '预计会改的路径（用逗号、空格或换行分开）'
 const startBtn = () => screen.getByRole('button', { name: '开工' })
+const gateStates = () => [1, 2, 3, 4, 5].map((n) => screen.getByTestId(`gate-${n}`).dataset.state)
+const flowStates = () => within(screen.getByRole('list', { name: '开需求的步骤' })).getAllByRole('listitem').map((li) => li.dataset.state)
 const checkBtn = () => screen.getByRole('button', { name: '先检查（不写入）' })
 
 async function fillBasics(user: ReturnType<typeof userEvent.setup>) {
@@ -48,7 +50,8 @@ describe('开需求', () => {
     await user.click(checkBtn())
     const findings = await screen.findByTestId('findings')
     for (const line of fx.intakeCheck().findings) expect(within(findings).getByText(line)).toBeInTheDocument()
-    expect(screen.getByTestId('check-summary')).toHaveTextContent('文档包 PKG-PAY-8-1 · 密级 confidential · 3 份来源 · 12 段')
+    const pkg = screen.getByTestId('check-summary')
+    expect(within(pkg).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['文档包PKG-PAY-8-1', '密级confidential', '3份来源', '12段', '需求号PAY-8'])
     expect(screen.getByText(/截图\.png：图片文件不收/)).toBeInTheDocument()
     const checkCall = apiCalls.find((c) => c.method === 'POST' && c.path === `${API}/intake/check`)
     expect(checkCall?.body).toEqual({
@@ -90,14 +93,17 @@ describe('开需求', () => {
 
     await user.click(within(out).getByRole('button', { name: '打开会话' }))
     expect(navigations).toEqual(['/chat?sid=brain-PAY-8-2c9d'])
-    await user.click(within(out).getByRole('button', { name: '看这个需求' }))
-    expect(props.go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-8' })
+    await user.click(within(out).getByRole('button', { name: '看需求看板' }))
+    expect(props.go).toHaveBeenCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-8' })
+    await user.click(within(out).getByRole('button', { name: '看需求详情' }))
+    expect(props.go).toHaveBeenLastCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-8' })
   })
 
   test('what may be a name or a password is listed under 请你确认 (not masked, not stopping 开工); the gate 4 rule says so', async () => {
     const { user } = setup()
-    expect(screen.getByText(GATE45)).toBeInTheDocument()
-    expect(GATE45).toContain('请你确认')
+    expect(within(screen.getByTestId('gate-4')).getByText(GATE4)).toBeInTheDocument()
+    expect(within(screen.getByTestId('gate-5')).getByText(GATE5)).toBeInTheDocument()
+    expect(GATE4).toContain('请你确认')
     await fillBasics(user)
     await fillGates(user)
     await user.click(checkBtn())
@@ -109,6 +115,8 @@ describe('开需求', () => {
     expect(review).toHaveTextContent(REVIEW_HINT)
     expect(within(screen.getByTestId('findings')).getByText(fx.intakeCheck().findings[0])).toBeInTheDocument() // verbatim too
     expect(startBtn()).toBeEnabled()
+    expect(screen.getByTestId('gate-4')).toHaveAttribute('data-state', 'warn') // the gate shows it, in the warn tone
+    expect(screen.getByTestId('gate-5')).toHaveAttribute('data-state', 'ok')
   })
 
   test('a check without review findings shows no 请你确认', async () => {
@@ -130,8 +138,13 @@ describe('开需求', () => {
     await user.click(checkBtn())
     const line = await within(await screen.findByTestId('findings')).findByText(blocking)
     expect(line).toHaveClass('is-blocking')
+    expect(within(screen.getByTestId('findings')).getAllByRole('listitem')[0]).toBe(line) // what stops comes first
     expect(startBtn()).toBeDisabled()
     expect(screen.getByTestId('start-why')).toHaveTextContent('检查没过')
+    // the gate it names is red; the others keep their own state
+    expect(screen.getByTestId('gate-2')).toHaveAttribute('data-state', 'bad')
+    expect(screen.getByTestId('gate-1')).toHaveAttribute('data-state', 'ok')
+    expect(flowStates()).toEqual(['done', 'bad', undefined, undefined, undefined])
   })
 
   test('a check that fails (a hard stop or a request error) says so and keeps 开工 off', async () => {
@@ -141,6 +154,7 @@ describe('开需求', () => {
     await user.click(checkBtn())
     expect(await screen.findByText('门 1：确认你是作者，或已取得作者同意（400）')).toBeInTheDocument()
     expect(startBtn()).toBeDisabled()
+    expect(screen.getByTestId('gate-1')).toHaveAttribute('data-state', 'bad')
   })
 
   test('without documents nothing needs checking: 开工 is on once title and slug are valid', async () => {
@@ -189,9 +203,9 @@ describe('开需求', () => {
       [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了：~/.kiro/agents/brain-dev.json', rows: fx.crew().rows.map((r) => ({ ...r, level: 'OK' })) }),
     })
     const card = await screen.findByRole('region', { name: 'KiroCrew 的检查' })
-    expect(card).toHaveTextContent('缺 Lean 的 hook：调用工具前（preToolUse）')
+    for (const r of fx.crew().rows.filter((x) => x.level !== 'OK')) expect(card).toHaveTextContent(r.text)
     expect(card).not.toHaveTextContent('KiroCrew 在跑') // OK rows are not listed here
-    await user.click(within(card).getByRole('button', { name: '装上或补全 brain-dev 的 Lean hook' }))
+    await user.click(within(card).getByRole('button', { name: /brain-dev 的 Lean hook/ }))
     await waitFor(() => expect(apiCalls.find((c) => c.path === `${API}/crew/fix`)?.body).toEqual({ what: 'agent' }))
     expect(await screen.findByText('KiroCrew 的检查都过了。')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'KiroCrew 的检查' })).toBeNull()
@@ -231,5 +245,59 @@ describe('开需求', () => {
     await user.click(within(banner).getByRole('button', { name: '导入仓库' }))
     await user.click(within(banner).getByRole('button', { name: '去设置' }))
     expect(go).toHaveBeenLastCalledWith({ kind: 'settings' })
+  })
+
+  test('the hero says what happens; its steps follow the form: 认领 → 文档过五关 (not needed without documents) → 开工 → Lean 推进', async () => {
+    const { user } = setup()
+    const hero = screen.getByRole('region', { name: '开需求' })
+    expect(hero).toHaveTextContent(HERO_TEXT)
+    const steps = within(screen.getByRole('list', { name: '开需求的步骤' })).getAllByRole('listitem')
+    expect(steps.map((li) => li.textContent)).toEqual([
+      '1认领仓库、标题、slug、需求号', '2文档过五关没有文档：不用过', '3开工在它自己的工作目录里开 brain-dev 会话', '4Lean 推进需求和设计由你批准', '5交给运行机交接以后它接着做',
+    ])
+    expect(flowStates()).toEqual(['now', 'off', undefined, undefined, undefined])
+    await fillBasics(user)
+    expect(flowStates()).toEqual(['done', 'off', 'now', undefined, undefined])
+    await user.type(screen.getByLabelText('文档（一行一个路径）'), '/Users/alice/Downloads/a.docx')
+    expect(flowStates()).toEqual(['done', 'now', undefined, undefined, undefined])
+    await fillGates(user)
+    await user.click(checkBtn())
+    await screen.findByTestId('check-result')
+    expect(flowStates()).toEqual(['done', 'done', 'now', undefined, undefined])
+    await user.click(startBtn())
+    await screen.findByTestId('start-result')
+    expect(flowStates()).toEqual(['done', 'done', 'done', 'now', undefined])
+  })
+
+  test('the five gates show their state: dashed without documents, magenta while they wait for you, green once done', async () => {
+    const { user } = setup()
+    await waitFor(() => expect(screen.getByLabelText('需求号')).toHaveValue('PAY-8'))
+    expect(gateStates()).toEqual(['off', 'off', 'off', 'off', 'off'])
+    expect(screen.getByTestId('gate-1')).toHaveTextContent('不用')
+    await user.type(screen.getByLabelText('文档（一行一个路径）'), '/Users/alice/Downloads/a.docx')
+    expect(gateStates()).toEqual(['wait', 'wait', 'wait', 'auto', 'auto'])
+    expect(screen.getByTestId('gate-1')).toHaveTextContent('等你勾')
+    expect(screen.getByTestId('gate-2')).toHaveTextContent('等你选')
+    expect(screen.getByTestId('gate-4')).toHaveTextContent('自动')
+    await user.click(screen.getByLabelText('我是作者，或已取得作者同意'))
+    await user.click(screen.getByLabelText('机密'))
+    expect(gateStates()).toEqual(['ok', 'ok', 'wait', 'auto', 'auto'])
+    await user.click(screen.getByLabelText('换成占位符'))
+    expect(gateStates()).toEqual(['ok', 'ok', 'ok', 'auto', 'auto'])
+    expect(screen.getByTestId('gate-3')).toHaveTextContent('好了')
+    expect(screen.getByLabelText('换成占位符').closest('label')).toHaveClass('is-on')
+  })
+
+  test('a start that did not work says so, shows brain start’s output open, and offers no session', async () => {
+    const { user } = setup({ [`POST ${API}/intake/start`]: () => ({ ...fx.start(), ok: false, url: null, slot: null, output: 'claim/PAY-8 已经被 bob 认领了' }) })
+    await fillBasics(user)
+    await user.click(startBtn())
+    const out = await screen.findByTestId('start-result')
+    expect(out).toHaveClass('is-bad')
+    expect(within(out).getByRole('status')).toHaveTextContent('没开成')
+    expect(out.querySelector('details')).toHaveAttribute('open')
+    expect(within(out).getByText('claim/PAY-8 已经被 bob 认领了')).toBeInTheDocument()
+    expect(within(out).queryByRole('button', { name: '打开会话' })).toBeNull()
+    expect(flowStates()[2]).toBe('bad')
   })
 })

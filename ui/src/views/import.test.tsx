@@ -44,6 +44,8 @@ function installed(): ImportInspect {
   return c
 }
 
+const flowStates = () => within(screen.getByRole('list', { name: '导入的步骤' })).getAllByRole('listitem').map((li) => li.dataset.state)
+
 async function inspectPath(user: ReturnType<typeof userEvent.setup>, path = REPO) {
   await user.type(screen.getByLabelText('仓库目录'), path)
   await user.click(screen.getByRole('button', { name: '检查' }))
@@ -67,10 +69,15 @@ describe('导入仓库', () => {
     expect(within(row('clean')).getByRole('img', { name: '注意' })).toHaveTextContent('!')
     expect(row('clean')).toHaveTextContent('不影响：安装在单独的工作目录里做，你的检出不会动')
     expect(within(card).getByText(/没有 ~\/\.kiro\/agents\/brain-dev\.json/)).toBeInTheDocument() // KiroCrew's rows
-    expect(within(card).getByRole('button', { name: '装上或补全 brain-dev 的 Lean hook' })).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: /brain-dev 的 Lean hook/ })).toBeInTheDocument()
     expect(screen.queryByTestId('install')).toBeNull()
+    expect(flowStates()).toEqual(['done', 'done', 'off', 'now']) // installed already: no install step
+    expect(within(screen.getByRole('list', { name: '导入的步骤' })).getAllByRole('listitem')[2]).toHaveTextContent('已经装了：不用装')
+    // the head counts the rows by level
+    expect(card.querySelector('[data-count="OK"]')).toHaveTextContent(`✓${installed().checks.filter((x) => x.level === 'OK').length} 项正常`)
     await user.click(screen.getByRole('button', { name: '加入列表' }))
     expect(await screen.findByTestId('added')).toHaveTextContent('加入了（r3）')
+    expect(flowStates()).toEqual(['done', 'done', 'off', 'done'])
     expect(apiCalls.find((c) => c.path === `${API}/import/add`)?.body).toEqual({ path: REPO })
     expect(props.setStatus).toHaveBeenCalledWith(status)
     await user.click(screen.getByRole('button', { name: '开需求' }))
@@ -84,8 +91,10 @@ describe('导入仓库', () => {
       [`POST ${API}/import/install`]: () => running(fx.importJob()),
       [`GET ${API}/import/jobs/*`]: jobRoute(fx.importJob(), 2),
     })
+    expect(flowStates()).toEqual(['now', undefined, undefined, undefined])
     await inspectPath(user)
     const form = await screen.findByRole('form', { name: 'kit.json' })
+    expect(flowStates()).toEqual(['done', 'done', 'now', undefined])
     expect(within(form).getByLabelText('需求号前缀')).toHaveValue('REFUND')
     expect(within(form).getByLabelText('GitLab 地址')).toHaveValue('https://gitlab.example.com')
     expect(within(form).getByLabelText('GitLab 项目')).toHaveValue('shop/refund')
@@ -97,28 +106,41 @@ describe('导入仓库', () => {
     await user.type(within(form).getByLabelText('需求号前缀'), 'ref')
     expect(within(form).getByText('需求号会是 REF-1、REF-2 …')).toBeInTheDocument()
     await user.type(within(form).getByLabelText('团队（可不填）'), '退款组')
+    // the live preview of .brain/kit.json
+    const preview = within(form).getByRole('complementary', { name: '会写进 .brain/kit.json' })
+    expect(within(preview).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['需求号REF-1', '跟踪不用 Jira', '默认分支main', 'GitLabshop/refund', '团队退款组'])
+    expect(within(preview).getByLabelText('新分支从哪来')).toHaveTextContent('origin/main→brain/install')
     await user.click(within(form).getByRole('button', { name: '安装到新分支' }))
     expect(apiCalls.find((c) => c.path === `${API}/import/install`)?.body).toEqual({
       path: REPO, branch: 'brain/install',
       kit: { req_prefix: 'REF', tracker: 'none', jira_base: '', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/refund', default_branch: 'main', team: '退款组' },
     })
-    const steps = await screen.findByRole('list', { name: '安装的进度' })
-    expect(within(steps).getAllByRole('listitem').map((li) => li.dataset.step)).toEqual(['branch', 'install', 'kit', 'doctor', 'commit'])
+    const job = await screen.findByRole('group', { name: '安装的进度' })
+    expect(within(job).getAllByRole('listitem').map((li) => li.dataset.step)).toEqual(['branch', 'install', 'kit', 'doctor', 'commit'])
     const out = await screen.findByTestId('install-result')
     expect(screen.getByTestId('job-install')).toHaveAttribute('data-state', 'done')
     expect(out).toHaveTextContent('brain/install（从 origin/main 建）')
     expect(out).toHaveTextContent('/Users/alice/workplace/brain-app/refund/_brain-install')
     expect(within(out).getByText('改了 14 个文件')).toBeInTheDocument()
-    expect(within(out).getByTestId('changed-files')).toHaveTextContent('新增 .brain/kit.json')
+    const added = within(out).getByTestId('changed-files').querySelector('[data-change="added"]') as HTMLElement
+    expect(within(added).getByText('.brain/kit.json')).toBeInTheDocument()
+    expect(added).toHaveTextContent(`新增 ${fx.importJob().result!.files.filter((f) => f.change === 'added').length}`)
     expect(within(out).getByTestId('doctor')).toHaveTextContent('kit config valid')
+    const doctor = fx.importJob().result!.doctor.rows
+    expect(within(within(out).getByTestId('doctor')).getAllByRole('listitem').filter((li) => !li.closest('details')).map((li) => li.dataset.level))
+      .toEqual(doctor.filter((r) => r.level !== 'OK').map((r) => r.level)) // what needs a look is shown; the OK rows are folded
+    expect(within(out).getByText(`另外 ${doctor.filter((r) => r.level === 'OK').length} 项正常`)).toBeInTheDocument()
+    expect(screen.getByTestId('elapsed-install')).toHaveTextContent('用了 9 秒')
+    expect(within(screen.getByRole('group', { name: '安装的进度' })).getByText('安装好了')).toBeInTheDocument()
     expect(within(out).getByTestId('commit-ok')).toHaveTextContent('提交了 eb43199f（作者 Alice Example <alice@example.com>）')
     expect(props.reloadStatus).toHaveBeenCalled()
     // checked again: on the install branch now
     const pending = await screen.findByTestId('pending')
     expect(pending).toHaveTextContent('安装在 brain/install 分支上，合并后生效')
     expect(inspected).toBe(2)
-    expect(screen.getByTestId('add')).toHaveTextContent('4 · 加入列表')
+    expect(within(screen.getByTestId('add')).getByRole('heading', { name: '加入列表' }).closest('header')).toHaveAttribute('data-step', '4')
     expect(screen.getByTestId('add')).toHaveTextContent('列表里这个仓库会显示「安装在 brain/install 分支上，合并后生效」')
+    expect(flowStates()).toEqual(['done', 'done', 'done', 'now'])
   })
 
   test('推送并开 MR asks first, saying which branch goes where; only then it posts, and shows the MR', async () => {
@@ -181,6 +203,8 @@ describe('导入仓库', () => {
     const no = await screen.findByTestId('commit-blocked')
     expect(no).toHaveTextContent('扫描到可疑的 token')
     expect(inspected).toBe(1) // not checked again: nothing was committed
+    expect(flowStates()[2]).toBe('wait')
+    expect(within(screen.getByRole('group', { name: '安装的进度' })).getByText('有一步没成')).toBeInTheDocument()
     await user.click(within(no).getByRole('button', { name: '再提交一次' }))
     expect(await screen.findByTestId('commit-ok')).toHaveTextContent('提交了 ffffffff')
     expect(apiCalls.find((c) => c.path === `${API}/import/commit`)?.body).toEqual({ path: REPO })
@@ -200,13 +224,18 @@ describe('导入仓库', () => {
       [`GET ${API}/import/jobs/*`]: (_b, path) => (path.endsWith(failed.id) && clones === 1 ? clone(failed) : fx.importCloneJob()),
       [`POST ${API}/import/inspect`]: () => fx.importInspect(),
     })
+    const options = screen.getByRole('radiogroup', { name: '从哪来' })
+    expect(within(options).getAllByRole('radio').map((r) => (r as HTMLInputElement).checked)).toEqual([true, false])
     await user.click(screen.getByLabelText('克隆（git 地址）'))
+    expect(screen.getByLabelText('克隆（git 地址）').closest('label')).toHaveClass('is-on')
+    expect(screen.getByLabelText('本机目录').closest('label')).not.toHaveClass('is-on')
     expect(await screen.findByLabelText('放在哪个目录下')).toHaveValue('/Users/alice/workplace')
     await user.type(screen.getByLabelText('仓库地址'), 'git@gitlab.example.com:shop/refund.git')
     expect(screen.getByLabelText('目录名（可不填）')).toHaveAttribute('placeholder', 'refund')
     await user.click(screen.getByRole('button', { name: '克隆' }))
     expect(apiCalls.find((c) => c.path === `${API}/import/clone`)?.body).toEqual({ url: 'git@gitlab.example.com:shop/refund.git', parent: '/Users/alice/workplace', name: '' })
     expect(await screen.findByText(/刷新你的 SSH 凭据/, { selector: '[role="alert"]' })).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: '克隆的进度' })).getByText('克隆没成')).toBeInTheDocument()
     expect(apiCalls.some((c) => c.path === `${API}/import/inspect`)).toBe(false)
     await user.click(screen.getByRole('button', { name: '克隆' }))
     expect(await screen.findByText(`克隆好了：${REPO}。下面是它的检查。`)).toBeInTheDocument()
@@ -236,6 +265,7 @@ describe('导入仓库', () => {
     const card = await screen.findByTestId('inspect')
     expect(within(card).getByRole('alert')).toHaveTextContent('符号链接')
     expect(screen.getByTestId('next-fix')).toHaveTextContent('先处理上面打 ✗ 的几行')
+    expect(flowStates()).toEqual(['done', 'bad', undefined, undefined])
     expect(screen.queryByTestId('install')).toBeNull()
     expect(screen.queryByTestId('add')).toBeNull()
     // the box changed: the check no longer counts
@@ -252,6 +282,7 @@ describe('导入仓库', () => {
     await inspectPath(user)
     const done = await screen.findByTestId('next-listed')
     expect(done).toHaveTextContent('已经在列表里（r1）。')
+    expect(flowStates()).toEqual(['done', 'done', 'off', 'done'])
     await user.click(within(done).getByRole('button', { name: '去交付总览' }))
     expect(props.go).toHaveBeenCalledWith({ kind: 'overview' })
     expect(screen.queryByTestId('add')).toBeNull()
@@ -274,5 +305,16 @@ describe('导入仓库', () => {
     expect(nameFromUrl('https://gitlab.example.com/shop/refund/')).toBe('refund')
     expect(nameFromUrl('/srv/git/pay.git')).toBe('pay')
   })
-})
 
+  test('跟踪方式 Jira: the Jira field appears and the preview says the keys come from Jira', async () => {
+    const { user } = setup({ [`POST ${API}/import/inspect`]: () => fx.importInspect() })
+    await inspectPath(user)
+    const form = await screen.findByRole('form', { name: 'kit.json' })
+    expect(within(form).queryByLabelText('Jira 地址')).toBeNull()
+    await user.click(within(form).getByLabelText('用 Jira 的号'))
+    expect(within(form).getByLabelText('Jira 地址')).toBeInTheDocument()
+    const preview = within(form).getByRole('complementary', { name: '会写进 .brain/kit.json' })
+    expect(within(preview).getAllByRole('listitem')[0]).toHaveTextContent('需求号Jira 上的号')
+    expect(within(preview).getAllByRole('listitem')[1]).toHaveTextContent('跟踪Jira')
+  })
+})
