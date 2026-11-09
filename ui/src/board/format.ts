@@ -245,7 +245,7 @@ export function checksSay(w: CheckWall, who: WaitWho, owner: string | null): Che
     .map((c) => (c.group === 'gate' ? `${c.label}审批` : c.label))
   const left = todo.length ? ` · 还剩 ${todo.join('、')}` : ''
   const watching = watch ? ` · ${watch} 项在观察` : ''
-  if (!w.total && !watch) return { text: todo.length ? `还没有检查结果${left}` : '还没有检查结果', tone: 'idle', green: false }
+  if (!w.total && !watch) return { text: '还没有检查结果', tone: 'idle', green: false }
   if (w.failed) return { text: `${w.failed} 项没过${left}`, tone: 'bad', green: false }
   if (wait) return { text: `${wait} 项${PERSON.has(who) ? whoWord(who, owner) : '等人'}${left}`, tone: 'approve', green: false }
   const all = w.passed === 1 ? '1 项过了' : `${w.passed} 项都过`

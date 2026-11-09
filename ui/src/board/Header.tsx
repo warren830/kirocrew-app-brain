@@ -241,7 +241,7 @@ export function Intro({ board, onStart }: { board: ReqBoard; onStart?: () => voi
   const only = localOnly(board)
   const way = only ? LOCAL_WAY : WAY
   const owner = board.person.owner
-  const who = onStart ? '你' : owner ?? '负责人'
+  const who = onStart ? '你' : owner ? ` ${owner} ` : '负责人'
   return (
     <section className="kt-empty" data-testid="br-board-intro" aria-label="这个需求还没开工">
       <div className="kt-empty-hero">
