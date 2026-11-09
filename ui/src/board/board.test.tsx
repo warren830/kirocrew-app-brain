@@ -478,7 +478,7 @@ const H = 3600
 function idle(): ReqBoard {
   const b = fx.board()
   const since = b.at - 11 * H - 30 * 60
-  b.row.waits = { who: 'you', text: '会话空着：轮到你回话', line: null, raw: '', do: 'reply', since, where: 'session' }
+  b.row.waits = { who: 'you', text: '会话空着：轮到你回话', line: null, raw: '', do: 'reply', since, where: 'session', review: false }
   b.row.lean = { ...b.row.lean, stage: 'release', stage_label: '发布', stage_n: 11, stage_state: 'todo', done: 10, done_n: 4, skipped_n: 6, next: { id: 'release', label: '发布', n: 11 } }
   b.accept.step = { text: '构建和测试做完了，下一步是发布：在会话里让它接着做', who: '你', line: null, mr_url: null, session_url: '/chat?sid=brain-PAY-3-7f3a' }
   b.questions = []
@@ -633,16 +633,30 @@ describe('需求看板 · 轮到谁、做什么', () => {
     expect(strip).not.toHaveTextContent('已经等了')
   })
 
-  test('an idle session whose Lean says a review in a new session comes next: that step, 开审查会话 right there', async () => {
+  test('an idle session whose next step is Lean’s review in a new session: that step, 开审查会话 right there, the line it says folded', async () => {
+    const said = 'Review intent 261107-refund-export against its requirements, design and plans, using the diff, and write construction/build-and-test/review.md.'
     const b = idle()
-    b.row.waits = { ...b.row.waits, text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）' }
-    b.accept.step = { ...b.accept.step, line: '接着做下一步：发布' }
+    b.row.waits = { ...b.row.waits, text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', review: false }
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    await loaded()
+    // the backend's judgment, not the words
+    expect(within(region('你要做的一步')).queryByRole('button', { name: '开审查会话' })).toBeNull()
+    cleanup()
+    b.row.waits.review = true
+    b.accept.step = { ...b.accept.step, line: said }
     installFixtureRoutes({ ...boardRoute(() => structuredClone(b)), [`POST ${API}/requirements/r1/PAY-3/session`]: () => ({ ok: true, slot: 'brain-PAY-3-r2', url: '/chat?sid=brain-PAY-3-r2' }) })
     renderBoard()
     await loaded()
     const strip = region('你要做的一步')
     expect(strip).toHaveTextContent('先开一个新会话做审查（这个会话写了代码，不能自己审）')
+    expect(strip).toHaveTextContent('开审查会话会把 Lean 的审查要求发给新会话')
     expect(within(strip).queryByTestId('type-line')).toBeNull()
+    const fold = within(strip).getByTestId('review-say')
+    expect(fold.tagName).toBe('DETAILS')
+    expect(fold).toHaveTextContent(`细节：开审查会话对新会话说的那一句${said}`)
+    fireEvent.click(within(fold).getByRole('button', { name: '复制那一句' }))
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(said))
     fireEvent.click(within(strip).getByRole('button', { name: '开审查会话' }))
     await waitFor(() => expect(apiCalls.find((c) => c.method === 'POST')).toMatchObject({ body: { trust: true, kickoff: true, review: true } }))
     await waitFor(() => expect(navigations).toEqual(['/chat?sid=brain-PAY-3-r2']))

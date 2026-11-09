@@ -15,7 +15,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, usePoll, useAction } from '../api'
 import { PERSON, todoLeft, whoWord } from '../board/format'
-import { isReview } from '../board/next'
+import { isReview, REVIEW_SENDS } from '../board/next'
 import { RoleIcon } from '../board/RoleIcon'
 import { Hit, Mini } from '../cto/charts'
 import { ago, fmtCredits, fmtIso, fmtSpan, fmtTime, isoDay } from '../format'
@@ -30,7 +30,7 @@ import {
 } from '../vocab'
 import { Inline } from './Markdown'
 import type { ViewProps } from './props'
-import { EntryChip, MrDescCard, QuestionCard, ReviewButton, useCopy } from './Question'
+import { EntryChip, MrDescCard, QuestionCard, ReviewButton, ReviewSay, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
 import { NotFound, ReqSwitch } from './ReqSwitch'
 
@@ -209,6 +209,8 @@ interface Now {
   choices: string
   /** a refused hand-over: how to hand it over again, as the board's step says it (its reason line is the text already) */
   how: string | null
+  /** Lean's next step is its review in a new session, and the line 开审查会话 says to it */
+  review: { say: string | null } | null
 }
 
 /** 此刻: one judgment (the backend's waits) with where to take the step. */
@@ -227,14 +229,18 @@ function nowOf(x: RequirementDetail, board: ReqBoard | null, live: SessionRow | 
     question: open?.id ?? null,
     choices: open?.options.length ? `选 ${open.options.map((o) => o.id).join(' / ')}` : 'approve / reject',
     how: step === 'redo_handoff' && board?.row.waits.do === 'redo_handoff' ? board.accept.step.text.split('\n').filter((l) => l && !l.startsWith('接手被拒')).join(' ') || null : null,
+    review: step === 'reply' ? reviewOf(x, board) : null,
   }
 }
 
 /** Lean's next step when it is a review in a new session (the session that wrote the code may not review it), and
- * the line Lean wrote to say to that session. */
-function reviewOf(next: string[]): { say: string | null } | null {
-  const n = next[0] ?? ''
-  if (!isReview(n)) return null
+ * the line 开审查会话 says to that session: the backend's (waits.review, 验收's line). An older backend said it only in
+ * words; Lean's next note had the line. */
+function reviewOf(x: RequirementDetail, board: ReqBoard | null): { say: string | null } | null {
+  const w = x.row.waits
+  if (w.review !== undefined) return w.review ? { say: board?.accept.step.line ?? null } : null
+  const n = x.lean.next[0] ?? ''
+  if (!isReview(n)) return isReview(w.text) ? { say: null } : null
   const m = /说[:：]\s*「([^」]+)」/.exec(n)
   return { say: m ? m[1] : null }
 }
@@ -489,9 +495,7 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
 }) {
   const navigate = useNavigate()
   const line = useCopy(now.line ?? '')
-  // Lean's next note says the line to say; without it, the waits' words still tell a review is next
-  const review = now.do === 'reply' ? reviewOf(x.lean.next) ?? (isReview(now.text) ? { say: null } : null) : null
-  const say = useCopy(review?.say ?? '')
+  const review = now.review
   const mine = now.who === 'you'
   const person = !['agent', 'runner', 'bridge', 'nobody'].includes(now.who)
   const waited = person && now.since ? fmtSpan(at - now.since) : null
@@ -535,15 +539,8 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
       if (review) {
         body = (
           <>
-            <p>Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审{review.say ? '，对它说：' : '。'}</p>
-            {review.say && (
-              <div className="br-now-say" data-testid="now-say">
-                <code>{review.say}</code>
-                <button type="button" className="kt-btn is-small" onClick={() => void say.copy()}><Icon name="Copy" size={13} />复制那一句</button>
-                {say.copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
-                {say.copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请手动选中</span>}
-              </div>
-            )}
+            <p>Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审。{REVIEW_SENDS}。</p>
+            {review.say && <ReviewSay say={review.say} />}
           </>
         )
         acts = <><ReviewButton repo={repo} reqKey={reqKey} liveSlot={live?.slot ?? null} worktree={x.row.worktree} />{openSession}</>

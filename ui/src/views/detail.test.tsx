@@ -103,18 +103,23 @@ describe('需求详情', () => {
     noLineSent()
   })
 
-  test('此刻 when it is your turn and Lean’s next step is a review: what to say, 复制那一句, 开审查会话 opens a new session', async () => {
-    const said = '审查 intent 261107-refund-export：对照 requirements.md，把结果写进 review.md'
+  test('此刻 when it is your turn and Lean’s next step is a review: 开审查会话 opens a new session; the line it says folded, 复制那一句', async () => {
+    const said = 'Review intent 261107-refund-export against its requirements, design and plans, using the diff, and write construction/build-and-test/review.md.'
+    const b = fx.board()
+    b.accept.step = { ...b.accept.step, text: '会话空着，轮到你回话。\n先开一个新会话做审查（这个会话写了代码，不能自己审），审查写好再回这个会话接着发布', line: said }
     withDetail((d) => {
-      d.row.waits = { who: 'you', text: '会话空着：轮到你回话', line: null, raw: '', do: 'reply', since: AT - 11 * 3600, where: 'session' }
+      d.row.waits = { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: AT - 11 * 3600, where: 'session', review: true }
       d.sessions[0].awaiting = false
-      d.lean.next = [`owner 开一个新会话做审查（这个会话写了代码，不能自己审）。对新会话说：「${said}」。`, '回到这里读 review.md']
-    }, { [`POST ${API}/requirements/r1/PAY-3/session`]: () => ({ ok: true, slot: 'brain-PAY-3-rev1', url: '/chat?sid=brain-PAY-3-rev1' }) })
+    }, {
+      [`GET ${API}/board/*`]: () => structuredClone(b),
+      [`POST ${API}/requirements/r1/PAY-3/session`]: () => ({ ok: true, slot: 'brain-PAY-3-rev1', url: '/chat?sid=brain-PAY-3-rev1' }),
+    })
     renderDetail()
     const bar = await screen.findByRole('region', { name: '此刻' })
     await waitFor(() => expect(bar).toHaveTextContent('已等 11 小时'))
-    expect(bar).toHaveTextContent('Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审，对它说：')
-    expect(within(bar).getByTestId('now-say')).toHaveTextContent(said)
+    expect(bar).toHaveTextContent('Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审。开审查会话会把 Lean 的审查要求发给新会话。')
+    await waitFor(() => expect(within(bar).getByTestId('review-say')).toHaveTextContent(said))
+    expect(within(bar).getByTestId('review-say').tagName).toBe('DETAILS')
     fireEvent.click(within(bar).getByRole('button', { name: '复制那一句' }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(said))
     expect(within(bar).getByRole('button', { name: '打开会话' })).toBeInTheDocument()
@@ -127,8 +132,7 @@ describe('需求详情', () => {
   test('开审查会话 that only gets the old session back says so and stays here', async () => {
     const user = userEvent.setup()
     withDetail((d) => {
-      d.row.waits = { who: 'you', text: '会话空着：轮到你回话', line: null, raw: '', do: 'reply', since: null, where: 'session' }
-      d.lean.next = ['owner 开一个新会话做审查。对新会话说：「审查 intent 261107-refund-export」。']
+      d.row.waits = { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: null, where: 'session', review: true }
     }, { [`POST ${API}/requirements/r1/PAY-3/session`]: () => ({ ok: true, slot: 'brain-PAY-3-7f3a', url: '/chat?sid=brain-PAY-3-7f3a' }) })
     renderDetail()
     const bar = await screen.findByRole('region', { name: '此刻' })
@@ -190,7 +194,7 @@ describe('需求详情', () => {
     expect(within(bar).queryByRole('button')).toBeNull()
   })
 
-  test('此刻 when the waits say a review in a new session is next, without Lean’s note: 开审查会话 all the same', async () => {
+  test('an older backend without waits.review: its words still tell a review in a new session is next; 开审查会话 all the same', async () => {
     withDetail((d) => {
       d.row.waits = { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: AT - 3600, where: 'session' }
       d.sessions[0].awaiting = false
@@ -200,6 +204,7 @@ describe('需求详情', () => {
     const bar = await screen.findByRole('region', { name: '此刻' })
     expect(within(bar).getByRole('button', { name: '开审查会话' })).toBeInTheDocument()
     expect(bar).toHaveTextContent('Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审。')
+    expect(within(bar).queryByTestId('review-say')).toBeNull()
   })
 
   test('此刻 for a refused hand-over: what to do, 打开会话, the bridge’s own words folded under 细节', async () => {

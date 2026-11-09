@@ -3,8 +3,9 @@
  * `waits` (who, do, since, where), 验收's step, the actors that wait for them, and the questions they can answer right
  * here. The strip above the graph, the chips under the nodes and the counters all read this. Pure.
  */
-import type { Actor, Question, ReqBoard, WaitDo, WaitWho } from '../types'
+import type { Actor, Question, ReqBoard, WaitDo, Waits, WaitWho } from '../types'
 import { isOpenQuestion } from '../ui'
+import { ACT } from '../vocab'
 import { leanOf } from './format'
 
 export interface Step {
@@ -20,6 +21,8 @@ export interface Step {
   line?: string | null
   /** Lean's next step is a review in a new session (the session that wrote the code may not review it): 开审查会话 */
   review?: boolean
+  /** the line 开审查会话 says to the new session (Lean's own), to copy for a session opened by hand */
+  say?: string | null
   /** a command typed in a terminal, in this directory */
   command?: { text: string; cwd: string | null } | null
   session?: string | null
@@ -46,6 +49,11 @@ export const openHere = (q: Question) => isOpenQuestion(q) && q.answerable_here 
 
 /** What a requirement waits for is Lean's review, in a new session (Lean's next note, the rows' waits.text). */
 export const isReview = (text: string) => /审查/.test(text) && /新会话/.test(text)
+
+export const REVIEW_SENDS = `${ACT.review}会把 Lean 的审查要求发给新会话`
+
+/** Its next step is Lean's review in a new session: the backend says so (waits.review); an older one said it in words. */
+export const reviewNext = (w: Waits): boolean => w.review ?? isReview(w.text)
 
 /** The step an older backend did not name, from the requirement's state. */
 function guessDo(b: ReqBoard): WaitDo {
@@ -101,7 +109,7 @@ export function nextOf(b: ReqBoard): Next {
     if (d === 'reply') {
       const next = leanOf(b.row.lean).next
       main.session = st.session_url ?? session
-      if (isReview(w.text)) Object.assign(main, { text: w.text, line: null, review: true })
+      if (reviewNext(w)) Object.assign(main, { text: w.text, line: null, review: true, hint: REVIEW_SENDS, say: w.review !== undefined ? st.line : null })
       else if (next && !text.includes(next.label)) main.hint = `Lean 的下一步是「${next.label}」：在会话里让它接着做`
     }
     if (d === 'tool') main.session = st.session_url ?? session
