@@ -225,7 +225,7 @@ const WAY: Way = [
     [{ icon: 'bridge', title: '桥', does: '核对、转问题' }, { icon: 'signer', title: '签名', does: '接手合同' }],
     [{ icon: 'runner', title: '运行机', does: '无人值守' }],
   ] },
-  { phase: '3 检查 · 验收', title: '机器检查，产品验收', steps: [[{ icon: 'ci', title: 'CI 检查', does: '跑 verify' }, { icon: 'release', title: '发布验收', does: '在 MR 上验收' }]] },
+  { phase: '3 检查 · 验收', title: '机器检查，产品验收', steps: [[{ icon: 'ci', title: 'CI 检查', does: '跑自动检查' }, { icon: 'release', title: '发布验收', does: '在 MR 上验收' }]] },
   { phase: '4 回写', title: '学到的写回 Brain', steps: [[{ icon: 'brain', title: '回写 Brain', does: '学到的写回去' }]] },
 ]
 
@@ -233,7 +233,7 @@ const WAY: Way = [
 const LOCAL_WAY: Way = [
   WAY[0],
   WAY[1],
-  { phase: '2 检查 · 发布', title: '机器检查，你批准发布', steps: [[{ icon: 'ci', title: 'CI 检查', does: '跑 verify' }, { icon: 'release', title: '发布审批', does: '会话里打一行' }]] },
+  { phase: '2 检查 · 发布', title: '机器检查，你批准发布', steps: [[{ icon: 'ci', title: 'CI 检查', does: '跑自动检查' }, { icon: 'release', title: '发布审批', does: '会话里打一行' }]] },
   { phase: '3 回写', title: '学到的写回 Brain', steps: [[{ icon: 'brain', title: '回写 Brain', does: '学到的写回去' }]] },
 ]
 

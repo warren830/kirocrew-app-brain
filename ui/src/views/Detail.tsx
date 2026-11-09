@@ -46,7 +46,7 @@ const KIND_META: Record<TimelineKind, { icon: string; label: string }> = {
   question: { icon: 'question', label: '问题' },
   decision: { icon: 'req', label: '决定' },
   blocked: { icon: 'blocked', label: '拦下' },
-  verify: { icon: 'ci', label: '验证' },
+  verify: { icon: 'ci', label: '自动检查' },
   merge: { icon: 'merge', label: '合并' },
   session: { icon: 'laptop', label: '会话' },
   app: { icon: 'brain', label: 'app' },

@@ -298,20 +298,20 @@ describe('需求看板', () => {
     const groups = within(wall).getAllByRole('group')
     const present = CELL_GROUPS.filter((g) => b.checks.cells.some((c) => c.group === g.key))
     expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(present.map((g) => g.label))
-    expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['Lean 审批', 'verify', '交接', 'Brain 和仓库'])
+    expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['Lean 审批', '自动检查', '交接', 'Brain 和仓库'])
     present.forEach((g, i) => {
       const cells = within(groups[i]).getAllByTestId('kt-cell')
       expect(cells.map((c) => [c.dataset.case, c.dataset.status])).toEqual(b.checks.cells.filter((c) => c.group === g.key).map((c) => [c.id, c.status]))
     })
     // nothing hovered: the one that failed
     const inspect = within(wall).getByTestId('kt-inspect')
-    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、verify · 没过的是 引用')
+    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、自动检查 · 没过的是 引用')
     const plan = b.checks.cells.find((c) => c.id === 'gate-PLAN')!
     const cell = within(wall).getByRole('button', { name: `${plan.name}：等你，${plan.detail}` })
     fireEvent.focus(cell)
     expect(inspect).toHaveTextContent(`✋ ${plan.name}${plan.detail}`)
     fireEvent.blur(cell)
-    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、verify · 没过的是 引用')
+    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、自动检查 · 没过的是 引用')
   })
 
   test('the event feed: the trace newest first; Lean 细节 hides the many quiet steps', async () => {
@@ -770,7 +770,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     expect(region('验收')).toHaveTextContent('花了多少37.0 credits · 运行记录里的合计')
     expect(within(graph).getByTestId('kt-roster')).toHaveTextContent('+2 条')
     expect(region('检查墙').querySelector('.kt-spark')).toBeNull()
-    expect(region('检查墙')).toHaveTextContent('verify 跑了 1 次：3 项过了')
+    expect(region('检查墙')).toHaveTextContent('自动检查跑了 1 次：3 项过了')
     const first = within(region('验收')).getByTestId('accept-first')
     expect(first).toHaveTextContent('给 calc.py 加乘法')
     expect(within(first).getByText('calc.py').tagName).toBe('CODE')

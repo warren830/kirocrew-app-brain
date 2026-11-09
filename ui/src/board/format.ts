@@ -60,7 +60,7 @@ export const EVENT_META: Record<BoardEventKind, { icon: string; label: string; t
   signed: { icon: '🔏', label: '签名', tone: 'handoff' },
   question: { icon: '❓', label: '问人', tone: 'approve' },
   answer: { icon: '💬', label: '回答', tone: 'ok' },
-  verify: { icon: '🧪', label: 'verify', tone: 'info' },
+  verify: { icon: '🧪', label: '自动检查', tone: 'info' },
   merge: { icon: '⤵️', label: '合并', tone: 'ok' },
   reflect: { icon: '📚', label: '回写 Brain', tone: 'ok' },
   session: { icon: '💻', label: '会话', tone: 'run' },
@@ -153,7 +153,7 @@ export function eventTouches(e: { from: string | null; to: string | null }, key:
 /** The cell groups of the check wall, in wall order. */
 export const CELL_GROUPS: { key: string; label: string }[] = [
   { key: 'gate', label: 'Lean 审批' },
-  { key: 'verify', label: 'verify' },
+  { key: 'verify', label: '自动检查' },
   { key: 'handover', label: '交接' },
   { key: 'brain', label: 'Brain 和仓库' },
   { key: 'after', label: '合并以后' },
