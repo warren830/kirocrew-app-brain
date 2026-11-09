@@ -37,7 +37,7 @@ export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail,
           <span className="kt-run-title">{r.title}</span>
         )}
         <span className="kt-pill tone-info kt-mono" data-testid="br-board-key">{r.key}</span>
-        <StateChip state={r.state} label={r.state_label} />
+        <StateChip state={r.state} label={r.state_label} who={r.waits.who} />
         {board.live && !replaying && <span className="kt-pill tone-run is-live"><i aria-hidden="true">●</i>此刻有人在做</span>}
         {localOnly(board) && (
           <span className="kt-pill tone-idle" data-testid="br-local-only" title="这个仓库没有远端：不交给运行机，没有 MR，在本机做完、在本机合并">这个仓库只在本机做</span>

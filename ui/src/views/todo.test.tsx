@@ -186,7 +186,7 @@ describe('待办', () => {
     const line = within(lean).getByTestId('type-line')
     expect(within(line).getByText('approve PLAN 5d1e7a90')).toHaveClass('br-mono')
     expect(line).toHaveTextContent(TYPE_IT_YOURSELF)
-    fireEvent.click(within(line).getByRole('button', { name: '复制' }))
+    fireEvent.click(within(line).getByRole('button', { name: '复制那一行' }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('approve PLAN 5d1e7a90'))
     fireEvent.click(within(line).getByRole('button', { name: '打开会话' }))
     expect(navigations).toEqual(['/chat?sid=brain-PAY-3-7f3a'])

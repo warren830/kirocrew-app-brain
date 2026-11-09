@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { useNavigate } from '@kirocrew/app-sdk'
 import type { ReqBoard } from '../types'
 import { ExtLink, Icon, TYPE_IT_YOURSELF } from '../ui'
-import { ACT } from '../vocab'
+import { ACT, DO_NAME } from '../vocab'
 import { QuestionCard } from '../views/Question'
 import { fmtSpan } from './format'
 import { useServerNow } from './hooks'
@@ -133,7 +133,7 @@ function StepRow({ s, onBrain, onDetail }: { s: Step; onBrain?: () => void; onDe
           <button type="button" className="kt-btn" onClick={onDetail} title="需求详情里能开一个新会话">去需求详情开会话</button>
         )}
         {s.mr && <ExtLink href={s.mr} className={`kt-btn br-extbtn${s.do === 'accept' || s.do === 'answer' || s.do === 'label_handoff' ? ' is-primary' : ''}`}>{s.do === 'answer' ? `${ACT.answerOnMr} ↗` : s.do === 'redo_handoff' ? '在 MR 上看桥说的 ↗' : '去 MR ↗'}</ExtLink>}
-        {s.do === 'write_back' && onBrain && <button type="button" className="kt-btn is-primary" onClick={onBrain}>去 Brain 回写 ↗</button>}
+        {s.do === 'write_back' && onBrain && <button type="button" className="kt-btn is-primary" onClick={onBrain}>{DO_NAME.write_back} ↗</button>}
       </div>
     </div>
   )

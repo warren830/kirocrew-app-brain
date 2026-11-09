@@ -369,7 +369,7 @@ function Header({ x }: { x: RequirementDetail }) {
     <header className="cto-item-head">
       <h2 className="kt-run-title">{r.title}</h2>
       <span className="kt-pill tone-info kt-mono">{r.key}</span>
-      <StateChip state={r.state} label={r.state_label} />
+      <StateChip state={r.state} label={r.state_label} who={r.waits.who} />
       <span className="cto-org">{r.owner ? `${r.owner} 的需求 · ` : ''}{WHERE_NAME[r.where] ?? x.where_label}</span>
     </header>
   )
