@@ -72,7 +72,8 @@ def test_a_local_requirement_waits_for_its_approval_on_the_board(tmp_path, home)
 
 @needs_brainkit
 def test_an_approved_requirement_handed_over_and_one_merged(tmp_path, home):
-    repo = make_project(tmp_path, kit={"gitlab": {"base": "https://gitlab.example.com", "project": "shop/pay"}})
+    # handed over through GitLab: a remote too (without one a repo is done only on this machine)
+    repo = make_project(tmp_path, origin=True, kit={"gitlab": {"base": "https://gitlab.example.com", "project": "shop/pay"}})
     wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "refund", "refund", "退款")
     intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
     line = request_requirements(wt, intent)
@@ -87,6 +88,7 @@ def test_an_approved_requirement_handed_over_and_one_merged(tmp_path, home):
     brain(wt, "handoff", "--no-push")
     wt2 = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "done", "done", "做完了")
     sh("git", "-C", repo, "merge", "-q", "--no-ff", "-m", "merge PAY-2", "ai/alice/PAY-2-done")
+    sh("git", "-C", repo, "push", "-q", "origin", "main")
     sh("git", "-C", repo, "worktree", "remove", "--force", wt2)
     svc = make_service(tmp_path, [repo])
 
