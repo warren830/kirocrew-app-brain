@@ -302,6 +302,7 @@ button.br-tag:hover { border-color: var(--accent); color: var(--text-strong); }
 .br-md pre { padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); white-space: pre-wrap; word-break: break-word; }
 .br-md .cto-table { font-size: 13px; }
 .br-md .cto-table td { color: var(--text); }
+.br-md .cto-table td:first-child { white-space: nowrap; }
 .br-md code, .br-inline code { padding: 0 4px; border-radius: 5px; background: color-mix(in srgb, var(--text) 8%, transparent); overflow-wrap: anywhere; }
 .br-mdfold > summary { font-size: 13px; }
 `
