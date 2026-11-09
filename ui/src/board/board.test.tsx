@@ -657,6 +657,9 @@ describe('需求看板 · 轮到谁、做什么', () => {
     expect(fold).toHaveTextContent(`细节：开审查会话对新会话说的那一句${said}`)
     fireEvent.click(within(fold).getByRole('button', { name: '复制那一句' }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(said))
+    // the chip under the session names the same step and brings the strip, not the session that wrote the code
+    fireEvent.click(within(screen.getByTestId('kt-graph')).getByRole('button', { name: '本机会话：开审查会话' }))
+    expect(navigations).toEqual([])
     fireEvent.click(within(strip).getByRole('button', { name: '开审查会话' }))
     await waitFor(() => expect(apiCalls.find((c) => c.method === 'POST')).toMatchObject({ body: { trust: true, kickoff: true, review: true } }))
     await waitFor(() => expect(navigations).toEqual(['/chat?sid=brain-PAY-3-r2']))
