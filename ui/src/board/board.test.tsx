@@ -609,7 +609,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     const strip = region('你要做的一步')
     expect(strip).toHaveTextContent('为什么被拒标签是 bob 打的，不是负责人 alice')
     expect(strip).toHaveTextContent(`怎么办${b.accept.step.text}`)
-    expect(strip).toHaveTextContent('在哪做在这个需求的工作区里开一个终端，敲：brain handoff')
+    expect(strip).toHaveTextContent('在哪做在这个需求的工作目录里开一个终端，敲：brain handoff')
     fireEvent.click(within(strip).getByRole('button', { name: '复制命令' }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`cd "${b.row.worktree}" && brain handoff`))
     expect(within(strip).getByText('细节').closest('details')).toHaveTextContent('was added by bob')

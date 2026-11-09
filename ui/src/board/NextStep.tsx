@@ -154,10 +154,10 @@ function Command({ cmd }: { cmd: { text: string; cwd: string | null } }) {
   return (
     <div className="br-next-cmd">
       <span className="br-next-k">在哪做</span>
-      <span>{cmd.cwd ? '在这个需求的工作区里开一个终端，敲：' : '在本机这个需求的分支上开一个终端，敲：'}</span>
+      <span>{cmd.cwd ? '在这个需求的工作目录里开一个终端，敲：' : '在本机这个需求的分支上开一个终端，敲：'}</span>
       <code className="br-mono" title={full}>{cmd.text}</code>
       <button type="button" className="br-btn is-small" onClick={() => void copy()}><Icon name="Copy" size={13} />复制命令</button>
-      {copied && <span className="br-small br-ok-text" role="status">已复制（含 cd 到工作区）</span>}
+      {copied && <span className="br-small br-ok-text" role="status">已复制（含 cd 到工作目录）</span>}
       {cmd.cwd && <span className="kt-dim kt-mono br-next-cwd" title={cmd.cwd}>{cmd.cwd}</span>}
     </div>
   )

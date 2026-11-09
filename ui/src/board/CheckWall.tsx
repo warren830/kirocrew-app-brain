@@ -30,12 +30,12 @@ export function CheckWall({ board, focus, onActor, flips, onSettings }: {
       <header className="kt-card-head">
         <h2>检查墙</h2>
         <span className={`kt-wall-score${green ? ' tone-ok' : failing.length ? ' tone-bad' : ''}`}>{w.passed}/{w.total}</span>
-        <span className="kt-wall-src">Lean 审批 · verify · 交接 · Brain</span>
+        <span className="kt-wall-src">{CELL_GROUPS.filter((g) => w.cells.some((c) => c.group === g.key)).map((g) => g.label).join(' · ')}</span>
         <TestedAt at={w.at} />
       </header>
       {w.history.length > 1 && (
         <div className="kt-spark-row">
-          <span title="每次 lean verify 记一个点">verify 通过数</span>
+          <span title="每跑一次 verify 记一个点">verify 通过数</span>
           <Sparkline history={w.history} />
         </div>
       )}

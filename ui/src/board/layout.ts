@@ -64,7 +64,6 @@ export interface PhaseBand {
   key: string
   n: string
   title: string
-  en: string
   sub: string
   x1: number
   x2: number
@@ -95,11 +94,11 @@ export interface GraphLayout {
 }
 
 /** The phases of a requirement's way, left to right (the bands' titles). */
-export const PHASES: ReadonlyArray<{ key: string; n: string; title: string; en: string; sub: string; short: string }> = [
-  { key: 'local', n: '1', title: '本机 · Lean', en: 'Local', sub: 'brain-dev 会话 · 需求和设计审批', short: '本机' },
-  { key: 'runner', n: '2', title: '交给运行机', en: 'Team runner', sub: 'brain handoff · 桥核对 · 签名 · brain-run', short: '运行机' },
-  { key: 'check', n: '3', title: '检查 · 验收', en: 'Checks', sub: 'verify · 发布审批 · 验收', short: '检查' },
-  { key: 'land', n: '4', title: '回写', en: 'Brain', sub: '合并以后 · brain reflect', short: '回写' },
+export const PHASES: ReadonlyArray<{ key: string; n: string; title: string; sub: string; short: string }> = [
+  { key: 'local', n: '1', title: '本机 · Lean', sub: 'brain-dev 会话 · 需求和设计审批', short: '本机' },
+  { key: 'runner', n: '2', title: '交给运行机', sub: '交接 · 桥核对 · 签名 · 运行机做', short: '运行机' },
+  { key: 'check', n: '3', title: '检查 · 验收', sub: 'verify · 发布审批 · 验收', short: '检查' },
+  { key: 'land', n: '4', title: '回写', sub: '合并以后 · 回写 Brain', short: '回写' },
 ]
 /** A folded phase's band. */
 export const GREY_W = 92
@@ -328,7 +327,7 @@ export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [st
   }
   phases.sort((a, b) => a.x1 - b.x1)
   // 0 认领: the person, at the far left, as the sample's orchestrator
-  phases.unshift({ key: 'init', n: '0', title: '你', en: 'Owner', sub: '认领 · 文档过五关 · 开工', short: '你', x1: 8, x2: round((phases[0]?.x1 ?? 200) - 8), used: true })
+  phases.unshift({ key: 'init', n: '0', title: '你', sub: '认领 · 文档过五关 · 开工', short: '你', x1: 8, x2: round((phases[0]?.x1 ?? 200) - 8), used: true })
   const orch = { x: round(PAD_X + ORCH_W / 2 - 10), y: TOP + ORCH_BOX.h / 2 - 6 }
   return { width: W, height: railY + 44, nodes, stages, edges, rail: { x1: PAD_X, x2: station.x - STATION_R, y: railY }, station, mergeX, phases, orch }
 }
