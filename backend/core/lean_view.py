@@ -114,7 +114,9 @@ def stages(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """The current stage of Lean's 11 (the row the overview shows, the same stages the detail view lists): the one
     furthest along that is started; else the next one to do after the last one done or skipped; else (nothing left
-    after it) that last one, done. None only when Lean has recorded no stage at all."""
+    after it) that last one, done. None only when Lean has recorded no stage at all. done_n / skipped_n / next say
+    the progress the one way the app says it (ui/src/vocab.ts leanProgress): next is the stage to do now (the
+    started one, else the first not reached), None once every stage is done or skipped."""
     started = [r for r in rows if r["state"] == "started"]
     cur = started[-1] if started else None
     if cur is None:
@@ -123,20 +125,55 @@ def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             last = max(done_n)
             cur = next((r for r in rows if r["state"] == "todo" and r["n"] > last), None) or \
                 next(r for r in rows if r["n"] == last)
+    nxt = cur if cur and cur["state"] in ("started", "todo") else \
+        None if cur else next((r for r in rows if r["state"] == "todo"), None)
     return {"stage": cur["id"] if cur else None, "stage_label": cur["label"] if cur else None,
             "stage_n": cur["n"] if cur else None, "stage_state": cur["state"] if cur else None,
-            "done": sum(1 for r in rows if r["state"] in ("done", "skipped")), "total": len(rows)}
-
-
-STAGE_HINT = {"todo": "（下一步）", "done": "（做完）", "skipped": "（做完）"}
+            "done": sum(1 for r in rows if r["state"] in ("done", "skipped")), "total": len(rows),
+            "done_n": sum(1 for r in rows if r["state"] == "done"),
+            "skipped_n": sum(1 for r in rows if r["state"] == "skipped"),
+            "next": {"id": nxt["id"], "label": nxt["label"], "n": nxt["n"]} if nxt else None}
 
 
 def stage_text(lean: dict[str, Any]) -> str | None:
-    """``9/11 代码生成``; ``3/11 用户故事（下一步）``; ``11/11 发布（做完）``; None before Lean recorded a stage."""
+    """「做完 4 · 跳过 6 · 下一步：发布」, as ui/src/vocab.ts leanProgress says it; None before Lean recorded a stage."""
     if not lean.get("stage_n"):
         return None
-    return "%d/%d %s%s" % (lean["stage_n"], lean["total"], lean.get("stage_label") or lean.get("stage") or "",
-                           STAGE_HINT.get(str(lean.get("stage_state")), ""))
+    parts = ["做完 %d" % lean["done_n"]] + (["跳过 %d" % lean["skipped_n"]] if lean.get("skipped_n") else [])
+    parts.append("下一步：%s" % lean["next"]["label"] if lean.get("next") else "全部做完")
+    return " · ".join(parts)
+
+
+REVIEW_DOC = "construction/build-and-test/review.md"   # Lean's release review (skill aidlc-lean-release)
+
+
+def review_current(review_at: float | None, exists: bool, evs: list[dict[str, Any]]) -> bool:
+    """Lean's review_is_current: review.md is there and newer than the last verify. A review read at a commit has no
+    time of its own (*review_at* None): its being there counts."""
+    if not exists:
+        return False
+    verified = [e["_at"] for e in evs if e.get("event") == "VERIFY" and isinstance(e.get("_at"), (int, float))]
+    return review_at is None or not verified or review_at > max(verified)
+
+
+def idle_step(rows: list[dict[str, Any]], *, review_ok: bool, default_branch: str) -> str:
+    """What the person tells an idle local session, from Lean's state: the stage it stopped in, or the next one (the
+    release starts with a review in a new session: the one that wrote the code cannot review it)."""
+    lean = summary(rows)
+    nxt = lean["next"]
+    if nxt is None:
+        return "Lean 的阶段都做完了：可以把分支合并进 %s 了" % default_branch
+    if lean["stage_state"] == "started":
+        return "「%s」做到一半，会话停下了：看它最后问了什么，回它" % nxt["label"]
+    before = [r for r in rows if r["state"] in ("done", "skipped") and r["n"] < nxt["n"]]
+    if not before:
+        return "会话停下了，Lean 还没记下阶段：看它最后说了什么，回它"
+    prev = max(before, key=lambda r: r["n"])["label"]
+    if nxt["id"] == "release":
+        if review_ok:
+            return "审查写好了，下一步是发布：回会话让它接着发布（它会请你批准发布）"
+        return "%s做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）" % prev
+    return "%s做完了，下一步是%s：在会话里让它接着做" % (prev, nxt["label"])
 
 
 def _approval_sha(path: str, raw: bytes | None) -> str | None:
