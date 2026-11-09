@@ -1054,7 +1054,7 @@ function BrainUseCard({ x, board, repo, reqKey, go }: { x: RequirementDetail; bo
     <section className="cto-card" aria-label="用到的 Brain">
       <div className="cto-chart-head"><h3>用到的 Brain</h3><span className="cto-dim">开工时带进来的、决定里引用的</span></div>
       <div className="br-row">
-        <span className="kt-pill tone-info">载入 {b.loaded ?? '—'} 条</span>
+        <span className="kt-pill tone-info">加载 {b.loaded ?? '—'} 条</span>
         <span className="kt-pill tone-ok">引用 {b.cited.length} 条</span>
       </div>
       {b.proposals !== null && b.proposals > 0 && (

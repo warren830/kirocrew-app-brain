@@ -220,7 +220,7 @@ def install(top: str, kit: dict[str, str], branch: str, work_root: str, records:
     ref, sha = got
     res.update(base=short_ref(ref), base_sha=sha)
     if has_at(g, sha, KIT):
-        raise ImportFail("%s 上已经有 .brain/kit.json：在这个目录里切到 %s 并 git pull 就行，不用再装" % (
+        raise ImportFail("%s 上已经装好 brain-kit 了：在这个目录里切到 %s、拉取最新的就行，不用再装" % (
             short_ref(ref), kit["default_branch"]), "installed", 409, res)
     links = symlinks_on_targets(g, sha)
     if links:

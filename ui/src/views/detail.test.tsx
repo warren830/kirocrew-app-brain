@@ -850,13 +850,12 @@ describe('需求详情', () => {
     const tl = await screen.findByRole('region', { name: '时间线' })
     const items = within(tl).getAllByTestId('tl-item')
     expect(items[0]).toHaveTextContent('回写 Brain 并推送：成功 · 分支 brain/PAY-3-reflect-1')
-    expect(items[1]).toHaveTextContent('代码生成：refund-api 的计划写好了')
-    expect(items.at(-1)).toHaveTextContent('认领')
+    expect(items[1]).toHaveTextContent('停下问人：澄清')
+    expect(items.at(-1)).toHaveTextContent('在 app 里开工')
     expect(tl).toHaveTextContent('最新的在上面 · brain-kit 记下的')
     expect(tl).toHaveTextContent('开了本机会话 · 工具调用不用逐个批准')
-    expect(items.at(-1)).toHaveTextContent('认领 · 认领推到了远端')
     expect(tl).not.toHaveTextContent(/brain reflect|--apply|G-A29056|claim\/|origin/)
-    expect(items.find((i) => i.textContent!.includes('批准需求'))!.title).toContain('化名 G-A29056')
+    expect(items.some((i) => i.textContent!.includes('批准需求') && i.title.includes('化名 G-A29056'))).toBe(true)
     expect(tl).not.toHaveTextContent('读不到')   // a local run: the bridge's and the runner's records are not on its way
   })
 

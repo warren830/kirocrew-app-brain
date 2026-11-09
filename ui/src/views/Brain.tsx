@@ -215,7 +215,12 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
         </EmptyHero>
       )}
       <LoadState loading={brain.loading} error={brain.error} has={!!data} />
-      {data?.error && <div className="br-banner is-error" role="alert">{data.error}</div>}
+      {data?.error && (
+        <div className="br-banner is-error" role="alert">
+          {data.error}
+          {data.raw && <details className="br-raw"><summary>细节</summary><pre className="br-mono">{data.raw}</pre></details>}
+        </div>
+      )}
 
       {data && empty && (
         <>
@@ -350,9 +355,9 @@ function BrainKpis({ data, lint, branch, onEntry }: { data: BrainView; lint: Che
       </Kpi>
       <Kpi label="Brain 检查" value={errors} of="个错" tone={errors ? 'bad' : warns ? undefined : 'ok'} testid="kpi-lint"
         note={errors || warns ? `${warns} 个提醒` : '全过'}>
-        {lint.length > 0 && (
+        {lint.some((r) => r.level !== 'OK') && (
           <div className="kt-segs bv-cells" role="img" aria-label={`${errors} 个错，${warns} 个提醒`}>
-            {lint.map((r, i) => <i key={i} className={r.level === 'FAIL' ? 'is-fail' : 'is-warn'} title={r.text} />)}
+            {lint.filter((r) => r.level !== 'OK').map((r, i) => <i key={i} className={r.level === 'FAIL' ? 'is-fail' : 'is-warn'} title={r.text} />)}
           </div>
         )}
       </Kpi>

@@ -211,6 +211,8 @@ function overview(path: string): Overview {
     o.eval = { available: false, error: '这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     o.cto = { ...o.cto, available: false, unattended: null, stepped_in: null, runs: [], sentence: o.cto.credits.per_req !== null ? `每个需求平均 ${o.cto.credits.per_req} credits。` : o.cto.sentence }
   }
+  // team mode: 全部 also lists the runner's runs, as the backend's overview does
+  if (flags.has('team') && repo === 'all' && byRepo?.runner) o.rows = [...o.rows, ...clone(byRepo.runner.rows)]
   return o
 }
 
