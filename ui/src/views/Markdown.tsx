@@ -21,6 +21,14 @@ export function Inline({ text }: { text: string | null | undefined }) {
   return <>{out}</>
 }
 
+const REF = /\s*（(D\d{2}#S\d{3}[^）]*)）/g
+
+/** A line's material refs (「（D01#S002 · 097f2e9e）」: a document's section and its hash) taken out: the line for a
+ * person, and the refs for 细节. */
+export function takeRefs(text: string): { text: string; refs: string[] } {
+  return { text: text.replace(REF, ''), refs: [...text.matchAll(REF)].map((m) => m[1]) }
+}
+
 type Block =
   | { kind: 'h'; level: number; text: string }
   | { kind: 'p'; lines: string[] }

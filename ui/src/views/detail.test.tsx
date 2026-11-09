@@ -139,10 +139,10 @@ describe('需求详情', () => {
     withDetail(handedOver)
     renderDetail()
     const bar = await screen.findByRole('region', { name: '此刻' })
-    expect(bar).toHaveTextContent('交接以后，批准在 MR 上回答：回答 D-3（approve 批准 / reject 退回）')
+    expect(bar).toHaveTextContent('交接以后，批准在 MR 上回答：回答 D-3（approve / reject）')
     expect(within(bar).getByRole('link', { name: /去 MR 上回答 D-3/ })).toHaveAttribute('href', MR)
     const q = within(screen.getByRole('region', { name: '问题和回答' })).getByTestId('question')
-    expect(q).toHaveTextContent('这是 Lean 的发布审批请求：在 MR 上回答 D-3（approve 批准 / reject 退回），这里不能回答。')
+    expect(q).toHaveTextContent('这是 Lean 的发布审批请求：在 MR 上回答 D-3（approve / reject），桥会把回答带回运行机。')
     expect(q).not.toHaveTextContent('在会话里')
     expect(within(q).getByRole('link', { name: /去 MR 上回答/ })).toHaveAttribute('href', MR)
     const lean = screen.getByRole('region', { name: 'Lean 进度' })
@@ -150,7 +150,7 @@ describe('需求详情', () => {
     expect(lean).not.toHaveTextContent('由你在会话里自己打')
     const release = await pendingApproval()
     expect(release).toHaveTextContent('发布审批在 MR 上等回答')
-    expect(release).toHaveTextContent('在 MR 上回答 D-3（approve 批准 / reject 退回），这里不能回答。')
+    expect(release).toHaveTextContent('在 MR 上回答 D-3（approve / reject），这里不能回答。')
     expect(within(release).queryByTestId('type-line')).toBeNull()
   })
 
@@ -318,6 +318,25 @@ describe('需求详情', () => {
     noLineSent()
   })
 
+  test('codes are folded under 细节: a question’s refs and material refs, the 变更说明 first line’s 「（D01#S002 · 097f2e9e）」', async () => {
+    withDetail((d) => {
+      d.questions[0].question = '导出文件里的时间用哪个时区？（D01#S004 · 9a1b2c3d）'
+      d.mr_desc.first = '给 `calc.py` 加乘法（D01#S002 · 097f2e9e）（规模 small）'
+    })
+    renderDetail()
+    const [clarify] = await screen.findAllByTestId('question')
+    const line = clarify.querySelector('p.br-strong') as HTMLElement
+    expect(line).toHaveTextContent(/^导出文件里的时间用哪个时区？$/)
+    const raw = within(clarify).getByTestId('question-raw')
+    expect(raw.tagName).toBe('DETAILS')
+    expect(raw).toHaveTextContent('D01#S004 · 9a1b2c3d')
+    expect(raw).toHaveTextContent('D01#S004')
+    const first = within(screen.getByRole('region', { name: '变更说明' })).getByTestId('mr-desc-first')
+    expect(first).toHaveTextContent(/^给 calc\.py 加乘法（规模 small）$/)
+    expect(first.querySelector('code')).toHaveTextContent('calc.py')
+    expect(first.title).toBe('出处 D01#S002 · 097f2e9e')
+  })
+
   test('a question answered on the MR says so in the form, and the answer names its D-n', async () => {
     const d = fx.detail()
     d.questions[0].answer_via = 'mr'
@@ -385,7 +404,7 @@ describe('需求详情', () => {
     })
     const [clarify, plan, old] = shown
     expect(clarify).toHaveTextContent('等回答')
-    expect(within(clarify).getByText(qs[0].refs[0])).toBeInTheDocument()
+    expect(within(clarify).getByText(qs[0].refs[0]).closest('details')).toHaveTextContent('细节')   // a ref is a code: folded
     expect(plan).toHaveTextContent('等回答')
     expect(old).toHaveTextContent('已送回')
     const opts = within(within(old).getByRole('list', { name: '选项' })).getAllByRole('listitem')

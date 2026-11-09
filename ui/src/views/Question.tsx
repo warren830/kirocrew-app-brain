@@ -8,7 +8,7 @@ import { ENTRY_RE, fileOfEntry } from '../nav'
 import type { MrDesc, Question } from '../types'
 import { AnswerForm, ExtLink, Icon, isOpenQuestion, questionMeta } from '../ui'
 import { ACT, approvalName } from '../vocab'
-import { Inline, Markdown } from './Markdown'
+import { Inline, Markdown, takeRefs } from './Markdown'
 import type { ViewProps } from './props'
 
 const SOURCE_LABEL: Record<Question['source'], string> = { park: '本地会话', bridge: '运行机', mr: 'MR' }
@@ -43,6 +43,8 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
   // a question the bridge put on the MR is answered there (handed over); only a local run's park.json is the session's
   const onMr = q.source !== 'park'
   const what = q.lean_request ? `${approvalName(q.lean_request.split(' ')[0]) || '审批'}请求` : ''
+  const asked = takeRefs(q.question)
+  const raw = [...q.refs, ...asked.refs, ...(q.lean_request ? [q.lean_request] : []), ...(q.voucher_id ? [`凭证 ${q.voucher_id}`] : [])]
   return (
     <article className={`br-q${open ? ' is-open' : ''}`} aria-label={`问题 ${q.id ?? q.kind_label}`} data-testid="question">
       <div className="br-row">
@@ -52,7 +54,7 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
         <span className={`br-chip tone-${meta.tone}`}>{meta.label}</span>
         {q.at !== null && <span className="br-dim br-small">{fmtTime(q.at)}</span>}
       </div>
-      {q.question && <p className="br-pre br-strong"><Inline text={q.question} /></p>}
+      {asked.text && <p className="br-pre br-strong"><Inline text={asked.text} /></p>}
       {q.options.length > 0 && !formHere && (
         <ol className="br-opts" aria-label="选项">
           {q.options.map((o) => (
@@ -65,23 +67,28 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
       )}
       {q.recommend && !q.options.some((o) => o.id === q.recommend) && <p className="br-note">推荐：{q.recommend}</p>}
       {q.lean_request && (
-        <p className="br-note" title={q.lean_request} data-testid="lean-request">
+        <p className="br-note" data-testid="lean-request">
           {onMr
-            ? <>这是 Lean 的{what}：在 MR 上回答{q.id ? ` ${q.id}` : ''}（approve 批准 / reject 退回），这里不能回答。</>
+            ? <>这是 Lean 的{what}：在 MR 上回答{q.id ? ` ${q.id}` : ''}（approve / reject），桥会把回答带回运行机。</>
             : <>这是 Lean 的{what}：在会话里自己打批准那一行，这里不能回答。</>}
         </p>
       )}
       {q.answer && (
-        <p className="br-pre" style={{ margin: 0 }} title={q.voucher_id ? `凭证 ${q.voucher_id}` : undefined}>
+        <p className="br-pre" style={{ margin: 0 }}>
           回答：<b className="br-strong">{q.answer}</b>
           {q.answerer ? ` · ${q.answerer}` : ''}
         </p>
       )}
-      {(link || q.refs.length > 0) && (
+      {link && (
         <div className="br-row br-small">
-          {link && <ExtLink href={link}>{open && !formHere ? ACT.answerOnMr : '在 MR 上看'}</ExtLink>}
-          {q.refs.map((r) => <span key={r} className="br-tag br-mono">{r}</span>)}
+          <ExtLink href={link}>{open && !formHere ? ACT.answerOnMr : '在 MR 上看'}</ExtLink>
         </div>
+      )}
+      {raw.length > 0 && (
+        <details className="br-raw" data-testid="question-raw">
+          <summary>细节</summary>
+          <div className="br-row" style={{ gap: 4, marginTop: 4 }}>{raw.map((r) => <code key={r}>{r}</code>)}</div>
+        </details>
       )}
       <AnswerForm question={q} repo={repo} reqKey={reqKey} onDone={() => onAnswered?.()} />
     </article>
@@ -118,6 +125,7 @@ export function useCopy(text: string) {
 export function MrDescCard({ m, bare = false }: { m: MrDesc; bare?: boolean }) {
   const { copied, copy } = useCopy(m.text)
   const from = mrDescSource(m)
+  const first = takeRefs(m.first ?? '')
   const body = (
     <>
       <header className="br-row">
@@ -131,7 +139,7 @@ export function MrDescCard({ m, bare = false }: { m: MrDesc; bare?: boolean }) {
         )}
       </header>
       {m.error && <p className="br-note">{m.error}</p>}
-      {m.first && <p className="br-strong br-mrfirst" style={{ margin: 0 }} data-testid="mr-desc-first"><Inline text={m.first} /></p>}
+      {first.text && <p className="br-strong br-mrfirst" style={{ margin: 0 }} data-testid="mr-desc-first" title={first.refs.length ? `出处 ${first.refs.join('、')}` : undefined}><Inline text={first.text} /></p>}
       {m.text && (
         <details className="br-raw br-mdfold">
           <summary>看全文</summary>

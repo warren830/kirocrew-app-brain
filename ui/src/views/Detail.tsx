@@ -220,7 +220,7 @@ function nowOf(x: RequirementDetail, board: ReqBoard | null, live: SessionRow | 
     sessionUrl: live?.url ?? null,
     mrUrl: board?.accept.step.mr_url ?? open?.mr_url ?? x.row.mr?.url ?? null,
     question: open?.id ?? null,
-    choices: open?.options.length ? `选 ${open.options.map((o) => o.id).join(' / ')}` : 'approve 批准 / reject 退回',
+    choices: open?.options.length ? `选 ${open.options.map((o) => o.id).join(' / ')}` : 'approve / reject',
   }
 }
 
@@ -864,7 +864,7 @@ function LeanCard({ x, sessionUrl, mrUrl }: { x: RequirementDetail; sessionUrl: 
                 {a.state === 'pending' && (onMr
                   ? (
                     <p className="br-note">
-                      在 MR 上回答{q?.id ? ` ${q.id}` : ''}（approve 批准 / reject 退回），这里不能回答。
+                      在 MR 上回答{q?.id ? ` ${q.id}` : ''}（approve / reject），这里不能回答。
                       {url && /^https?:\/\//i.test(url) && <> <a className="br-link" href={url} target="_blank" rel="noopener noreferrer">{ACT.answerOnMr} <Icon name="ExternalLink" size={12} /></a></>}
                     </p>
                   )
