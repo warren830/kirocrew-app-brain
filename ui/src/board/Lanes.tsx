@@ -345,7 +345,11 @@ function Changes({ commits }: { commits: BeltItem[] }) {
           {show.map((f) => (
             <li key={f.path} title={`${f.path}  +${f.added} −${f.removed}`}>
               <span className={`kt-file-st is-${f.status}`}>{f.status}</span>
-              <span className="kt-file-path kt-mono">{f.path}</span>
+              {/* a narrow lane cuts the directory, never the file's own name */}
+              <span className="kt-file-path kt-mono is-split">
+                <span className="kt-file-dir">{f.path.slice(0, f.path.lastIndexOf('/') + 1)}</span>
+                <span className="kt-file-base">{f.path.slice(f.path.lastIndexOf('/') + 1)}</span>
+              </span>
               <span className="kt-file-bar" aria-hidden="true">
                 <i className="kt-bar-add" style={{ width: `${(f.added / scale) * 100}%` }} />
                 <i className="kt-bar-del" style={{ width: `${(f.removed / scale) * 100}%` }} />

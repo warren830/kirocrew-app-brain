@@ -660,6 +660,9 @@ ${legendSwatches}
 .kt-file-st { text-align: center; font-family: var(--mono, monospace); font-weight: 850; }
 .kt-file-st.is-A { color: var(--kt-ok); } .kt-file-st.is-M { color: var(--kt-warn); } .kt-file-st.is-D { color: var(--kt-bad); }
 .kt-file-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.kt-file-path.is-split { display: flex; }
+.kt-file-dir { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.kt-file-base { flex: none; }
 .kt-file-bar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: color-mix(in srgb, var(--muted) 15%, transparent); }
 .kt-bar-add { background: var(--kt-ok); } .kt-bar-del { background: var(--kt-bad); }
 .kt-file-num { text-align: right; white-space: nowrap; }
