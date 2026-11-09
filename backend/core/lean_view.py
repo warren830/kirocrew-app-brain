@@ -145,6 +145,16 @@ def stage_text(lean: dict[str, Any]) -> str | None:
 
 
 REVIEW_DOC = "construction/build-and-test/review.md"   # Lean's release review (skill aidlc-lean-release)
+INTENT_RE = re.compile(r"^[0-9]{6}-[a-z0-9][a-z0-9-]{0,80}$")
+# what Lean's release skill tells the person to say in a new chat: the review is made by a context that did not write
+# the code (and is not told how by the one that did)
+REVIEW_LINE = ("Review intent %s against its requirements, design and plans, using the diff, and write "
+               "construction/build-and-test/review.md.")
+
+
+def review_line(intent: Any) -> str | None:
+    """Lean's review line for *intent* (run.json is agent-writable: an intent not in Lean's format gets none)."""
+    return REVIEW_LINE % intent if isinstance(intent, str) and INTENT_RE.match(intent) else None
 
 
 def review_current(review_at: float | None, exists: bool, evs: list[dict[str, Any]]) -> bool:

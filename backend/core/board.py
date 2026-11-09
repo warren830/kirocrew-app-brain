@@ -978,11 +978,17 @@ def _reply_step(row: dict[str, Any], f: dict[str, Any], you: str) -> tuple[str, 
     if done:
         head += "Lean 做完了「%s」，" % max(done, key=lambda r: r["n"])["label"]
     head += "下一步是「%s」。" % nxt["label"] if nxt else "Lean 的阶段都做完了。"
+    # before the release, the review in a new session: the line to say is Lean's own (the one 开审查会话 sends), never
+    # one the session that wrote the code worded for its reviewer
+    review = lean_view.review_line(run_of(f).get("intent")) if nxt and nxt.get("id") == "release" and not \
+        lean_view.review_current((f.get("review") or {}).get("at"), bool(f.get("review")), f.get("events") or []) else None
     # an English note (Lean's notes are the agent's words) is not shown: the stage names say it in Chinese
     notes = [x for x in lean_view.notes(f.get("state_text")).get("next") or [] if re.search(r"[\u4e00-\u9fff]", x)]
     if notes:
         text, line = _said(notes[0], you)
-        return _lines("%s\nLean 留的下一步：%s" % (head, text)), line
+        return _lines("%s\nLean 留的下一步：%s" % (head, text)), review or line
+    if review:
+        return _lines("%s\n先开一个新会话做审查（这个会话写了代码，不能自己审），审查写好再回这个会话接着发布" % head), review
     if nxt:
         tail = "（做完会请%s批准发布）" % you if nxt.get("id") == "release" else ""
         return _lines("%s\n在会话里让它接着做「%s」%s" % (head, nxt["label"], tail)), "接着做下一步：%s" % nxt["label"]

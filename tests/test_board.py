@@ -325,10 +325,17 @@ def test_the_idle_step_says_what_to_say_next_and_where():
     step = b["accept"]["step"]
     assert step["who"] == "你" and step["session_url"] == "/chat?sid=brain-r1-demo-3-1" and step["mr_url"] is None
     assert "下一步是「发布」" in step["text"] and "你开一个新会话做审查" in step["text"]
-    assert step["line"] == "审查 intent 261109-x：看 git diff 5d331b4..HEAD"
+    # the line for the new session is Lean's own review line, the one 开审查会话 sends: the session that wrote the code
+    # does not word its reviewer's task
+    review = "Review intent 261109-x against its requirements, design and plans, using the diff, and write " \
+             "construction/build-and-test/review.md."
+    assert step["line"] == review
     assert "`" not in step["text"] + step["line"] and "owner" not in step["text"]
-    # without Lean's notes it still says what to say
+    # without Lean's notes it still says what to do: the review first, then the release
     b = snapshot(facts(demo3_events()), row_of("local", "you", "会话空着：轮到你回话"), sessions=[session(last)])
+    assert "先开一个新会话做审查" in b["accept"]["step"]["text"] and b["accept"]["step"]["line"] == review
+    reviewed = dict(facts(demo3_events()), review={"at": None})
+    b = snapshot(reviewed, row_of("local", "you", "会话空着：轮到你回话"), sessions=[session(last)])
     assert "在会话里让它接着做「发布」" in b["accept"]["step"]["text"] and b["accept"]["step"]["line"] == "接着做下一步：发布"
 
 
