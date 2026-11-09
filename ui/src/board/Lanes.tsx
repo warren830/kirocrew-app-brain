@@ -1,16 +1,20 @@
 /**
  * One lane per actor, in the order of the way (the sample team board's Lanes.tsx): who it is, what state it is in and
- * since when, what it is doing or waits for (the line a person types, the question, why it was refused), a few facts and
- * its latest marks, and its time track.
+ * since when, what it is doing or waits for (the line a person types, the question, why it was refused), what it
+ * changed (the sample's 改动 block: its commits and the files they touched), a few facts and its latest marks, and its
+ * time track.
  *
- * Every lane ends in a time track on one shared axis (the requirement's start → its end, or now): its work spans, the
- * spans it waited for a person (magenta), the ones it did again (orange), with commits, approvals, verify rounds and
- * questions marked where they happened. Read down the lanes and the way lines up like a Gantt chart.
+ * Every lane ends in a time track on one shared axis, the requirement's start → its last activity (or its merge): its
+ * work spans, the spans it waited for a person (magenta when it is you, blue for someone else), the ones it did again
+ * (orange), with commits, approvals, verify rounds and questions marked where they happened. A long quiet time after the
+ * last activity (a night, hours of waiting) is drawn short at the end, with how long it was, so the activity keeps the
+ * width. Read down the lanes and the way lines up like a Gantt chart.
  */
 import { useNavigate } from '@kirocrew/app-sdk'
-import type { Actor, ReqBoard } from '../types'
+import type { Actor, BeltItem, ReqBoard } from '../types'
 import { TypeLine } from '../ui'
-import { actorMeta, fmtAgo, fmtCredits, fmtSpan, fmtWhen } from './format'
+import { ACT, leanProgress } from '../vocab'
+import { WORKING, actorLabel, actorMeta, fmtAgo, fmtCredits, fmtSpan, fmtWhen, leanOf, waitsOnMe } from './format'
 import { useServerNow } from './hooks'
 import { RoleIcon } from './RoleIcon'
 
@@ -25,11 +29,12 @@ export interface LanesProps {
 
 export function Lanes({ board, focus, bumps, onActor, quiet = false }: LanesProps) {
   const off = board.actors.filter((a) => a.status === 'skipped')
+  const ax = axisOf(board, useServerNow())
   return (
     <section className="kt-lanes" aria-label="各环节的泳道" data-testid="kt-lanes">
-      <LanesAxis board={board} />
+      <LanesAxis board={board} ax={ax} />
       {board.actors.filter((a) => a.status !== 'skipped').map((a) => (
-        <LaneRow key={a.key} a={a} board={board} focused={focus === a.key} dim={!!focus && focus !== a.key} bump={bumps[a.key] ?? 0} onActor={onActor} quiet={quiet} />
+        <LaneRow key={a.key} a={a} board={board} ax={ax} focused={focus === a.key} dim={!!focus && focus !== a.key} bump={bumps[a.key] ?? 0} onActor={onActor} quiet={quiet} />
       ))}
       {off.length > 0 && (
         <p className="kt-dim kt-lanes-out" data-testid="kt-lanes-out">
@@ -66,23 +71,64 @@ export function tickLabel(s: number): string {
   return h ? `${d} 天 ${h} 时` : `${d} 天`
 }
 
-function useAxis(board: ReqBoard): { t0: number; t1: number; pct: (t: number) => number } {
-  const now = useServerNow()
-  const t0 = board.started_at ?? board.at
-  const t1 = Math.max(t0 + 60, board.ended_at ?? now)
-  return { t0, t1, pct: (t: number) => Math.min(100, Math.max(0, ((t - t0) / (t1 - t0)) * 100)) }
+/** The share of the track a long quiet tail is drawn in. */
+export const TAIL_PCT = 16
+
+export interface Axis {
+  t0: number
+  /** the last activity (the end of the even part) */
+  last: number
+  /** the axis' end: the merge, else now */
+  end: number
+  /** the quiet time after the last activity, drawn short; null: none worth folding */
+  tail: number | null
+  pct: (t: number) => number
 }
 
-function LanesAxis({ board }: { board: ReqBoard }) {
-  const { t0, t1 } = useAxis(board)
-  const dur = t1 - t0
+/** The last thing that happened on the board: an event, a commit, a mark, a span's start or end. */
+export function lastActivity(b: ReqBoard): number | null {
+  const ts: number[] = [...b.events.map((e) => e.at), ...b.belt.map((x) => x.at)]
+  for (const a of b.actors) {
+    for (const m of a.marks) ts.push(m.at)
+    for (const s of a.spans) ts.push(s.b ?? s.a)
+  }
+  return ts.length ? Math.max(...ts) : null
+}
+
+export function axisOf(b: ReqBoard, now: number): Axis {
+  const t0 = b.started_at ?? b.at
+  const end = Math.max(t0 + 60, b.ended_at ?? now)
+  const last = Math.min(end, Math.max(t0 + 60, lastActivity(b) ?? end))
+  const quiet = end - last
+  const tail = b.ended_at === null && quiet > Math.max(900, 0.3 * (last - t0)) ? quiet : null
+  const even = tail === null ? 100 : 100 - TAIL_PCT
+  const top = tail === null ? end : last
+  const pct = (t: number) => {
+    if (t <= top) return Math.max(0, ((t - t0) / (top - t0)) * even)
+    return Math.min(100, even + ((t - last) / (end - last)) * TAIL_PCT)
+  }
+  return { t0, last, end, tail, pct }
+}
+
+function LanesAxis({ board, ax }: { board: ReqBoard; ax: Axis }) {
+  const dur = (ax.tail === null ? ax.end : ax.last) - ax.t0
+  const ticks = axisTicks(dur)
+  const waiting = board.actors.some((a) => a.status === 'awaiting_approval')
   return (
     <div className="kt-lane kt-lane-axis" aria-hidden="true">
-      <div className="kt-axis-title">时间线（从 {fmtWhen(t0)} 开工起）</div>
+      <div className="kt-axis-title">时间线（从 {fmtWhen(ax.t0)} 开工起）</div>
       <div className="kt-axis">
-        {axisTicks(dur).map((t) => (
-          <span key={t} className="kt-axis-tick" style={{ left: `${(t / dur) * 100}%` }}>{tickLabel(t)}</span>
-        ))}
+        {ticks.map((t, i) => {
+          const left = ax.pct(ax.t0 + t)
+          const edge = i === 0 ? ' is-first' : left > (ax.tail === null ? 92 : 100 - TAIL_PCT - 6) ? ' is-last' : ''
+          return <span key={t} className={`kt-axis-tick${edge}`} style={{ left: `${left}%` }}>{tickLabel(t)}</span>
+        })}
+        {ax.tail !== null && (
+          <span className="kt-axis-tail" style={{ left: `${100 - TAIL_PCT}%`, width: `${TAIL_PCT}%` }} data-testid="kt-axis-tail"
+            title={`最后一次动静以后又过了 ${fmtSpan(ax.tail)}${waiting ? '，一直在等' : board.live ? '' : '，没有动静'}：这一段画短了`}>
+            之后 {fmtSpan(ax.tail)}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -94,44 +140,59 @@ const MARK_TITLE: Record<string, string> = {
   'verify-fail': 'verify 没过', reflect: '回写', session: '会话',
 }
 
-function LaneTrack({ a, board }: { a: Actor; board: ReqBoard }) {
+function spanWord(kind: string, wait: string) {
+  return kind === 'wait' ? wait : kind === 'fix' ? '返工' : '在做'
+}
+
+function LaneTrack({ a, board, ax }: { a: Actor; board: ReqBoard; ax: Axis }) {
   const now = useServerNow()
-  const { pct, t0 } = useAxis(board)
+  // a wait that still goes on says whom it waits for; one that is over, that a person was waited for
+  const now_ = actorLabel('awaiting_approval', board.row.waits.who, board.person.owner)
+  const word = (s: { kind: string; b: number | null }) => (s.kind === 'wait' && s.b === null && a.status === 'awaiting_approval' ? now_ : spanWord(s.kind, '等人'))
+  // an open span glows only while it really goes on: work while the actor works, a wait while it waits
+  const going = (kind: string) => (kind === 'wait' ? a.status === 'awaiting_approval' : WORKING.has(a.status))
   return (
-    <div className="kt-track" role="img" aria-label={`${a.title}的时间线：${a.spans.length ? a.spans.map((s) => `${s.kind === 'wait' ? '等人' : s.kind === 'fix' ? '返工' : '在做'} ${fmtSpan((s.b ?? now) - s.a)}`).join('，') : '还没开始'}`}>
+    <div className="kt-track" role="img" aria-label={`${a.title}的时间线：${a.spans.length ? a.spans.map((s) => `${word(s)} ${fmtSpan((s.b ?? now) - s.a)}`).join('，') : '还没开始'}`}>
       <div className="kt-track-line" />
+      {ax.tail !== null && <div className="kt-track-tail" style={{ left: `${100 - TAIL_PCT}%`, width: `${TAIL_PCT}%` }} />}
       {a.spans.map((s, i) => (
-        <span key={i} className={`kt-track-span is-${s.kind}${s.b === null ? ' is-live' : ''}`}
-          style={{ left: `${pct(s.a)}%`, width: `${Math.max(0.6, pct(s.b ?? now) - pct(s.a))}%` }}
-          title={`${s.kind === 'wait' ? '等人' : s.kind === 'fix' ? '返工' : '在做'}：${fmtWhen(s.a)} 起，${s.b === null ? '到现在' : `用了 ${fmtSpan(s.b - s.a)}`}（开工后 ${fmtSpan(s.a - t0)}）`} />
+        <span key={i} className={`kt-track-span is-${s.kind}${s.b === null && going(s.kind) ? ' is-live' : ''}${s.kind === 'wait' && !waitsOnMe(board) ? ' is-other' : ''}`}
+          style={{ left: `${ax.pct(s.a)}%`, width: `${Math.max(0.6, ax.pct(s.b ?? now) - ax.pct(s.a))}%` }}
+          title={`${word(s)}：${fmtWhen(s.a)} 起，${s.b === null ? `到现在（${fmtSpan(now - s.a)}）` : `用了 ${fmtSpan(s.b - s.a)}`}（开工后 ${fmtSpan(s.a - ax.t0)}）`} />
       ))}
       {a.marks.map((m, i) => (
-        <span key={`m${i}`} className={`kt-track-mark is-${m.kind}`} style={{ left: `${pct(m.at)}%` }} title={`${fmtWhen(m.at)} · ${m.title}`} />
+        <span key={`m${i}`} className={`kt-track-mark is-${m.kind}`} style={{ left: `${ax.pct(m.at)}%` }} title={`${fmtWhen(m.at)} · ${m.title}`} />
       ))}
     </div>
   )
 }
 
-function LaneRow({ a, board, focused, dim, bump, onActor, quiet }: { a: Actor; board: ReqBoard; focused: boolean; dim: boolean; bump: number; onActor: (k: string) => void; quiet: boolean }) {
+function LaneRow({ a, board, ax, focused, dim, bump, onActor, quiet }: {
+  a: Actor; board: ReqBoard; ax: Axis; focused: boolean; dim: boolean; bump: number; onActor: (k: string) => void; quiet: boolean
+}) {
   const meta = actorMeta(a.status)
   const waiting = a.status === 'waiting'
+  const other = a.status === 'awaiting_approval' && !waitsOnMe(board)
   return (
-    <article className={`kt-lane is-${a.status} tone-${meta.tone}${focused ? ' is-focus' : ''}${dim ? ' is-dim' : ''}${waiting ? ' is-compact' : ''}`}
-      data-testid="kt-lane" data-role={a.key} data-status={a.status} aria-label={`${a.title}：${meta.label}`}>
+    <article className={`kt-lane is-${a.status} tone-${other ? 'info' : meta.tone}${focused ? ' is-focus' : ''}${dim ? ' is-dim' : ''}${waiting ? ' is-compact' : ''}`}
+      data-testid="kt-lane" data-role={a.key} data-status={a.status} aria-label={`${a.title}：${actorLabel(a.status, board.row.waits.who, board.person.owner)}`}>
       {bump > 0 && <span key={bump} className="kt-lane-bump" aria-hidden="true" />}
-      <LaneId a={a} focused={focused} onActor={onActor} quiet={quiet} />
+      <LaneId a={a} board={board} focused={focused} onActor={onActor} quiet={quiet} />
       <div className="kt-lane-live">
-        <Situation a={a} quiet={quiet} />
+        <Situation a={a} board={board} quiet={quiet} />
       </div>
-      <div className="kt-lane-work">{!waiting && <Work a={a} />}</div>
-      <LaneTrack a={a} board={board} />
+      <div className="kt-lane-work">{!waiting && <Work a={a} board={board} />}</div>
+      <LaneTrack a={a} board={board} ax={ax} />
     </article>
   )
 }
 
-function LaneId({ a, focused, onActor, quiet }: { a: Actor; focused: boolean; onActor: (k: string) => void; quiet: boolean }) {
+function LaneId({ a, board, focused, onActor, quiet }: { a: Actor; board: ReqBoard; focused: boolean; onActor: (k: string) => void; quiet: boolean }) {
   const meta = actorMeta(a.status)
   const navigate = useNavigate()
+  const awaiting = a.status === 'awaiting_approval'
+  const mine = waitsOnMe(board)
+  const label = actorLabel(a.status, board.row.waits.who, board.person.owner)
   return (
     <div className="kt-lane-id">
       <button type="button" className="kt-avatar" onClick={() => onActor(a.key)} aria-pressed={focused} aria-label={focused ? `不再只看${a.title}` : `只看${a.title}`} title={focused ? '再点一次看全部' : '只看这一环'}>
@@ -141,20 +202,22 @@ function LaneId({ a, focused, onActor, quiet }: { a: Actor; focused: boolean; on
         <div className="kt-lane-name"><span>{a.title}</span></div>
         <div className="kt-lane-doing">{a.sub}</div>
         <div className="kt-lane-tag">
-          <span className={`kt-pill tone-${meta.tone}${a.status === 'running' || a.status === 'awaiting_approval' ? ' is-live' : ''}`} title={meta.hint}>
+          <span className={`kt-pill tone-${awaiting && !mine ? 'info' : meta.tone}${a.status === 'running' || (awaiting && mine) ? ' is-live' : ''}`} title={meta.hint}>
             <i aria-hidden="true">{meta.icon}</i>
-            {meta.label}
+            {label}
           </span>
         </div>
       </div>
       {a.status !== 'waiting' && (
         <p className="kt-lane-stats">
-          {a.since !== null && <span title={fmtWhen(a.since)}>⏱ <b><Ago at={a.since} /></b></span>}
+          {a.since !== null && (awaiting
+            ? <span title={`从 ${fmtWhen(a.since)} 起`}>⏱ 等了 <b><Wait since={a.since} /></b></span>
+            : <span title={fmtWhen(a.since)}>⏱ <b><Ago at={a.since} /></b></span>)}
           {a.credits !== null && <span><b>{fmtCredits(a.credits)}</b> credits</span>}
         </p>
       )}
       {!quiet && a.session && (
-        <button type="button" className="kt-out-btn" onClick={() => navigate(a.session!.url)} title="在 Kiro Crew 里打开它的会话">打开会话 ›</button>
+        <button type="button" className="kt-out-btn" onClick={() => navigate(a.session!.url)} title="在 Kiro Crew 里打开它的会话">{ACT.openSession} ›</button>
       )}
     </div>
   )
@@ -165,36 +228,60 @@ function Ago({ at }: { at: number }) {
   return <>{fmtAgo(now - at)}</>
 }
 
+function Wait({ since }: { since: number }) {
+  const now = useServerNow()
+  return <>{fmtSpan(now - since)}</>
+}
+
 /** What the actor does or waits for: one loud line, and what the person can do about it right here. */
-function Situation({ a, quiet }: { a: Actor; quiet: boolean }) {
+function Situation({ a, board, quiet }: { a: Actor; board: ReqBoard; quiet: boolean }) {
   const meta = actorMeta(a.status)
+  const mine = waitsOnMe(board)
+  const other = a.status === 'awaiting_approval' && !mine
   const strong: Record<string, string> = {
-    awaiting_approval: '✋ 等你：', failed: '✕ 没过：', stalled: '⚠ 卡住：', fixing: '↻ 返工：', queued: '⏸ 排队：', merged: '✔ 完成', done: '✓ 做完这步',
-    running: '● 在做：', waiting: '还没轮到：',
+    awaiting_approval: `${mine ? '✋ ' : ''}${actorLabel(a.status, board.row.waits.who, board.person.owner)}：`, failed: '✕ 没过：', stalled: '⚠ 卡住：',
+    fixing: '↻ 返工：', queued: '⏸ 排队：', merged: '✔ 完成', done: '✓ 做完这步', running: '●', waiting: '还没轮到：',
   }
   const lead = strong[a.status] ?? meta.label
   const bare = lead.replace(/[：:]$/, '')
   const same = !a.doing || a.doing === meta.label || a.doing === bare
   return (
     <>
-      <div className={`kt-situation tone-${meta.tone}`}>
-        <strong>{same ? bare : lead}</strong>
+      <div className={`kt-situation tone-${other ? 'info' : meta.tone}`}>
+        <strong>{same ? (a.status === 'running' ? '● 在做' : bare) : lead}</strong>
         {!same && <span className="kt-summary">{a.doing}</span>}
       </div>
-      {!quiet && a.line && <TypeLine line={a.line} sessionUrl={a.session?.url ?? null} />}
+      {!quiet && mine && a.line && <TypeLine line={a.line} sessionUrl={a.session?.url ?? null} />}
     </>
   )
 }
 
-function Work({ a }: { a: Actor }) {
-  const marks = a.marks.slice().reverse().slice(0, 4)
-  if (!a.facts.length && !marks.length) return <p className="kt-dim kt-nothing">还没有记录</p>
+/** Its facts as small tags; the local session's Lean progress is the one the whole app says (vocab.leanProgress). */
+function factsOf(a: Actor, b: ReqBoard): string[] {
+  if (a.key !== 'local') return a.facts
+  const rest = a.facts.filter((f) => !f.startsWith('Lean 做完'))
+  return b.row.lean.stage ? [`Lean ${leanProgress(leanOf(b.row.lean))}`, ...rest] : rest
+}
+
+function Work({ a, board }: { a: Actor; board: ReqBoard }) {
+  const commits = board.belt.filter((x) => x.actor === a.key && x.kind !== 'merge')
+  const verify = a.key === 'ci' ? board.checks.cells.filter((c) => c.group === 'verify' && (c.status === 'pass' || c.status === 'fail')) : []
+  const marks = a.marks.filter((m) => !(commits.length && (m.kind === 'commit' || m.kind === 'handover'))).slice().reverse().slice(0, commits.length ? 2 : 4)
+  const facts = factsOf(a, board)
+  if (!facts.length && !marks.length && !commits.length && !verify.length) return <p className="kt-dim kt-nothing">还没有记录</p>
   return (
     <>
-      {a.facts.length > 0 && (
+      {facts.length > 0 && (
         <ul className="kt-tools br-facts-chips" aria-label="事实">
-          {a.facts.map((f) => <li key={f}><span className="kt-mono br-fact">{f}</span></li>)}
+          {facts.map((f) => <li key={f}><span className="kt-mono br-fact">{f}</span></li>)}
         </ul>
+      )}
+      {commits.length > 0 && <Changes commits={commits} />}
+      {verify.length > 0 && (
+        <div className="kt-owned" aria-label="verify 的结果">
+          <span className="kt-dim">verify</span>
+          {verify.map((c) => <span key={c.id} className={`kt-owned-case is-${c.status}`} title={c.detail}>{c.label} {c.status === 'pass' ? '✓' : '✕'}</span>)}
+        </div>
       )}
       {marks.length > 0 && (
         <ul className="kt-commits" aria-label="最近的记录">
@@ -207,5 +294,79 @@ function Work({ a }: { a: Actor }) {
         </ul>
       )}
     </>
+  )
+}
+
+type FileChange = NonNullable<BeltItem['changes']>[number]
+
+/** The files an actor's commits changed, one row each, biggest first (lines added / removed summed over its commits). */
+export function filesOf(commits: BeltItem[]): FileChange[] {
+  const by = new Map<string, FileChange>()
+  for (const c of commits) {
+    for (const f of c.changes ?? []) {
+      const had = by.get(f.path)
+      by.set(f.path, had ? { ...had, added: had.added + f.added, removed: had.removed + f.removed, status: had.status === 'A' ? 'A' : f.status } : { ...f })
+    }
+  }
+  return [...by.values()].sort((x, y) => y.added + y.removed - (x.added + x.removed))
+}
+
+/** 改动 (the sample's change block): the files and their +/− bars when the backend reads them, and the commits. */
+function Changes({ commits }: { commits: BeltItem[] }) {
+  const files = filesOf(commits)
+  const added = files.reduce((n, f) => n + f.added, 0)
+  const removed = files.reduce((n, f) => n + f.removed, 0)
+  const scale = Math.max(1, ...files.map((f) => f.added + f.removed))
+  const most = Math.max(1, ...commits.map((c) => c.files))
+  const show = files.slice(0, 5)
+  return (
+    <div className="br-changes" data-testid="kt-changes">
+      <div className="kt-files-head">
+        <span>改动</span>
+        {files.length > 0 ? (
+          <>
+            <span className="kt-add">+{added}</span>
+            <span className="kt-del">−{removed}</span>
+            <span className="kt-dim">{files.length} 个文件 · 提交 {commits.length} 次</span>
+          </>
+        ) : (
+          <span className="kt-dim">提交 {commits.length} 次</span>
+        )}
+      </div>
+      {show.length > 0 && (
+        <ul className="kt-files">
+          {show.map((f) => (
+            <li key={f.path} title={`${f.path}  +${f.added} −${f.removed}`}>
+              <span className={`kt-file-st is-${f.status}`}>{f.status}</span>
+              <span className="kt-file-path kt-mono">{f.path}</span>
+              <span className="kt-file-bar" aria-hidden="true">
+                <i className="kt-bar-add" style={{ width: `${(f.added / scale) * 100}%` }} />
+                <i className="kt-bar-del" style={{ width: `${(f.removed / scale) * 100}%` }} />
+              </span>
+              <span className="kt-file-num kt-mono">
+                <span className="kt-add">+{f.added}</span>
+                {f.removed > 0 && <span className="kt-del"> −{f.removed}</span>}
+              </span>
+            </li>
+          ))}
+          {files.length > show.length && <li className="kt-more kt-dim">还有 {files.length - show.length} 个文件</li>}
+        </ul>
+      )}
+      <ul className="kt-commits br-commit-rows" aria-label="提交">
+        {commits.slice().reverse().slice(0, 3).map((c) => (
+          <li key={`${c.kind}-${c.sha}`} className={c.records_only ? 'is-records' : ''}>
+            <code>{c.sha.slice(0, 8)}</code>
+            <span className="br-commit-subj" title={c.text}>{c.kind === 'handover' ? `交接：${c.text}` : c.text}</span>
+            {!files.length && (
+              <span className="br-commit-files" title={`${c.files} 个文件`}>
+                <span className="kt-file-bar" aria-hidden="true"><i className="kt-bar-add" style={{ width: `${(c.files / most) * 100}%` }} /></span>
+                <span className="kt-mono">{c.files} 个文件{c.records_only ? ' · 只改记录' : ''}</span>
+              </span>
+            )}
+          </li>
+        ))}
+        {commits.length > 3 && <li className="kt-more kt-dim">还有 {commits.length - 3} 次提交：看提交传送带</li>}
+      </ul>
+    </div>
   )
 }

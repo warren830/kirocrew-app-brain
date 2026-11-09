@@ -1344,7 +1344,21 @@
       "text": "PAY-2：需求初稿",
       "files": 2,
       "records_only": true,
-      "actor": "local"
+      "actor": "local",
+      "changes": [
+        {
+          "path": "aidlc-docs/refund-id/requirements.md",
+          "added": 41,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "runs/PAY-2/run.json",
+          "added": 29,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1354,7 +1368,15 @@
       "text": "PAY-2：按意见改设计（接口加分页）",
       "files": 1,
       "records_only": true,
-      "actor": "local"
+      "actor": "local",
+      "changes": [
+        {
+          "path": "aidlc-docs/refund-id/design.md",
+          "added": 22,
+          "removed": 8,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1364,7 +1386,15 @@
       "text": "PAY-2：交接说明",
       "files": 1,
       "records_only": true,
-      "actor": "local"
+      "actor": "local",
+      "changes": [
+        {
+          "path": "runs/PAY-2/handoff.md",
+          "added": 17,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "handover",
@@ -1374,7 +1404,21 @@
       "text": "PAY-2：交接（brain handoff）",
       "files": 2,
       "records_only": true,
-      "actor": "handover"
+      "actor": "handover",
+      "changes": [
+        {
+          "path": "runs/PAY-2/run.json",
+          "added": 6,
+          "removed": 1,
+          "status": "M"
+        },
+        {
+          "path": "runs/PAY-2/MR.md",
+          "added": 23,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1384,7 +1428,27 @@
       "text": "PAY-2：接口和数据结构（refund-api）",
       "files": 3,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": [
+        {
+          "path": "src/refund/id.py",
+          "added": 38,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "src/refund/models.py",
+          "added": 14,
+          "removed": 2,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/__init__.py",
+          "added": 1,
+          "removed": 0,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1394,7 +1458,33 @@
       "text": "PAY-2：主流程（refund-api）",
       "files": 4,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": [
+        {
+          "path": "src/refund/id.py",
+          "added": 27,
+          "removed": 6,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/service.py",
+          "added": 33,
+          "removed": 4,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/api.py",
+          "added": 9,
+          "removed": 1,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/models.py",
+          "added": 3,
+          "removed": 1,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1404,7 +1494,39 @@
       "text": "PAY-2：错误处理和重试（refund-api）",
       "files": 5,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": [
+        {
+          "path": "src/refund/retry.py",
+          "added": 44,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "src/refund/service.py",
+          "added": 12,
+          "removed": 5,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/id.py",
+          "added": 6,
+          "removed": 2,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/errors.py",
+          "added": 18,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "src/refund/api.py",
+          "added": 4,
+          "removed": 2,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1414,7 +1536,45 @@
       "text": "PAY-2：测试（refund-api）",
       "files": 6,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": [
+        {
+          "path": "tests/test_refund_id.py",
+          "added": 52,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "tests/test_retry.py",
+          "added": 37,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "tests/conftest.py",
+          "added": 8,
+          "removed": 1,
+          "status": "M"
+        },
+        {
+          "path": "tests/test_api.py",
+          "added": 19,
+          "removed": 3,
+          "status": "M"
+        },
+        {
+          "path": "tests/test_service.py",
+          "added": 24,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "pytest.ini",
+          "added": 2,
+          "removed": 0,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1424,7 +1584,21 @@
       "text": "PAY-2：按 D-1 的回答改",
       "files": 2,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": [
+        {
+          "path": "src/refund/id.py",
+          "added": 7,
+          "removed": 4,
+          "status": "M"
+        },
+        {
+          "path": "tests/test_refund_id.py",
+          "added": 6,
+          "removed": 1,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1434,7 +1608,21 @@
       "text": "PAY-2：修好 pytest 里没过的两个用例",
       "files": 2,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": [
+        {
+          "path": "tests/test_retry.py",
+          "added": 5,
+          "removed": 3,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/retry.py",
+          "added": 2,
+          "removed": 2,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "merge",
@@ -1444,7 +1632,8 @@
       "text": "合并进 main（合并提交）",
       "files": 0,
       "records_only": false,
-      "actor": "release"
+      "actor": "release",
+      "changes": []
     }
   ],
   "checks": {
