@@ -185,7 +185,7 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
           <div className="imp-done" role="status" data-testid="next-listed">
             <span className="imp-mark" aria-hidden="true">✓</span>
             <div>
-              <b>已经在列表里（{shown.listed}）。</b>
+              <b>已经在列表里。</b>
               <small>{shown.pending ? shown.pending.next : '交付总览、开需求都能用它。'}</small>
             </div>
             <div className="br-row">
@@ -596,13 +596,13 @@ function NextBox({ r, c, added, addBusy, addError, onAdd, onChanged, go }: {
   const ready = inplace && (!r.remote_url || pushed)
   const head = inplace ? `装好了，提交在 ${r.branch} 上` : `装在 ${r.branch} 分支上`
   const line = ready ? '现在就能开需求了。'
-    : inplace ? `推送 ${r.branch} 以后就能开需求：开工从 origin 上的 ${r.branch} 建分支。`
+    : inplace ? `推送 ${r.branch} 以后就能开需求。`
       : `合进 ${target} 以后才能开需求。${p?.next ? `下一步：${p.next}。` : ''}`
   return (
     <div className={`imp-done${ready ? '' : ' is-wait'}`} role="status" data-testid="install-next">
       <span className="imp-mark" aria-hidden="true">{ready ? '✓' : '✋'}</span>
       <div>
-        <b>{head}{listedId ? `，已经加入列表（${listedId}）` : ''}</b>
+        <b>{head}{listedId ? '，已经加入列表' : ''}</b>
         <small>{line}</small>
         {!listedId && (
           <span className="br-row">

@@ -161,7 +161,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
           : keyBad ? '需求号的格式不对'
             : me?.ask ? `先在上面「${me.label}」旁点「保存」${me.suggest ? `（确认是 ${me.suggest}）` : ''}`
               : started?.ok ? '已经开工了'
-                : info?.push ? `先推送 ${info.push.branch}：开工从远端的 ${info.push.branch} 建分支，那里还没有 brain-kit`
+                : info?.push ? `先推送 ${info.push.branch}：开工从 origin 上的 ${info.push.branch} 建分支，那里还没有 brain-kit`
                   : openSession && crewBad ? `KiroCrew 这边有问题，开不了会话：先点上面的${crewFix ? `「${crewFix}」` : '修复按钮'}，或者不勾「开工后开会话」`
                     : classRefused ? NO_CONFIDENTIAL
                       : noDocs ? ''

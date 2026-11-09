@@ -272,7 +272,7 @@ describe('设置', () => {
     render(<SettingsView {...p} />)
     const kpi = screen.getByRole('region', { name: '你是谁' })
     expect(kpi).toHaveTextContent('alice')
-    expect(kpi).toHaveTextContent('1 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」里填上')
+    expect(kpi).toHaveTextContent('1 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」那一行看一眼名字，点「保存」')
     const card = screen.getByRole('region', { name: '仓库' })
     const r1 = card.querySelector('[data-repo="r1"]') as HTMLElement
     expect(within(r1).getByTestId('me-line')).toHaveTextContent('alice（这台机器的登录名：这个仓库不用 GitLab）')

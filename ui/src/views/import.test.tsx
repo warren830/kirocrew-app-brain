@@ -149,7 +149,7 @@ describe('导入仓库', () => {
     expect(props.setStatus).toHaveBeenCalledWith(addedStatus(true))
     await waitFor(() => expect(inspected).toBe(2))
     const next = await screen.findByTestId('install-next')
-    expect(next).toHaveTextContent('装在 brain/install 分支上，已经加入列表（r3）')
+    expect(next).toHaveTextContent('装在 brain/install 分支上，已经加入列表')
     expect(next).toHaveTextContent('合进 main 以后才能开需求')
     expect(within(next).getByRole('button', { name: '推送并开 MR' })).toHaveClass('is-primary')    // the recommended next step
     expect(within(next).getByRole('button', { name: '在本机合并到 main' })).not.toHaveClass('is-primary')
@@ -299,7 +299,7 @@ describe('导入仓库', () => {
     const { user, props } = setup({ [`POST ${API}/import/inspect`]: () => listed })
     await inspectPath(user)
     const done = await screen.findByTestId('next-listed')
-    expect(done).toHaveTextContent('已经在列表里（r1）。')
+    expect(done).toHaveTextContent('已经在列表里。')
     expect(flowStates()).toEqual(['done', 'done', 'off', 'done'])
     await user.click(within(done).getByRole('button', { name: '去交付总览' }))
     expect(props.go).toHaveBeenCalledWith({ kind: 'overview' })
@@ -312,7 +312,7 @@ describe('导入仓库', () => {
     c.listed = 'r2'
     const { user } = setup({ [`POST ${API}/import/inspect`]: () => c }, { path: REPO })
     await user.click(screen.getByRole('button', { name: '检查' }))
-    expect(await screen.findByTestId('next-listed')).toHaveTextContent('已经在列表里（r2）。')
+    expect(await screen.findByTestId('next-listed')).toHaveTextContent('已经在列表里。')
     expect(screen.getByTestId('pending')).toHaveTextContent('装在 brain/install 分支上，还没推送：合进 main 以后生效')
     expect(screen.getByRole('button', { name: '推送并开 MR' })).toBeInTheDocument()
     expect(screen.queryByTestId('add')).toBeNull()
@@ -366,8 +366,9 @@ describe('导入仓库', () => {
     expect(within(out).getByText(`提交了 ${fx.importInplaceJob().result!.files.length} 个文件`)).toBeInTheDocument()
     expect(screen.getByTestId('sub-3')).toHaveTextContent('装好了，提交在 main')
     const next = await screen.findByTestId('install-next')
-    await waitFor(() => expect(next).toHaveTextContent('装好了，提交在 main 上，已经加入列表（r3）'))
-    expect(next).toHaveTextContent('推送 main 以后就能开需求：开工从 origin 上的 main 建分支。')
+    await waitFor(() => expect(next).toHaveTextContent('装好了，提交在 main 上，已经加入列表'))
+    expect(next).not.toHaveTextContent(/（r\d+）/)                                         // not the app's own id of the repo
+    expect(next).toHaveTextContent('推送 main 以后就能开需求。')
     expect(within(next).getByRole('button', { name: '推送 main' })).toHaveClass('is-primary')
     expect(within(next).queryByRole('button', { name: '开需求' })).toBeNull()             // not before the push
     expect(screen.queryByTestId('add')).toBeNull()

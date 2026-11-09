@@ -297,7 +297,7 @@ describe('开需求', () => {
     const { user } = setup({ [`GET ${API}/intake/next*`]: () => ({ ...fx.intakeNext(), push: { branch: 'main', remote_url: 'git@gitlab.example.com:shop/shop-pay.git' } }) })
     await fillBasics(user)
     expect(startBtn()).toBeDisabled()
-    expect(screen.getByTestId('start-why')).toHaveTextContent('先推送 main：开工从远端的 main 建分支')
+    expect(screen.getByTestId('start-why')).toHaveTextContent('先推送 main：开工从 origin 上的 main 建分支')
     const box = screen.getByTestId('new-push')
     await user.click(within(box).getByRole('button', { name: '推送 main' }))
     expect(within(box).getByTestId('push-team')).toHaveTextContent('这会直接改团队的 main，没有 MR 评审')
