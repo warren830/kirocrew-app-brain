@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ItemEntry } from '../nav'
 import { apiCalls, apiError, navigations } from '../test/stubs/app-sdk'
+import { fmtCredits } from '../format'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import { TYPE_IT_YOURSELF } from '../ui'
@@ -190,12 +191,13 @@ describe('需求详情', () => {
     expect(who('D-3')).not.toHaveAttribute('title')
   })
 
-  test('the crumb goes back; a Brain cite opens the Brain view at that entry', async () => {
+  test('the crumb and ← 返回 go back; a Brain cite opens the Brain view at that entry', async () => {
     const { go, onBack } = renderDetail({ repo: 'r1', key: 'PAY-3', from: 'todo' })
     const crumb = await screen.findByRole('navigation', { name: '位置' })
     await screen.findByRole('region', { name: '决定' })
+    expect(crumb).toHaveTextContent('待办›PAY-3')
     fireEvent.click(within(crumb).getByRole('button', { name: '待办' }))
-    fireEvent.click(within(crumb).getByRole('button', { name: '← 返回待办' }))
+    fireEvent.click(screen.getByRole('button', { name: '← 返回待办' }))   // beside 需求看板 ↗, no longer in the crumb
     expect(onBack).toHaveBeenCalledTimes(2)
     const decisions = screen.getByRole('region', { name: '决定' })
     fireEvent.click(within(decisions).getByRole('button', { name: 'P-PAY-2-1' }))
@@ -203,6 +205,7 @@ describe('需求详情', () => {
     const brain = screen.getByRole('region', { name: '用到的 Brain' })
     fireEvent.click(within(brain).getAllByRole('button', { name: 'T-12' })[0])
     expect(go).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', id: 'T-12', file: 'TECH' })
+    expect(within(brain).getByText('T-PAY-9-1')).toBeInTheDocument()
     expect(within(brain).queryByRole('button', { name: 'T-PAY-9-1' })).toBeNull() // not in the Brain: plain text
   })
 
@@ -255,5 +258,195 @@ describe('需求详情', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('没有这个需求（404）')
     expect(screen.queryByRole('region', { name: '需求' })).toBeNull()
     expect(apiCalls[0].path).toBe(`${API}/requirements/r1/PAY-99`)
+  })
+
+  test('价值流: the board’s time as parts in order (quiet stretches left out), its moments under it; a part opens the board', async () => {
+    const { go } = renderDetail()
+    const card = await screen.findByRole('region', { name: '价值流' })
+    expect(apiCalls.map((c) => c.path)).toEqual([`${API}/requirements/r1/PAY-3`, `${API}/board/r1/PAY-3`])
+    // board.json: the local session works with three waits for a person between (REQUIREMENTS, DESIGN, then the
+    // question running into the pending PLAN, one part); the gaps after each approval have nothing recorded
+    const parts = ['AI 在本机做 31 分钟', '等人 21 分钟', 'AI 在本机做 41 分钟', '等人 25 分钟', 'AI 在本机做 25 小时 35 分', '等人 20 分钟']
+    const band = within(card).getByRole('img')
+    expect(band).toHaveAttribute('aria-label', '价值流：' + parts.join('，'))
+    expect(within(card).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(parts)
+    expect(card).toHaveTextContent('从开工到此刻，记下的 27 小时 53 分')
+    // the moments: approvals and the question, not the requests, stages or commits
+    for (const t of ['你批准了需求', '你批准了设计', '停下问你：澄清']) expect(band).toHaveTextContent(t)
+    expect(band).not.toHaveTextContent('请你批准')
+    expect(band).not.toHaveTextContent('提交')
+    fireEvent.click(within(card).getByRole('button', { name: '等人 21 分钟' }))
+    expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item' })
+  })
+
+  test('a board that does not come is silent: no 价值流, no error, the cards say the board has not come', async () => {
+    installFixtureRoutes({ [`GET ${API}/board/*`]: () => { throw apiError(503, 'unavailable', '看板读不到') } })
+    renderDetail()
+    await screen.findByRole('region', { name: 'Lean 进度' })
+    await waitFor(() => expect(apiCalls.map((c) => c.path)).toContain(`${API}/board/r1/PAY-3`))
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)) })   // let the failed board answer land
+    expect(within(screen.getByRole('article', { name: '时间花在哪' })).getByText('看板的数据还没来')).toBeInTheDocument()
+    expect(within(screen.getByRole('article', { name: '检查' })).queryByRole('button')).toBeNull()
+    expect(screen.queryByRole('region', { name: '价值流' })).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByText(/看板读不到/)).toBeNull()
+  })
+
+  test('the Lean card: the 11 stages in order, each its number, name, state and units; only the pending approval has the line to type', async () => {
+    renderDetail()
+    const lean = await screen.findByRole('region', { name: 'Lean 进度' })
+    const d = fx.detail()
+    const STATE: Record<string, string> = { done: '做完', skipped: '跳过', started: '在做', todo: '没开始' }
+    const cells = within(within(lean).getByRole('list', { name: '11 个阶段' })).getAllByTestId('stage')
+    expect(cells).toHaveLength(11)
+    cells.forEach((cell, i) => {
+      const s = d.lean.stages[i]
+      expect(cell.dataset.state).toBe(s.state)
+      expect(cell).toHaveTextContent(`${s.n} · ${STATE[s.state]}`)
+      expect(cell).toHaveTextContent(s.label)
+      for (const u of s.units) expect(cell).toHaveTextContent(`${u.unit} · ${STATE[u.state]}`)
+      expect(cell).toHaveAttribute('title', s.note ?? STATE[s.state])
+    })
+    expect(lean).toHaveTextContent(`做完或跳过 ${d.row.lean.done}/${d.row.lean.total} 个阶段`)
+    const rows = within(within(lean).getByRole('list', { name: '审批' })).getAllByTestId('approval')
+    expect(rows).toHaveLength(d.lean.approvals.length)
+    rows.forEach((row, i) => {
+      const a = d.lean.approvals[i]
+      expect(row).toHaveTextContent(a.kind)
+      expect(row).toHaveTextContent(a.state === 'pending' ? '等你批' : '已批准')
+      if (a.sha8) expect(row).toHaveTextContent(a.sha8)
+      if (a.path) expect(row).toHaveTextContent(a.path)
+      expect(within(row).queryByTestId('type-line') !== null).toBe(a.state === 'pending')
+    })
+    const line = within(lean).getByTestId('type-line')   // the one line, on the pending PLAN
+    expect(within(line).getByText(LINE)).toHaveClass('br-mono')
+    expect(line).toHaveTextContent(TYPE_IT_YOURSELF)
+    expect(within(line).getByRole('button', { name: '打开会话' })).toBeInTheDocument()   // the live local session
+    noLineSent()
+  })
+
+  test('决定: each decision with its stage, why and vouchers; every Brain cite opens the Brain view at that entry', async () => {
+    const { go } = renderDetail()
+    const card = await screen.findByRole('region', { name: '决定' })
+    const ds = fx.detail().decisions
+    expect(card).toHaveTextContent(`decisions.md · ${ds.length} 条 · 人定了 ${ds.filter((d) => d.by === 'person').length} 条`)
+    const FILE: Record<string, string> = { P: 'PRODUCT', T: 'TECH' }
+    let clicks = 0
+    for (const d of ds) {
+      const row = within(card).getByText(d.id).closest('tr')!
+      expect(row.children[0]).toHaveAttribute('title', d.src)
+      expect(row).toHaveTextContent(d.text)
+      expect(row).toHaveTextContent(d.stage!)
+      expect(row).toHaveTextContent(d.why!)
+      for (const v of d.vouchers) expect(within(row).getByText(v).tagName).toBe('CODE')
+      const cites = row.children[6] as HTMLElement
+      if (d.cites.length === 0) expect(cites).toHaveTextContent(/^—$/)
+      for (const c of d.cites) {
+        fireEvent.click(within(cites).getByRole('button', { name: c }))
+        expect(go).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', id: c, file: FILE[c[0]] })
+        clicks++
+      }
+    }
+    expect(clicks).toBe(ds.flatMap((d) => d.cites).length)
+    expect(go).toHaveBeenCalledTimes(clicks)
+  })
+
+  test('a decision cite that is not a Brain entry id stays plain text: no button, no markup', async () => {
+    const d = fx.detail()
+    d.decisions[0].cites = ['javascript:alert(1)', '<img src=x onerror=alert(1)>', 'P-PAY-2-1']
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d })
+    const { go } = renderDetail()
+    const card = await screen.findByRole('region', { name: '决定' })
+    const cites = within(card).getByText('D-1').closest('tr')!.children[6] as HTMLElement
+    expect(within(cites).getAllByRole('button').map((b) => b.textContent)).toEqual(['P-PAY-2-1'])
+    expect(within(cites).getByText('javascript:alert(1)').tagName).toBe('SPAN')
+    expect(within(cites).getByText('<img src=x onerror=alert(1)>').tagName).toBe('SPAN')
+    expect(card.querySelector('img, a')).toBeNull()
+    fireEvent.click(within(cites).getByText('javascript:alert(1)'))
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  test('问题和回答: how many, each question as asked with its kind and state, the options where there is no form; none says so', async () => {
+    const { unmount } = render(<DetailView entry={{ repo: 'r1', key: 'PAY-3' }} status={fx.status()} go={vi.fn()} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} pollMs={60_000} />)
+    const card = await screen.findByRole('region', { name: '问题和回答' })
+    const qs = fx.detail().questions
+    expect(card).toHaveTextContent(`${qs.length} 个 · 能在这里回答的才有回答框`)
+    const shown = within(card).getAllByTestId('question')
+    expect(shown).toHaveLength(qs.length)
+    shown.forEach((el, i) => {
+      expect(el).toHaveTextContent(qs[i].question!)
+      expect(el).toHaveTextContent(qs[i].kind_label)
+      expect(el).toHaveTextContent('本地会话')   // park.json
+    })
+    const [clarify, plan, old] = shown
+    expect(clarify).toHaveTextContent('等回答')
+    expect(within(clarify).getByText(qs[0].refs[0])).toBeInTheDocument()
+    expect(plan).toHaveTextContent('等回答')
+    expect(old).toHaveTextContent('已送回')
+    const opts = within(within(old).getByRole('list', { name: '选项' })).getAllByRole('listitem')
+    expect(opts.map((o) => o.textContent)).toEqual(qs[2].options.map((o) => `${o.id} ${o.text}${o.id === qs[2].recommend ? '推荐' : ''}`))
+    expect(within(clarify).queryByRole('list', { name: '选项' })).toBeNull()   // its options are the form's
+    unmount()
+    const none = fx.detail()
+    none.questions = []
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => none })
+    renderDetail()
+    const empty = await screen.findByRole('region', { name: '问题和回答' })
+    expect(empty).toHaveTextContent('0 个')
+    expect(empty).toHaveTextContent('没有问过人。')
+    expect(within(empty).queryByTestId('question')).toBeNull()
+  })
+
+  test('变更说明 复制 the clipboard refuses says so; copying sends nothing', async () => {
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error('denied'))
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '变更说明' })
+    fireEvent.click(within(card).getByRole('button', { name: '复制' }))
+    expect(await within(card).findByRole('status')).toHaveTextContent('没复制成：请展开全文手动选中')
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(fx.detail().mr_desc.text)
+    expect(within(card).queryByText('已复制')).toBeNull()
+    expect(apiCalls.filter((c) => c.method !== 'GET')).toEqual([])
+  })
+
+  test('会话: each session with its state, where it runs, agent, credits and turns; the total and where credits come from', async () => {
+    const d = fx.detail()
+    const runner = { ...d.sessions[0], slot: 'brain-PAY-3-run1', title: 'PAY-3 运行机', kind: 'runner' as const, agent: 'brain-runner', credits: 3.5, turns: 4, awaiting: false, error: '会话断了', url: '/chat?sid=brain-PAY-3-run1' }
+    d.sessions.push(runner)
+    d.credits.total = 15.9
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d })
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '会话' })
+    const [local, run] = within(card).getAllByTestId('session')
+    const s = d.sessions[0]
+    for (const t of [s.title, '等批准', '本机', s.agent, `credits ${fmtCredits(s.credits)}`, `${s.turns} 轮`]) expect(local).toHaveTextContent(t)
+    for (const t of [runner.title, '出错', '运行机', runner.agent, 'credits 3.5', '4 轮', '会话断了']) expect(run).toHaveTextContent(t)
+    expect(card).toHaveTextContent('这个 app 开的 · 合计 15.9 credits')
+    expect(card).toHaveTextContent(d.credits.note)
+    fireEvent.click(within(run).getByRole('button', { name: '打开会话' }))
+    expect(navigations).toEqual([runner.url])
+  })
+
+  test('需求看板 ↗ and the cards’ board links go to this requirement’s board; no 回放 before it is merged', async () => {
+    const { go } = renderDetail()
+    await screen.findByRole('region', { name: '价值流' })
+    const toBoard = { kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item' }
+    fireEvent.click(screen.getByRole('button', { name: '需求看板 ↗' }))
+    expect(go).toHaveBeenLastCalledWith(toBoard)
+    fireEvent.click(within(screen.getByRole('article', { name: '检查' })).getByRole('button', { name: '在需求看板的检查墙上看每一项' }))
+    const legend = within(screen.getByRole('article', { name: '时间花在哪' })).getAllByRole('button')
+    expect(legend.map((b) => b.title)).toEqual(['在需求看板上看', '在需求看板上看'])   // AI 在本机做, 等人
+    for (const b of legend) fireEvent.click(b)
+    expect(go).toHaveBeenCalledTimes(4)
+    for (const [v] of go.mock.calls) expect(v).toEqual(toBoard)
+    expect(screen.queryByRole('button', { name: /回放/ })).toBeNull()
+  })
+
+  test('a merged requirement offers ▶ 回放 ↗: its board with the replay', async () => {
+    const d = fx.detail()
+    d.row.state = 'merged'
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d, [`GET ${API}/board/*`]: () => fx.boardMerged() })
+    const { go } = renderDetail()
+    fireEvent.click(await screen.findByRole('button', { name: '▶ 回放 ↗' }))
+    expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item', replay: true })
   })
 })
