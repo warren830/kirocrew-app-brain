@@ -101,7 +101,8 @@ def test_made_from_the_records_at_the_commit(tmp_path, home):
     assert m["first"].startswith("退款单可以导出成 CSV，给财务对账用（规模 small）") and "这句还没提交" not in m["text"]
     # the overview row: nothing while it is being made in the background, then its first line
     assert first["rows"][0]["summary"] is None
-    assert ov["rows"][0]["summary"] == m["first"]
+    # in plain words (OVERVIEW-16): no Markdown, no source references, 规模小; where it is the row says itself
+    assert ov["rows"][0]["summary"] == "退款单可以导出成 CSV，给财务对账用（规模小）。"
     assert time.monotonic() - started < 60
     # nothing of the project was run (Lean's fingerprint would write its stat cache in .aidlc-lean/), nothing written
     assert files(wt) == before
@@ -126,7 +127,7 @@ def test_the_committed_mr_md_is_shown_inert(tmp_path, home):
     assert "<" not in t and "＜!-- 藏起来的内容 --＞" in t.replace(">", "＞")              # no HTML comment
     assert "![" not in t                                                               # no image loaded
     assert m["first"] == "退款单可以导出成 CSV（规模 small）。现在：在本地开发（还没交接）。"
-    assert ov["rows"][0]["summary"] == m["first"]
+    assert ov["rows"][0]["summary"] == "退款单可以导出成 CSV（规模小）。"
 
 
 def test_a_symlinked_mr_md_is_not_read(tmp_path, home):

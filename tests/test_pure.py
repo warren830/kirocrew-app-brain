@@ -347,6 +347,8 @@ def test_every_row_says_whose_turn_the_step_where_and_since_when():
     assert w["since"] == lv.epoch("2026-11-09T00:51:25Z")
     _, w = row_of({}, me="bob")
     assert (w["who"], w["do"], w["text"]) == ("people", "start", "等 alice 开工")
+    _, w = row_of({"owner": None, "claim": dict(claim, owner=None)})     # filed for others: not yours until you start it
+    assert (w["who"], w["do"], w["text"]) == ("people", "start", "待认领：谁开工就归谁")
 
     run = {"intent": "261109-pay-1-refund", "branch": "ai/alice/PAY-1-refund"}
     ev = [{"event": "STAGE_COMPLETED", "data": {"stage": "requirements"}, "ts": "2026-11-09T01:00:00Z", "_at": 1.0}]

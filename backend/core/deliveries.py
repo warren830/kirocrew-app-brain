@@ -126,8 +126,11 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
     if f.get("merged"):
         return _merged(put, f, now=now, reflected=reflected)
     if not run:
+        since = lean_view.epoch(claim.get("created_at"))
+        if "owner" in claim and claim["owner"] is None:    # filed for others (brain-kit claims.unowned): anyone's
+            return put("claimed", "people", "start", "待认领：谁开工就归谁", where="app", since=since)
         return put("claimed", you, "start", "认领了，还没开工" if mine else "等 %s 开工" % owner, where="app",
-                   since=lean_view.epoch(claim.get("created_at")))
+                   since=since)
     if not run.get("handoff"):
         if pending:
             a = pending[0]

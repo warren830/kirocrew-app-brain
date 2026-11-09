@@ -334,9 +334,9 @@ class Service:
     # ---- 交付总览 ------------------------------------------------------------------------------------- #
 
     def _local_only(self, repo: Repo) -> bool:
-        """Its requirements are done only on this machine: no remote, or no GitLab to hand them over through."""
+        """Its requirements are done only on this machine: no GitLab to hand them over through (the board's rule)."""
         base, project = self._gitlab_of(repo)
-        return not (base and project) or not repo.has_origin()
+        return not (base and project)
 
     def _row(self, repo: Repo, f: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
         row = deliveries.base_row(repo.id, f, local_only=self._local_only(repo))
