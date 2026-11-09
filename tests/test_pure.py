@@ -359,6 +359,11 @@ def test_every_row_says_whose_turn_the_step_where_and_since_when():
     _, w = row_of({"run": run, "events": ev, "worktree": "/w"}, slot=dict(idle, busy=True))
     assert (w["who"], w["do"], w["where"]) == ("agent", "none", None) and w["text"] == "AI 在做「用户故事」"
     approval = {"kind": "REQUIREMENTS", "state": "pending", "line": "approve REQUIREMENTS 1a2b3c4d", "at": 1794186000.0}
+    # a session whose last message KiroCrew has not reported yet went quiet no earlier than its last recorded step,
+    # as the board says it
+    late = [dict(ev[0], _at=1794186450.0)]
+    _, w = row_of({"run": run, "events": late, "worktree": "/w", "tip_at": 1794186440.0}, slot=idle)
+    assert (w["do"], w["since"]) == ("reply", 1794186450.0)
     _, w = row_of({"run": run, "approvals": [approval]}, slot=idle)
     assert (w["do"], w["where"], w["line"], w["since"]) == ("approve", "session", approval["line"], 1794186000.0)
 

@@ -96,7 +96,7 @@ class Service:
         self._eval_running: set[str] = set()
         self._trace: dict[tuple, tuple] = {}
         self.desc = mrdesc_view.DescCache()     # each requirement's 变更说明, by the commits it is made from
-        self._subj: dict[tuple, dict[str, str]] = {}   # the board's commit subjects, by the commits asked for
+        self._subj: dict[tuple, tuple] = {}     # the board's commit subjects and changed files, by the commits asked for
         self._me: str | None = None
 
     # ---- lifecycle ------------------------------------------------------------------------------------ #
@@ -640,8 +640,8 @@ class Service:
                                           repo.cfg.get("bot_users") or []),
             "questions": questions,
             "timeline": {"source": tl["source"], "items": tl["items"], "error": tl["error"],
-                         "missing": detail.missing_text(tl["missing"], handed_over=bool(run.get("handoff")),
-                                                        local_only=row["local_only"])},
+                         "missing": board_mod.missing_sources(tl["missing"], local_only=row["local_only"],
+                                                              handed=bool(run.get("handoff")))},
             "sessions": [{k: s[k] for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                              "last_activity", "opened_at", "project", "url", "error")}
                          for s in snap["by"].get(scope, [])],
@@ -719,7 +719,7 @@ class Service:
             "decisions": detail.decisions(f.get("decisions_text"), "decisions.md", []),
             "questions": detail.ledger_questions(decs, row["mr"]["url"] if row.get("mr") else None),
             "timeline": {"source": tl["source"], "items": tl["items"], "error": tl["error"],
-                         "missing": detail.missing_text(tl["missing"], handed_over=True, local_only=False)},
+                         "missing": board_mod.missing_sources(tl["missing"], local_only=False, handed=True)},
             "sessions": [{k: s[k] for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                              "last_activity", "opened_at", "project", "url", "error")} for s in sess],
             "credits": {"total": row["credits"], "note": detail.NO_TOKENS},
@@ -747,16 +747,18 @@ class Service:
 
     # ---- 需求看板 ------------------------------------------------------------------------------------- #
 
-    def _subjects(self, git: Git, shas: list[str]) -> dict[str, str]:
-        """The commits' subjects (one git call, kept by the commits asked for)."""
+    def _commits(self, git: Git, shas: list[str]) -> tuple[dict[str, str], dict[str, list[dict[str, Any]]]]:
+        """The commits' subjects and the files each changed (one git call, board_mod.GIT_LOG; kept by the commits
+        asked for)."""
         shas = [x for x in shas if re.match(r"^[0-9a-f]{40}$", x or "")][-board_mod.MAX_BELT:]
         if not shas:
-            return {}
+            return {}, {}
         sig = (git.repo, tuple(shas))
         got = self._subj.get(sig)
         if got is None:
-            p = git.run("log", "--no-walk=unsorted", "--format=%H%x00%s", *shas, timeout=20)
-            got = board_mod.subjects_from_log(p.stdout if p.returncode == 0 else "")
+            p = git.run(*board_mod.GIT_LOG, *shas, timeout=20)
+            out = p.stdout if p.returncode == 0 else ""
+            got = (board_mod.subjects_from_log(out), board_mod.changes_from_log(out))
             if len(self._subj) > 200:
                 self._subj.clear()
             self._subj[sig] = got
@@ -783,13 +785,13 @@ class Service:
         repo = parts.get("repo")
         git = repo.git if repo is not None else (Git(parts["path"]) if parts.get("path") else None)
         commits = ((t or {}).get("actions") or {}).get("commits") or []
-        subjects = self._subjects(git, [str(c.get("sha") or "") for c in commits]) if git is not None else {}
+        subjects, changes = self._commits(git, [str(c.get("sha") or "") for c in commits]) if git is not None else ({}, {})
         sessions = parts["sessions"] if parts.get("sessions") is not None else snap["by"].get(parts.get("scope") or "", [])
         app_events = parts["app_events"] if parts.get("app_events") is not None else (
             self.store.events(parts["scope"]) if parts.get("scope") else [])
         g = board_mod.build(
             f, d["row"], t, mr=parts.get("mr"), sessions=sessions, app_events=app_events,
-            team_decisions=parts.get("decisions") or [], subjects=subjects,
+            team_decisions=parts.get("decisions") or [], subjects=subjects, changes=changes,
             reflect_refs=self._reflect_refs(git, key) if git is not None else [],
             default_branch=str(cfg.get("default_branch") or "main"), local_only=bool(parts.get("local_only")),
             kit_rows=board_mod.kit_cells(self.crew.get("rows") or [], parts.get("path") or ""),
@@ -801,7 +803,7 @@ class Service:
                 "events": g["events"], "belt": g["belt"], "checks": g["checks"], "accept": g["accept"],
                 "brain": d["brain"], "decisions": d["decisions"], "questions": d["questions"], "mr_desc": d["mr_desc"],
                 "sessions": d["sessions"], "credits": d["credits"], "source": d["timeline"]["source"],
-                "missing": d["timeline"]["missing"], "error": d["timeline"]["error"]}
+                "missing": g["missing"], "error": d["timeline"]["error"]}
 
     async def board(self, rid: str, key: str) -> dict[str, Any]:
         """需求看板: polled every 2 s; the trace, the facts and the 变更说明 come from their caches."""

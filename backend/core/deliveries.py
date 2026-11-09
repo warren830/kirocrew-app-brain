@@ -151,12 +151,12 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
             return put("local", "agent", "none", "AI 在做" + ("「%s」" % nxt["label"] if nxt else ""))
         if slot and slot.get("awaiting"):
             return put("local", "you", "tool", "会话里有一个工具调用等你批准", where="session",
-                       since=slot.get("last_activity"))
+                       since=updated_at(f, slot))
         step = lean_view.idle_step(f.get("stages") or lean_view.stages([]), default_branch=str(
             cfg.get("default_branch") or "main"), review_ok=lean_view.review_current(
                 (f.get("review") or {}).get("at"), bool(f.get("review")), f.get("events") or []))
-        if slot:
-            return put("local", "you", "reply", step, where="session", since=slot.get("last_activity"))
+        if slot:   # since the session went quiet: its last message, not before its last recorded step (the board's)
+            return put("local", "you", "reply", step, where="session", since=updated_at(f, slot))
         if f.get("worktree"):
             return put("local", "you", "reply", "没有开着的会话：打开会话接着做。" + step, where="app",
                        since=updated_at(f, None))

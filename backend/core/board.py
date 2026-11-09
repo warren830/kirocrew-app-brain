@@ -669,9 +669,10 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
     if state == "local" and not hand_at:
         s = local[-1] if local else None
         pend = any(a.get("state") == "pending" for a in f.get("approvals") or [])
-        # the moment the session went quiet: its last message, not before its last recorded step
-        quiet = max([x for x in (since if waits.get("do") in ("reply", "tool") else None,
-                                 _epoch((s or {}).get("last_activity")), last_local) if x is not None], default=now)
+        # the moment the session went quiet: its last message, not before its last recorded step; the row's waits.since
+        # says it (deliveries.updated_at), so the board and every list agree on it
+        quiet = since if waits.get("do") in ("reply", "tool") and since is not None else max(
+            [x for x in (_epoch((s or {}).get("last_activity")), last_local) if x is not None], default=now)
         def quiet_down() -> None:
             fo.close("ci", quiet, "fix")   # nobody fixes a red verify in a session that waits either
             fo.close("ci", quiet, "work")

@@ -93,11 +93,11 @@ def test_an_approved_requirement_handed_over_and_one_merged(tmp_path, home):
     async def go():
         await svc.start()
         try:
-            return await svc.board("r1", "PAY-1"), await svc.board("r1", "PAY-2")
+            return await svc.board("r1", "PAY-1"), await svc.board("r1", "PAY-2"), await svc.requirement("r1", "PAY-1")
         finally:
             await svc.stop()
 
-    b1, b2 = run(go())
+    b1, b2, d1 = run(go())
     a1 = actors(b1)
     assert a1["req"]["status"] == "merged" and a1["req"]["line"] is None
     assert a1["local"]["status"] == "done" and a1["handover"]["status"] == "queued"
@@ -111,6 +111,12 @@ def test_an_approved_requirement_handed_over_and_one_merged(tmp_path, home):
         subj = [x["text"] for x in b1["belt"] if x["kind"] == "commit"]
         assert any("refund: the CSV export" in s for s in subj)
         assert any(e["kind"] == "handover" and e["to"] == "handover" for e in b1["events"])
+        # BOARD-21: each commit with the files it changed, as git says it
+        export = next(x for x in b1["belt"] if x["kind"] == "commit" and "refund: the CSV export" in x["text"])
+        assert {"path": "src/refund.py", "added": 2, "removed": 0, "status": "A"} in export["changes"]
+        # the sources brain-kit could not read, in words, said the same on the board and in 需求详情 (DETAIL-6)
+        assert b1["missing"] and b1["missing"] == d1["timeline"]["missing"]
+        assert not any(w in json.dumps(b1["missing"]) for w in ("ledger", "--", "not given"))
     cells = {c["id"]: c for c in b1["checks"]["cells"]}
     assert cells["gate-REQUIREMENTS"]["status"] == "pass" and cells["bridge"]["status"] == "wait"
     a2 = actors(b2)
@@ -123,6 +129,43 @@ def test_an_approved_requirement_handed_over_and_one_merged(tmp_path, home):
         assert all(a2[k]["status"] == "skipped" for k in ("handover", "bridge", "signer", "runner"))
     text = json.dumps([b1, b2])
     assert "glpat-" not in text and "gitlab_token" not in text.lower() and "@example" not in text  # no secret, no email
+
+
+@needs_brainkit
+def test_an_idle_session_waits_since_one_moment_and_a_claim_has_nothing_to_trace(tmp_path, home):
+    """The row (交付总览, 待办) and the board say one moment the session went quiet: not before Lean's last step, even
+    when KiroCrew reported only the kickoff's time. A requirement only claimed has no run: no error on its board
+    (BOARD-6)."""
+    from brainfix import FakeGateway, install_brain_dev
+    repo = make_project(tmp_path)
+    install_brain_dev(home)
+    wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "refund", "refund", "退款")
+    brain(repo, "claim", "--title", "只认领")
+    gw = FakeGateway()
+    gw.templates = {"brain-dev"}
+    svc = make_service(tmp_path, [repo], gw=gw)
+
+    async def go():
+        await svc.start()
+        try:
+            await svc.open_session("r1", "PAY-1")
+            gw.finish(next(iter(gw.slot_rows)))
+            for _ in range(6):
+                await svc.sessions.poll()
+            lean(wt, "stage", "skip", "reverse-engineering", "--reason", "greenfield")
+            svc.repos["r1"].invalidate()
+            rows = {r["key"]: r for r in (await svc.overview("all"))["rows"]}
+            return rows, await svc.board("r1", "PAY-1"), await svc.board("r1", "PAY-2")
+        finally:
+            await svc.stop()
+
+    rows, b, claimed = run(go())
+    w = rows["PAY-1"]["waits"]
+    assert (w["who"], w["do"]) == ("you", "reply")
+    assert w["since"] > time.time() - 600          # the Lean step just now, not the transcript's 2026-11-08 stamp
+    local = actors(b)["local"]
+    assert local["status"] == "awaiting_approval" and local["since"] == w["since"] == b["row"]["waits"]["since"]
+    assert claimed["row"]["state"] == "claimed" and claimed["error"] == "" and claimed["source"] == "app"
 
 
 @needs_brainkit
