@@ -200,7 +200,7 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
         )}
         {kit && (
           <Banner p={kit} raw={s?.brainkit.error ?? ''} bad testid="br-no-brainkit">
-            {kit.where && v.kind !== 'settings' && <button type="button" className="br-btn is-small" onClick={() => go({ kind: 'settings' })}>去设置</button>}
+            {v.kind !== 'settings' && <button type="button" className="br-btn is-small" onClick={() => go({ kind: 'settings' })}>去设置</button>}
           </Banner>
         )}
         {failing.length > 0 && (
@@ -235,17 +235,17 @@ export function statusProblem(code: number, before: boolean): Problem {
   return { text: `${head}app 的后端出错了`, todo: '点「再试一次」；还不行就在 KiroCrew 里重启这个 app' }
 }
 
-/** Why brain-kit cannot be used (backend/core/bk.py says it in one of three ways) and what to do; *where*: the fix
- * is its place in 设置. */
-export function brainkitProblem(error: string): Problem & { where: boolean } {
+/** Why brain-kit cannot be used (backend/core/bk.py says it in one of three ways) and what to do. 设置's 保存 reads
+ * brain-kit again, so each way ends there. */
+export function brainkitProblem(error: string): Problem {
   if (/^brain-kit 太旧/.test(error)) {
     const need = /要 (\S+?) 或更新的版本/.exec(error)?.[1]
-    return { text: 'brain-kit 太旧了', todo: `把 brain-kit 更新到${need ? ` ${need} ` : '最新的'}版本（在它的目录里拉取最新的），再重新打开这个 app`, where: false }
+    return { text: 'brain-kit 太旧了：位置是对的', todo: `把 brain-kit 更新到${need ? ` ${need} 或更新的` : '最新的'}版本（在它的目录里拉取最新的），再到设置里点「保存」重新读它` }
   }
   if (/^brain-kit 导入失败/.test(error)) {
-    return { text: 'brain-kit 装得不完整：位置是对的，读它的时候出错了', todo: '把 brain-kit 重新装一遍（或拉取完整的代码），再重新打开这个 app', where: false }
+    return { text: 'brain-kit 装得不完整：位置是对的，读它的时候出错了', todo: '把 brain-kit 重新装一遍（或拉取完整的代码），再到设置里点「保存」重新读它' }
   }
-  return { text: '找不到 brain-kit', todo: '在设置里写对 brain-kit 的位置', where: true }
+  return { text: '找不到 brain-kit', todo: '在设置里写对 brain-kit 的位置，点「保存」' }
 }
 
 /** A problem above every view: what it is, 做什么, the buttons, the original words folded. */

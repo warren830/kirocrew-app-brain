@@ -197,7 +197,7 @@ describe('the app: one bar over the views', () => {
     })
     render(<BrainApp pollMs={60_000} />)
     const nokit = await screen.findByTestId('br-no-brainkit')
-    expect(nokit).toHaveTextContent('找不到 brain-kit做什么在设置里写对 brain-kit 的位置')
+    expect(nokit).toHaveTextContent('找不到 brain-kit做什么在设置里写对 brain-kit 的位置，点「保存」')
     expect(within(nokit).getByText('细节').closest('details')).not.toHaveAttribute('open')
     expect(within(nokit).getByText(s.brainkit.error)).toBeInTheDocument()
     const crew = screen.getByTestId('br-crew-fail')
@@ -301,10 +301,10 @@ describe('the app: one bar over the views', () => {
     await waitFor(() => expect(screen.queryByTestId('br-status-error')).toBeNull())
   })
 
-  test('brain-kit that cannot be used says its own cause: too old → update it; broken → install it again (not 去设置)', () => {
-    expect(brainkitProblem('brain-kit 太旧（没有 trace.build）：要 0.4 或更新的版本')).toEqual({ text: 'brain-kit 太旧了', todo: '把 brain-kit 更新到 0.4 版本（在它的目录里拉取最新的），再重新打开这个 app', where: false })
-    expect(brainkitProblem('brain-kit 导入失败：ModuleNotFoundError: No module named \'yaml\'')).toMatchObject({ text: 'brain-kit 装得不完整：位置是对的，读它的时候出错了', where: false })
-    expect(brainkitProblem('这里没有 brain-kit（找不到 /x/brainkit/__init__.py）')).toMatchObject({ text: '找不到 brain-kit', where: true })
+  test('brain-kit that cannot be used says its own cause: not found → its place; too old → update it; broken → install it again', () => {
+    expect(brainkitProblem('brain-kit 太旧（没有 trace.build）：要 0.4 或更新的版本')).toEqual({ text: 'brain-kit 太旧了：位置是对的', todo: '把 brain-kit 更新到 0.4 或更新的版本（在它的目录里拉取最新的），再到设置里点「保存」重新读它' })
+    expect(brainkitProblem('brain-kit 导入失败：ModuleNotFoundError: No module named \'yaml\'')).toMatchObject({ text: 'brain-kit 装得不完整：位置是对的，读它的时候出错了' })
+    expect(brainkitProblem('这里没有 brain-kit（找不到 /x/brainkit/__init__.py）')).toEqual({ text: '找不到 brain-kit', todo: '在设置里写对 brain-kit 的位置，点「保存」' })
     expect(statusProblem(0, true).text).toBe('状态刷新没成：连不上 app 的后端')
     expect(statusProblem(401, false).text).toBe('登录过期了')
   })
