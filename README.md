@@ -13,7 +13,7 @@ commit of this repo is that copy, unchanged.
 
 | Kept from the sample | Dropped (it stays in the sample) |
 | --- | --- |
-| `backend/core/gateway.py` (Kiro Crew HTTP API with the app secret, loopback only), `sessions.py` (chat slots in sidebar folders, project dir, `trust` per slot, idle detection, resend on start errors, credits), `httpkit.py` (owner-only routes), `store.py` (append-only log, now the app's own events), the bootstrap in `backend/routes.py` / `hooks.py`, `scripts/dev-install.sh`, `scripts/kcapi.sh`, the test fakes (`tests/http_fakes.py`, the fake gateway), and the UI shell: AppBar, URL navigation, SDK stubs, polling rules, preview build | The agent-team engine: team files, roles, packs, starters, the taoyuan demo, the CTO history, the team board, checks/deploy/site |
+| `backend/core/gateway.py` (Kiro Crew HTTP API with the app secret, loopback only), `sessions.py` (chat slots in sidebar folders, project dir, `trust` per slot, idle detection, resend on start errors, credits), `httpkit.py` (owner-only routes), `store.py` (append-only log, now the app's own events), the bootstrap in `backend/routes.py` / `hooks.py`, `scripts/dev-install.sh`, `scripts/kcapi.sh`, the test fakes (`tests/http_fakes.py`, the fake gateway), and the UI shell: AppBar, URL navigation, SDK stubs, polling rules, preview build. The UI's look: the team board's styles, particle engine and overlay, role icons and hooks (`ui/src/board/styles.ts`, `engine.ts`, `overlay.ts`, `hooks.ts`, `RoleIcon.tsx`: copied), its graph, lanes, conveyor, test wall, event feed, sign-off card and replay (redrawn for one requirement's way), the CTO view's styles and charts (`ui/src/cto/`), the card frame (`ui/src/kit.ts`) | The agent-team engine: team files, roles, packs, starters, the taoyuan demo, the CTO history (its numbers are brain-kit's eval here), checks/deploy/site |
 
 Added to the session runner: `strict_agent` (a session boots exactly the template `brain-dev` / `brain-run`, or is
 not opened: Crew's default agent would run without Lean's hooks), exact slot names (the bridge names runner slots
@@ -24,14 +24,22 @@ bridge's KiroCrew surface (`adapter_create / set_project / send / slot / stop`).
 
 | View | What it shows | Where it comes from |
 | --- | --- | --- |
-| **交付总览** | Every requirement: claimed, local, handed over, running on the runner, parked with D-n, waiting acceptance, merged; owner, the current Lean stage n/11 (`lean` and the row's `stage` text, e.g. `2/11 需求分析`, `11/11 发布（下一步）`, `11/11 发布（做完）`: the same stages the detail lists, null only before Lean recorded one), what it waits on (with the exact approval line; a hand-over that was pushed but whose MR carries no hand-over label says that nothing was handed over), the first line of its 变更说明 (`summary`, made in the background), credits, overlap warnings; Eval numbers, the runs Eval skipped and its notes (also the runs known wrong that wait for their merge: autonomy's `wrong_open`), and the low-score queue (复看队列); the decision funnel, with the decisions.md rows whose Who is not in the vocabulary (没归类) | git refs (`claim/*`, run branches, the default branch), worktree files, run.json, park.json, the Lean ledger; `brainkit.evaluate` when present; `brainkit.mrdesc`; the bridge ledger in team mode; the MR via GitLab (person's token) |
-| **需求详情** | Lean's 11 stages and approvals, Session notes, decisions with their Brain citations and who settled each (brain-kit's Who vocabulary: `agent` or a bot user, `brain <entry id>`, `check`, `<P-xxxx> <V-xxxxxxxxxx>`, `owner`; anything else is 没归类 and not shown, it may be a real name), parked questions and answers (MR link), the MR's 变更说明 (its first line, the whole Markdown folded, 复制 for the MR description), the run trace timeline (a commit's author date, and its commit date when it differs; how it was merged, in words), the sessions this app opened with their credits, Brain usage | `brainkit.trace.build` (else the Lean ledger, its audit files shown as `L-<6 hex>.jsonl` like brain-kit's), decisions.md, `sessions.slot_stats`; the 变更说明: `runs/<KEY>/MR.md` at the commit when the branch has it, else `brainkit.mrdesc.build` / `render` at that commit |
-| **开需求** | The form: repo, title, slug, key, expected paths (separated by commas, spaces or new lines); the five gates (consent, classification incl. 不确定, business keep/mask, exclude globs); 先检查 shows brain-kit's dry-run findings verbatim, and what may be a name or a password but may as well be a word (brain-kit's review findings, not masked, stopping nothing) once more per file under 请你确认; 开工 runs `brain start` and opens a `brain-dev` session in the run's own worktree | `brainkit.intake.package.build(dry_run=True)`, `bin/brain start` |
+| **交付总览** | The sample's CTO view: one sentence and three numbers from brain-kit's eval (how many handed-over requirements ran unattended end to end, how often a person stepped in at the judgment points against outside them, credits per requirement), each with its small chart, and who settled the decisions (the funnel); 每周合并 (12 weeks, by how they were delivered, 图 / 表格); 需求流动, the kanban of what is in progress (columns 需求 → 设计 → 构建 → 交给运行机 → 发布 · 验收 → 已合并, lanes 等人批准 / 等人回答问题 / AI 在做（本机） / 运行机在做; a card opens the requirement's 需求看板); 交付清单, the ledger with the eval batch's summary rows. Every requirement: claimed, local, handed over, running on the runner, parked with D-n, waiting acceptance, merged; owner, the current Lean stage n/11 (`lean` and the row's `stage` text, e.g. `2/11 需求分析`, `11/11 发布（下一步）`, `11/11 发布（做完）`: the same stages the detail lists, null only before Lean recorded one), what it waits on (with the exact approval line; a hand-over that was pushed but whose MR carries no hand-over label says that nothing was handed over), the first line of its 变更说明 (`summary`, made in the background), credits, overlap warnings; Eval numbers, the runs Eval skipped and its notes (also the runs known wrong that wait for their merge: autonomy's `wrong_open`), and the low-score queue (复看队列); the decision funnel, with the decisions.md rows whose Who is not in the vocabulary (没归类) | git refs (`claim/*`, run branches, the default branch), worktree files, run.json, park.json, the Lean ledger; `brainkit.evaluate` when present; `brainkit.mrdesc`; the bridge ledger in team mode; the MR via GitLab (person's token) |
+| **需求看板** | One requirement as the sample's team board: the hero graph of who acts on it (you, the local `brain-dev` session, Lean's approvals REQUIREMENTS / DESIGN / RELEASE, the hand-over, the bridge, the signer, the runner session, the CI checks, the write-back into the Brain) with each one's state in colour, shape and words, the person's line to whoever waits on them, the run branch as a rail with its commits and the check ring; KPIs; 验收 (the 变更说明, the decisions and who made them, the checks, the one step a person takes: the line to type, the MR to answer on); 提交传送带 (commits, the hand-over, the merge); a lane per actor on one time axis; 检查墙 (Lean approvals, verify, the hand-over, the Brain and the repo's kit, after the merge); open questions; the event feed. Polled every 2 s. 回放 plays a finished requirement's trace (1× / 2× / 4×, scrubber; the URL says `replay=1`) | `GET /board/{repo}/{key}`: `backend/core/board.py` folds `brainkit.trace.build`, the Lean audit events, the run branch's commits, park.json, the MR and the app's sessions into one snapshot |
+| **需求详情** | The sample's 交付详情 layout: 周期, 时间花在哪, 成本, 检查; 价值流 (AI on this machine, the runner, waits for people, rework, with the key moments); Lean's 11 stages and approvals, Session notes, decisions with their Brain citations and who settled each (brain-kit's Who vocabulary: `agent` or a bot user, `brain <entry id>`, `check`, `<P-xxxx> <V-xxxxxxxxxx>`, `owner`; anything else is 没归类 and not shown, it may be a real name), parked questions and answers (MR link), the MR's 变更说明 (its first line, the whole Markdown folded, 复制 for the MR description), the run trace timeline (a commit's author date, and its commit date when it differs; how it was merged, in words), the sessions this app opened with their credits, Brain usage | `brainkit.trace.build` (else the Lean ledger, its audit files shown as `L-<6 hex>.jsonl` like brain-kit's), decisions.md, `sessions.slot_stats`; the 变更说明: `runs/<KEY>/MR.md` at the commit when the branch has it, else `brainkit.mrdesc.build` / `render` at that commit |
+| **开需求** | The way in five steps, then the form: repo, title, slug, key, expected paths (separated by commas, spaces or new lines); the five gates (consent, classification incl. 不确定, business keep/mask, exclude globs); 先检查 shows brain-kit's dry-run findings verbatim, and what may be a name or a password but may as well be a word (brain-kit's review findings, not masked, stopping nothing) once more per file under 请你确认; 开工 runs `brain start` and opens a `brain-dev` session in the run's own worktree | `brainkit.intake.package.build(dry_run=True)`, `bin/brain start` |
 | **Brain** | Entries by file and section with type, sources, usage counts and withdraw candidates; lint; reflect preview, apply on a new branch (the reply names the branch and the worktree brain-kit wrote it in, `~/.brain/worktrees/<repo>/…`), apply and open the MR | `brainkit.entries`, `usage`, `brainlint`, `reflect`; `bin/brain reflect --apply [--push]` |
 | **待办** | Lean approvals pending (the line the person types in that session), D-n questions on the runner (link to the MR), runner questions stuck for good (the signer refused the answer, the question is void or could not be asked), the person's own clarify questions (answer here), acceptance, refused hand-overs, hand-overs pushed without their label (没交出去的交接), Kiro Crew problems | as above |
 | **运行机** (team mode) | The bridge ledger (questions in brain-kit's states, `asking`: a bridge posting it right now), what the bridge said about each labelled MR last round (接手了, 拒绝接手, 看过了, 标签刚被拿掉 = `unlabelled`, 正在别处签名 = `waiting`, 这一轮没查成), runs in brain-kit's states (`signing`: the run id reserved while the signer signs the contract), signature requests waiting for the signer, the ones it refused, and vouchers it has not answered yet (asked for again, the same voucher, next round) | the hosted bridge, the signer spool |
 | **导入仓库** | How a repo gets into the app (the bar's button, and every place that has no repo: 交付总览's empty state, 开需求, 设置's 仓库 card). 本机目录 or 克隆; 检查 (✓ / ! / ✗ with why and what to do); not installed: the kit.json form and 安装到新分支, then (optional, after a confirm) 推送并开 MR; 加入列表 | `/import/*` (backend/core/importer.py, installer.py), `imports.json` in the app's data dir |
-| **设置** | brain-kit checkout, work root, team mode; the repos with 移出列表 (the app's list only) and 导入仓库; Kiro Crew checks with their fixes (and, per repo, Lean's lean.json leaving `runs/**` out of its code fingerprint) | `settings.json` in the app's data dir |
+| **设置** | brain-kit checkout, work root, team mode; the repos with 移出列表 (the app's list only) and 导入仓库; Kiro Crew checks with their fixes (and, per repo, Lean's lean.json leaving `runs/**` out of its code fingerprint; an old hook adapter, which matters only for a repo that hands over to the team runner: ! there, not 有问题, with 重装到新分支) | `settings.json` in the app's data dir |
+
+Every view uses the sample's components: cards, state chips, role icons, the progress as segments and charts, and
+empty states that say what to do. Above every view (but 开需求 and 设置, which list them themselves) KiroCrew's failing
+checks, each with its fix button. The preview (`npm run preview:build`) shows a world made by
+`scripts/preview_world.py` with the backend's own `board.py` and `cto_numbers`: four repos, seventeen requirements in
+every state (one waiting for an approval, one parked on a question, one waiting for its acceptance, a refused
+hand-over, one running on the runner, merged ones with whole traces for 回放, a local-only repo with an old adapter).
 
 The app never sends a Lean approval line: it shows it, copies it, and opens the session; the person types it. On the
 team runner's dashboard no question is answered (answers are made on GitLab, where the person is identified). On a
@@ -40,14 +48,18 @@ run), or as their own MR comment `answer D-n X` with their own token (a handed-o
 other). X is one of the question's options, or `approve` / `reject` for a question without options (brain-kit counts
 nothing else). A question that carries a Lean request is never answerable in the app.
 
-The routes' JSON is `ui/src/types.ts`. `POST /intake/start` takes `paths` as a list (one path per item) or as one
+The routes' JSON is `ui/src/types.ts`. `GET /overview` adds `cto` (the sentence, the three numbers, the runs and the
+weeks: `deliveries.cto_numbers`); `GET /board/{repo}/{key}` answers one requirement's `ReqBoard`. `POST /intake/start` takes `paths` as a list (one path per item) or as one
 string with the paths separated by commas, spaces or new lines (`"calc.py,tests"`); each must be a relative path in
 the repo. `POST /brain/reflect/apply` answers `{ok, output, branch, worktree}`. `POST /settings` takes any part of the
 settings: a key left out keeps its value (the 设置 form sends no `repos`; the list is changed by `POST /import/add`
 and `POST /repos/remove` only). The import routes: `GET /import/defaults`, `POST /import/inspect {path}` (read only),
-`POST /import/clone {url, parent, name}` and `POST /import/install {path, branch, kit}` (both answer `{job}`; `GET
-/import/jobs/{id}` until it is not running), `POST /import/commit {path}`, `POST /import/publish {path, branch, target,
-remote_url, confirm: true}`, `POST /import/add {path}`, `POST /repos/remove {path}`.
+`POST /import/clone {url, parent, name}`, `POST /import/install {path, branch, kit}` and `POST /import/upgrade {path,
+branch?}` (the 'kit' fix below; all three answer `{job}`; `GET /import/jobs/{id}` until it is not running), `POST
+/import/commit {path, purpose?}`, `POST /import/publish {path, branch, target, remote_url, confirm: true, purpose?}`
+(`purpose`: `install`, the default, or `upgrade`), `POST /import/add {path}`, `POST /repos/remove {path}`. Every
+check row (`CheckRow`) is said in plain short Chinese with a 做什么 line, its fix and brain-kit's own words (`raw`,
+shown folded): `backend/core/problems.py`.
 
 ## How to import a repo (导入仓库)
 
@@ -114,7 +126,14 @@ remote_url, confirm: true}`, `POST /import/add {path}`, `POST /repos/remove {pat
   fix or remove. A spec that differs from brain-kit's in other ways is fine (72b278e: an OK row names the fields you set
   yourself; `brain crew-agent --reset` takes brain-kit's, `--force` only adds what is missing). The engine fix runs
   `kirocrew config set agent.acp_backend kas`. Per repo, the check also FAILs when Lean counts `runs/**` as code
-  (`mrdesc.write_problem`: lean.json `fingerprint_exclude`), with brain-kit's fix; lean.json is the person's to change.
+  (`mrdesc.write_problem`: lean.json `fingerprint_exclude`) and (d46765f) when the committed adapter is too old for the
+  team runner (`crew_hook_problem`). Those two matter to the runner only: FAIL for a repo handed to it (kit.json
+  `bridge_user`, or a requirement with a hand-over), a reminder (WARN, no 待办 item) for a local-only one; not
+  committed is FAIL everywhere. Their fix ('kit') is `POST /import/upgrade`: like 安装到新分支, a new branch
+  (`brain/upgrade-kit`, -2 … when taken) from the default branch in its own worktree, `brain install` there (kit.json
+  kept, the kit files refreshed, runs/** added to lean.json), `brain doctor`, the person's commit (their hooks), then
+  推送并开 MR with `purpose: upgrade`; nothing to change takes the branch and worktree back. Its records are
+  `upgrades.json`, apart from the install's.
 - **Team mode** hosts brain-kit's own `bridge.handoff.Bridge` (poll → dispatch → watch → collect → reconcile) and
   `bridge.runnerd.once` as a background task (`on_startup` / `on_shutdown`): bridge.json is read by brain-kit's
   `load_bridge_config`, and the bridge runs with `signer=` brain-kit's `sign.SpoolSigner` (bridge.json's `signer`
@@ -201,7 +220,9 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
   `~/.brain/gitlab-token`, refused when others can read it) and never logged, stored or returned; agent-written text
   on its way to the page goes through Kiro Crew's scrubber; materials stay in the intake store (never in a repo). The
   变更说明 is read from commits only (an MR.md committed as a symlink is not followed): a planted link cannot bring a
-  file of this machine into the text the person copies to GitLab.
+  file of this machine into the text the person copies to GitLab. `GET /board/{repo}/{key}` only reads (the repo and
+  key are checked as every route's are) and its agent-written text (commit subjects, event lines, an actor's facts)
+  goes through the same scrubber; 回放 runs in the page on the snapshot it has and sends nothing.
 - The brain-kit checkout and the app directory run inside the gateway: in production they must not be writable by
   the agents' OS user. Team mode refuses to start unless bridge.json, runnerd.json, allowed_signers and the
   identities file are owned by another user and read-only to the app (`dev_same_user` skips this for a local trial).
@@ -274,14 +295,17 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
 | `backend/core/service.py`, `handlers.py` | The service object (settings, repos, sessions, team mode, every view) and the routes |
 | `backend/core/bk.py` | brain-kit, loaded from the configured checkout under a private name; guarded optional modules |
 | `backend/core/repo.py`, `lean_view.py` | Requirements found in a repo (claims, run branches, worktrees, main); Lean's stages, approvals, Session notes |
-| `backend/core/deliveries.py`, `detail.py`, `todo.py`, `mrinfo.py` | 交付总览, 需求详情, 待办, the MR on a person's machine |
+| `backend/core/deliveries.py`, `detail.py`, `todo.py`, `mrinfo.py` | 交付总览 (and its eval numbers, `cto_numbers`), 需求详情, 待办, the MR on a person's machine |
+| `backend/core/board.py` | 需求看板: the actors, events, commits, check wall and acceptance of one requirement, folded from the trace and the repo |
+| `backend/core/problems.py` | Every check row in plain Chinese: brain-kit's crewcheck, doctor, lint and refusals mapped to a sentence, 做什么 and a fix |
 | `backend/core/mrdesc_view.py` | The 变更说明 at a commit (MR.md, else brain-kit's mrdesc), its first line, the cache and its background maker |
 | `backend/core/intake.py`, `crewcheck.py`, `brainview.py` | 开需求, the Kiro Crew checks and fixes, Brain and reflect |
 | `backend/core/importer.py`, `installer.py` | 导入仓库: path checks, 检查, 克隆, the install records and background jobs; 安装到新分支 (worktree, `brain install`, kit.json, `brain doctor`, commit), 推送并开 MR |
 | `backend/core/team/` | Team mode: the hosted bridge (`bridgehost.py`: brain-kit's Bridge and SpoolSigner, its poll loop with each MR's result, the spool view for the page), the KiroCrew adapter |
 | `backend/core/gateway.py`, `sessions.py`, `httpkit.py`, `store.py` | Kept from the sample (see above) |
 | `signer/` | The separate signer (brain-kit's rules, its own ledger; the service half of brain-kit's spool protocol), its example config and systemd unit |
-| `ui/src/` | The page: `main.tsx`, `AppBar.tsx`, `nav.ts`, `views/*`, the contract `types.ts`; `ui/preview/` on the fixtures |
+| `ui/src/` | The page: `main.tsx`, `AppBar.tsx`, `nav.ts`, `views/*`, `board/*` (需求看板), `cto/*` (交付总览's charts and kanban), the contract `types.ts`; `ui/preview/` on `world.json` |
+| `scripts/preview_world.py` | Writes `ui/preview/world.json` and the board and overview fixtures with the backend's own code |
 | `tests/` | Backend tests: real brain-kit projects in temp dirs, the fake Kiro Crew gateway, a fake GitLab with GraphQL's edit marks (`teamfix.py`), the real signer behind brain-kit's own Bridge and SpoolSigner (`test_signer.py`: the attacks it refuses, the edit signal) |
 
 ## Host APIs relied on (Kiro Crew 0.11.2)
@@ -300,6 +324,7 @@ predicate; the UI host modules `@kirocrew/app-sdk` (`useAppApi`, `useNavigate`, 
 python3 -m pytest -q                     # backend (Python 3.9+, pytest, git, ssh-keygen, the brain-kit checkout)
 (cd ui && npm ci && npm run check)       # UI: type check, component tests, build
 (cd ui && npm run preview:build)         # ui/preview-dist/index.html: the page on the fixtures, no Kiro Crew
+python3 scripts/preview_world.py         # after changing board.py, detail.py or deliveries.py: the preview's world
 ```
 
 `BRAIN_TEST_BRAINKIT` points the backend tests at a brain-kit checkout (default `~/warren_ws/brain-kit`; a clean clone
