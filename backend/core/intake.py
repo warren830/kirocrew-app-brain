@@ -19,7 +19,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from . import bk, problems
+from . import bk, lean_view, problems
 from .constants import KEY_RE, PYTHON_BIN, SLUG_RE
 from .repo import Repo, parse_branch
 
@@ -358,7 +358,7 @@ def start(repo: Repo, body: dict[str, Any], work_root: str) -> dict[str, Any]:
     return out
 
 
-INTENT_RE = re.compile(r"^[0-9]{6}-[a-z0-9][a-z0-9-]{0,80}$")
+INTENT_RE = lean_view.INTENT_RE
 PKG_RE = re.compile(r"^PKG-[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,4}$")
 APPROVAL_LINE_RE = re.compile(r"(?im)^[ \t>*-]*(approve|approved|reject|批准|同意|驳回|拒绝)\b")
 
@@ -375,4 +375,16 @@ def kickoff(key: str, branch: str, intent: str | None, materials: list[str]) -> 
              "按 brain-dev 的步骤开始：先读 AGENTS.md 和 brain/ 下的四个文件，再读 runs/%s/run.json" % key
              + ("" if not pkgs else "，然后读材料包 .brain-materials/%s/toc.md" % pkgs[0]) + "。",
              "有问题一次问完，每题带推荐答案。"]
+    return "\n".join(l for l in lines if not APPROVAL_LINE_RE.match(l))
+
+
+def review_task(key: str, branch: str, intent: str | None) -> str:
+    """The first message to a requirement's review session: Lean's review line for its intent (lean_view.review_line),
+    ids only, checked like kickoff's (no approval line can get in). '' when run.json names no usable intent."""
+    line = lean_view.review_line(intent)
+    if not line:
+        return ""
+    key = key if KEY_RE.match(key or "") else "?"
+    branch = branch if parse_branch(branch or "", branch.split("/", 1)[0] if branch else "ai") else "?"
+    lines = ["这是需求 %s 的审查会话：新开的，没写过这次的代码。分支 %s，Lean intent %s。" % (key, branch, intent), line]
     return "\n".join(l for l in lines if not APPROVAL_LINE_RE.match(l))

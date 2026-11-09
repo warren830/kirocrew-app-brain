@@ -3,5 +3,37 @@
   "work_root": "/Users/alice/workplace/brain-app",
   "branch": "brain/install",
   "token": true,
-  "brainkit_ok": true
+  "brainkit_ok": true,
+  "found": [
+    {
+      "path": "/Users/alice/workplace/shop-cart",
+      "name": "shop-cart",
+      "installed": false,
+      "listed": false
+    },
+    {
+      "path": "/Users/alice/workplace/shop-order",
+      "name": "shop-order",
+      "installed": true,
+      "listed": true
+    },
+    {
+      "path": "/Users/alice/workplace/shop-pay",
+      "name": "shop-pay",
+      "installed": true,
+      "listed": true
+    },
+    {
+      "path": "/Users/alice/workplace/shop-tools",
+      "name": "shop-tools",
+      "installed": true,
+      "listed": true
+    },
+    {
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web",
+      "installed": false,
+      "listed": true
+    }
+  ]
 }

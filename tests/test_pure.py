@@ -1,6 +1,8 @@
 """Pure readers: the bridge's MR comments parsed back (a person's machine), states from the bridge ledger (team
 mode), overlaps, the decision funnel's fallback."""
 
+import json
+
 import pytest
 
 from appkit import BRAINKIT, mod
@@ -135,7 +137,7 @@ def test_overlaps_and_the_funnel_fallback():
                                                         "unclassified": 1}
     assert f["total"] == 7 and f["source"] == "app" and f["questions"]["delivered"] == 1
     assert f["unclassified"] == [{"key": "PAY-2", "id": "D-4", "src": "decisions.md:9"}]
-    assert {x["id"]: x["label"] for x in f["rows"]}["unclassified"] == "没归类（Who 不是规定的写法）"
+    assert {x["id"]: x["label"] for x in f["rows"]}["unclassified"] == "没归类"         # vocab.ts DECIDED_BY
 
 
 def test_the_lean_stage_of_a_row():
@@ -153,8 +155,9 @@ def test_the_lean_stage_of_a_row():
         return lean["stage"], lean["stage_state"], lean["done_n"], lean["skipped_n"], nxt, lv.stage_text(lean)
 
     assert at([]) == (None, None, 0, 0, "reverse-engineering", None)
-    assert at([ev("STAGE_STARTED", "requirements")]) == ("requirements", "started", 0, 0, "requirements",
-                                                         "做完 0 · 下一步：需求分析")
+    # a stage Lean went past without a word (here a greenfield intent's reverse engineering) is skipped, said once
+    assert at([ev("STAGE_STARTED", "requirements")]) == ("requirements", "started", 0, 1, "requirements",
+                                                         "做完 0 · 跳过 1 · 下一步：需求分析")
     done = [ev("STAGE_COMPLETED", s) for s in ("reverse-engineering", "requirements")] + \
         [ev("STAGE_SKIPPED", s) for s in ("user-stories", "application-design", "units")] + \
         [ev("STAGE_SKIPPED", s, "app") for s in ("functional-design", "nfr-design", "infrastructure-design")] + \
@@ -163,6 +166,11 @@ def test_the_lean_stage_of_a_row():
     assert at(done + [ev("STAGE_STARTED", "release")]) == ("release", "started", 4, 6, "release",
                                                            "做完 4 · 跳过 6 · 下一步：发布")
     assert at(done + [ev("STAGE_COMPLETED", "release")]) == ("release", "done", 5, 6, None, "做完 5 · 跳过 6 · 全部做完")
+    # a merged run that never recorded its unit's design stages: the cells and the count say the same (skipped)
+    unsaid = [e for e in done if e["data"]["stage"] not in ("functional-design", "nfr-design", "infrastructure-design")]
+    rows = lv.stages(unsaid + [ev("STAGE_COMPLETED", "release")])
+    assert [r["state"] for r in rows if r["n"] in (6, 7, 8)] == ["skipped"] * 3
+    assert at(unsaid + [ev("STAGE_COMPLETED", "release")])[2:4] == (5, 6)
     assert at([ev("STAGE_SKIPPED", "reverse-engineering")]) == ("requirements", "todo", 0, 1, "requirements",
                                                                 "做完 0 · 跳过 1 · 下一步：需求分析")
 
@@ -266,10 +274,12 @@ def test_a_hand_over_without_its_label_is_said_to_be_nothing_handed_over():
         row = {"state": "", "state_label": "", "waits": {}}
         mr = {"state": mr_state, "labels": labels, "sha": sha, "questions": []}
         deliveries.classify(row, f, mr=mr, slot=None, cfg=cfg, at_handover=at_handover)
-        return row["state"], row["waits"]["who"], row["waits"]["text"]
+        return row["state"], row["waits"]["who"], row["waits"]["text"], row["waits"]["raw"]
 
-    st, who, text = state([])
-    assert (st, who) == ("handed_over", "you") and "没有交接标签 ai-handoff" in text and "什么也没交出去" in text
+    st, who, text, raw = state([])
+    assert (st, who) == ("handed_over", "you") and "没有交接标签" in text and "什么也没交出去" in text
+    # the command to hand over again is under 细节, never in the sentence (REST-29)
+    assert "brain handoff" not in text and "brain handoff" in raw and "ai-handoff" in raw
     assert state(["ai-handoff"])[:2] == ("handed_over", "bridge")            # labelled: the bridge looks at it
     assert state(["ai-running"])[:2] == ("running", "runner")
     assert state([], at_handover=False)[:2] == ("handed_over", "bridge")     # the runner's work on top: not said
@@ -359,6 +369,11 @@ def test_every_row_says_whose_turn_the_step_where_and_since_when():
     _, w = row_of({"run": run, "events": ev, "worktree": "/w"}, slot=dict(idle, busy=True))
     assert (w["who"], w["do"], w["where"]) == ("agent", "none", None) and w["text"] == "AI 在做「用户故事」"
     approval = {"kind": "REQUIREMENTS", "state": "pending", "line": "approve REQUIREMENTS 1a2b3c4d", "at": 1794186000.0}
+    # a session whose last message KiroCrew has not reported yet went quiet no earlier than its last recorded step,
+    # as the board says it
+    late = [dict(ev[0], _at=1794186450.0)]
+    _, w = row_of({"run": run, "events": late, "worktree": "/w", "tip_at": 1794186440.0}, slot=idle)
+    assert (w["do"], w["since"]) == ("reply", 1794186450.0)
     _, w = row_of({"run": run, "approvals": [approval]}, slot=idle)
     assert (w["do"], w["where"], w["line"], w["since"]) == ("approve", "session", approval["line"], 1794186000.0)
 
@@ -380,6 +395,18 @@ def test_every_row_says_whose_turn_the_step_where_and_since_when():
     assert w["text"] == "已合并，有 1 条新知识等你回写 Brain"
     _, w = row_of(merged, reflected=True)
     assert (w["who"], w["do"], w["since"]) == ("nobody", "watch", 1794186000.0) and "观察合并后的 14 天" in w["text"]
+    _, w = row_of(merged, me="bob")          # someone else's merge: its write-back is theirs
+    assert (w["who"], w["do"], w["text"]) == ("people", "write_back", "已合并，有 1 条新知识等 alice 回写 Brain")
+
+    # built and verified, no review yet: the reply is the review in a new session (开审查会话), said by a flag too
+    built = [{"event": e, "data": {"stage": st}, "ts": "2026-11-09T01:00:00Z", "_at": 1.0} for e, st in (
+        ("STAGE_COMPLETED", "requirements"), ("STAGE_COMPLETED", "code-generation"), ("STAGE_COMPLETED", "build-and-test"))]
+    _, w = row_of({"run": run, "events": built, "worktree": "/w"}, slot=idle)
+    assert (w["do"], w["review"]) == ("reply", True) and "先开一个新会话做审查" in w["text"]
+    _, w = row_of({"run": run, "events": built, "worktree": "/w", "review": {"at": None}}, slot=idle)
+    assert (w["do"], w["review"]) == ("reply", False) and "回会话让它接着发布" in w["text"]
+    _, w = row_of({"run": run, "events": ev, "worktree": "/w"}, slot=idle)
+    assert w["review"] is False
 
 
 def test_todo_lists_what_waits_for_you_the_way_the_rows_say_it():
@@ -410,3 +437,17 @@ def test_the_eval_queue_says_what_people_did_in_words():
     assert deliveries.acts_in_words("判断点之外有人介入 2 次（allow_test_change、platform_merge）") == \
         "判断点之外有人介入 2 次（允许改验收测试、平台上的手动操作）"
     assert deliveries.acts_in_words("验收被驳回 1 次（RELEASE）") == "验收被驳回 1 次（RELEASE）"
+
+
+def test_what_an_older_app_wrote_is_read_in_words(tmp_path):
+    """The app's own record is said in words (REST-29): an older app wrote the command it ran and the session's slot
+    name; they are read back the way it writes them now."""
+    st = mod("store").Store(tmp_path)
+    (tmp_path / "r1-DEMO-1.jsonl").write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in (
+        {"at": "2026-11-09T00:29:34Z", "kind": "app", "label": "开了 brain-dev 会话", "detail": "brain-r1-demo-1-1-4115，信任这个会话"},
+        {"at": "2026-11-09T00:51:05Z", "kind": "app", "label": "brain reflect --apply：成功", "detail": "brain/DEMO-1-reflect-1"},
+        {"at": "2026-11-09T00:52:05Z", "kind": "app", "label": "brain reflect --apply --push：失败", "detail": None})) + "\n")
+    st.append("r1-DEMO-1", "app", "开了审查会话", None)
+    assert [(e["label"], e["detail"]) for e in st.events("r1-DEMO-1")] == [
+        ("开了本机会话", "工具调用不用逐个批准"), ("回写 Brain：成功", "brain/DEMO-1-reflect-1"), ("回写 Brain 并推送：失败", None),
+        ("开了审查会话", None)]

@@ -72,7 +72,8 @@ def test_a_local_requirement_waits_for_its_approval_on_the_board(tmp_path, home)
 
 @needs_brainkit
 def test_an_approved_requirement_handed_over_and_one_merged(tmp_path, home):
-    repo = make_project(tmp_path, kit={"gitlab": {"base": "https://gitlab.example.com", "project": "shop/pay"}})
+    # handed over through GitLab: a remote too (without one a repo is done only on this machine)
+    repo = make_project(tmp_path, origin=True, kit={"gitlab": {"base": "https://gitlab.example.com", "project": "shop/pay"}})
     wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "refund", "refund", "退款")
     intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
     line = request_requirements(wt, intent)
@@ -87,17 +88,18 @@ def test_an_approved_requirement_handed_over_and_one_merged(tmp_path, home):
     brain(wt, "handoff", "--no-push")
     wt2 = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "done", "done", "做完了")
     sh("git", "-C", repo, "merge", "-q", "--no-ff", "-m", "merge PAY-2", "ai/alice/PAY-2-done")
+    sh("git", "-C", repo, "push", "-q", "origin", "main")
     sh("git", "-C", repo, "worktree", "remove", "--force", wt2)
     svc = make_service(tmp_path, [repo])
 
     async def go():
         await svc.start()
         try:
-            return await svc.board("r1", "PAY-1"), await svc.board("r1", "PAY-2")
+            return await svc.board("r1", "PAY-1"), await svc.board("r1", "PAY-2"), await svc.requirement("r1", "PAY-1")
         finally:
             await svc.stop()
 
-    b1, b2 = run(go())
+    b1, b2, d1 = run(go())
     a1 = actors(b1)
     assert a1["req"]["status"] == "merged" and a1["req"]["line"] is None
     assert a1["local"]["status"] == "done" and a1["handover"]["status"] == "queued"
@@ -111,6 +113,12 @@ def test_an_approved_requirement_handed_over_and_one_merged(tmp_path, home):
         subj = [x["text"] for x in b1["belt"] if x["kind"] == "commit"]
         assert any("refund: the CSV export" in s for s in subj)
         assert any(e["kind"] == "handover" and e["to"] == "handover" for e in b1["events"])
+        # BOARD-21: each commit with the files it changed, as git says it
+        export = next(x for x in b1["belt"] if x["kind"] == "commit" and "refund: the CSV export" in x["text"])
+        assert {"path": "src/refund.py", "added": 2, "removed": 0, "status": "A"} in export["changes"]
+        # the sources brain-kit could not read, in words, said the same on the board and in 需求详情 (DETAIL-6)
+        assert b1["missing"] and b1["missing"] == d1["timeline"]["missing"]
+        assert not any(w in json.dumps(b1["missing"]) for w in ("ledger", "--", "not given"))
     cells = {c["id"]: c for c in b1["checks"]["cells"]}
     assert cells["gate-REQUIREMENTS"]["status"] == "pass" and cells["bridge"]["status"] == "wait"
     a2 = actors(b2)
@@ -123,6 +131,44 @@ def test_an_approved_requirement_handed_over_and_one_merged(tmp_path, home):
         assert all(a2[k]["status"] == "skipped" for k in ("handover", "bridge", "signer", "runner"))
     text = json.dumps([b1, b2])
     assert "glpat-" not in text and "gitlab_token" not in text.lower() and "@example" not in text  # no secret, no email
+
+
+@needs_brainkit
+def test_an_idle_session_waits_since_one_moment_and_a_claim_has_nothing_to_trace(tmp_path, home):
+    """The row (交付总览, 待办) and the board say one moment the session went quiet: not before Lean's last step, even
+    when KiroCrew reported only the kickoff's time. A requirement only claimed has no run: no error on its board
+    (BOARD-6)."""
+    from brainfix import FakeGateway, install_brain_dev
+    repo = make_project(tmp_path)
+    install_brain_dev(home)
+    wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "refund", "refund", "退款")
+    brain(repo, "claim", "--title", "只认领")
+    gw = FakeGateway()
+    gw.templates = {"brain-dev"}
+    svc = make_service(tmp_path, [repo], gw=gw)
+
+    async def go():
+        await svc.start()
+        try:
+            await svc.open_session("r1", "PAY-1")
+            gw.finish(next(iter(gw.slot_rows)))
+            for _ in range(6):
+                await svc.sessions.poll()
+            lean(wt, "stage", "skip", "reverse-engineering", "--reason", "greenfield")
+            svc.repos["r1"].invalidate()
+            rows = {r["key"]: r for r in (await svc.overview("all"))["rows"]}
+            return rows, await svc.board("r1", "PAY-1"), await svc.board("r1", "PAY-2")
+        finally:
+            await svc.stop()
+
+    rows, b, claimed = run(go())
+    w = rows["PAY-1"]["waits"]
+    assert (w["who"], w["do"]) == ("you", "reply")
+    assert w["since"] > time.time() - 600          # the Lean step just now, not the transcript's 2026-11-08 stamp
+    local = actors(b)["local"]
+    assert local["status"] == "awaiting_approval" and local["since"] == w["since"] == b["row"]["waits"]["since"]
+    assert local["history"][-1]["who"] == "you"            # the replay says whose turn each wait was
+    assert claimed["row"]["state"] == "claimed" and claimed["error"] == "" and claimed["source"] == "app"
 
 
 @needs_brainkit
@@ -282,10 +328,17 @@ def test_the_idle_step_says_what_to_say_next_and_where():
     step = b["accept"]["step"]
     assert step["who"] == "你" and step["session_url"] == "/chat?sid=brain-r1-demo-3-1" and step["mr_url"] is None
     assert "下一步是「发布」" in step["text"] and "你开一个新会话做审查" in step["text"]
-    assert step["line"] == "审查 intent 261109-x：看 git diff 5d331b4..HEAD"
+    # the line for the new session is Lean's own review line, the one 开审查会话 sends: the session that wrote the code
+    # does not word its reviewer's task
+    review = "Review intent 261109-x against its requirements, design and plans, using the diff, and write " \
+             "construction/build-and-test/review.md."
+    assert step["line"] == review
     assert "`" not in step["text"] + step["line"] and "owner" not in step["text"]
-    # without Lean's notes it still says what to say
+    # without Lean's notes it still says what to do: the review first, then the release
     b = snapshot(facts(demo3_events()), row_of("local", "you", "会话空着：轮到你回话"), sessions=[session(last)])
+    assert "先开一个新会话做审查" in b["accept"]["step"]["text"] and b["accept"]["step"]["line"] == review
+    reviewed = dict(facts(demo3_events()), review={"at": None})
+    b = snapshot(reviewed, row_of("local", "you", "会话空着：轮到你回话"), sessions=[session(last)])
     assert "在会话里让它接着做「发布」" in b["accept"]["step"]["text"] and b["accept"]["step"]["line"] == "接着做下一步：发布"
 
 
@@ -320,17 +373,32 @@ def test_the_merge_ends_the_requirements_time_and_its_14_days_are_watched_not_wa
                             ev(T + 16 * M, "APPROVED", kind="RELEASE", sha256="ab" * 32)]
     b = snapshot(facts(evs, merged=True), row_of("merged", "nobody", "已合并"), sessions=[session(T + 17 * M)],
                  t=merged_trace(merged_at, merged_at + 14 * 86400), brain_={"proposals": 2},
-                 app_events=[{"at": iso(merged_at + 15 * H), "label": "brain reflect --apply：成功", "detail": "brain/DEMO-3-reflect-1"}],
+                 app_events=[{"at": iso(merged_at + 15 * H), "label": "回写 Brain：成功", "detail": "brain/DEMO-3-reflect-1"}],
                  reflect_refs=[("brain/DEMO-3-reflect-1", merged_at + 15 * H)], now=merged_at + 2 * 86400)
     assert b["ended_at"] == merged_at
     assert all(s["b"] is not None and s["b"] <= merged_at for a in b["actors"] for s in a["spans"])
     cells = {c["id"]: c for c in b["checks"]["cells"]}
     assert cells["after-14d"]["status"] == "watch" and cells["after-14d"]["detail"].startswith("观察中")
-    assert b["checks"]["todo"] == ["合并后 14 天"] and b["checks"]["passed"] == b["checks"]["total"]
+    # watched is not still to come: nothing is left, one cell is watched
+    assert b["checks"]["todo"] == [] and b["checks"]["passed"] == b["checks"]["total"]
+    assert b["accept"]["checks"] == "目前 %d 项都过 · 1 项在观察" % b["checks"]["passed"]
     # one write-back, one event
     assert [e["text"] for e in b["events"] if e["kind"] == "reflect"] == ["回写 Brain：成功（回写分支 brain/DEMO-3-reflect-1）"]
     # the owner approved the release in their own session: they are named, never a pseudonym
     assert b["accept"]["done"]["who"] == "ychchen"
+
+
+def test_the_replay_knows_whose_turn_each_wait_was():
+    """A release asked on the MR after the hand-over waits for the product, not for you: each history entry of a wait
+    says whom it is on, as Waits.who does."""
+    hand = T + 16 * M
+    evs = demo3_events() + [ev(T + 40 * M, "APPROVAL_REQUESTED", kind="RELEASE", sha256="cd" * 32)]
+    b = snapshot(facts(evs, handoff={"requested_at": iso(hand), "by": "ychchen"}),
+                 row_of("acceptance", "product", "等产品在 MR 上验收 D-3（approve / reject）", do="accept"),
+                 local_only=False, now=T + 2 * H)
+    waits = [(h["status"], h["who"]) for h in actor(b, "release")["history"] if h["status"] == "awaiting_approval"]
+    assert waits and all(who == "product" for _, who in waits)
+    assert [h["who"] for h in actor(b, "req")["history"] if h["status"] == "awaiting_approval"] == ["you"]
 
 
 def test_a_repo_done_only_here_has_no_runner_half_and_reads_no_runner_sources():

@@ -942,15 +942,15 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
             checks.append(row("kit", "WARN", "brain-kit", "装了，已提交，但 %s 上还没有" % (d or "默认分支"),
                               "合并到 %s：app 给每个需求建的工作目录从那里来" % (d or "默认分支")))
         elif changed:
-            checks.append(row("kit", "WARN", "brain-kit", "装了，但 .brain/kit.json 有没提交的改动", "改完记得提交"))
+            checks.append(row("kit", "WARN", "brain-kit", "装了，但 brain-kit 的设置有没提交的改动", "改完记得提交"))
         else:
-            checks.append(row("kit", "OK", "brain-kit", "装了，已提交（.brain/kit.json）"))
+            checks.append(row("kit", "OK", "brain-kit", "装了，已提交"))
     elif pend:
         out["kit"]["state"] = pend["state"]
         checks.append(row("kit", "WARN", "brain-kit", pend["text"] + (
             "（AI-DLC Lean、Brain 文件、AGENTS.md 都在分支上）" if pend["state"] == "branch" else ""), pend["next"]))
     elif not bk.ok():
-        checks.append(row("kit", "FAIL", "brain-kit", "没装（没有 .brain/kit.json），app 现在也没装载 brain-kit，装不了",
+        checks.append(row("kit", "FAIL", "brain-kit", "还没装 brain-kit，app 现在也没装载 brain-kit，装不了",
                           "先在设置里写对 brain-kit 的位置"))
     else:
         # the start of an import, not a fault: one row, its level WARN only for older pages (the page shows it as the

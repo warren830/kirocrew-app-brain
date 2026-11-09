@@ -1,6 +1,6 @@
 {
   "repo": "r1",
-  "ref": "main@3f9c2a1b",
+  "ref": "main",
   "files": [
     {
       "key": "PRODUCT",
@@ -18,6 +18,21 @@
           "title": "退款",
           "entries": [
             {
+              "id": "P-7",
+              "type": "principle",
+              "side": "product",
+              "rel": "new",
+              "repeats": 0,
+              "src": [
+                "PAY-1"
+              ],
+              "text": "对商户的金额一律到分，不四舍五入到元。",
+              "cites": 1,
+              "runs": 1,
+              "loaded_by": 1,
+              "candidate": false
+            },
+            {
               "id": "P-PAY-2-1",
               "type": "decision",
               "side": "product",
@@ -28,25 +43,10 @@
                 "RUN-PAY-2-1"
               ],
               "text": "退款单只给有退款权限的运营看：里面有收款人姓名。",
-              "cites": 3,
-              "runs": 2,
-              "loaded_by": 5,
-              "candidate": false
-            },
-            {
-              "id": "P-7",
-              "type": "principle",
-              "side": "product",
-              "rel": "same",
-              "repeats": 0,
-              "src": [
-                "PAY-1"
-              ],
-              "text": "对商户的金额一律到分，不四舍五入到元。",
               "cites": 0,
               "runs": 0,
-              "loaded_by": 6,
-              "candidate": true
+              "loaded_by": 0,
+              "candidate": false
             }
           ]
         }
@@ -70,22 +70,6 @@
           "title": "退款",
           "entries": [
             {
-              "id": "T-PAY-2-1",
-              "type": "pitfall",
-              "side": "builder",
-              "rel": "repeats",
-              "repeats": 2,
-              "src": [
-                "D01#S030",
-                "V-1a2b3c4d5e"
-              ],
-              "text": "退款单号是 RF + 9 位；样例文件里的 7 位是旧格式。\n校验时两种都认，生成只用新格式。",
-              "cites": 4,
-              "runs": 3,
-              "loaded_by": 6,
-              "candidate": false
-            },
-            {
               "id": "T-12",
               "type": "guideline",
               "side": "builder",
@@ -97,7 +81,23 @@
               "text": "导出大文件分批写，一批不超过 5000 行。",
               "cites": 1,
               "runs": 1,
-              "loaded_by": 6,
+              "loaded_by": 1,
+              "candidate": false
+            },
+            {
+              "id": "T-PAY-2-1",
+              "type": "pitfall",
+              "side": "builder",
+              "rel": "new",
+              "repeats": 2,
+              "src": [
+                "D01#S030",
+                "V-1a2b3c4d5e"
+              ],
+              "text": "退款单号是 RF + 9 位；样例文件里的 7 位是旧格式。\n校验时两种都认，生成只用新格式。",
+              "cites": 0,
+              "runs": 0,
+              "loaded_by": 0,
               "candidate": false
             }
           ]
@@ -106,19 +106,18 @@
           "title": "回调",
           "entries": [
             {
-              "id": "T-PAY-5-1",
+              "id": "T-13",
               "type": "decision",
               "side": "builder",
               "rel": "new",
               "repeats": 0,
               "src": [
-                "D-2",
-                "RUN-PAY-5-1"
+                "见群聊"
               ],
               "text": "退款回调失败后按 1、5、30 分钟重试三次，之后进人工队列。",
-              "cites": 1,
-              "runs": 1,
-              "loaded_by": 2,
+              "cites": 0,
+              "runs": 0,
+              "loaded_by": 1,
               "candidate": false
             }
           ]
@@ -149,10 +148,10 @@
               "src": [
                 "RUN-PAY-2-1"
               ],
-              "text": "交接前先 rebase 到最新的 main：bridge 只收 brain_commit 在 main 上的运行。",
-              "cites": 2,
-              "runs": 2,
-              "loaded_by": 4,
+              "text": "交接前先 rebase 到最新的 main：桥只收 brain_commit 在 main 上的运行。",
+              "cites": 0,
+              "runs": 0,
+              "loaded_by": 0,
               "candidate": false
             }
           ]
@@ -184,7 +183,7 @@
               "text": "需求文档一律走开需求的五关，原件不进任何仓库。",
               "cites": 0,
               "runs": 0,
-              "loaded_by": 6,
+              "loaded_by": 1,
               "candidate": false
             }
           ]
@@ -196,75 +195,81 @@
     "errors": [
       {
         "level": "FAIL",
-        "text": "brain/TECH.md 第 14 行：出处「见群聊」不是引用",
-        "todo": "出处写 D01#S003、PKG-…、D-3、V-…、RUN-… 或条目号",
+        "text": "brain/TECH.md 第 20 行：出处「见群聊」不是引用",
+        "todo": "出处写成查得到的引用：需求文档的段落、材料包、决定号、凭证号、运行号或条目号",
         "fix": null,
         "repo": "/Users/alice/workplace/shop-pay",
-        "raw": "TECH.md:14: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
+        "raw": "TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
       }
     ],
     "warnings": [
       {
         "level": "WARN",
-        "text": "brain/TECH.md 第 20 行：T-PAY-2-1 已经重复出现 3 次",
-        "todo": "把它做成一个会失败的检查（gate），别再加文字",
+        "text": "brain/PRODUCT.md 第 13 行：P-7 是旧式条目号",
+        "todo": "不用改；新条目用 <字母>-<需求号>-<n>",
         "fix": null,
         "repo": "/Users/alice/workplace/shop-pay",
-        "raw": "TECH.md:20: T-PAY-2-1 came back 3 times: make it a gate (a check that fails), not more text"
+        "raw": "PRODUCT.md:13: legacy sequential id P-7; new entries use <side>-<KEY>-<n>"
       },
       {
         "level": "WARN",
-        "text": "brain/PRODUCT.md：有 1 行文字不在条目里",
-        "todo": "它们不算知识，可每个 run 都会读到：看一眼，要的话写成条目",
+        "text": "brain/PROJECT.md 第 11 行：J-3 是旧式条目号",
+        "todo": "不用改；新条目用 <字母>-<需求号>-<n>",
         "fix": null,
         "repo": "/Users/alice/workplace/shop-pay",
-        "raw": "PRODUCT.md: 1 line(s) of text outside entries (not tracked as knowledge; read them): 退款要在 7 天内处理"
+        "raw": "PROJECT.md:11: legacy sequential id J-3; new entries use <side>-<KEY>-<n>"
+      },
+      {
+        "level": "WARN",
+        "text": "brain/TECH.md 第 11 行：T-12 是旧式条目号",
+        "todo": "不用改；新条目用 <字母>-<需求号>-<n>",
+        "fix": null,
+        "repo": "/Users/alice/workplace/shop-pay",
+        "raw": "TECH.md:11: legacy sequential id T-12; new entries use <side>-<KEY>-<n>"
+      },
+      {
+        "level": "WARN",
+        "text": "brain/TECH.md 第 14 行：T-PAY-2-1 已经重复出现 2 次",
+        "todo": "把它做成一个会失败的检查，别再加文字",
+        "fix": null,
+        "repo": "/Users/alice/workplace/shop-pay",
+        "raw": "TECH.md:14: T-PAY-2-1 came back 2 times: make it a gate (a check that fails), not more text"
+      },
+      {
+        "level": "WARN",
+        "text": "brain/TECH.md 第 20 行：T-13 是旧式条目号",
+        "todo": "不用改；新条目用 <字母>-<需求号>-<n>",
+        "fix": null,
+        "repo": "/Users/alice/workplace/shop-pay",
+        "raw": "TECH.md:20: legacy sequential id T-13; new entries use <side>-<KEY>-<n>"
       }
     ]
   },
   "usage": {
     "useful": [
-      5,
-      8
+      2,
+      7
     ],
     "repeat_rate": [
-      1,
-      6
+      0,
+      0
     ],
-    "archived": 3,
-    "purged": 1,
+    "archived": 0,
+    "purged": 0,
     "runs": [
       {
-        "intent": "261107-refund-export",
-        "key": "PAY-3",
-        "loaded": 14,
+        "intent": "261102-refund-id",
+        "key": "PAY-2",
+        "loaded": 4,
         "cited": [
-          "P-PAY-2-1",
-          "T-PAY-2-1",
+          "P-7",
           "T-12"
-        ],
-        "stale": [
-          "T-12"
-        ],
-        "unknown": [
-          "T-PAY-9-1"
-        ]
-      },
-      {
-        "intent": "261103-callback-retry",
-        "key": "PAY-5",
-        "loaded": 12,
-        "cited": [
-          "T-PAY-2-1"
         ],
         "stale": [],
         "unknown": []
       }
     ],
-    "never_cited": [
-      "P-7",
-      "J-3"
-    ],
+    "never_cited": [],
     "repeats_any": [
       [
         "T-PAY-2-1",
@@ -277,26 +282,57 @@
     ],
     "unmerged": [
       {
-        "key": "PAY-4",
-        "loaded": 11,
+        "key": "PAY-1",
+        "loaded": 7,
         "cited": [
-          "T-PAY-2-1",
-          "T-12"
+          "P-PAY-2-1"
         ],
+        "where": "worktree"
+      },
+      {
+        "key": "PAY-3",
+        "loaded": 7,
+        "cited": [
+          "T-12",
+          "T-PAY-2-1"
+        ],
+        "where": "worktree"
+      },
+      {
+        "key": "PAY-4",
+        "loaded": 7,
+        "cited": [
+          "T-12",
+          "T-PAY-2-1"
+        ],
+        "where": "branch"
+      },
+      {
+        "key": "PAY-5",
+        "loaded": 7,
+        "cited": [
+          "T-PAY-2-1"
+        ],
+        "where": "branch"
+      },
+      {
+        "key": "PAY-7",
+        "loaded": 7,
+        "cited": [],
         "where": "branch"
       }
     ]
   },
   "reflect": [
     {
-      "key": "PAY-2",
-      "title": "退款单号校验",
-      "state": "merged"
-    },
-    {
       "key": "PAY-5",
       "title": "退款回调失败重试",
       "state": "acceptance"
+    },
+    {
+      "key": "PAY-2",
+      "title": "退款单号校验",
+      "state": "merged"
     }
   ],
   "error": ""

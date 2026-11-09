@@ -76,10 +76,7 @@ def test_a_requirement_claimed_already_is_started_with_its_own_key(tmp_path, hom
         try:
             nxt = await svc.intake_next("r1")
             mine = await svc.intake_start(dict(start, key="PAY-1", title="只认领"))
-            # (intake.start's own answer: the route's who-only problem line is service.py's)
-            theirs = await asyncio.to_thread(mod("intake").start, svc.repos["r1"], dict(start, key="PAY-2", title="鲍勃的",
-                                                                                       slug="other"),
-                                             svc.settings["work_root"])
+            theirs = await svc.intake_start(dict(start, key="PAY-2", title="鲍勃的", slug="other"))
             return nxt, mine, theirs
         finally:
             await svc.stop()
@@ -89,6 +86,7 @@ def test_a_requirement_claimed_already_is_started_with_its_own_key(tmp_path, hom
     assert mine["ok"] and mine["key"] == "PAY-1" and mine["branch"] == "ai/alice/PAY-1-refund"
     assert theirs["ok"] is False and theirs["problem"]["text"] == "PAY-2 是 bob 认领的"
     assert "只有 bob 能开工" in theirs["problem"]["todo"] and "claimed by bob" in theirs["problem"]["raw"]
+    assert theirs["me"] is None          # who you are is not the question here: 你是谁 is not asked
 
 
 def test_an_install_in_place_not_pushed_yet_asks_for_the_push_before_a_start(tmp_path, home):

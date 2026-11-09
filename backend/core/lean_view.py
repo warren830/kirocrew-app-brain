@@ -34,6 +34,7 @@ STAGES = (
 STAGE_LABEL = {s[0]: s[1] for s in STAGES}
 STAGE_N = {s[0]: i for i, s in enumerate(STAGES, 1)}
 STAGE_STATE = {"STAGE_STARTED": "started", "STAGE_COMPLETED": "done", "STAGE_SKIPPED": "skipped"}
+PASSED_OVER = "Lean 没记这一步，直接往后做了"
 APPROVAL_EVENTS = ("APPROVAL_REQUESTED", "APPROVED", "REJECTED", "APPROVAL_REFUSED")
 KIND_LABEL = {"REQUIREMENTS": "需求", "DESIGN": "设计", "INCEPTION": "需求和设计", "PLAN": "代码生成计划",
               "RELEASE": "发布"}
@@ -108,6 +109,11 @@ def stages(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "units": [{"unit": u, "state": s} for u, s in units] if per_unit else [],
                     "note": str(note)[:300] if isinstance(note, str) else None,
                     "at": latest.get("_at") if latest else (whole.get("_at") if whole else None)})
+    # a stage Lean went past without a word (a later one is recorded) was not on this intent's way: skipped
+    last = max((r["n"] for r in out if r["state"] != "todo"), default=0)
+    for r in out:
+        if r["state"] == "todo" and r["n"] < last:
+            r.update(state="skipped", note=PASSED_OVER)
     return out
 
 
@@ -145,6 +151,16 @@ def stage_text(lean: dict[str, Any]) -> str | None:
 
 
 REVIEW_DOC = "construction/build-and-test/review.md"   # Lean's release review (skill aidlc-lean-release)
+INTENT_RE = re.compile(r"^[0-9]{6}-[a-z0-9][a-z0-9-]{0,80}$")
+# what Lean's release skill tells the person to say in a new chat: the review is made by a context that did not write
+# the code (and is not told how by the one that did)
+REVIEW_LINE = ("Review intent %s against its requirements, design and plans, using the diff, and write "
+               "construction/build-and-test/review.md.")
+
+
+def review_line(intent: Any) -> str | None:
+    """Lean's review line for *intent* (run.json is agent-writable: an intent not in Lean's format gets none)."""
+    return REVIEW_LINE % intent if isinstance(intent, str) and INTENT_RE.match(intent) else None
 
 
 def review_current(review_at: float | None, exists: bool, evs: list[dict[str, Any]]) -> bool:

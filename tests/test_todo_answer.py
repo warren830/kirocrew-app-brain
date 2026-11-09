@@ -47,10 +47,42 @@ def test_todo_lists_the_approval_line_and_the_app_never_sends_it(tmp_path, home)
     opened, todo, status = run(go())
     items = [i for i in todo["items"] if i["kind"] == "lean_approval"]
     assert len(items) == 1 and items[0]["line"] == line and items[0]["approval"] == "REQUIREMENTS"
-    assert items[0]["session"]["slot"] == opened["slot"] and "自己打这一行" in items[0]["text"]
+    # what it waits on, said once: the row's own words (REST-11), the line beside them
+    assert items[0]["session"]["slot"] == opened["slot"] and items[0]["text"] == "等你批准需求：读完再在会话里自己打那一行"
     sent = [m["content"] for msgs in gw.msgs.values() for m in msgs if m["role"] == "user"]
     assert sent and not any("approve" in s.lower() for s in sent)
     assert status["counts"]["todo"] >= 1 and status["me"]["user"] == "alice" and status["me"]["token"] is False
+
+
+def test_a_review_session_is_a_new_one_told_leans_review_line_never_an_approval(tmp_path, home):
+    """开审查会话 (DETAIL-9, BOARD-4): Lean's next step is a review by a context that did not write the code, so a new
+    brain-dev session opens in the run's worktree even with one live, told Lean's review line; the app said it in
+    words, and no approval line was ever sent."""
+    repo, wt, line, gw = setup(tmp_path, home)
+    intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
+    svc = make_service(tmp_path, [repo], gw=gw)
+
+    async def go():
+        await svc.start()
+        try:
+            first = await svc.open_session("r1", "PAY-1")
+            again = await svc.open_session("r1", "PAY-1")
+            review = await svc.open_session("r1", "PAY-1", review=True)
+            return first, again, review, await svc.requirement("r1", "PAY-1")
+        finally:
+            await svc.stop()
+
+    first, again, review, d = run(go())
+    assert again["slot"] == first["slot"] and review["slot"] != first["slot"]
+    assert gw.slot_rows[review["slot"]]["project"] == str(wt) and gw.slot_rows[review["slot"]]["title"] == "PAY-1 · 审查"
+    told = [m["content"] for m in gw.msgs[review["slot"]] if m["role"] == "user"]
+    assert len(told) == 1 and "Review intent %s against its requirements, design and plans" % intent in told[0]
+    sent = [m["content"] for msgs in gw.msgs.values() for m in msgs if m["role"] == "user"]
+    assert not any(line in s or "approve" in s.lower() for s in sent)
+    said = [(i["label"], i["detail"]) for i in d["timeline"]["items"] if i["kind"] == "app"]
+    assert ("开了审查会话", "工具调用不用逐个批准") in said and ("开了本机会话", "工具调用不用逐个批准") in said
+    assert not any(first["slot"] in str(x) for x in said)          # no session id said to a person
+    assert len(d["sessions"]) == 2
 
 
 def test_a_local_clarify_question_is_answered_into_its_session(tmp_path, home):
@@ -220,7 +252,8 @@ def test_a_pushed_hand_over_without_its_label_is_nothing_handed_over(tmp_path, h
     v1, t1, v2, t2 = run(go())
     row = v1["rows"][0]
     assert (row["state"], row["waits"]["who"]) == ("handed_over", "you"), row
-    assert "没有交接标签 ai-handoff" in row["waits"]["text"] and "什么也没交出去" in row["waits"]["text"]
+    assert "没有交接标签" in row["waits"]["text"] and "什么也没交出去" in row["waits"]["text"]
+    assert "ai-handoff" in row["waits"]["raw"] and "brain handoff" not in row["waits"]["text"]
     item = [i for i in t1["items"] if i["key"] == "PAY-1"]
     assert [i["kind"] for i in item] == ["handoff_unlabelled"] and item[0]["mr_url"].endswith("/merge_requests/7")
     assert (v2["rows"][0]["state"], v2["rows"][0]["waits"]["who"]) == ("handed_over", "bridge")

@@ -27,6 +27,7 @@ from .gateway import Gateway
 from .httpkit import AppError
 from .repo import Git, Repo, Source, read_facts
 from .sessions import SessionManager
+from . import store as store_mod
 from .store import Store
 
 _REGISTRY: dict[str, "Service"] = {}
@@ -96,7 +97,7 @@ class Service:
         self._eval_running: set[str] = set()
         self._trace: dict[tuple, tuple] = {}
         self.desc = mrdesc_view.DescCache()     # each requirement's 变更说明, by the commits it is made from
-        self._subj: dict[tuple, dict[str, str]] = {}   # the board's commit subjects, by the commits asked for
+        self._subj: dict[tuple, tuple] = {}     # the board's commit subjects and changed files, by the commits asked for
         self._me: str | None = None
 
     # ---- lifecycle ------------------------------------------------------------------------------------ #
@@ -337,9 +338,10 @@ class Service:
     # ---- 交付总览 ------------------------------------------------------------------------------------- #
 
     def _local_only(self, repo: Repo) -> bool:
-        """Its requirements are done only on this machine: no GitLab to hand them over through (the board's rule)."""
+        """Its requirements are done only on this machine: no GitLab, or no remote (RepoInfo.remote), to hand them over
+        through."""
         base, project = self._gitlab_of(repo)
-        return not (base and project)
+        return not (base and project) or not repo.has_origin()
 
     def _row(self, repo: Repo, f: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
         row = deliveries.base_row(repo.id, f, local_only=self._local_only(repo))
@@ -437,7 +439,7 @@ class Service:
             row["mr"] = {"iid": int(r["iid"]), "url": self.team.mr_url(r["project"], r["iid"]), "state": None}
             row["updated_at"] = lean_view.epoch(r.get("updated"))
             job = self._runner_desc(facts, key, row) if facts.get("run") else None
-            row["summary"] = self.desc.first(*job) if job else None
+            row["summary"] = mrdesc_view.plain_line(self.desc.first(*job)) if job else None
             out.append((row, facts, decs))
         return out
 
@@ -530,13 +532,14 @@ class Service:
                                     if k.startswith(rid + "-")}}
                 threading_start(self._eval_compute, rid, sha, credits)
         if not views:
-            return {"available": False, "error": "正在算 Eval…" if ids else "没有仓库", "ref": None, "metrics": [],
-                    "queue": [], "skipped": [], "notes": []}, None
+            return {"available": False, "error": "正在算交付评估…" if ids else "没有仓库", "raw": "", "ref": None,
+                    "metrics": [], "queue": [], "skipped": [], "notes": []}, None
         ref = deliveries.branch_words([(v.pop("_name"), v.get("ref")) for v in views])
         if len(views) == 1:
             return dict(views[0], ref=ref), (dict(funnels[0]) if funnels else None)
-        merged = {"available": any(v["available"] for v in views), "error": "；".join(v["error"] for v in views if v["error"]),
-                  "ref": ref, "metrics": [], "queue": [q for v in views for q in v["queue"]],
+        merged = {"available": any(v["available"] for v in views),
+                  "error": "；".join(dict.fromkeys(v["error"] for v in views if v["error"])),
+                  "raw": "\n".join(v.get("raw") or "" for v in views if v.get("raw")), "ref": ref, "metrics": [], "queue": [q for v in views for q in v["queue"]],
                   "skipped": [x for v in views for x in v.get("skipped") or []],
                   "notes": [x for v in views for x in v.get("notes") or []]}
         for m in views[0]["metrics"]:
@@ -569,9 +572,9 @@ class Service:
             view, funnel = deliveries.evaluate(repo.path, repo.cfg, repo.main_ref(), credits)
             self._eval[rid] = (sha, time.monotonic(), view, funnel)
         except Exception as exc:  # noqa: BLE001
-            self._eval[rid] = (sha, time.monotonic(), {"available": False, "error": "Eval 算不出来：%s" % str(exc)[:200],
-                                                        "ref": None, "metrics": [], "queue": [], "skipped": [],
-                                                        "notes": []}, None)
+            self._eval[rid] = (sha, time.monotonic(), {"available": False, "error": "交付评估没算成：原话在细节里",
+                                                        "raw": str(exc)[:2000], "ref": None, "metrics": [],
+                                                        "queue": [], "skipped": [], "notes": []}, None)
         finally:
             self._eval_running.discard(rid)
 
@@ -640,8 +643,8 @@ class Service:
                                           repo.cfg.get("bot_users") or []),
             "questions": questions,
             "timeline": {"source": tl["source"], "items": tl["items"], "error": tl["error"],
-                         "missing": detail.missing_text(tl["missing"], handed_over=bool(run.get("handoff")),
-                                                        local_only=row["local_only"])},
+                         "missing": board_mod.missing_sources(tl["missing"], local_only=row["local_only"],
+                                                              handed=bool(run.get("handoff")))},
             "sessions": [{k: s[k] for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                              "last_activity", "opened_at", "project", "url", "error")}
                          for s in snap["by"].get(scope, [])],
@@ -719,7 +722,7 @@ class Service:
             "decisions": detail.decisions(f.get("decisions_text"), "decisions.md", []),
             "questions": detail.ledger_questions(decs, row["mr"]["url"] if row.get("mr") else None),
             "timeline": {"source": tl["source"], "items": tl["items"], "error": tl["error"],
-                         "missing": detail.missing_text(tl["missing"], handed_over=True, local_only=False)},
+                         "missing": board_mod.missing_sources(tl["missing"], local_only=False, handed=True)},
             "sessions": [{k: s[k] for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                              "last_activity", "opened_at", "project", "url", "error")} for s in sess],
             "credits": {"total": row["credits"], "note": detail.NO_TOKENS},
@@ -747,16 +750,18 @@ class Service:
 
     # ---- 需求看板 ------------------------------------------------------------------------------------- #
 
-    def _subjects(self, git: Git, shas: list[str]) -> dict[str, str]:
-        """The commits' subjects (one git call, kept by the commits asked for)."""
+    def _commits(self, git: Git, shas: list[str]) -> tuple[dict[str, str], dict[str, list[dict[str, Any]]]]:
+        """The commits' subjects and the files each changed (one git call, board_mod.GIT_LOG; kept by the commits
+        asked for)."""
         shas = [x for x in shas if re.match(r"^[0-9a-f]{40}$", x or "")][-board_mod.MAX_BELT:]
         if not shas:
-            return {}
+            return {}, {}
         sig = (git.repo, tuple(shas))
         got = self._subj.get(sig)
         if got is None:
-            p = git.run("log", "--no-walk=unsorted", "--format=%H%x00%s", *shas, timeout=20)
-            got = board_mod.subjects_from_log(p.stdout if p.returncode == 0 else "")
+            p = git.run(*board_mod.GIT_LOG, *shas, timeout=20)
+            out = p.stdout if p.returncode == 0 else ""
+            got = (board_mod.subjects_from_log(out), board_mod.changes_from_log(out))
             if len(self._subj) > 200:
                 self._subj.clear()
             self._subj[sig] = got
@@ -783,13 +788,13 @@ class Service:
         repo = parts.get("repo")
         git = repo.git if repo is not None else (Git(parts["path"]) if parts.get("path") else None)
         commits = ((t or {}).get("actions") or {}).get("commits") or []
-        subjects = self._subjects(git, [str(c.get("sha") or "") for c in commits]) if git is not None else {}
+        subjects, changes = self._commits(git, [str(c.get("sha") or "") for c in commits]) if git is not None else ({}, {})
         sessions = parts["sessions"] if parts.get("sessions") is not None else snap["by"].get(parts.get("scope") or "", [])
         app_events = parts["app_events"] if parts.get("app_events") is not None else (
             self.store.events(parts["scope"]) if parts.get("scope") else [])
         g = board_mod.build(
             f, d["row"], t, mr=parts.get("mr"), sessions=sessions, app_events=app_events,
-            team_decisions=parts.get("decisions") or [], subjects=subjects,
+            team_decisions=parts.get("decisions") or [], subjects=subjects, changes=changes,
             reflect_refs=self._reflect_refs(git, key) if git is not None else [],
             default_branch=str(cfg.get("default_branch") or "main"), local_only=bool(parts.get("local_only")),
             kit_rows=board_mod.kit_cells(self.crew.get("rows") or [], parts.get("path") or ""),
@@ -801,7 +806,7 @@ class Service:
                 "events": g["events"], "belt": g["belt"], "checks": g["checks"], "accept": g["accept"],
                 "brain": d["brain"], "decisions": d["decisions"], "questions": d["questions"], "mr_desc": d["mr_desc"],
                 "sessions": d["sessions"], "credits": d["credits"], "source": d["timeline"]["source"],
-                "missing": d["timeline"]["missing"], "error": d["timeline"]["error"]}
+                "missing": g["missing"], "error": d["timeline"]["error"]}
 
     async def board(self, rid: str, key: str) -> dict[str, Any]:
         """需求看板: polled every 2 s; the trace, the facts and the 变更说明 come from their caches."""
@@ -810,38 +815,48 @@ class Service:
 
     # ---- sessions and answers ------------------------------------------------------------------------- #
 
-    async def open_session(self, rid: str, key: str, trust: bool = True, kickoff: bool = True) -> dict[str, Any]:
+    async def open_session(self, rid: str, key: str, trust: bool = True, kickoff: bool = True,
+                           review: bool = False) -> dict[str, Any]:
+        """The requirement's brain-dev session on this machine: the live one, else a new one. *review*: a new one in
+        any case (开审查会话: the session that wrote the code may not review it), told Lean's review line."""
         repo = self._repo(rid)
         f = await asyncio.to_thread(self._facts, repo, key)
         run = f.get("run") or {}
         if not run or run.get("handoff") or f.get("merged"):
-            raise AppError("只有本地开发中的需求能在这里开 brain-dev 会话", "not_local", 409)
+            raise AppError("只有本地开发中的需求能在这里开会话", "not_local", 409)
         if not f.get("worktree"):
-            raise AppError("这台机器上没有检出 %s 的分支：先 git worktree add 或在开需求里开工" % f.get("branch"), "no_worktree", 409)
-        return await self._open_local(repo, key, f["branch"], f["worktree"], run, trust=trust, kickoff=kickoff)
+            raise AppError("这台机器上没有检出 %s 的分支：先在开需求里开工" % f.get("branch"), "no_worktree", 409)
+        return await self._open_local(repo, key, f["branch"], f["worktree"], run, trust=trust, kickoff=kickoff,
+                                      review=review)
 
     async def _open_local(self, repo: Repo, key: str, branch: str, wt: str, run: dict[str, Any], *, trust: bool,
-                          kickoff: bool) -> dict[str, Any]:
+                          kickoff: bool, review: bool = False) -> dict[str, Any]:
         self.crew = await asyncio.to_thread(self.crew_sync)
         if not crewcheck.agent_ok(self.crew["rows"]):
             raise AppError("brain-dev 还没带上 Lean 的 hook：先在设置里修好（KiroCrew 检查）", "agent_not_ready", 409)
         scope = scope_of(repo.id, key)
-        live = [i for i in self.sessions.roots(key=scope, kind="local") if i.slot and not
-                (self.sessions.slot_stats(i.slot) or {}).get("missing")]
-        if live:
-            return {"ok": True, "slot": live[-1].slot, "url": "/chat?sid=%s" % live[-1].slot}
-        task = intake.kickoff(key, branch, run.get("intent"),
-                              [str(m.get("package")) for m in run.get("materials") or [] if isinstance(m, dict)]) \
-            if kickoff else ""
+        if review:
+            task = intake.review_task(key, branch, run.get("intent"))
+            if not task:
+                raise AppError("这个需求的记录里没有 Lean 的 intent：开不了审查会话", "no_intent", 409)
+            title, said = "%s · 审查" % key, "开了审查会话"
+        else:
+            live = [i for i in self.sessions.roots(key=scope, kind="local") if i.slot and not
+                    (self.sessions.slot_stats(i.slot) or {}).get("missing")]
+            if live:
+                return {"ok": True, "slot": live[-1].slot, "url": "/chat?sid=%s" % live[-1].slot}
+            task = intake.kickoff(key, branch, run.get("intent"),
+                                  [str(m.get("package")) for m in run.get("materials") or [] if isinstance(m, dict)]) \
+                if kickoff else ""
+            title, said = "%s · 本地开发" % key, "开了本机会话"
         slug = branch.rsplit("/", 1)[-1][len(key) + 1:] or key.lower()
         info = await self.sessions.open_session(
-            task, parent_session_key="%s:%s" % (self.name, scope), cwd=wt, title="%s · 本地开发" % key,
+            task, parent_session_key="%s:%s" % (self.name, scope), cwd=wt, title=title,
             folder="%s · %s" % (key, slug), agent=LOCAL_AGENT, root_folder=LOCAL_FOLDER, project_dir=wt,
             strict_agent=True, resend_ok=True, nudge_ok=False, trust_ok=bool(trust), kind="local", key=scope)
         if info.error or not info.slot:
             raise AppError(info.error or "会话没开成", "session_failed", 502)
-        await asyncio.to_thread(self.store.append, scope, "app", "开了 brain-dev 会话",
-                                "%s%s" % (info.slot, "，信任这个会话" if trust else ""))
+        await asyncio.to_thread(self.store.append, scope, "app", said, store_mod.TRUSTED if trust else None)
         await self.sessions.save()
         return {"ok": True, "slot": info.slot, "url": "/chat?sid=%s" % info.slot}
 
@@ -858,7 +873,7 @@ class Service:
         f = await asyncio.to_thread(self._facts, repo, key)
         me = await asyncio.to_thread(self.me_in, repo)
         if not me or me != f.get("owner"):
-            raise AppError("只有需求负责人本人能在这里回答（git config brain.user）", "not_owner", 403)
+            raise AppError("只有需求负责人本人能在这里回答（按你在这个仓库的名字认人）", "not_owner", 403)
         run = f.get("run") or {}
         scope = scope_of(rid, key)
         park = f.get("park")
@@ -912,8 +927,8 @@ class Service:
             raise AppError(str(exc), "invalid_intake")
         out = scrub_tree(out, self.scrub)
         if not out["ok"]:
-            out["problem"] = problems.who_row(out["output"], repo=repo.path)
-            if out["problem"]:
+            out["problem"] = out.get("problem") or problems.who_row(out["output"], repo=repo.path)
+            if (out["problem"] or {}).get("fix") == "me":
                 out["me"] = await asyncio.to_thread(self._me_view, repo, await asyncio.to_thread(self._token_present))
             return out
         scope = scope_of(repo.id, out["key"])
@@ -972,7 +987,7 @@ class Service:
         f = await asyncio.to_thread(self._facts, repo, key)
         out = scrub_tree(await asyncio.to_thread(brainview.apply, repo, f, push), self.scrub)
         await asyncio.to_thread(self.store.append, scope_of(rid, key), "app",
-                                "brain reflect --apply%s：%s" % (" --push" if push else "", "成功" if out["ok"] else "失败"),
+                                "回写 Brain%s：%s" % (" 并推送" if push else "", "成功" if out["ok"] else "失败"),
                                 out.get("branch"))
         return out
 
@@ -990,8 +1005,8 @@ class Service:
             me = self.me_in(repo)
             for f in facts:
                 row = self._row(repo, f, snap)
-                if row["state"] in ("merged", "closed"):
-                    continue
+                if row["state"] == "closed" or (row["state"] == "merged" and row["waits"]["who"] != "you"):
+                    continue    # a merge waits for nobody, unless its write-back waits for you
                 live = self._live(snap["by"].get(scope_of(rid, f["key"]), []))
                 own = bool(me) and me == f.get("owner")
                 entries.append({"row": row, "facts": f, "own": own, "has_session": bool(live),
@@ -1016,7 +1031,7 @@ class Service:
     def _team_status(self) -> dict[str, Any]:
         if self.team is None:
             on = bool(self.settings["team"].get("enabled"))
-            return {"enabled": on, "ok": False, "error": "运行机模式没打开" if not on else "brain-kit 没装载",
+            return {"enabled": on, "ok": False, "error": "brain-kit 没装载" if on else "",
                     "last_loop_at": None, "loop_error": "", "same_user": False, "signer": {"pending": 0, "refused": 0}}
         return self.team.status()
 
@@ -1092,8 +1107,9 @@ class Service:
 
     async def import_defaults(self) -> dict[str, Any]:
         token = await asyncio.to_thread(self._token_present)
+        found = await asyncio.to_thread(importer.found_repos, list(self.settings["repos"]), self.settings["work_root"])
         return {"clone_parent": importer.default_parent(self.settings["work_root"]), "work_root": self.settings["work_root"],
-                "branch": importer.DEFAULT_BRANCH, "token": token, "brainkit_ok": bk.ok()}
+                "branch": importer.DEFAULT_BRANCH, "token": token, "brainkit_ok": bk.ok(), "found": found}
 
     async def import_inspect(self, body: dict[str, Any]) -> dict[str, Any]:
         """检查: read only (see importer.inspect)."""
@@ -1200,8 +1216,8 @@ class Service:
             base = await asyncio.to_thread(lambda: ((installer._kit_of(top) or {}).get("gitlab") or {}).get("base") or "")
             me = await asyncio.to_thread(lambda: identity.of(top, base, token=token))
         self.log.info("brain: git config brain.user set in %s", top)
-        return {"ok": True, "text": "这个仓库的 git config brain.user 设成了 %s" % name, "me": me,
-                "status": await self.status()}
+        return {"ok": True, "text": "你在这个仓库的名字设成了 %s" % name, "raw": "git config brain.user %s" % name,
+                "me": me, "status": await self.status()}
 
     async def import_choices(self, body: dict[str, Any]) -> dict[str, Any]:
         """Where an install (or a kit update, purpose "upgrade") goes: in place or a new branch (importer.choices)."""
@@ -1224,9 +1240,11 @@ class Service:
             raise self._fail(exc)
         work_root = self.settings["work_root"]
 
-        async def after(_res: Any) -> None:
+        async def after(res: Any) -> None:
             if top in self.settings["repos"]:   # a listed repo that was not installed: usable now, or pending
                 await asyncio.to_thread(self.reload_sync)
+            elif ((res or {}).get("commit") or {}).get("ok"):   # listed even when the page was closed (SETUP-18)
+                await self.import_add({"path": top})
 
         if mode == "inplace":
             jid = self._start_job("install", top, inplace.INSTALL_STEPS,

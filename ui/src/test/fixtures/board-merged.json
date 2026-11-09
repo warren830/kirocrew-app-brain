@@ -16,13 +16,13 @@
       "stage_label": "发布",
       "stage_n": 11,
       "stage_state": "done",
-      "done": 8,
+      "done": 11,
       "total": 11,
       "done_n": 5,
-      "skipped_n": 3,
+      "skipped_n": 6,
       "next": null
     },
-    "stage": "做完 5 · 跳过 3 · 全部做完",
+    "stage": "做完 5 · 跳过 6 · 全部做完",
     "waits": {
       "who": "nobody",
       "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -30,9 +30,10 @@
       "raw": "",
       "do": "watch",
       "since": 1793661540.0,
-      "where": null
+      "where": null,
+      "review": false
     },
-    "summary": "对账单按自然日切分（规模小）。",
+    "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
     "credits": 22.7,
     "updated_at": 1793663640,
     "mr": {
@@ -77,67 +78,80 @@
         {
           "at": 1793628000.0,
           "status": "running",
-          "doing": "开工：读需求、按 Lean 推进"
+          "doing": "开工：读需求、按 Lean 推进",
+          "who": null
         },
         {
           "at": 1793628180,
           "status": "running",
-          "doing": "在做：需求分析"
+          "doing": "在做：需求分析",
+          "who": null
         },
         {
           "at": 1793629860,
           "status": "done",
-          "doing": "交给你批准需求"
+          "doing": "交给你批准需求",
+          "who": null
         },
         {
           "at": 1793631120,
           "status": "running",
-          "doing": "批准了，接着做"
+          "doing": "批准了，接着做",
+          "who": null
         },
         {
           "at": 1793631180,
           "status": "running",
-          "doing": "在做：下一个阶段"
+          "doing": "在做：下一个阶段",
+          "who": null
         },
         {
           "at": 1793631300,
           "status": "running",
-          "doing": "在做：应用设计"
+          "doing": "在做：应用设计",
+          "who": null
         },
         {
           "at": 1793633760,
           "status": "done",
-          "doing": "交给你批准设计"
+          "doing": "交给你批准设计",
+          "who": null
         },
         {
           "at": 1793635080,
           "status": "fixing",
-          "doing": "按你的意见重写"
+          "doing": "按你的意见重写",
+          "who": null
         },
         {
           "at": 1793636580,
           "status": "done",
-          "doing": "交给你批准设计"
+          "doing": "交给你批准设计",
+          "who": null
         },
         {
           "at": 1793637960,
           "status": "running",
-          "doing": "批准了，接着做"
+          "doing": "批准了，接着做",
+          "who": null
         },
         {
           "at": 1793638020,
           "status": "running",
-          "doing": "在做：下一个阶段"
+          "doing": "在做：下一个阶段",
+          "who": null
         },
         {
           "at": 1793639340.0,
           "status": "done",
-          "doing": "交给运行机了"
+          "doing": "交给运行机了",
+          "who": null
         },
         {
           "at": 1793661540.0,
           "status": "merged",
-          "doing": "已合并"
+          "doing": "已合并",
+          "who": null
         }
       ],
       "spans": [
@@ -186,7 +200,7 @@
         {
           "at": 1793639340.0,
           "kind": "handover",
-          "title": "交给运行机（提交 9ed34417）"
+          "title": "交给运行机（提交 a9617a94）"
         }
       ],
       "facts": [
@@ -205,7 +219,7 @@
     {
       "key": "req",
       "title": "需求审批",
-      "sub": "REQUIREMENTS",
+      "sub": "Lean 请人批需求",
       "icon": "req",
       "status": "merged",
       "doing": "你批准了 · 需求",
@@ -214,12 +228,14 @@
         {
           "at": 1793629860,
           "status": "awaiting_approval",
-          "doing": "等你批准需求"
+          "doing": "等你批准需求",
+          "who": "you"
         },
         {
           "at": 1793631120,
           "status": "merged",
-          "doing": "你批准了 · 需求"
+          "doing": "你批准了 · 需求",
+          "who": null
         }
       ],
       "spans": [
@@ -251,7 +267,7 @@
     {
       "key": "design",
       "title": "设计审批",
-      "sub": "DESIGN · PLAN",
+      "sub": "设计 · 代码生成计划",
       "icon": "design",
       "status": "merged",
       "doing": "你批准了 · 设计",
@@ -260,27 +276,32 @@
         {
           "at": 1793631120,
           "status": "waiting",
-          "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+          "doing": "等 Lean 做完设计再请人批（小需求它会跳过）",
+          "who": null
         },
         {
           "at": 1793633760,
           "status": "awaiting_approval",
-          "doing": "等你批准设计"
+          "doing": "等你批准设计",
+          "who": "you"
         },
         {
           "at": 1793635080,
           "status": "fixing",
-          "doing": "你退回了：等它改好再请你批"
+          "doing": "你退回了：等它改好再请你批",
+          "who": null
         },
         {
           "at": 1793636580,
           "status": "awaiting_approval",
-          "doing": "等你批准设计"
+          "doing": "等你批准设计",
+          "who": "you"
         },
         {
           "at": 1793637960,
           "status": "merged",
-          "doing": "你批准了 · 设计"
+          "doing": "你批准了 · 设计",
+          "who": null
         }
       ],
       "spans": [
@@ -328,7 +349,7 @@
     {
       "key": "handover",
       "title": "交接",
-      "sub": "brain handoff",
+      "sub": "本机做完交给运行机",
       "icon": "handover",
       "status": "merged",
       "doing": "桥接手了",
@@ -337,12 +358,14 @@
         {
           "at": 1793639340.0,
           "status": "queued",
-          "doing": "等桥核对交接"
+          "doing": "等桥核对交接",
+          "who": null
         },
         {
           "at": 1793639460.0,
           "status": "merged",
-          "doing": "桥接手了"
+          "doing": "桥接手了",
+          "who": null
         }
       ],
       "spans": [],
@@ -350,7 +373,7 @@
         {
           "at": 1793639340.0,
           "kind": "handover",
-          "title": "交给运行机（提交 9ed34417）"
+          "title": "交给运行机（提交 a9617a94）"
         }
       ],
       "facts": [
@@ -373,17 +396,20 @@
         {
           "at": 1793639340.0,
           "status": "running",
-          "doing": "核对交接：标签、提交、材料"
+          "doing": "核对交接：标签、提交、材料",
+          "who": null
         },
         {
           "at": 1793639460.0,
           "status": "done",
-          "doing": "接手了 · 转问题和回答"
+          "doing": "接手了 · 转问题和回答",
+          "who": null
         },
         {
           "at": 1793661540.0,
           "status": "merged",
-          "doing": "已合并"
+          "doing": "已合并",
+          "who": null
         }
       ],
       "spans": [
@@ -429,7 +455,8 @@
         {
           "at": 1793639460.0,
           "status": "merged",
-          "doing": "签了接手合同"
+          "doing": "签了接手合同",
+          "who": null
         }
       ],
       "spans": [],
@@ -469,77 +496,92 @@
         {
           "at": 1793639460.0,
           "status": "running",
-          "doing": "在做：运行机接手了"
+          "doing": "在做：运行机接手了",
+          "who": null
         },
         {
           "at": 1793639580,
           "status": "running",
-          "doing": "在做：代码生成"
+          "doing": "在做：代码生成",
+          "who": null
         },
         {
           "at": 1793647980.0,
           "status": "awaiting_approval",
-          "doing": "停下问人：澄清"
+          "doing": "停下问人：澄清",
+          "who": "people"
         },
         {
           "at": 1793648040.0,
           "status": "awaiting_approval",
-          "doing": "停下问人：澄清（D-1）"
+          "doing": "停下问人：澄清（D-1）",
+          "who": "people"
         },
         {
           "at": 1793650500.0,
           "status": "running",
-          "doing": "按回答接着做"
+          "doing": "按回答接着做",
+          "who": null
         },
         {
           "at": 1793651880,
           "status": "running",
-          "doing": "在做：下一个阶段"
+          "doing": "在做：下一个阶段",
+          "who": null
         },
         {
           "at": 1793651940,
           "status": "running",
-          "doing": "在做：构建测试"
+          "doing": "在做：构建测试",
+          "who": null
         },
         {
           "at": 1793654640,
           "status": "running",
-          "doing": "在做：下一个阶段"
+          "doing": "在做：下一个阶段",
+          "who": null
         },
         {
           "at": 1793654700,
           "status": "running",
-          "doing": "在做：发布"
+          "doing": "在做：发布",
+          "who": null
         },
         {
           "at": 1793655180,
           "status": "done",
-          "doing": "交给人批准发布"
+          "doing": "交给人批准发布",
+          "who": null
         },
         {
           "at": 1793655240.0,
           "status": "awaiting_approval",
-          "doing": "停下问人：验收"
+          "doing": "停下问人：验收",
+          "who": "product"
         },
         {
           "at": 1793656440.0,
           "status": "awaiting_approval",
-          "doing": "停下问人：验收（D-2）"
+          "doing": "停下问人：验收（D-2）",
+          "who": "product"
         },
         {
           "at": 1793659440.0,
           "status": "running",
-          "doing": "按回答接着做"
+          "doing": "按回答接着做",
+          "who": null
         },
         {
           "at": 1793659560,
           "status": "running",
-          "doing": "在做：下一个阶段"
+          "doing": "在做：下一个阶段",
+          "who": null
         },
         {
           "at": 1793661540.0,
           "status": "merged",
-          "doing": "已合并"
+          "doing": "已合并",
+          "who": null
         }
       ],
       "spans": [
@@ -662,7 +704,7 @@
     {
       "key": "ci",
       "title": "CI 检查",
-      "sub": "lean verify",
+      "sub": "构建和测试的自动检查",
       "icon": "ci",
       "status": "merged",
       "doing": "已合并",
@@ -671,22 +713,26 @@
         {
           "at": 1793651940,
           "status": "running",
-          "doing": "跑 verify：构建和测试"
+          "doing": "跑 verify：构建和测试",
+          "who": null
         },
         {
           "at": 1793652660,
           "status": "failed",
-          "doing": "verify 没过：pytest"
+          "doing": "verify 没过：pytest",
+          "who": null
         },
         {
           "at": 1793654580,
           "status": "done",
-          "doing": "verify 通过（3 项）"
+          "doing": "verify 通过（3 项）",
+          "who": null
         },
         {
           "at": 1793661540.0,
           "status": "merged",
-          "doing": "已合并"
+          "doing": "已合并",
+          "who": null
         }
       ],
       "spans": [
@@ -725,7 +771,7 @@
     {
       "key": "release",
       "title": "发布验收",
-      "sub": "RELEASE · 验收",
+      "sub": "发布审批 · 验收",
       "icon": "release",
       "status": "merged",
       "doing": "产品在 MR 上批准了 · 发布",
@@ -734,12 +780,14 @@
         {
           "at": 1793655180,
           "status": "awaiting_approval",
-          "doing": "等人在 MR 上批准发布"
+          "doing": "等人在 MR 上批准发布",
+          "who": "product"
         },
         {
           "at": 1793659500,
           "status": "merged",
-          "doing": "产品在 MR 上批准了 · 发布"
+          "doing": "产品在 MR 上批准了 · 发布",
+          "who": null
         }
       ],
       "spans": [
@@ -771,7 +819,7 @@
     {
       "key": "reflect",
       "title": "回写 Brain",
-      "sub": "brain reflect",
+      "sub": "合并后写回新知识",
       "icon": "brain",
       "status": "done",
       "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
@@ -780,12 +828,14 @@
         {
           "at": 1793661540.0,
           "status": "awaiting_approval",
-          "doing": "等你回写 1 条新知识"
+          "doing": "等你回写 1 条新知识",
+          "who": "you"
         },
         {
           "at": 1793715540.0,
           "status": "done",
-          "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）"
+          "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
+          "who": null
         }
       ],
       "spans": [],
@@ -1044,7 +1094,7 @@
       "kind": "handover",
       "from": "local",
       "to": "handover",
-      "text": "交给运行机（提交 9ed34417）",
+      "text": "交给运行机（提交 a9617a94）",
       "detail": false,
       "src": null
     },
@@ -1349,7 +1399,20 @@
       "files": 2,
       "records_only": true,
       "actor": "local",
-      "changes": []
+      "changes": [
+        {
+          "path": "aidlc-docs/261102-refund-id/inception/requirements/requirements.md",
+          "added": 71,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "aidlc-docs/261102-refund-id/inception/application-design/application-design.md",
+          "added": 38,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1360,7 +1423,14 @@
       "files": 1,
       "records_only": true,
       "actor": "local",
-      "changes": []
+      "changes": [
+        {
+          "path": "aidlc-docs/261102-refund-id/audit.md",
+          "added": 43,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1371,18 +1441,38 @@
       "files": 1,
       "records_only": true,
       "actor": "local",
-      "changes": []
+      "changes": [
+        {
+          "path": "aidlc-docs/261102-refund-id/inception/requirements/requirements.md",
+          "added": 36,
+          "removed": 2,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "handover",
       "at": 1793639340.0,
-      "sha": "9ed344170a66",
+      "sha": "a9617a94c6a9",
       "by": "person",
-      "text": "PAY-2：交接（brain handoff）",
+      "text": "交给运行机",
       "files": 2,
       "records_only": true,
       "actor": "handover",
-      "changes": []
+      "changes": [
+        {
+          "path": "runs/PAY-2/run.json",
+          "added": 30,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "runs/PAY-2/MR.md",
+          "added": 63,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1393,7 +1483,26 @@
       "files": 3,
       "records_only": false,
       "actor": "runner",
-      "changes": []
+      "changes": [
+        {
+          "path": "src/refund/service.py",
+          "added": 32,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "src/refund/models.py",
+          "added": 46,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "src/refund/api.py",
+          "added": 49,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1404,7 +1513,32 @@
       "files": 4,
       "records_only": false,
       "actor": "runner",
-      "changes": []
+      "changes": [
+        {
+          "path": "src/refund/export.py",
+          "added": 63,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "src/refund/jobs.py",
+          "added": 36,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "tests/test_refund.py",
+          "added": 29,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "tests/test_refund_api.py",
+          "added": 62,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1415,7 +1549,38 @@
       "files": 5,
       "records_only": false,
       "actor": "runner",
-      "changes": []
+      "changes": [
+        {
+          "path": "src/refund/models.py",
+          "added": 47,
+          "removed": 8,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/api.py",
+          "added": 14,
+          "removed": 11,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/export.py",
+          "added": 41,
+          "removed": 5,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/jobs.py",
+          "added": 65,
+          "removed": 10,
+          "status": "M"
+        },
+        {
+          "path": "tests/test_refund.py",
+          "added": 71,
+          "removed": 12,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1426,7 +1591,44 @@
       "files": 6,
       "records_only": false,
       "actor": "runner",
-      "changes": []
+      "changes": [
+        {
+          "path": "tests/test_refund.py",
+          "added": 23,
+          "removed": 9,
+          "status": "M"
+        },
+        {
+          "path": "tests/test_refund_api.py",
+          "added": 8,
+          "removed": 4,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/service.py",
+          "added": 40,
+          "removed": 9,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/models.py",
+          "added": 13,
+          "removed": 12,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/api.py",
+          "added": 41,
+          "removed": 6,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/export.py",
+          "added": 13,
+          "removed": 3,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1437,7 +1639,20 @@
       "files": 2,
       "records_only": false,
       "actor": "runner",
-      "changes": []
+      "changes": [
+        {
+          "path": "src/refund/models.py",
+          "added": 5,
+          "removed": 11,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/api.py",
+          "added": 39,
+          "removed": 5,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -1448,7 +1663,20 @@
       "files": 2,
       "records_only": false,
       "actor": "runner",
-      "changes": []
+      "changes": [
+        {
+          "path": "src/refund/jobs.py",
+          "added": 64,
+          "removed": 0,
+          "status": "M"
+        },
+        {
+          "path": "tests/test_refund.py",
+          "added": 54,
+          "removed": 0,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "merge",
@@ -1498,7 +1726,7 @@
         "id": "verify-pytest-1",
         "group": "verify",
         "label": "pytest",
-        "name": "lean verify：pytest",
+        "name": "自动检查：pytest",
         "status": "pass",
         "at": 1793654580,
         "detail": "通过",
@@ -1508,7 +1736,7 @@
         "id": "verify-ruff-1",
         "group": "verify",
         "label": "ruff",
-        "name": "lean verify：ruff",
+        "name": "自动检查：ruff",
         "status": "pass",
         "at": 1793654580,
         "detail": "通过",
@@ -1518,7 +1746,7 @@
         "id": "verify-mypy-1",
         "group": "verify",
         "label": "mypy",
-        "name": "lean verify：mypy",
+        "name": "自动检查：mypy",
         "status": "pass",
         "at": 1793654580,
         "detail": "通过",
@@ -1568,9 +1796,7 @@
     "passed": 9,
     "failed": 0,
     "total": 9,
-    "todo": [
-      "合并后 14 天"
-    ],
+    "todo": [],
     "at": 1793659500,
     "history": [
       {
@@ -1602,11 +1828,11 @@
       },
       {
         "id": "brain",
-        "label": "Brain 条目（引用）",
+        "label": "照 Brain",
         "count": 2
       }
     ],
-    "checks": "目前 9 项都过 · 还剩 合并后 14 天",
+    "checks": "目前 9 项都过 · 1 项在观察",
     "done": {
       "at": 1793661540.0,
       "who": "产品",
@@ -1626,53 +1852,52 @@
   "decisions": [
     {
       "id": "D-1",
-      "date": "2026-11-07",
+      "date": "2026-11-02",
       "stage": "requirements",
-      "text": "导出只给有退款权限的运营看",
-      "why": "退款单里有收款人姓名",
-      "who": "P-PAY-2-1",
-      "by": "brain",
-      "cites": [
-        "P-PAY-2-1"
-      ],
-      "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L8"
-    },
-    {
-      "id": "D-2",
-      "date": "2026-11-07",
-      "stage": "application-design",
-      "text": "大文件分批写，一批 5000 行",
-      "why": "TECH 里记过一次导出把内存打满",
-      "who": null,
-      "by": "agent",
-      "cites": [
-        "T-PAY-2-1",
-        "T-12"
-      ],
-      "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L9"
-    },
-    {
-      "id": "D-3",
-      "date": "2026-11-08",
-      "stage": "code-generation",
-      "text": "金额列带币种，单独一列 currency",
-      "why": "回答了澄清问题",
+      "text": "退款单号按 RF + 9 位校验，旧的 7 位也认",
+      "why": "回答了澄清问题 D-1",
       "who": "P-1A2B",
       "by": "person",
       "cites": [],
       "vouchers": [
-        "V-1a2b3c4d5e"
+        "V-ec134a89e2"
       ],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L10"
+      "src": "aidlc-docs/261102-refund-id/decisions.md#L8"
+    },
+    {
+      "id": "D-2",
+      "date": "2026-11-02",
+      "stage": "application-design",
+      "text": "重复和非法单号在入口直接拒",
+      "why": "下游对账按单号去重",
+      "who": null,
+      "by": "agent",
+      "cites": [
+        "T-12"
+      ],
+      "vouchers": [],
+      "src": "aidlc-docs/261102-refund-id/decisions.md#L9"
+    },
+    {
+      "id": "D-3",
+      "date": "2026-11-02",
+      "stage": "code-generation",
+      "text": "校验写成纯函数，接口和批量导入共用",
+      "why": "照 Brain 的约定",
+      "who": "P-7",
+      "by": "brain",
+      "cites": [
+        "P-7"
+      ],
+      "vouchers": [],
+      "src": "aidlc-docs/261102-refund-id/decisions.md#L10"
     }
   ],
   "questions": [],
   "mr_desc": {
     "available": true,
-    "text": "## PAY-2 · 退款单导出 CSV\n\n**一句话**：对账单按自然日切分（规模小）。\n（分支 `ai/alice/PAY-2-refund-export`；负责人 alice；intent `261107-refund-export`）\n\n### 做了什么 / 没做什么\n- 不做：不做 Excel 导出\n- 代码计划：refund-api 做完 3/5 步\n\n### 验收标准和证据\n还没跑 verify。\n\n| AC | 要求 | 测试 | 结果 |\n|---|---|---|---|\n| AC-1 | 选一段日期 → 下载这段时间的退款单 CSV | `tests/test_export.py::test_range` | 还没跑 verify |\n\n### 关键决定\n| ID | 决定 | 为什么 | 谁定的 | Brain |\n|---|---|---|---|---|\n| D-2 | 退款单号按 RF+9 位 | 见 T-PAY-1-2 | agent（agent 自己定的） | T-PAY-1-2 |\n\n### 怎么审\n1. 先看 AC-1 的测试 `tests/test_export.py::test_range`；它的边界是 agent 自己定的（D-2）\n\n### 还没有\n- 还没跑 verify\n\n---\n由 `brain mr-desc` 从记录生成（run.json、Lean 记录、git），别手改。重新生成：`brain mr-desc PAY-2 --write`。\n",
-    "first": "对账单按自然日切分（规模小）。",
+    "text": "## PAY-2 · 退款单号校验\n\n**一句话**：退款单号加上校验位，重复和非法单号在入口就拒掉。\n（分支 `ai/alice/PAY-2-refund-id`；负责人 alice；intent `261102-refund-id`）\n\n### 做了什么 / 没做什么\n- 错误处理和重试（refund-api）\n- 测试（refund-api）\n- 按 D-1 的回答改\n- 修好 pytest 里没过的两个用例\n\n### 验收标准和证据\nverify 通过：pytest -q、ruff check .、python -m mypy src。\n\n### 还没有\n- 合并后 14 天还在观察\n\n---\n由 `brain mr-desc` 从记录生成（run.json、Lean 记录、git），别手改。重新生成：`brain mr-desc PAY-2 --write`。\n",
+    "first": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
     "source": "file",
     "path": "runs/PAY-2/MR.md",
     "ref": "69bc4ac06c1b",
@@ -1717,9 +1942,9 @@
   "source": "trace",
   "error": "",
   "missing": [
-    "桥的账本（这台机器上没有：交接以后的问答在 MR 上看）",
-    "签名凭证（这台机器上没有）",
-    "推送记录（git 不记推送：交接以后的提交代替它）",
-    "CI 流水线（在 GitLab 上，这里读不到）"
+    "桥的账本：这台机器上读不到，交接以后桥的核对和转的问题看不全",
+    "签名凭证：这台机器上读不到，看不到签名服务签了什么",
+    "推送记录：git 不记推送，交接以后人的提交当作推送",
+    "CI 流水线：在 GitLab 上，这里读不到"
   ]
 }

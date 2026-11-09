@@ -209,7 +209,8 @@ def test_the_name_route_takes_brainkits_names_only_runs_no_shell_and_stores_no_t
     assert (got["rel"].status, got["rel"].code) == (400, "invalid_path")
     assert not planted.exists()
     assert got["ok"].status == 200 and got["ok"].body["me"]["name"] == "alice.w-1"
-    assert got["ok"].body["text"] == "这个仓库的 git config brain.user 设成了 alice.w-1"
+    assert got["ok"].body["text"] == "你在这个仓库的名字设成了 alice.w-1"     # the command only under 细节
+    assert got["ok"].body["raw"] == "git config brain.user alice.w-1"
     assert sh("git", "-C", repo, "config", "--local", "brain.user").stdout.strip() == "alice.w-1"
     assert token not in json.dumps(got["ok"].body) and token not in (repo / ".git" / "config").read_text()
     assert got["same_rule"] and identity.valid("alice") and not identity.valid("Alice")

@@ -79,7 +79,7 @@ def of(top: str, gitlab_base: str, *, token: bool) -> dict[str, Any]:
     who = env or conf
     if who and valid(who.lower()):
         out.update(name=who.lower(), source="env" if env else "git",
-                   text="%s（%s）" % (who.lower(), "环境变量 BRAIN_USER 里写的" if env else "这个仓库里记下的名字"))
+                   text="%s（%s）" % (who.lower(), "环境变量 BRAIN_USER 里写的" if env else "你在这个仓库的名字"))
         return out
     if env:     # git config does not win over it: nothing to fix here
         out.update(source="env", error="环境变量 BRAIN_USER（%s）不能用：%s。改掉它" % (env[:64], RULE))
@@ -89,7 +89,7 @@ def of(top: str, gitlab_base: str, *, token: bool) -> dict[str, Any]:
         out.update(name=login, source="login", text="%s（这台机器的登录名：这个仓库不用 GitLab）" % login)
         return out
     if who:
-        out["error"] = "这个仓库里记下的名字「%s」不能用：%s" % (who[:64], RULE)
+        out["error"] = "你在这个仓库的名字「%s」不能用：%s" % (who[:64], RULE)
     why = WHY_GITLAB if base else WHY_LOCAL if who else WHY_LOGIN if falls_back() else WHY_OLD
     out.update(ask=True, suggest=login, label=LABEL_GITLAB if base else LABEL_NAME, why=why)
     return out

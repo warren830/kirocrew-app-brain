@@ -15,6 +15,12 @@ import time
 from pathlib import Path
 from typing import Any
 
+TRUSTED = "工具调用不用逐个批准"     # a session opened trusted (KiroCrew's trust: no approval per tool call)
+# what an older version of this app wrote, said the way it is written now (a command and a session's slot name are
+# nobody's words)
+OLD_LABEL = ((re.compile(r"^brain reflect --apply --push[：:]"), "回写 Brain 并推送："),
+             (re.compile(r"^brain reflect --apply[：:]"), "回写 Brain："),
+             (re.compile(r"^开了 brain-dev 会话$"), "开了本机会话"))
 SCOPE_RE = re.compile(r"^(?:r[1-9][0-9]{0,2}|runner)-[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}$|^RUN-[A-Z0-9-]{3,40}$")
 KEEP = 500
 
@@ -52,6 +58,12 @@ class Store:
             except ValueError:
                 continue  # a torn line
             if isinstance(ev, dict) and ev.get("label"):
-                out.append({"at": ev.get("at"), "kind": "app", "label": str(ev["label"]),
-                            "detail": ev.get("detail"), "who": None, "src": "app"})
+                label, detail = str(ev["label"]), ev.get("detail")
+                for rx, now in OLD_LABEL:
+                    if rx.match(label):
+                        label = rx.sub(now, label)
+                        if now == "开了本机会话":   # its detail was the slot's name, then 「，信任这个会话」
+                            detail = TRUSTED if "信任" in str(detail or "") else None
+                out.append({"at": ev.get("at"), "kind": "app", "label": label, "detail": detail, "who": None,
+                            "src": "app"})
         return out
