@@ -137,7 +137,7 @@ def test_overlaps_and_the_funnel_fallback():
                                                         "unclassified": 1}
     assert f["total"] == 7 and f["source"] == "app" and f["questions"]["delivered"] == 1
     assert f["unclassified"] == [{"key": "PAY-2", "id": "D-4", "src": "decisions.md:9"}]
-    assert {x["id"]: x["label"] for x in f["rows"]}["unclassified"] == "没归类（Who 不是规定的写法）"
+    assert {x["id"]: x["label"] for x in f["rows"]}["unclassified"] == "没归类"         # vocab.ts DECIDED_BY
 
 
 def test_the_lean_stage_of_a_row():
@@ -155,8 +155,9 @@ def test_the_lean_stage_of_a_row():
         return lean["stage"], lean["stage_state"], lean["done_n"], lean["skipped_n"], nxt, lv.stage_text(lean)
 
     assert at([]) == (None, None, 0, 0, "reverse-engineering", None)
-    assert at([ev("STAGE_STARTED", "requirements")]) == ("requirements", "started", 0, 0, "requirements",
-                                                         "做完 0 · 下一步：需求分析")
+    # a stage Lean went past without a word (here a greenfield intent's reverse engineering) is skipped, said once
+    assert at([ev("STAGE_STARTED", "requirements")]) == ("requirements", "started", 0, 1, "requirements",
+                                                         "做完 0 · 跳过 1 · 下一步：需求分析")
     done = [ev("STAGE_COMPLETED", s) for s in ("reverse-engineering", "requirements")] + \
         [ev("STAGE_SKIPPED", s) for s in ("user-stories", "application-design", "units")] + \
         [ev("STAGE_SKIPPED", s, "app") for s in ("functional-design", "nfr-design", "infrastructure-design")] + \
@@ -165,6 +166,11 @@ def test_the_lean_stage_of_a_row():
     assert at(done + [ev("STAGE_STARTED", "release")]) == ("release", "started", 4, 6, "release",
                                                            "做完 4 · 跳过 6 · 下一步：发布")
     assert at(done + [ev("STAGE_COMPLETED", "release")]) == ("release", "done", 5, 6, None, "做完 5 · 跳过 6 · 全部做完")
+    # a merged run that never recorded its unit's design stages: the cells and the count say the same (skipped)
+    unsaid = [e for e in done if e["data"]["stage"] not in ("functional-design", "nfr-design", "infrastructure-design")]
+    rows = lv.stages(unsaid + [ev("STAGE_COMPLETED", "release")])
+    assert [r["state"] for r in rows if r["n"] in (6, 7, 8)] == ["skipped"] * 3
+    assert at(unsaid + [ev("STAGE_COMPLETED", "release")])[2:4] == (5, 6)
     assert at([ev("STAGE_SKIPPED", "reverse-engineering")]) == ("requirements", "todo", 0, 1, "requirements",
                                                                 "做完 0 · 跳过 1 · 下一步：需求分析")
 
@@ -389,6 +395,18 @@ def test_every_row_says_whose_turn_the_step_where_and_since_when():
     assert w["text"] == "已合并，有 1 条新知识等你回写 Brain"
     _, w = row_of(merged, reflected=True)
     assert (w["who"], w["do"], w["since"]) == ("nobody", "watch", 1794186000.0) and "观察合并后的 14 天" in w["text"]
+    _, w = row_of(merged, me="bob")          # someone else's merge: its write-back is theirs
+    assert (w["who"], w["do"], w["text"]) == ("people", "write_back", "已合并，有 1 条新知识等 alice 回写 Brain")
+
+    # built and verified, no review yet: the reply is the review in a new session (开审查会话), said by a flag too
+    built = [{"event": e, "data": {"stage": st}, "ts": "2026-11-09T01:00:00Z", "_at": 1.0} for e, st in (
+        ("STAGE_COMPLETED", "requirements"), ("STAGE_COMPLETED", "code-generation"), ("STAGE_COMPLETED", "build-and-test"))]
+    _, w = row_of({"run": run, "events": built, "worktree": "/w"}, slot=idle)
+    assert (w["do"], w["review"]) == ("reply", True) and "先开一个新会话做审查" in w["text"]
+    _, w = row_of({"run": run, "events": built, "worktree": "/w", "review": {"at": None}}, slot=idle)
+    assert (w["do"], w["review"]) == ("reply", False) and "回会话让它接着发布" in w["text"]
+    _, w = row_of({"run": run, "events": ev, "worktree": "/w"}, slot=idle)
+    assert w["review"] is False
 
 
 def test_todo_lists_what_waits_for_you_the_way_the_rows_say_it():

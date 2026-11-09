@@ -27,8 +27,8 @@ ASK_NAME = {"product": "产品", "builder": "开发的人", "you": "你", "peopl
 WATCH_S = 14 * 86400    # brain-kit's 14 days after a merge (eval.md: a delivery counts once they are over)
 # who settled a decision (brainkit.evaluate's categories and labels; "unclassified": a Who outside the runner's
 # vocabulary, listed and never guessed)
-CAT_LABEL = {"person": "人", "check": "确定性检查", "brain": "Brain 条目（引用）", "agent": "agent 自己定（权限内）",
-             "unknown": "看不出（Who 空着）", "unclassified": "没归类（Who 不是规定的写法）"}
+CAT_LABEL = {"person": "人", "check": "检查定的", "brain": "照 Brain", "agent": "AI 自己定的",
+             "unknown": "看不出是谁定的", "unclassified": "没归类"}      # ui/src/vocab.ts DECIDED_BY
 CAT_ORDER = ("person", "check", "brain", "agent", "unknown", "unclassified")
 # brain-kit's ledger states of a decision that leave the run waiting for good: nobody can answer it any more (the
 # signer refused the answer, the question is void, or it could not be asked) until the run pushes again
@@ -54,11 +54,12 @@ def park_is_acceptance(park: dict[str, Any]) -> bool:
 
 
 def waits(who: str, do: str, text: str, *, where: str | None = None, since: float | None = None,
-          line: str | None = None, raw: str = "") -> dict[str, Any]:
-    """A row's ``waits`` (ui/src/types.ts Waits): who, the step (WaitDo), where it is taken, since when."""
+          line: str | None = None, raw: str = "", review: bool = False) -> dict[str, Any]:
+    """A row's ``waits`` (ui/src/types.ts Waits): who, the step (WaitDo), where it is taken, since when; *review*: the
+    reply is the review in a new session (开审查会话), not a turn in the one that wrote the code."""
     return {"who": who, "text": text, "line": line, "raw": raw, "do": do,
             "since": float(since) if isinstance(since, (int, float)) and not isinstance(since, bool) else None,
-            "where": where}
+            "where": where, "review": bool(review)}
 
 
 def base_row(repo_id: str, f: dict[str, Any], *, local_only: bool = False) -> dict[str, Any]:
@@ -89,12 +90,17 @@ def proposals(decisions_text: str | None) -> int:
     return len(re.findall(r"^\s*```+\s*brain-proposal\s*$", decisions_text or "", re.M))
 
 
-def _merged(put: Any, f: dict[str, Any], *, now: float | None, reflected: bool, text: str = "已合并") -> None:
-    """Merged: the write-back into the Brain waits for the person when the run proposed knowledge not written back
-    yet; else the 14 days after the merge are watched (nobody's turn), then nothing is left."""
+def _merged(put: Any, f: dict[str, Any], *, now: float | None, reflected: bool, text: str = "已合并",
+            owner: str | None = None) -> None:
+    """Merged: the write-back into the Brain waits for the requirement's owner (*owner*: someone else, None: the
+    person) when the run proposed knowledge not written back yet; else the 14 days after the merge are watched
+    (nobody's turn), then nothing is left."""
     at = f.get("merged_at")
     n = proposals(f.get("decisions_text"))
     if n and not reflected:
+        if owner:
+            return put("merged", "people", "write_back", "%s，有 %d 条新知识等 %s 回写 Brain" % (text, n, owner),
+                       where="app", since=at)
         return put("merged", "you", "write_back", "%s，有 %d 条新知识等你回写 Brain" % (text, n), where="app", since=at)
     if at is None or now is None or now - at < WATCH_S:
         end = time.strftime("%m-%d", time.localtime(at + WATCH_S)) if at is not None else None
@@ -127,7 +133,7 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
         return put("closed", "nobody", "none", "已关闭" + ("：%s" % str(why)[:80] if why else ""),
                    since=lean_view.epoch(closed.get("at")))
     if f.get("merged"):
-        return _merged(put, f, now=now, reflected=reflected)
+        return _merged(put, f, now=now, reflected=reflected, owner=None if mine else owner)
     if not run:
         since = lean_view.epoch(claim.get("created_at"))
         if "owner" in claim and claim["owner"] is None:    # filed for others (brain-kit claims.unowned): anyone's
@@ -152,25 +158,29 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
         if slot and slot.get("awaiting"):
             return put("local", "you", "tool", "会话里有一个工具调用等你批准", where="session",
                        since=updated_at(f, slot))
-        step = lean_view.idle_step(f.get("stages") or lean_view.stages([]), default_branch=str(
-            cfg.get("default_branch") or "main"), review_ok=lean_view.review_current(
-                (f.get("review") or {}).get("at"), bool(f.get("review")), f.get("events") or []))
+        rows = f.get("stages") or lean_view.stages([])
+        review_ok = lean_view.review_current((f.get("review") or {}).get("at"), bool(f.get("review")),
+                                             f.get("events") or [])
+        step = lean_view.idle_step(rows, default_branch=str(cfg.get("default_branch") or "main"), review_ok=review_ok)
+        nxt = lean_view.summary(rows)["next"]
+        review = bool(nxt and nxt["id"] == "release" and not review_ok)   # idle_step said 先开一个新会话做审查
         if slot:   # since the session went quiet: its last message, not before its last recorded step (the board's)
-            return put("local", "you", "reply", step, where="session", since=updated_at(f, slot))
+            return put("local", "you", "reply", step, where="session", since=updated_at(f, slot), review=review)
         if f.get("worktree"):
-            return put("local", "you", "reply", "没有开着的会话：打开会话接着做。" + step, where="app",
-                       since=updated_at(f, None))
+            return put("local", "you", "reply", step if review else "没有开着的会话：打开会话接着做。" + step,
+                       where="app", since=updated_at(f, None), review=review)
         return put("local", "you", "reply", "这台机器上没有它的工作区：先检出分支 %s，再打开会话接着做" % f.get("branch"),
                    since=updated_at(f, None))
     labels = set((mr or {}).get("labels") or [])
     if mr and mr.get("state") == "merged":
-        return _merged(put, f, now=now, reflected=reflected, text="MR 已合并")
+        return _merged(put, f, now=now, reflected=reflected, text="MR 已合并", owner=None if mine else owner)
     if mr and mr.get("state") == "closed":
         return put("closed", "nobody", "none", "MR 已关闭")
     if cfg.get("rejected_label") in labels:
         return put("rejected", you, "redo_handoff",
                    "接手被拒：" + (str((mr or {}).get("rejected_reason") or "看 MR 上的说明")[:200]), where="session",
-                   raw=str((mr or {}).get("rejected_raw") or "")[:2000])   # the bridge's own words (problems.reason)
+                   raw=str((mr or {}).get("rejected_raw") or "")[:2000],   # the bridge's own words (problems.reason)
+                   since=lean_view.epoch((mr or {}).get("rejected_at")) or f.get("tip_at"))
     open_q = [q for q in (mr or {}).get("questions") or [] if q.get("state") == "open"]
     if park_waiting(park) or open_q:
         q = open_q[-1] if open_q else {}
@@ -356,23 +366,27 @@ def _pair(x: Any) -> list[int] | None:
     return None
 
 
+NO_EVALUATE = "这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit"
+
+
 def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict[str, Any] | None,
              ledger_path: str | None = None, vouchers_dir: str | None = None) -> tuple[dict[str, Any], dict | None]:
     """(EvalView, the funnel from brainkit.evaluate or None). Without the module: available false."""
-    view = {"available": False, "error": "", "ref": ref, "metrics": [], "queue": [], "skipped": [], "notes": []}
+    view = {"available": False, "error": "", "raw": "", "ref": ref, "metrics": [], "queue": [], "skipped": [],
+            "notes": []}
     if not bk.has("evaluate"):
-        view["error"] = "brain-kit 还没有 evaluate 模块" + (
-            "（%s）" % bk.info()["module_errors"].get("evaluate") if bk.info()["module_errors"].get("evaluate") else "")
+        view["error"] = NO_EVALUATE
+        view["raw"] = str(bk.info()["module_errors"].get("evaluate") or "")[:2000]
         return view, None
     ev = bk.m("evaluate")
     try:
         data = _call(ev.collect, repo_path, cfg, ref=ref, credits=credits, ledger_path=ledger_path,
                      vouchers_dir=vouchers_dir)
     except Exception as exc:  # noqa: BLE001 - a module still being written must not break the overview
-        view["error"] = "evaluate 跑不起来：%s" % str(exc)[:200]
+        view["error"], view["raw"] = "交付评估没算成：brain-kit 的原话在细节里", str(exc)[:2000]
         return view, None
     if not isinstance(data, dict):
-        view["error"] = "evaluate 返回的不是对象"
+        view["error"], view["raw"] = "交付评估的结果读不懂：brain-kit 的原话在细节里", repr(data)[:2000]
         return view, None
 
     def rule(k: str) -> str:

@@ -93,6 +93,9 @@ export interface Waits {
   since?: number | null
   /** where the step is taken: the local session, the MR, this app (开需求 / 待办), nowhere. The backend always sends it */
   where?: 'session' | 'mr' | 'app' | null
+  /** the reply is Lean's review in a NEW session (开审查会话: the session that wrote the code may not review it), not a
+   * turn in the open one. The backend always sends it */
+  review?: boolean
 }
 
 export interface LeanSummary {
@@ -546,6 +549,8 @@ export interface EvalView {
   /** brain-kit's notes on the numbers, verbatim (credits it could not attribute to a run, deliveries already known
    * wrong whose 14 days are not over …) */
   notes: string[]
+  /** brain-kit's own words behind error (for 细节); '' when none. The backend always sends it */
+  raw?: string
 }
 
 /**

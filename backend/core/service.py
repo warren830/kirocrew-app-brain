@@ -338,9 +338,10 @@ class Service:
     # ---- 交付总览 ------------------------------------------------------------------------------------- #
 
     def _local_only(self, repo: Repo) -> bool:
-        """Its requirements are done only on this machine: no GitLab to hand them over through (the board's rule)."""
+        """Its requirements are done only on this machine: no GitLab, or no remote (RepoInfo.remote), to hand them over
+        through."""
         base, project = self._gitlab_of(repo)
-        return not (base and project)
+        return not (base and project) or not repo.has_origin()
 
     def _row(self, repo: Repo, f: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
         row = deliveries.base_row(repo.id, f, local_only=self._local_only(repo))
@@ -438,7 +439,7 @@ class Service:
             row["mr"] = {"iid": int(r["iid"]), "url": self.team.mr_url(r["project"], r["iid"]), "state": None}
             row["updated_at"] = lean_view.epoch(r.get("updated"))
             job = self._runner_desc(facts, key, row) if facts.get("run") else None
-            row["summary"] = self.desc.first(*job) if job else None
+            row["summary"] = mrdesc_view.plain_line(self.desc.first(*job)) if job else None
             out.append((row, facts, decs))
         return out
 
@@ -531,13 +532,14 @@ class Service:
                                     if k.startswith(rid + "-")}}
                 threading_start(self._eval_compute, rid, sha, credits)
         if not views:
-            return {"available": False, "error": "正在算 Eval…" if ids else "没有仓库", "ref": None, "metrics": [],
-                    "queue": [], "skipped": [], "notes": []}, None
+            return {"available": False, "error": "正在算交付评估…" if ids else "没有仓库", "raw": "", "ref": None,
+                    "metrics": [], "queue": [], "skipped": [], "notes": []}, None
         ref = deliveries.branch_words([(v.pop("_name"), v.get("ref")) for v in views])
         if len(views) == 1:
             return dict(views[0], ref=ref), (dict(funnels[0]) if funnels else None)
-        merged = {"available": any(v["available"] for v in views), "error": "；".join(v["error"] for v in views if v["error"]),
-                  "ref": ref, "metrics": [], "queue": [q for v in views for q in v["queue"]],
+        merged = {"available": any(v["available"] for v in views),
+                  "error": "；".join(dict.fromkeys(v["error"] for v in views if v["error"])),
+                  "raw": "\n".join(v.get("raw") or "" for v in views if v.get("raw")), "ref": ref, "metrics": [], "queue": [q for v in views for q in v["queue"]],
                   "skipped": [x for v in views for x in v.get("skipped") or []],
                   "notes": [x for v in views for x in v.get("notes") or []]}
         for m in views[0]["metrics"]:
@@ -570,9 +572,9 @@ class Service:
             view, funnel = deliveries.evaluate(repo.path, repo.cfg, repo.main_ref(), credits)
             self._eval[rid] = (sha, time.monotonic(), view, funnel)
         except Exception as exc:  # noqa: BLE001
-            self._eval[rid] = (sha, time.monotonic(), {"available": False, "error": "Eval 算不出来：%s" % str(exc)[:200],
-                                                        "ref": None, "metrics": [], "queue": [], "skipped": [],
-                                                        "notes": []}, None)
+            self._eval[rid] = (sha, time.monotonic(), {"available": False, "error": "交付评估没算成：原话在细节里",
+                                                        "raw": str(exc)[:2000], "ref": None, "metrics": [],
+                                                        "queue": [], "skipped": [], "notes": []}, None)
         finally:
             self._eval_running.discard(rid)
 
@@ -1003,8 +1005,8 @@ class Service:
             me = self.me_in(repo)
             for f in facts:
                 row = self._row(repo, f, snap)
-                if row["state"] in ("merged", "closed"):
-                    continue
+                if row["state"] == "closed" or (row["state"] == "merged" and row["waits"]["who"] != "you"):
+                    continue    # a merge waits for nobody, unless its write-back waits for you
                 live = self._live(snap["by"].get(scope_of(rid, f["key"]), []))
                 own = bool(me) and me == f.get("owner")
                 entries.append({"row": row, "facts": f, "own": own, "has_session": bool(live),
