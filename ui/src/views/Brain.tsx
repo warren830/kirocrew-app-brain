@@ -544,10 +544,11 @@ type StepState = 'done' | 'now' | 'bad' | 'off' | undefined
 /** What a preview means for the person: there is something to write, there is nothing new, or it cannot be written. */
 function previewSays(p: ReflectPreview): { what: 'write' | 'nothing' | 'blocked'; text: string } {
   if (p.error || p.problems.length) return { what: 'blocked', text: '' }
-  if (p.ops.length === 0) return { what: 'nothing', text: '这次的提议 Brain 里都有了（或者已经在别的回写分支上）：不用回写。' }
+  const gaps = p.gaps.length ? '下面「Brain 里缺的」是这次发现还缺的知识或测试，可以开成新的需求。' : ''
+  if (p.ops.length === 0) return { what: 'nothing', text: `这次的提议 Brain 里都有了（或者已经在别的回写分支上）：不用回写。${gaps}` }
   if (!p.substantive) {
     const ids = Array.from(new Set(p.ops.map((o) => o.target).filter((x): x is string => !!x)))
-    return { what: 'nothing', text: `这次的提议只是给已有的 ${ids.join('、') || '条目'} 补来源，没有新知识：不开分支，Brain 不变，不用回写。` }
+    return { what: 'nothing', text: `这次的提议只是给已有的 ${ids.join('、') || '条目'} 补来源，没有新知识：不开分支，Brain 不变，不用回写。${gaps}` }
   }
   return { what: 'write', text: '' }
 }

@@ -244,7 +244,7 @@ describe('Brain', () => {
 
   test('a preview that only adds sources is not substantive: it says so once, and there is nothing to write', async () => {
     const same = fx.reflect().ops[1]
-    const { user } = setup({ repo: 'r1', reflect: 'PAY-5' }, { [`POST ${API}/brain/reflect/preview`]: (): ReflectPreview => ({ ...fx.reflect(), ops: [same], substantive: false }) })
+    const { user } = setup({ repo: 'r1', reflect: 'PAY-5' }, { [`POST ${API}/brain/reflect/preview`]: (): ReflectPreview => ({ ...fx.reflect(), ops: [same], gaps: [], substantive: false }) })
     const card = await screen.findByRole('region', { name: '回写' })
     await user.click(within(card).getByRole('button', { name: '预览' }))
     const preview = await within(card).findByTestId('reflect-preview')
