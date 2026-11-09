@@ -305,5 +305,8 @@ button.br-tag:hover { border-color: var(--accent); color: var(--text-strong); }
 .br-md .cto-table td:first-child { white-space: nowrap; }
 .br-md code, .br-inline code { padding: 0 4px; border-radius: 5px; background: color-mix(in srgb, var(--text) 8%, transparent); overflow-wrap: anywhere; }
 .br-mdfold > summary { font-size: 13px; }
+/* ---------- a command a person types in a terminal (ui.tsx CommandLine) ---------- */
+.br-cmd { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.br-cmd code { padding: 3px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--kt-glass); color: var(--text-strong); font-size: .92em; user-select: all; word-break: break-all; }
 `
 

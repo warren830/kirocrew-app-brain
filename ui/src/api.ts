@@ -49,26 +49,44 @@ export const paths = {
   meName: () => `${BASE}/me/name`,
 }
 
-/** The API error's text in Chinese (the SDK rejects with `API <status>: <body>`, the body `{"error", "code"}`). */
+const CJK = /[\u3400-\u9fff]/
+const NO_ANSWER = /failed to fetch|networkerror|load failed|network request failed/i
+
+/**
+ * What a failed request means for a person when the backend said nothing of its own in Chinese, by the HTTP status
+ * (0: no answer at all). The one place for these words: errorText (every view) and the banner over every view say
+ * them. KiroCrew's host answers `{"error": "Token required"}` (403) when the dashboard login is gone; the browser's own
+ * words for no answer are `Failed to fetch`.
+ */
+export function httpProblem(status: number): { text: string; todo: string } {
+  if (status === 401 || status === 403) return { text: '登录过期了', todo: '重新打开 KiroCrew 仪表盘，登录以后点「再试一次」' }
+  if (status === 0) return { text: '连不上 app 的后端', todo: 'KiroCrew 或这个 app 可能停了，网络也可能断了：等一会儿点「再试一次」' }
+  if (status === 404) return { text: 'app 的后端和页面版本对不上', todo: '在 KiroCrew 里重新装一次这个 app' }
+  return { text: 'app 的后端出错了', todo: '点「再试一次」；还不行就在 KiroCrew 里重启这个 app' }
+}
+
+/** The error as it came (the SDK rejects with `API <status>: <body>`, the body `{"error", "code"}`), for 细节. */
+export function errorRaw(e: unknown): string {
+  return e instanceof Error ? e.message : String(e)
+}
+
+/** The API error's text in Chinese: the backend's own words (with the status), else httpProblem's; never English. */
 export function errorText(e: unknown): string {
-  const raw = e instanceof Error ? e.message : String(e)
+  const raw = errorRaw(e)
   const m = /^API (\d{3}): ([\s\S]*)$/.exec(raw)
-  if (!m) return raw
+  if (!m) return CJK.test(raw) ? raw : httpProblem(NO_ANSWER.test(raw) ? 0 : 500).text
   const [, status, body] = m
   try {
     const data = JSON.parse(body) as { error?: unknown }
-    if (data && typeof data.error === 'string' && data.error) return `${data.error}（${status}）`
+    if (data && typeof data.error === 'string' && CJK.test(data.error)) return `${data.error}（${status}）`
   } catch {
-    /* not JSON */
+    if (CJK.test(body)) return `${body.trim().slice(0, 200)}（${status}）`
   }
-  if (status === '401') return '需要登录 KiroCrew dashboard（401）'
-  if (status === '403') return '没有权限：只接受 dashboard 主人本人的请求（403）'
-  if (status === '404') return '后端还没有这个接口（404）'
-  return `请求失败（${status}）${body.trim() ? `：${body.trim().slice(0, 200)}` : ''}`
+  return `${httpProblem(Number(status)).text}（${status}）`
 }
 
 export function errorStatus(e: unknown): number {
-  const m = /^API (\d{3}):/.exec(e instanceof Error ? e.message : String(e))
+  const m = /^API (\d{3}):/.exec(errorRaw(e))
   return m ? Number(m[1]) : 0
 }
 
@@ -78,6 +96,8 @@ export interface Polled<T> {
   error: string
   /** the HTTP status of that error (0: none, or not an HTTP error) */
   status: number
+  /** that error as it came (errorRaw), for 细节; '' when it worked */
+  raw: string
   loading: boolean
   /** poll now (after a write) */
   reload: () => void
@@ -92,8 +112,8 @@ export interface Polled<T> {
 export function usePoll<T>(path: string | null, pollMs: number = POLL_MS): Polled<T> {
   const api = useAppApi()
   const apiRef = useLatest<AppApi>(api)
-  const [state, setState] = useState<{ data: T | null; error: string; status: number; loading: boolean; path: string | null }>(
-    { data: null, error: '', status: 0, loading: path !== null, path },
+  const [state, setState] = useState<{ data: T | null; error: string; status: number; raw: string; loading: boolean; path: string | null }>(
+    { data: null, error: '', status: 0, raw: '', loading: path !== null, path },
   )
   const inFlight = useRef(false)
   const again = useRef(false)
@@ -111,10 +131,10 @@ export function usePoll<T>(path: string | null, pollMs: number = POLL_MS): Polle
     try {
       const got = await apiRef.current.get<T>(p)
       if (pathRef.current !== p) return
-      setState({ data: got, error: '', status: 0, loading: false, path: p })
+      setState({ data: got, error: '', status: 0, raw: '', loading: false, path: p })
     } catch (e) {
       if (pathRef.current !== p) return
-      setState((s) => ({ ...s, error: errorText(e), status: errorStatus(e), loading: false }))
+      setState((s) => ({ ...s, error: errorText(e), status: errorStatus(e), raw: errorRaw(e), loading: false }))
     } finally {
       inFlight.current = false
       if (again.current) {
@@ -126,11 +146,11 @@ export function usePoll<T>(path: string | null, pollMs: number = POLL_MS): Polle
 
   useEffect(() => {
     if (path === null) {
-      setState({ data: null, error: '', status: 0, loading: false, path })
+      setState({ data: null, error: '', status: 0, raw: '', loading: false, path })
       kick.current = () => {}
       return
     }
-    setState((s) => (s.path === path ? s : { data: null, error: '', status: 0, loading: true, path }))
+    setState((s) => (s.path === path ? s : { data: null, error: '', status: 0, raw: '', loading: true, path }))
     let timer: ReturnType<typeof setTimeout> | undefined
     let alive = true
     let chain = 0
@@ -165,9 +185,12 @@ export function usePoll<T>(path: string | null, pollMs: number = POLL_MS): Polle
   }, [path, pollMs, load])
 
   const reload = useCallback(() => kick.current(), [])
-  const set = useCallback((data: T) => setState((s) => ({ ...s, data, error: '', status: 0, loading: false })), [])
+  const set = useCallback((data: T) => setState((s) => ({ ...s, data, error: '', status: 0, raw: '', loading: false })), [])
   const fresh = state.path === path
-  return { data: fresh ? state.data : null, error: fresh ? state.error : '', status: fresh ? state.status : 0, loading: fresh ? state.loading : path !== null, reload, set }
+  return {
+    data: fresh ? state.data : null, error: fresh ? state.error : '', status: fresh ? state.status : 0, raw: fresh ? state.raw : '',
+    loading: fresh ? state.loading : path !== null, reload, set,
+  }
 }
 
 /** A write: its pending flag, its answer and its error (errorText), for one button. */

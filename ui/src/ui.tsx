@@ -833,17 +833,58 @@ export function Segs({ cells, label }: { cells: { tone: 'pass' | 'fail' | 'run' 
 /** Where brain-kit comes from, for a machine that has none (设置, the shell's banner). */
 export const BRAINKIT_CLONE = 'git clone https://github.com/warren830/brain-kit.git ~/brain-kit'
 
+/** A path as a shell word: as it is when it is plain, else in single quotes. */
+const shellWord = (p: string) => (/^[\w@%+=:,./~-]+$/.test(p) ? p : `'${p.replace(/'/g, `'\\''`)}'`)
+
 /**
- * Why the app has no brain-kit, from Status.brainkit.error (backend/core/bk.py), said as what to do: not there (write
- * its place, or clone it), too old (update it), there but not importable (a broken checkout: the Python error is
- * only for 细节).
+ * Why the app has no brain-kit, from Status.brainkit.error (backend/core/bk.py says it in one of three ways), said as
+ * what to do: not there (write its place in 设置, or clone it first), too old (pull it), there but not importable (a
+ * checkout that is not whole: pull it, else clone it again). *cmd* is the line to type in a terminal, shown with 复制;
+ * the version brain-kit wants and the Python error are only in *raw*, for 细节. 设置's 保存 reads brain-kit again, so
+ * every way ends there. The banner over every view and 设置's card both say these words.
  */
-export function brainkitProblem(error: string): { kind: 'missing' | 'old' | 'broken'; text: string; todo: string; raw: string } {
+export function brainkitProblem(error: string, path = ''): { kind: 'missing' | 'old' | 'broken'; text: string; todo: string; cmd: string; raw: string } {
+  const pull = path ? `git -C ${shellWord(path)} pull --ff-only` : ''
   if (/太旧/.test(error)) {
-    return { kind: 'old', text: 'brain-kit 太旧', todo: '在 brain-kit 的目录里 git pull 更新到新版本，再回这里点「保存」重新读取', raw: error }
+    return { kind: 'old', text: 'brain-kit 太旧了（位置是对的）', todo: `在它的目录里拉取最新的代码${pull ? '（下面这行）' : ''}，再到设置里点「保存」重新读它`, cmd: pull, raw: error }
   }
   if (/导入失败/.test(error)) {
-    return { kind: 'broken', text: 'brain-kit 读不进来：那个目录里的 brain-kit 不完整', todo: '在 brain-kit 的目录里 git status 看看有没有改坏的文件，git pull，或者重新克隆一份', raw: error }
+    return {
+      kind: 'broken', text: 'brain-kit 读不进来（位置是对的）',
+      todo: `那个目录里的 brain-kit 不完整：拉取一遍${pull ? '（下面这行）' : ''}，还不行就重新克隆一份；再到设置里点「保存」重新读它`, cmd: pull, raw: error,
+    }
   }
-  return { kind: 'missing', text: '这个位置没有 brain-kit', todo: '写对 brain-kit 的位置，点「保存」；这台机器上还没有的话，先克隆一份（下面这行命令），再写它的位置', raw: error }
+  return {
+    kind: 'missing', text: '找不到 brain-kit',
+    todo: '在设置的「brain-kit 在哪」写上它的目录，点「保存」；这台机器上还没有的话，先克隆一份（下面这行），再写它的位置', cmd: BRAINKIT_CLONE, raw: error,
+  }
+}
+
+/** A command a person types in a terminal: the line itself and 复制 (the app never runs it). */
+export function CommandLine({ cmd }: { cmd: string }) {
+  const [copied, setCopied] = useState<'' | 'ok' | 'fail'>('')
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(cmd)
+      setCopied('ok')
+    } catch {
+      setCopied('fail')
+    }
+  }
+  return (
+    <span className="br-cmd" data-testid="cmd-line">
+      <code className="br-mono">{cmd}</code>
+      <button type="button" className="br-btn is-small" onClick={() => void copy()}><Icon name="Copy" size={13} />复制</button>
+      {copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
+      {copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请手动选中这一行</span>}
+    </span>
+  )
+}
+
+/** A repo as a person knows it: by its name; by its name and folder when two listed repos share a name (never the
+ * app's own id, r1). */
+export function repoLabel(r: { name: string; path: string }, all: { name: string }[]): string {
+  if (all.filter((x) => x.name === r.name).length < 2) return r.name
+  const dir = r.path.replace(/\/+$/, '').split('/').slice(-2, -1)[0]
+  return dir ? `${r.name}（${dir}/）` : r.name
 }
