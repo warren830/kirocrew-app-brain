@@ -65,10 +65,13 @@ def started(svc, coro_fn):
     return run(go())
 
 
-async def install(svc, path, kit=None, branch=None):
+async def install(svc, path, kit=None, branch=None, mode="branch"):
+    """安装 on a new branch (the way these tests follow; in place is the recommended one, test_inplace.py's)."""
     body = {"path": str(path), "kit": dict(kit or KIT)}
     if branch:
         body["branch"] = branch
+    if mode:
+        body["mode"] = mode
     job = (await svc.import_install(body))["job"]
     steps = [s["id"] for s in job["steps"]]      # a new branch (a repo with a remote), else in place
     assert job["state"] == "running" and steps in ([s for s, _ in installer.INSTALL_STEPS],
@@ -122,7 +125,8 @@ def test_an_installed_repo_is_one_click_inspect_then_add(tmp_path, home):
         == ["OK"] * 10, got["checks"]
     assert c["branch"]["why"] == "在 main 上" and c["default"]["why"].startswith("main")
     assert c["kit"]["why"] == "装了，已提交（.brain/kit.json）" and c["listed"]["why"] == "还不在列表里"
-    assert c["origin"]["level"] == "WARN" and "git remote add origin" in c["origin"]["todo"]
+    # a repo done only on this machine: no origin is no warning (UI问题清单 #5)
+    assert c["origin"]["level"] == "OK" and c["origin"]["why"].startswith("没有 origin：这个仓库只在本机做")
     assert got["kit"]["state"] == "checkout" and got["kit"]["values"]["req_prefix"] == "PAY"
     assert any(r["text"].startswith("KiroCrew 引擎") for r in got["crew"]["rows"])   # crewcheck's rows for it
     assert added["ok"] and added["id"] == "r1" and added["status"]["repos"][0]["ok"] is True
@@ -162,10 +166,12 @@ def test_a_plain_dirty_repo_each_check_says_why_and_the_form_is_prefilled(tmp_pa
     assert c["origin"]["level"] == "OK" and "GitLab https://gitlab.example.com，项目 grp/pay" in c["origin"]["why"]
     assert got["origin"] == {"url": "git@gitlab.example.com:grp/pay.git", "base": "https://gitlab.example.com",
                              "project": "grp/pay"}
-    assert c["clean"]["level"] == "WARN" and "有 2 个改动没提交" in c["clean"]["why"] and "不会动" in c["clean"]["todo"]
-    assert c["kit"]["level"] == "FAIL" and "没装" in c["kit"]["why"] and "直接装在当前分支" in c["kit"]["todo"]
-    assert got["install"]["recommend"] == "branch"            # a remote: the new branch for an MR is recommended
-    assert [c[k]["level"] for k in ("lean", "brain", "agents")] == ["FAIL"] * 3
+    # SETUP-2: true for the way that is picked by default (in place): only the install's own files are committed
+    assert c["clean"]["level"] == "WARN" and "有 2 个改动没提交" in c["clean"]["why"] and "原样留着" in c["clean"]["todo"]
+    # SETUP-7: not installed yet is where an import starts: one row (Lean, the Brain, AGENTS.md come with it), no ✗
+    assert c["kit"]["why"] == "还没装（会一起装上 AI-DLC Lean、Brain 文件、AGENTS.md）" and c["kit"]["todo"] == "下一步：在下面装上"
+    assert not any(k in c for k in ("lean", "brain", "agents")) and "FAIL" not in {x["level"] for x in got["checks"]}
+    assert got["install"]["recommend"] == "inplace"           # a requirement can be opened today (after 推送)
     assert got["form"] == {"req_prefix": "PAY", "tracker": "none", "jira_base": "", "gitlab_base": "https://gitlab.example.com",
                            "gitlab_project": "grp/pay", "default_branch": "main", "team": ""}
     assert got["current_branch"] == "main" and got["default_branch"] == "main"
@@ -349,7 +355,7 @@ def test_install_refuses_what_it_should_and_leaves_nothing_behind(tmp_path, home
         out = {"prefix": await refused({"path": str(plain), "kit": dict(KIT, req_prefix="pay-1")}),
                "half_gitlab": await refused({"path": str(plain), "kit": dict(KIT, gitlab_project="")}),
                "jira": await refused({"path": str(plain), "kit": dict(KIT, tracker="jira")}),
-               "branch": await refused({"path": str(plain), "kit": KIT, "branch": "bad..name"}),
+               "branch": await refused({"path": str(plain), "kit": KIT, "branch": "bad..name", "mode": "branch"}),
                "no_kit": await refused({"path": str(plain)})}
         out["installed"] = await install(svc, repo)
         out["no_default"] = await install(svc, plain, dict(KIT, default_branch="develop"))

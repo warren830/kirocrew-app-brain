@@ -181,8 +181,15 @@ export function TypeLine({ line, sessionUrl }: { line: string; sessionUrl?: stri
   )
 }
 
-const FIX_LABEL: Record<CrewFixBody['what'], string> = { agent: '补上 brain-dev 的 Lean hook', engine: '把引擎换成 kas' }
+/** The fix buttons' names (backend/core/problems.py FIX_BUTTON): a row's 做什么 names its button, 点「…」, and the button
+ * shows that name (「装上 brain-dev」 when the file is not there at all); these when it names none. */
+const FIX_LABEL: Record<CrewFixBody['what'], string> = { agent: '补上 Lean 的 hook', engine: '把引擎换成 kas' }
 export const KIT_FIX_LABEL = '重装 kit 文件'
+const FIX_NAMES: readonly string[] = [...Object.values(FIX_LABEL), KIT_FIX_LABEL, '装上 brain-dev']
+const fixName = (r: CheckRow, fallback: string): string => {
+  const named = /点「([^」]{2,20})」/.exec(r.todo ?? '')?.[1] ?? ''
+  return FIX_NAMES.includes(named) ? named : fallback
+}
 
 /** The fix a row offers: its own (`fix`), else the old per-check flags (an older backend's rows have no `fix`). */
 function fixOf(r: CheckRow, flags?: { agent: boolean; engine: boolean }): CheckRow['fix'] {
@@ -249,10 +256,10 @@ export function CheckRows({ rows, fix, only, onFixed, onHold, empty }: {
                 <span className="br-prob-acts">
                   {(f === 'agent' || f === 'engine') && (
                     <button type="button" className="br-btn is-small is-primary" disabled={act.busy} onClick={() => void doFix(f)}>
-                      <Icon name="Wrench" size={13} />{FIX_LABEL[f]}
+                      <Icon name="Wrench" size={13} />{fixName(r, FIX_LABEL[f])}
                     </button>
                   )}
-                  {kit && <KitFix repo={r.repo as string} onHold={(on) => hold(r, on)} onDone={() => onFixed?.(rows)} />}
+                  {kit && <KitFix repo={r.repo as string} label={fixName(r, KIT_FIX_LABEL)} onHold={(on) => hold(r, on)} onDone={() => onFixed?.(rows)} />}
                   {r.raw && (
                     <details className="br-raw">
                       <summary>brain-kit 的原话</summary>
@@ -317,7 +324,7 @@ export function JobSteps({ job }: { job: ImportJob<unknown> }) {
  * in place, 推送 when there is a remote (asked first, never by itself); on a branch, 推送并开 MR (a remote) or 「合并到
  * <default>」 (none).
  */
-export function KitFix({ repo, onDone, onHold }: { repo: string; onDone?: () => void; onHold?: (on: boolean) => void }) {
+export function KitFix({ repo, label = KIT_FIX_LABEL, onDone, onHold }: { repo: string; label?: string; onDone?: () => void; onHold?: (on: boolean) => void }) {
   const api = useAppApi()
   const [asking, setAsking] = useState(false)
   const [plan, setPlan] = useState<InstallChoices | null>(null)
@@ -362,8 +369,8 @@ export function KitFix({ repo, onDone, onHold }: { repo: string; onDone?: () => 
         {!plan ? (
           <span className="br-row" style={{ gap: 6 }}>
             <button type="button" className="br-btn is-small is-primary" disabled={busy} onClick={() => void ask()}
-              title="重跑 brain install，用你的 git 身份提交：默认直接在当前分支上，团队仓库可以选新分支开 MR">
-              <Icon name="Wrench" size={13} />{busy ? '正在开始…' : KIT_FIX_LABEL}
+              title="重装这个仓库的 brain-kit 文件，用你的 git 身份提交：默认直接在当前分支上，团队仓库可以选新分支开 MR">
+              <Icon name="Wrench" size={13} />{busy ? '正在开始…' : label}
             </button>
           </span>
         ) : (
@@ -389,7 +396,7 @@ export function KitFix({ repo, onDone, onHold }: { repo: string; onDone?: () => 
               </div>
             </div>
           )}
-          {commit?.ok && inplace && r.remote_url && <PushBox path={repo} branch={r.branch} remoteUrl={r.remote_url} onDone={finish} onLater={finish} />}
+          {commit?.ok && inplace && r.remote_url && <PushBox path={repo} branch={r.branch} remoteUrl={r.remote_url} target={r.target} onDone={finish} onLater={finish} />}
           {commit?.ok && !inplace && !r.remote_url && r.target && (
             <PendingActions path={repo} purpose="upgrade" onDone={onDone}
               p={{ merge: { ok: true, why: '', confirm: false }, pull: null, mr_url: null, target: r.target, remote_url: '' }} />
@@ -453,13 +460,18 @@ export function ModePick({ choices, busy, onPick, onCancel }: {
 
 /**
  * 推送 of a branch the app committed on in the person's checkout (in place, or a local merge): asked first, never by
- * itself, no force. *onLater*: 「先不推送」, for a page that waits for the person's answer before it moves on.
+ * itself, no force. With a remote it is what makes it count: `brain start` branches a requirement from origin's default
+ * branch. Pushing the default branch (*target*) changes the team's branch without a review: the confirm says so, and
+ * that a protected one refuses it. *onLater*: 「先不推送」, for a page that waits for the person's answer.
  */
-export function PushBox({ path, branch, remoteUrl, onDone, onLater }: { path: string; branch: string; remoteUrl: string; onDone?: () => void; onLater?: () => void }) {
+export function PushBox({ path, branch, remoteUrl, target, onDone, onLater }: {
+  path: string; branch: string; remoteUrl: string; target?: string; onDone?: () => void; onLater?: () => void
+}) {
   const api = useAppApi()
   const [asking, setAsking] = useState(false)
   const push = useAction(() => api.post<PushResult>(paths.importPush(), { path, branch, remote_url: remoteUrl, confirm: true }))
   const r = push.result
+  const team = !!target && branch === target
   const send = async () => {
     const x = await push.run()
     setAsking(false)
@@ -469,14 +481,15 @@ export function PushBox({ path, branch, remoteUrl, onDone, onLater }: { path: st
     <div className="br-stack" style={{ gap: 6 }} data-testid="push-box">
       {!asking && !r?.ok && (
         <span className="br-row">
-          <button type="button" className="br-btn is-small" onClick={() => setAsking(true)}><Icon name="Upload" size={13} />{r ? '再推一次' : `推送 ${branch}`}</button>
+          <button type="button" className="br-btn is-small is-primary" onClick={() => setAsking(true)}><Icon name="Upload" size={13} />{r ? '再推一次' : `推送 ${branch}`}</button>
           {onLater && <button type="button" className="br-btn is-small" onClick={onLater}>先不推送</button>}
-          <span className="br-hint">可选：本机已经能用，推不推你说了算。</span>
+          <span className="br-hint">推送以后才算数：开工从 origin 上的 {target || branch} 建分支，那里现在还没有它。</span>
         </span>
       )}
       {asking && (
         <div className="br-confirm" role="group" aria-label="确认推送" data-testid="push-confirm">
           <p>会把分支 <code>{branch}</code> 推到 origin（<code>{remoteUrl}</code>），不强推。</p>
+          {team && <p className="br-warn-text" data-testid="push-team">这会直接改团队的 {branch}，没有 MR 评审；{branch} 受保护时推不上去，就改用「装到新分支，开 MR 给团队看」。</p>}
           <div className="br-row">
             <button type="button" className="br-btn is-small is-primary" disabled={push.busy} onClick={() => void send()}>{push.busy ? '正在推送…' : '确定推送'}</button>
             <button type="button" className="br-btn is-small" disabled={push.busy} onClick={() => setAsking(false)}>取消</button>
@@ -539,14 +552,14 @@ export function PendingActions({ path, p, purpose, onDone }: { path: string; p: 
           )
       )}
       {m && <p className={`br-pre br-small ${m.ok ? 'br-ok-text' : 'br-bad-text'}`} role="status">{m.text}</p>}
-      {m?.ok && m.remote_url && <PushBox path={path} branch={m.branch} remoteUrl={m.remote_url} onDone={onDone} onLater={onDone} />}
+      {m?.ok && m.remote_url && <PushBox path={path} branch={m.branch} remoteUrl={m.remote_url} target={p.target} onDone={onDone} onLater={onDone} />}
       {p.pull && !pull.result?.ok && (
         !p.pull.ok ? <p className="br-small br-warn-text" data-testid="pull-why">{p.pull.why}</p> : (
           <span className="br-row">
             <button type="button" className="br-btn is-small is-primary" disabled={pull.busy} onClick={() => void doPull()}>
               <Icon name="Download" size={13} />{pull.busy ? '正在拉取…' : '拉取'}
             </button>
-            <span className="br-hint">git pull --ff-only：只快进，不合并、不变基。</span>
+            <span className="br-hint">只快进：不合并、不变基，你的改动不动。</span>
           </span>
         )
       )}
@@ -631,25 +644,27 @@ export function AnswerForm({ question, repo, reqKey, onDone }: { question: Quest
   )
 }
 
-export const IMPORT_WHY = '先导入一个项目仓库：本机的目录，或者从 GitLab 克隆。app 会先检查它；没装 brain-kit 的，直接装在当前分支并提交，马上能用（团队仓库也可以装到新分支、开 MR）。'
+export const IMPORT_WHY = '先导入一个项目仓库：本机的目录，或者从 GitLab 克隆。app 会先检查它；没装 brain-kit 的，直接装在当前分支并提交，当天就能开需求（团队仓库推送以后就能开；也可以装到新分支、开 MR，合并以后才能开）。'
 
 /** The way a repo gets in, as the steps of 导入仓库 (the empty states show it). */
 export const IMPORT_FLOW: FlowStep[] = [
   { icon: 'import', title: '从哪来', text: '本机目录，或从 GitLab 克隆' },
   { icon: 'lint', title: '检查', text: '只读：git、brain-kit、Lean、KiroCrew' },
   { icon: 'handover', title: '安装', text: '没装 brain-kit 的：装上并提交' },
-  { icon: 'list', title: '加入列表', text: '交付总览、开需求就能用了' },
+  { icon: 'list', title: '加入列表', text: '装好自动加入：交付总览、开需求就能用' },
 ]
 
 /** No repo yet: the way in, big (交付总览, 开需求), as the board's empty state introduces the team. */
-export function ImportCta({ onImport, title = '还没有仓库' }: { onImport: () => void; title?: string }) {
+export function ImportCta({ onImport, title = '还没有仓库', punch = '导入以后，每个需求都在这里：在哪一步、等谁、花了多少。' }: {
+  onImport: () => void; title?: string; punch?: string
+}) {
   return (
     <EmptyHero
       testid="import-cta"
       label="导入仓库"
       title={title}
       text={[IMPORT_WHY]}
-      punch="导入以后，每个需求都在这里：在哪一步、等谁、花了多少。"
+      punch={punch}
       flow={IMPORT_FLOW}
     >
       <button type="button" className="br-btn is-primary is-big" onClick={onImport}>
@@ -668,8 +683,8 @@ export function PendingRepo({ repo, onOpen, onDone, banner = false }: { repo: Re
   // every half minute)
   const p = p0.remote_url ? { ...p0, merge: null } : p0
   const acts = !!(p.merge || p.pull || p.mr_url)
-  // what only the wizard does: 再提交一次, 推送并开 MR, a local merge in a team repo
-  const wizard = !acts || p.state === 'uncommitted' || (p.state === 'branch' && !!p.remote_url)
+  // what only the wizard does: 再提交一次, 推送并开 MR, a local merge in a team repo, 改成直接装 (the branch cannot go in)
+  const wizard = !acts || p.state === 'uncommitted' || (p.state === 'branch' && !!p.remote_url) || (!!p.merge && !p.merge.ok)
   return (
     <div className={banner ? 'br-banner is-info' : 'br-stack'} style={banner ? undefined : { gap: 4 }} role="status" data-testid="repo-pending" data-repo={repo.id}>
       <div className="br-row">
@@ -813,4 +828,22 @@ export function Segs({ cells, label }: { cells: { tone: 'pass' | 'fail' | 'run' 
       {cells.map((c, i) => <i key={i} className={c.tone === 'pass' ? 'is-pass' : c.tone === 'fail' ? 'is-fail' : c.tone === 'run' ? 'is-run' : ''} title={c.title} />)}
     </div>
   )
+}
+
+/** Where brain-kit comes from, for a machine that has none (设置, the shell's banner). */
+export const BRAINKIT_CLONE = 'git clone https://github.com/warren830/brain-kit.git ~/brain-kit'
+
+/**
+ * Why the app has no brain-kit, from Status.brainkit.error (backend/core/bk.py), said as what to do: not there (write
+ * its place, or clone it), too old (update it), there but not importable (a broken checkout: the Python error is
+ * only for 细节).
+ */
+export function brainkitProblem(error: string): { kind: 'missing' | 'old' | 'broken'; text: string; todo: string; raw: string } {
+  if (/太旧/.test(error)) {
+    return { kind: 'old', text: 'brain-kit 太旧', todo: '在 brain-kit 的目录里 git pull 更新到新版本，再回这里点「保存」重新读取', raw: error }
+  }
+  if (/导入失败/.test(error)) {
+    return { kind: 'broken', text: 'brain-kit 读不进来：那个目录里的 brain-kit 不完整', todo: '在 brain-kit 的目录里 git status 看看有没有改坏的文件，git pull，或者重新克隆一份', raw: error }
+  }
+  return { kind: 'missing', text: '这个位置没有 brain-kit', todo: '写对 brain-kit 的位置，点「保存」；这台机器上还没有的话，先克隆一份（下面这行命令），再写它的位置', raw: error }
 }

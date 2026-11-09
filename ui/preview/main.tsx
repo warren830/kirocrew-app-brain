@@ -77,7 +77,12 @@ function status(): Status {
   if (flags.has('nokit')) {
     s.brainkit = { ...s.brainkit, ok: false, version: null, error: `${settings.brainkit} 里没有 brainkit/` }
   }
-  if (flags.has('crewfail') && !crewFixed) s.crew.rows = [{ level: 'FAIL', text: '没有 ~/.kiro/agents/brain-dev.json', todo: '点「装上 brain-dev」：app 装上 brain-kit 带的那一份', fix: 'agent', repo: null, raw: '' }, ...s.crew.rows]
+  if (flags.has('crewfail') && !crewFixed) {
+    // as crewcheck says it: no brain-dev.json at all, so no 「Lean 的三个 hook」 row either
+    s.crew.rows = [{ level: 'FAIL', text: '没有 ~/.kiro/agents/brain-dev.json', todo: '点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的 hook 在 KiroCrew 里不会跑', fix: 'agent', repo: null, raw: '' },
+      ...s.crew.rows.filter((r) => !/brain-dev.*(带着 Lean|Lean hook 都在)/.test(r.text))]
+    s.crew.fix = { ...s.crew.fix, agent: true }
+  }
   if (crewFixed) s.crew.rows = s.crew.rows.map((r) => (r.fix === 'agent' || r.fix === 'engine' ? { ...r, level: 'OK' as const, todo: '', fix: null } : r))
   s.counts.todo = todo().items.length
   s.team.enabled = s.team.enabled || settings.team.enabled
@@ -191,13 +196,32 @@ setApiRoutes({
   [`POST ${API}/intake/check`]: (body) => {
     const b = body as IntakeBody
     const c = fx.intakeCheck()
-    // the partner guide (D03) is marked Confidential: a lower classification blocks, as brain-kit does
-    if (b.classification === 'public' || b.classification === 'internal') {
-      c.ok = false
-      c.blocking = [`门 2：D03 合作方接口说明.pdf 标着 Confidential，高于你选的 ${b.classification}（选机密或不确定，或把它排除掉）`]
+    if (!b.consent) return { ...c, ok: false, findings: [], files: [], blocking: [], blocking_raw: [], refused: [], error: '第 1 关：勾上「我是作者，或已取得作者同意」' }
+    // as brain-kit's rules go with this repo's kit.json (intake.allow_confidential false, the default): the partner
+    // guide (D03) is marked Confidential, so it stops the check unless it is left out; so does a confidential pick
+    const partner = !b.exclude.some((g) => '合作方接口说明.pdf'.includes(g.replace(/\*/g, '')))
+    const given = b.classification === 'unsure' ? 'confidential' : b.classification
+    if (!partner) {
+      c.findings = c.findings.filter((l) => !l.includes('D03'))
+      c.files = (c.files ?? []).filter((f) => f.id !== 'D03')
+      c.sources -= 1
     }
-    if (!b.consent) return { ...c, ok: false, findings: [], blocking: [], refused: [], error: '门 1：确认你是作者，或已取得作者同意' }
-    return c
+    const raw: string[] = []
+    const plain: string[] = []
+    if (given === 'secret') {
+      raw.push('门 2：材料是绝密（你选的是 secret），不收，只留哈希')
+      plain.push('第 2 关：绝密材料不收（你选的是「绝密」）：只交脱敏摘要')
+    } else if (partner || given === 'confidential') {
+      const what = partner ? 'D03 合作方接口说明.pdf=confidential' : `你选的是 ${b.classification}`
+      raw.push(`门 2：材料按机密处理（${what}），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。`)
+      plain.push(`第 2 关：这个仓库不收机密材料（${partner ? 'D03 合作方接口说明.pdf 标着机密' : `你选的是「${b.classification === 'unsure' ? '不确定' : '机密'}」`}）。请产品写一份脱敏摘要再交，或者把这份写进「不收这些文件」`)
+    }
+    if (!b.business) {
+      raw.push("门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉")
+      plain.push('第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」')
+    }
+    c.classification = given === 'secret' ? 'secret' : partner ? 'confidential' : given || 'internal'
+    return { ...c, ok: raw.length === 0, blocking: plain, blocking_raw: raw }
   },
   [`POST ${API}/intake/start`]: (body) => {
     const b = body as StartBody

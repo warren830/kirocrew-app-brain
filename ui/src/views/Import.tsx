@@ -2,21 +2,23 @@
  * 导入仓库: how a project repo gets into the app, in the sample's look: a hero with the four steps as a Flow whose
  * states follow the wizard, then one numbered card per step:
  *
- *   1 从哪来   two big option cards: 本机目录 (a path), or 克隆 (a git URL, the folder it goes under, its name): the
- *              clone runs in the background (POST /import/clone, then GET /import/jobs/{id} until it ends; its steps as
- *              pills, the time it took) and the new folder is checked next.
- *   2 检查     POST /import/inspect, read only: each check as a row with its ✓ / ! / ✗ chip, why and what to do;
- *              KiroCrew's checks with their fixes (CheckRows).
- *   3 安装     not installed: where it goes (ImportInspect.install: 「直接装在 <branch>」, the default, committed right
- *              there and usable at once; or 「装到新分支，开 MR 给团队看」, recommended for a repo with a remote and
- *              offered when the checkout has uncommitted changes; one plain line each, the recommended one marked, one
- *              that cannot be done says why), the kit.json values `brain install` asks you to check in a field grid with
- *              a live preview, then the install (POST /import/install with the mode, a job): brain doctor, the changed
- *              files, a commit with the person's own git identity. A hook that says no is shown as it said it;
- *              「再提交一次」 (POST /import/commit). In place: 推送 is offered when there is a remote, asked first, never
- *              done by itself. On a new branch: 「推送并开 MR」 (asked first), or 「合并到 <default>」 (a fast-forward
- *              here, POST /import/merge), and 「拉取」 once the MR was merged (POST /import/pull).
- *   4 加入列表  POST /import/add. A repo whose brain-kit is only on the install branch is listed with what to do.
+ *   1 从哪来   two big option cards: 本机目录 (a path, or one of the checkouts found under ~/workplace and ~/workspace),
+ *              or 克隆 (a git URL, the folder it goes under, its name): the clone runs in the background (POST
+ *              /import/clone, then GET /import/jobs/{id} until it ends; its steps as pills, the time it took) and the
+ *              new folder is checked next.
+ *   2 检查     POST /import/inspect, read only: what needs a look as rows with their ✓ / ! / ✗ chip, why and what to
+ *              do (the rows that are fine folded); 「还没装 brain-kit」 is the next step, not a fault; KiroCrew's checks
+ *              with their fixes (CheckRows).
+ *   3 安装     not installed: where it goes (ImportInspect.install: 「直接装在 <branch>」, recommended whenever it can
+ *              be done, so a requirement can be opened today, or 「装到新分支，开 MR 给团队看」; one plain line each
+ *              that says what it costs), the values of the repo's brain-kit settings in a field grid with a live preview,
+ *              then the install (POST /import/install with the mode, a job). Done: one line at the top says where it
+ *              is and what comes next, with that step's button (开需求; 推送 <default> for a repo with a remote; on a
+ *              branch 推送并开 MR or 合并到 <default>), and the repo is put in the list by itself (POST /import/add).
+ *              The self-check (brain doctor), the files and brain-kit's own output below it, folded. A hook that says
+ *              no is shown as it said it; 「再提交一次」 (POST /import/commit). An install branch that can no longer go
+ *              in (the default branch moved on): 「改成直接装在 <branch>」.
+ *   4 加入列表  POST /import/add, for a repo installed before (an install here adds it by itself).
  *
  * A path from the URL (?path=) only fills the box: nothing runs before 检查.
  */
@@ -28,23 +30,26 @@ import { JOB_POLL_MS, useJob } from '../jobs'
 import type { ImportEntry } from '../nav'
 import type { Tone } from '../styles'
 import type {
-  AddResult, CloneBody, CloneResult, CommitResult, FileChange, ImportCheck, ImportDefaults, ImportInspect, ImportJob,
+  AddResult, CloneBody, CloneResult, CommitResult, FileChange, FoundRepo, ImportCheck, ImportDefaults, ImportInspect, ImportJob,
   InstallBody, InstallChoice, InstallMode, InstallResult, JobStart, KitForm, Level, PendingInstall, PublishBody, PublishResult,
 } from '../types'
 import {
   CheckRows, ExtLink, Flow, IMPORT_FLOW, Icon, JobSteps, LEVEL_LABEL, LEVEL_TONE, MeLine, PendingActions, PushBox, RoleIcon, type FlowStep,
 } from '../ui'
+import { TRACKER_NAME } from '../vocab'
 import type { ViewProps } from './props'
 
-export const HERO_TEXT = '把一个项目仓库导进来：先只读地检查它；没装 brain-kit 的，直接装在当前分支并提交（团队仓库也可以装到新分支、开 MR）；最后加入列表，交付总览和开需求就能用它了。'
-export const SAFE_INPLACE = '只提交 brain install 写的文件，你自己没提交的改动不碰；用你自己的 git 身份提交，你的 git hook 照常跑；不会自己推送。'
-export const SAFE_BRANCH = '只装在新分支上：从默认分支建，放在单独的工作目录里（work_root 下面）。你现在的检出、分支和改动都不动。提交用你自己的 git 身份，你的 git hook 照常跑。'
+export const HERO_TEXT = '把一个项目仓库导进来：先只读地检查它；没装 brain-kit 的，默认直接装在当前分支并提交，当天就能开需求（团队仓库推送以后就能开；也可以装到新分支、开 MR，合并以后才能开）；装好就自动加入列表，交付总览和开需求就能用它了。'
+export const SAFE_INPLACE = '只提交安装写的文件，你自己没提交的改动不碰；用你自己的 git 身份提交，你的 git hook 照常跑；不会自己推送。'
+export const SAFE_BRANCH = '只装在新分支上：从默认分支建，放在单独的工作目录里（设置里「每个需求的工作目录」下面）。你现在的检出、分支和改动都不动。提交用你自己的 git 身份，你的 git hook 照常跑。'
 const GLYPH: Record<Level, string> = { OK: '✓', WARN: '!', FAIL: '✗' }
 const CHANGE: Record<FileChange['change'], string> = { added: '新增', modified: '改动', deleted: '删除', other: '其他' }
 const CHANGE_TONE: Record<FileChange['change'], Tone> = { added: 'ok', modified: 'warn', deleted: 'bad', other: 'idle' }
 const CHANGE_ORDER: FileChange['change'][] = ['added', 'modified', 'deleted', 'other']
 const EMPTY_FORM: KitForm = { req_prefix: '', tracker: 'none', jira_base: '', gitlab_base: '', gitlab_project: '', default_branch: 'main', team: '' }
 type StepState = FlowStep['state']
+/** GET /import/defaults, with the checkouts found on this machine when the backend sends them */
+type Defaults = ImportDefaults & { found?: FoundRepo[] }
 
 /** The folder name a clone of *url* gets when the name is left empty (as the backend makes it). */
 export function nameFromUrl(url: string): string {
@@ -52,45 +57,82 @@ export function nameFromUrl(url: string): string {
   return last.endsWith('.git') ? last.slice(0, -4) : last
 }
 
+/** 「还没装 brain-kit」 before an install: the next step, said in a neutral colour, not counted as a problem. */
+const isNext = (c: ImportInspect, x: ImportCheck) => x.id === 'kit' && c.next === 'install' && c.kit.state === 'none'
+
 export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { entry: ImportEntry } & ViewProps) {
   const api = useAppApi()
   const jobMs = Math.min(pollMs ?? JOB_POLL_MS, JOB_POLL_MS)
-  const defaults = usePoll<ImportDefaults>(paths.importDefaults(), 0)
+  const defaults = usePoll<Defaults>(paths.importDefaults(), 0)
   const [source, setSource] = useState<'local' | 'clone'>('local')
   const [path, setPath] = useState(entry.path ?? '')
   const [checked, setChecked] = useState<{ path: string; result: ImportInspect } | null>(null)
-  const [added, setAdded] = useState('')
+  const [added, setAdded] = useState<AddResult | null>(null)
   const inspect = useAction((p: string) => api.post<ImportInspect>(paths.importInspect(), { path: p }))
+  const add = useAction((p: string) => api.post<AddResult>(paths.importAdd(), { path: p }))
   const runInspect = useCallback(async (p: string) => {
     const r = await inspect.run(p)
     if (r) setChecked({ path: p, result: r })
   }, [inspect])
+  const runAdd = async (p: string) => {
+    const r = await add.run(p)
+    if (r) {
+      setAdded(r)
+      setStatus(r.status)
+    }
+    return r
+  }
+  // an install that went in puts the repo in the list by itself, then the repo is checked again
   const install = useJob<InstallResult>(jobMs, (j) => {
     reloadStatus()
-    if (j.state === 'done' && j.result?.commit.ok && checked) void runInspect(checked.path)
+    if (j.state !== 'done' || !j.result?.commit.ok || !checked) return
+    const p = checked.path
+    void (async () => {
+      if (!checked.result.listed) await runAdd(checked.result.path ?? p)
+      await runInspect(p)
+    })()
   })
 
   const c = checked?.result ?? null
   const stale = !!checked && source === 'local' && path.trim() !== checked.path
   const shown = c && !stale ? c : null
   const installFor = install.job && c?.path && install.job.target === c.path ? install.job : null
+  const addedHere = added && shown?.path && added.status.repos.some((r) => r.id === added.id && r.path === shown.path) ? added : null
   const recheck = () => checked && void runInspect(checked.path)
+  const pick = (p: string) => {
+    setSource('local')
+    setPath(p)
+    void runInspect(p)
+  }
 
   // ---- the four steps, as the wizard stands
   const installState = (): StepState => {
     if (!shown || shown.next === 'fix') return undefined
     if (installFor && installFor.state === 'done' && installFor.result?.commit.ok) return 'done'
     if (shown.next === 'add' || (shown.next === 'listed' && !shown.pending)) return 'off'
-    if (shown.next === 'pending' || shown.next === 'listed') return shown.pending?.state === 'uncommitted' ? 'wait' : 'done'
+    if (shown.next === 'pending' || shown.next === 'listed') return shown.pending?.state === 'uncommitted' ? 'wait' : shown.install ? 'now' : 'done'
     if (!installFor || installFor.state === 'running') return 'now'
     if (installFor.state === 'failed') return 'bad'
     return installFor.result?.commit.ok ? 'done' : 'wait'
   }
   const s3 = installState()
-  const s4: StepState = !shown || shown.next === 'fix' || shown.next === 'install' ? undefined
-    : shown.next === 'listed' || (!!shown.path && added === shown.path) ? 'done' : 'now'
+  const s4: StepState = !shown || shown.next === 'fix' || shown.next === 'install' ? (addedHere ? 'done' : undefined)
+    : shown.next === 'listed' || addedHere ? 'done' : 'now'
   const states: StepState[] = [shown ? 'done' : 'now', shown ? (shown.next === 'fix' ? 'bad' : 'done') : inspect.busy ? 'now' : undefined, s3, s4]
   const flow: FlowStep[] = IMPORT_FLOW.map((s, i) => ({ ...s, state: states[i], ...(i === 2 && s3 === 'off' ? { text: '已经装了：不用装' } : {}) }))
+  // an install branch that can no longer go in: its card first, then the way out (改成直接装) under it
+  const again = !!shown && !installFor && !!shown.install && shown.next !== 'install' && !!shown.pending
+  const showInstall = !!shown && (shown.next === 'install' || !!installFor || again)
+  const found = (defaults.data?.found ?? []).filter((f) => f.path !== shown?.path)
+  const installCard = shown && (
+    <InstallCard key={`install:${shown.path}`} c={shown} job={installFor} state={s3} readError={install.readError} onStart={install.start}
+      onCommitted={async () => {
+        if (shown.path && !shown.listed) await runAdd(shown.path)
+        recheck()
+      }}
+      added={addedHere} addBusy={add.busy} addError={add.error} onAdd={() => shown.path && void runAdd(shown.path)}
+      onChanged={() => { reloadStatus(); recheck() }} go={go} />
+  )
 
   return (
     <main className="kt-root br-view imp-root" data-testid="br-import">
@@ -111,6 +153,7 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
         </div>
         {source === 'local' ? (
           <form className="imp-local" aria-label="本机目录" onSubmit={(e) => { e.preventDefault(); void runInspect(path.trim()) }}>
+            {found.length > 0 && <FoundList found={found} busy={inspect.busy} onPick={pick} />}
             <div className="br-field">
               <label htmlFor="imp-path">仓库目录</label>
               <div className="imp-inline">
@@ -119,7 +162,7 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
                   <RoleIcon role="lint" size={17} />{inspect.busy ? '正在检查…' : '检查'}
                 </button>
               </div>
-              <p className="br-hint">写绝对路径。仓库里的子目录、工作区也行：会找到仓库本身。只读，什么都不改。</p>
+              <p className="br-hint">以 / 或 ~ 开头的完整路径。仓库里的子目录、工作区也行：会找到仓库本身。只读，什么都不改。</p>
             </div>
             {stale && <p className="imp-stale" role="status"><i aria-hidden="true">!</i>目录改过了：再检查一遍。</p>}
           </form>
@@ -133,14 +176,12 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
       </section>
 
       {shown && <InspectCard c={shown} busy={inspect.busy} state={states[1]} onRecheck={recheck} onFixed={() => { reloadStatus(); recheck() }} />}
-      {shown && (shown.next === 'install' || installFor) && (
-        <InstallCard key={`install:${shown.path}`} c={shown} job={installFor} state={s3} readError={install.readError} onStart={install.start} onCommitted={recheck} />
+      {showInstall && !again && installCard}
+      {shown && !installFor && (shown.next === 'pending' || shown.next === 'listed') && shown.pending && shown.path && (
+        <PendingCard key={`pending:${shown.path}`} path={shown.path} p={shown.pending} onChanged={() => { reloadStatus(); recheck() }} />
       )}
-      {shown && (shown.next === 'pending' || shown.next === 'listed') && shown.pending && shown.path && (
-        <PendingCard key={`pending:${shown.path}`} path={shown.path} p={shown.pending} title={installFor ? '下一步' : undefined}
-          onChanged={() => { reloadStatus(); recheck() }} />
-      )}
-      {shown && shown.next === 'listed' && (
+      {again && installCard}
+      {shown && !installFor && shown.next === 'listed' && (
         <section className="br-card imp-sec is-ok" aria-label="加入列表">
           <StepHead n={4} title="加入列表" state="done" />
           <div className="imp-done" role="status" data-testid="next-listed">
@@ -149,13 +190,18 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
               <b>已经在列表里（{shown.listed}）。</b>
               <small>{shown.pending ? shown.pending.next : '交付总览、开需求都能用它。'}</small>
             </div>
-            <button type="button" className="br-btn" onClick={() => go({ kind: 'overview' })}><RoleIcon role="list" size={16} />去交付总览</button>
+            <div className="br-row">
+              {!shown.pending && shown.listed && (
+                <button type="button" className="br-btn is-primary" onClick={() => go({ kind: 'new', repo: shown.listed as string })}><RoleIcon role="new" size={16} />开需求</button>
+              )}
+              <button type="button" className="br-btn" onClick={() => go({ kind: 'overview' })}><RoleIcon role="list" size={16} />去交付总览</button>
+            </div>
           </div>
         </section>
       )}
-      {shown && (shown.next === 'add' || shown.next === 'pending') && shown.path && (
-        <AddCard key={`add:${shown.path}`} path={shown.path} pending={shown.next === 'pending' ? shown.pending : null} state={s4}
-          onAdded={(r) => { setAdded(shown.path ?? ''); setStatus(r.status) }} go={go} />
+      {shown && !installFor && (shown.next === 'add' || shown.next === 'pending') && shown.path && (
+        <AddCard key={`add:${shown.path}`} pending={shown.next === 'pending' ? shown.pending : null} state={s4}
+          result={addedHere} busy={add.busy} error={add.error} onAdd={() => shown.path && void runAdd(shown.path)} go={go} />
       )}
     </main>
   )
@@ -167,7 +213,7 @@ function StepHead({ n, title, state, sub, children }: { n: number; title: string
     <header className="imp-head" data-step={n} data-state={state}>
       <span className={`imp-n${state ? ` is-${state}` : ''}`} aria-hidden="true">{state === 'done' ? '✓' : n}</span>
       <h3>{title}</h3>
-      {sub && <small>{sub}</small>}
+      {sub && <small data-testid={`sub-${n}`}>{sub}</small>}
       {children}
     </header>
   )
@@ -184,6 +230,27 @@ function SourceOption({ value, on, icon, title, text, onPick }: { value: string;
       <small id={`${id}-d`}>{text}</small>
       <span className="imp-tick" aria-hidden="true">{on ? '✓' : ''}</span>
     </label>
+  )
+}
+
+/** The checkouts found on this machine: one click fills the path and checks it. */
+function FoundList({ found, busy, onPick }: { found: FoundRepo[]; busy: boolean; onPick: (path: string) => void }) {
+  return (
+    <div className="imp-found" role="group" aria-label="这台机器上的仓库" data-testid="found">
+      <span className="br-label">这台机器上的仓库（点一下就检查）</span>
+      <ul>
+        {found.map((f) => (
+          <li key={f.path}>
+            <button type="button" className="imp-found-btn" disabled={busy} title={f.path} onClick={() => onPick(f.path)}>
+              <RoleIcon role="file" size={15} />
+              <b>{f.name}</b>
+              <code>{f.path.replace(/^\/(?:Users|home)\/[^/]+/, '~')}</code>
+              {f.listed ? <span className="br-chip tone-ok">已在列表里</span> : f.installed ? <span className="br-chip tone-info">已装 brain-kit</span> : null}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -253,16 +320,19 @@ function JobBox({ job, what, readError }: { job: ImportJob<unknown>; what: strin
   )
 }
 
-function CheckList({ rows }: { rows: ImportCheck[] }) {
+function CheckList({ rows, next }: { rows: ImportCheck[]; next?: (x: ImportCheck) => boolean }) {
   return (
     <ul className="imp-checks" data-testid="import-checks">
-      {rows.map((x) => (
-        <li key={x.id} className={`imp-check is-${x.level}`} data-check={x.id} data-level={x.level}>
-          <span className={`imp-glyph tone-${LEVEL_TONE[x.level]}`} role="img" aria-label={LEVEL_LABEL[x.level]}>{GLYPH[x.level]}</span>
-          <span className="imp-check-main"><b>{x.label}</b><span className="br-pre">{x.why}</span></span>
-          {x.todo && <span className="imp-todo"><b>做什么</b>{x.todo}</span>}
-        </li>
-      ))}
+      {rows.map((x) => {
+        const n = next?.(x) ?? false
+        return (
+          <li key={x.id} className={`imp-check is-${n ? 'next' : x.level}`} data-check={x.id} data-level={n ? 'next' : x.level}>
+            <span className={`imp-glyph tone-${n ? 'info' : LEVEL_TONE[x.level]}`} role="img" aria-label={n ? '下一步' : LEVEL_LABEL[x.level]}>{n ? '→' : GLYPH[x.level]}</span>
+            <span className="imp-check-main"><b>{x.label}</b><span className="br-pre">{x.why}</span></span>
+            {x.todo && <span className="imp-todo"><b>做什么</b>{x.todo}</span>}
+          </li>
+        )
+      })}
     </ul>
   )
 }
@@ -282,23 +352,40 @@ function Counts({ levels }: { levels: Level[] }) {
 }
 
 function InspectCard({ c, busy, state, onRecheck, onFixed }: { c: ImportInspect; busy: boolean; state: StepState; onRecheck: () => void; onFixed: () => void }) {
+  const next = (x: ImportCheck) => isNext(c, x)
+  const look = c.checks.filter((x) => x.level !== 'OK' || next(x))
+  const fine = c.checks.filter((x) => x.level === 'OK' && !next(x))
+  const crewLook = c.crew.rows.filter((r) => r.level !== 'OK')
+  const crewFine = c.crew.rows.filter((r) => r.level === 'OK')
   return (
     <section className={`br-card imp-sec${c.next === 'fix' ? ' is-bad' : ''}`} aria-label="检查" data-testid="inspect">
       <StepHead n={2} title="检查" state={state}>
         {c.path && <code className="imp-path">{c.path}</code>}
-        <Counts levels={c.checks.map((x) => x.level)} />
+        <Counts levels={c.checks.filter((x) => !next(x)).map((x) => x.level)} />
         <button type="button" className="br-btn is-small imp-end" disabled={busy} onClick={onRecheck}>
           <Icon name="RefreshCw" size={13} />{busy ? '正在检查…' : '再检查一遍'}
         </button>
       </StepHead>
       {c.note && <p className="br-hint">{c.note}</p>}
       {c.error && <p className="br-error" role="alert">{c.error}</p>}
-      <CheckList rows={c.checks} />
+      {look.length > 0 && <CheckList rows={look} next={next} />}
+      {fine.length > 0 && (
+        <details className="imp-more" data-testid="checks-fine" open={look.length === 0 || undefined}>
+          <summary>{look.length ? `另外 ${fine.length} 项正常` : `${fine.length} 项都正常`}</summary>
+          <CheckList rows={fine} />
+        </details>
+      )}
       {c.me?.ask && c.path && <MeLine key={c.path} path={c.path} me={c.me} onSaved={onFixed} />}
       {c.crew.rows.length > 0 && (
         <div className="imp-block">
           <div className="imp-block-head"><RoleIcon role="settings" size={18} /><b>KiroCrew</b><Counts levels={c.crew.rows.map((r) => r.level)} /></div>
-          <CheckRows rows={c.crew.rows} fix={c.crew.fix} onFixed={onFixed} />
+          <CheckRows rows={crewLook} fix={c.crew.fix} onFixed={onFixed} />
+          {crewFine.length > 0 && (
+            <details className="imp-more">
+              <summary>另外 {crewFine.length} 项正常</summary>
+              <CheckRows rows={crewFine} />
+            </details>
+          )}
         </div>
       )}
       {c.next === 'fix' && (
@@ -311,18 +398,18 @@ function InspectCard({ c, busy, state, onRecheck, onFixed }: { c: ImportInspect;
   )
 }
 
-/** What goes into .brain/kit.json, as chips (the form's live preview, and the install's result). */
+/** The repo's brain-kit settings (.brain/kit.json), as chips (the form's live preview, and the install's result). */
 function KitChips({ k }: { k: KitForm }) {
   const prefix = k.req_prefix.trim().toUpperCase()
   const items: [string, string][] = [
     ['需求号', k.tracker === 'jira' ? 'Jira 上的号' : prefix ? `${prefix}-1` : ''],
-    ['跟踪', k.tracker === 'jira' ? 'Jira' : '不用 Jira'],
+    ['跟踪', TRACKER_NAME[k.tracker] ?? k.tracker],
     ['默认分支', k.default_branch.trim()],
-    ['GitLab', k.gitlab_project.trim()],
+    ['GitLab', k.gitlab_project.trim() || '不用 GitLab'],
     ['团队', k.team.trim()],
   ]
   return (
-    <ul className="imp-kv" aria-label="kit.json">
+    <ul className="imp-kv" aria-label="这个仓库的 brain-kit 设置">
       {items.map(([label, value]) => (
         <li key={label} className={value ? undefined : 'is-empty'}><small>{label}</small><b>{value || '—'}</b></li>
       ))}
@@ -330,18 +417,26 @@ function KitChips({ k }: { k: KitForm }) {
   )
 }
 
-function InstallCard({ c, job, state, readError, onStart, onCommitted }: {
+function InstallCard({ c, job, state, readError, onStart, onCommitted, added, addBusy, addError, onAdd, onChanged, go }: {
   c: ImportInspect
   job: ImportJob<InstallResult> | null
   state: StepState
   readError: string
   onStart: (j: ImportJob<InstallResult> | null) => void
   onCommitted: () => void
+  added: AddResult | null
+  addBusy: boolean
+  addError: string
+  onAdd: () => void
+  onChanged: () => void
+  go: ViewProps['go']
 }) {
   const api = useAppApi()
   const [form, setForm] = useState<KitForm>(() => c.form ?? EMPTY_FORM)
   const [branch, setBranch] = useState(c.branch)
   const choice = c.install
+  // an install branch that can no longer go in: installing in place instead (the backend offers that option only)
+  const again = c.next !== 'install' && !!c.pending
   // what the person picked, while it is still possible (a re-check can refuse it); else the recommended way
   const [want, setMode] = useState<InstallMode | null>(null)
   const can = choice?.options.filter((o) => o.ok) ?? []
@@ -353,6 +448,7 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted }: {
   const done = job?.state === 'done' && !!job.result?.commit.ok
   const here = choice?.current || c.current_branch || '当前分支'
   const picked = choice?.options.find((o) => o.mode === mode)
+  const remote = !!choice?.remote_url || !!c.origin
   const run = async () => {
     if (!c.path) return
     const r = await start.run({ path: c.path, branch: mode === 'branch' ? branch.trim() : '', mode, kit: { ...form, req_prefix: form.req_prefix.trim().toUpperCase() } })
@@ -360,12 +456,24 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted }: {
   }
   const fromOrigin = !!c.origin?.project && form.gitlab_project === c.origin.project
   const jira = form.tracker === 'jira'
+  const r = job && !running ? job.result : null
+  const sub = done && r ? (r.mode === 'inplace' ? `装好了，提交在 ${r.branch}` : `装在 ${r.branch} 分支上，合进 ${r.target || '默认分支'} 以后生效`)
+    : running ? '正在装…'
+      : job?.state === 'failed' ? '没装成'
+        : again ? `这个安装分支合不进去了：改成直接装在 ${here}`
+          : '这个仓库还没装 brain-kit（会一起装上 AI-DLC Lean、Brain 文件、AGENTS.md）'
   return (
     <section className={`br-card imp-sec${done ? ' is-ok' : ''}`} aria-label="安装" data-testid="install">
-      <StepHead n={3} title="安装" state={state} sub="这个仓库还没装 brain-kit" />
+      <StepHead n={3} title="安装" state={state} sub={sub} />
       {!job && (
         <>
-          {choice && choice.options.length > 1 ? (
+          {again && (
+            <p className="imp-where" data-testid="install-again">
+              <RoleIcon role="commit" size={18} /><b>改成直接装在 {here}</b>
+              <span>装好以后，删掉没推送的 {c.pending?.branch} 分支和它的工作目录（那次没合进去的安装）。{picked?.line ?? ''}</span>
+            </p>
+          )}
+          {!again && (choice && choice.options.length > 1 ? (
             <div className="imp-options" role="radiogroup" aria-label="装在哪" data-testid="install-modes">
               {choice.options.map((o) => (
                 <ModeOption key={o.mode} o={o} on={mode === o.mode} rec={o.mode === choice.recommend} onPick={() => setMode(o.mode)} />
@@ -373,8 +481,8 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted }: {
             </div>
           ) : (
             <p className="imp-where" data-testid="install-where"><RoleIcon role="commit" size={18} /><b>{picked?.title ?? `直接装在 ${here}`}</b><span>{picked?.line ?? ''}</span></p>
-          )}
-          <form className="imp-install" aria-label="kit.json" onSubmit={(e) => { e.preventDefault(); void run() }}>
+          ))}
+          <form className="imp-install" aria-label="这个仓库的 brain-kit 设置" onSubmit={(e) => { e.preventDefault(); void run() }}>
             <div className="imp-grid">
               <div className="br-field">
                 <label htmlFor="imp-prefix">需求号前缀</label>
@@ -424,20 +532,20 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted }: {
                 </div>
               )}
             </div>
-            <aside className="imp-preview" aria-label="会写进 .brain/kit.json">
-              <b>会写进 .brain/kit.json</b>
+            <aside className="imp-preview" aria-label="会写进这个仓库的 brain-kit 设置">
+              <b>会写进这个仓库的 brain-kit 设置 <small className="br-mono">.brain/kit.json</small></b>
               <KitChips k={form} />
               {mode === 'branch' ? (
                 <div className="imp-route" aria-label="新分支从哪来">
                   <code>{c.origin ? 'origin/' : ''}{form.default_branch.trim() || 'main'}</code>
                   <span className="imp-arrow" aria-hidden="true">→</span>
                   <code className="is-new">{branch.trim() || '—'}</code>
-                  <small>新分支，单独的工作目录</small>
+                  <small>新分支，单独的工作目录；合并以后才能开需求</small>
                 </div>
               ) : (
                 <div className="imp-route" aria-label="提交在哪">
                   <code className="is-new">{here}</code>
-                  <small>你现在的检出，提交在这里，马上能用</small>
+                  <small>{remote ? '你现在的检出，提交在这里；推送以后就能开需求' : '你现在的检出，提交在这里，马上能开需求'}</small>
                 </div>
               )}
               <p className="imp-safe" data-testid="install-safe"><RoleIcon role="security" size={18} /><span>{mode === 'branch' ? SAFE_BRANCH : SAFE_INPLACE}</span></p>
@@ -445,7 +553,7 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted }: {
                 <button type="submit" className="br-btn is-primary is-big"
                   disabled={start.busy || !picked?.ok && !!choice || !form.req_prefix.trim() || !form.default_branch.trim() || (mode === 'branch' && !branch.trim())}>
                   <RoleIcon role={mode === 'branch' ? 'handover' : 'commit'} size={17} />
-                  {start.busy ? '正在开始…' : mode === 'branch' ? '安装到新分支' : `直接装在 ${here}`}
+                  {start.busy ? '正在开始…' : mode === 'branch' ? '安装到新分支' : again ? `改成直接装在 ${here}` : `直接装在 ${here}`}
                 </button>
               </div>
               {start.error && <p className="br-error" role="alert">{start.error}</p>}
@@ -454,13 +562,69 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted }: {
         </>
       )}
       {job && <JobBox job={job} what="安装" readError={readError} />}
-      {job && !running && job.result && <InstallOut r={job.result} onCommitted={onCommitted} />}
+      {r && r.commit.ok && (
+        <NextBox r={r} c={c} added={added} addBusy={addBusy} addError={addError} onAdd={onAdd} onChanged={onChanged} go={go} />
+      )}
+      {r && <InstallOut r={r} onCommitted={onCommitted} />}
       {job && job.state === 'failed' && (
         <div className="br-row">
           <button type="button" className="br-btn is-small" onClick={() => onStart(null)}>改一下再装</button>
         </div>
       )}
     </section>
+  )
+}
+
+/**
+ * After an install that went in: where it is, that it is in the list, and the one next step with its button. In place
+ * without a remote: 开需求. With a remote: 推送 <default> first (`brain start` branches from origin). On a branch: the
+ * team's way (推送并开 MR) or 合并到 <default> without a remote, the recommended one first.
+ */
+function NextBox({ r, c, added, addBusy, addError, onAdd, onChanged, go }: {
+  r: InstallResult
+  c: ImportInspect
+  added: AddResult | null
+  addBusy: boolean
+  addError: string
+  onAdd: () => void
+  onChanged: () => void
+  go: ViewProps['go']
+}) {
+  const [pushed, setPushed] = useState(false)
+  const inplace = r.mode === 'inplace'
+  const listedId = added?.id ?? c.listed
+  const target = r.target || '默认分支'
+  const p = inplace ? null : c.pending
+  const ready = inplace && (!r.remote_url || pushed)
+  const head = inplace ? `装好了，提交在 ${r.branch} 上` : `装在 ${r.branch} 分支上`
+  const line = ready ? '现在就能开需求了。'
+    : inplace ? `推送 ${r.branch} 以后就能开需求：开工从 origin 上的 ${r.branch} 建分支。`
+      : `合进 ${target} 以后才能开需求。${p?.next ? `下一步：${p.next}。` : ''}`
+  return (
+    <div className={`imp-done${ready ? '' : ' is-wait'}`} role="status" data-testid="install-next">
+      <span className="imp-mark" aria-hidden="true">{ready ? '✓' : '✋'}</span>
+      <div>
+        <b>{head}{listedId ? `，已经加入列表（${listedId}）` : ''}</b>
+        <small>{line}</small>
+        {!listedId && (
+          <span className="br-row">
+            <button type="button" className="br-btn is-small" disabled={addBusy} onClick={onAdd}><RoleIcon role="list" size={14} />{addBusy ? '正在加入…' : '加入列表'}</button>
+            {addError && <span className="br-error" role="alert">{addError}</span>}
+          </span>
+        )}
+        {inplace && r.remote_url && (
+          <PushBox path={r.path} branch={r.branch} remoteUrl={r.remote_url} target={r.target} onDone={() => setPushed(true)} />
+        )}
+        {p && p.state === 'branch' && p.remote_url && !p.mr_url && <PublishBox path={r.path} p={p} primary onDone={onChanged} />}
+        {p && (p.merge || p.pull || p.mr_url) && <PendingActions key={`${p.state}:${p.branch}`} path={r.path} p={p} onDone={onChanged} />}
+      </div>
+      <div className="br-row">
+        {ready && listedId && (
+          <button type="button" className="br-btn is-primary" onClick={() => go({ kind: 'new', repo: listedId })}><RoleIcon role="new" size={16} />开需求</button>
+        )}
+        <button type="button" className="br-btn" onClick={() => go({ kind: 'overview' })}><RoleIcon role="list" size={16} />去交付总览</button>
+      </div>
+    </div>
   )
 }
 
@@ -479,6 +643,8 @@ function ModeOption({ o, on, rec, onPick }: { o: InstallChoice; on: boolean; rec
   )
 }
 
+/** What the install did: where the commit is, the self-check (what needs a look; the rest folded), the files, the raw
+ * output folded. */
 function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => void }) {
   const api = useAppApi()
   const again = useAction(() => api.post<CommitResult>(paths.importCommit(), { path: r.path }))
@@ -499,12 +665,12 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
           <div><dt>新分支</dt><dd><code>{r.branch}</code>{r.base ? `（从 ${r.base} 建）` : ''}</dd></div>
         )}
         {r.worktree && <div><dt>工作目录</dt><dd><code>{r.worktree}</code></dd></div>}
-        <div><dt>kit.json</dt><dd><KitChips k={r.kit} /></dd></div>
+        <div><dt>brain-kit 设置</dt><dd><KitChips k={r.kit} /></dd></div>
       </dl>
       {commit.ok ? (
-        <div className="imp-commit is-ok" role="status" data-testid="commit-ok">
+        <div className="imp-commit is-ok" data-testid="commit-ok">
           <span className="imp-mark" aria-hidden="true">✓</span>
-          <div><b>{commit.text}</b>{inplace && <small>这个仓库现在就能用。</small>}</div>
+          <div><b className="br-pre">{commit.text}</b></div>
         </div>
       ) : commit.text ? (
         <div className="imp-commit is-bad" role="alert" data-testid="commit-blocked">
@@ -519,27 +685,26 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
           </div>
         </div>
       ) : null}
-      {commit.ok && inplace && r.remote_url && <PushBox path={r.path} branch={r.branch} remoteUrl={r.remote_url} />}
       {again.error && <p className="br-error" role="alert">{again.error}</p>}
       {r.doctor.ran && (
         <div className="imp-block" data-testid="doctor">
-          <div className="imp-block-head"><RoleIcon role="ci" size={18} /><b>brain doctor</b><Counts levels={r.doctor.rows.map((x) => x.level)} /></div>
+          <div className="imp-block-head"><RoleIcon role="ci" size={18} /><b>自检</b><Counts levels={r.doctor.rows.map((x) => x.level)} /></div>
           {r.doctor.rows.length > 0 ? (
             <>
-              <CheckRows rows={r.doctor.rows} only={['FAIL', 'WARN']} empty="全部正常。" />
+              <CheckRows rows={r.doctor.rows} only={['FAIL', 'WARN']} />
               {okRows.length > 0 && (
                 <details className="imp-more">
-                  <summary>另外 {okRows.length} 项正常</summary>
+                  <summary>{okRows.length === r.doctor.rows.length ? `${okRows.length} 项都正常` : `另外 ${okRows.length} 项正常`}</summary>
                   <CheckRows rows={okRows} />
                 </details>
               )}
             </>
-          ) : <pre className="br-findings">{r.doctor.output || '（没有输出）'}</pre>}
+          ) : <p className="br-note">自检没给出结果：原始输出在下面的「细节」里。</p>}
         </div>
       )}
       {r.files.length > 0 && (
-        <div className="imp-block">
-          <div className="imp-block-head"><RoleIcon role="file" size={18} /><b>{inplace ? `提交了 ${r.files.length} 个文件` : `改了 ${r.files.length} 个文件`}</b></div>
+        <details className="imp-more imp-block" data-testid="files">
+          <summary><b>{inplace ? `提交了 ${r.files.length} 个文件` : `改了 ${r.files.length} 个文件`}</b></summary>
           <div className="imp-files" data-testid="changed-files">
             {groups.map(([ch, fs]) => (
               <div key={ch} className="imp-fgroup" data-change={ch}>
@@ -548,12 +713,12 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
               </div>
             ))}
           </div>
-        </div>
+        </details>
       )}
-      {r.output && (
+      {(r.output || r.doctor.output) && (
         <details className="imp-more">
-          <summary>brain install 的输出</summary>
-          <pre className="br-findings">{r.output}</pre>
+          <summary>细节：brain install 和 brain doctor 的原始输出</summary>
+          <pre className="br-findings">{[r.output, r.doctor.output].filter(Boolean).join('\n\n')}</pre>
         </details>
       )}
     </div>
@@ -563,13 +728,13 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
 /** the chip of an older backend's pending state, which has no word of its own */
 const PENDING_WORD: Record<PendingInstall['state'], string> = { branch: '在分支上', uncommitted: '还没提交', merged: '要拉取' }
 
-function PendingCard({ path, p, title, onChanged }: { path: string; p: PendingInstall; title?: string; onChanged: () => void }) {
+function PendingCard({ path, p, onChanged }: { path: string; p: PendingInstall; onChanged: () => void }) {
   const api = useAppApi()
   const again = useAction(() => api.post<CommitResult>(paths.importCommit(), { path }))
   return (
     <section className="br-card imp-sec is-wait" aria-label="装在新分支上" data-testid="pending">
-      <StepHead n={3} title={title ?? (p.state === 'merged' ? `已经合进 ${p.target || '默认分支'}` : '装在新分支上')}
-        state={title ? (p.pushed ? 'done' : undefined) : p.state === 'uncommitted' ? 'wait' : 'done'} />
+      <StepHead n={3} title={p.state === 'merged' ? `已经合进 ${p.target || '默认分支'}` : '装在新分支上'}
+        state={p.state === 'uncommitted' ? 'wait' : 'done'} />
       <div className="imp-pend">
         <span className="br-chip kt-pill tone-wait is-live"><i aria-hidden="true">✋</i>{p.word || PENDING_WORD[p.state]}</span>
         <b>{p.text}</b>
@@ -591,12 +756,12 @@ function PendingCard({ path, p, title, onChanged }: { path: string; p: PendingIn
         </div>
       )}
       {(p.merge || p.pull || p.mr_url) && <PendingActions key={`${p.state}:${p.branch}`} path={path} p={p} onDone={onChanged} />}
-      {p.state === 'branch' && p.remote_url && !p.mr_url && <PublishBox path={path} p={p} onDone={onChanged} />}
+      {p.state === 'branch' && p.remote_url && !p.mr_url && <PublishBox path={path} p={p} primary onDone={onChanged} />}
     </section>
   )
 }
 
-function PublishBox({ path, p, onDone }: { path: string; p: PendingInstall; onDone: () => void }) {
+function PublishBox({ path, p, primary = false, onDone }: { path: string; p: PendingInstall; primary?: boolean; onDone: () => void }) {
   const api = useAppApi()
   const [asking, setAsking] = useState(false)
   const pub = useAction((b: PublishBody) => api.post<PublishResult>(paths.importPublish(), b))
@@ -612,10 +777,10 @@ function PublishBox({ path, p, onDone }: { path: string; p: PendingInstall; onDo
     <div className="imp-block">
       {!asking && (!r || !r.ok) && (
         <div className="br-row">
-          <button type="button" className="br-btn" onClick={() => setAsking(true)}>
+          <button type="button" className={`br-btn${primary ? ' is-primary' : ''}`} onClick={() => setAsking(true)}>
             <RoleIcon role="pr" size={16} />{r ? '再试一次' : p.pushed ? '再推送一次并开 MR' : '推送并开 MR'}
           </button>
-          <span className="br-hint">可选：把这个分支推到远端，在 GitLab 上开 MR。</span>
+          <span className="br-hint">把这个分支推到远端，在 GitLab 上开 MR；MR 合并以后点「拉取」，就能开需求。</span>
         </div>
       )}
       {asking && (
@@ -623,7 +788,7 @@ function PublishBox({ path, p, onDone }: { path: string; p: PendingInstall; onDo
           <span className="imp-confirm-head"><RoleIcon role="pr" size={18} /><b>推送之前确认一下</b></span>
           <p>
             会把分支 <code>{p.branch}</code> 推到 origin（<code>{p.remote_url}</code>）
-            {p.gitlab_project ? <>，再在 GitLab 的 <code>{p.gitlab_project}</code> 上开 MR：<code>{p.branch}</code> → <code>{p.target}</code>。</> : '。kit.json 没写 GitLab 项目：MR 要你自己开。'}
+            {p.gitlab_project ? <>，再在 GitLab 的 <code>{p.gitlab_project}</code> 上开 MR：<code>{p.branch}</code> → <code>{p.target}</code>。</> : '。这个仓库的 brain-kit 设置没写 GitLab 项目：MR 要你自己开。'}
           </p>
           {p.gitlab_project && !p.can_open_mr && <p className="br-hint">这台机器上没有 GitLab token：只推送，MR 用给出的命令或链接自己开。</p>}
           <div className="br-row">
@@ -672,7 +837,7 @@ function PublishOut({ r }: { r: PublishResult }) {
         )}
         {r.output && (
           <details className="imp-more">
-            <summary>git push 的输出</summary>
+            <summary>细节：git push 的输出</summary>
             <pre className="br-findings">{r.output}</pre>
           </details>
         )}
@@ -681,29 +846,26 @@ function PublishOut({ r }: { r: PublishResult }) {
   )
 }
 
-function AddCard({ path, pending, state, onAdded, go }: {
-  path: string
+/** 加入列表 of a repo installed before (an install here adds the repo by itself). */
+function AddCard({ pending, state, result: r, busy, error, onAdd, go }: {
   pending: PendingInstall | null
   state: StepState
-  onAdded: (r: AddResult) => void
+  result: AddResult | null
+  busy: boolean
+  error: string
+  onAdd: () => void
   go: ViewProps['go']
 }) {
-  const api = useAppApi()
-  const add = useAction(() => api.post<AddResult>(paths.importAdd(), { path }))
-  const run = async () => {
-    const r = await add.run()
-    if (r) onAdded(r)
-  }
-  const r = add.result
+  const info = r?.status.repos.find((x) => x.id === r.id)
   return (
     <section className={`br-card imp-sec${r ? ' is-ok' : ''}`} aria-label="加入列表" data-testid="add">
-      <StepHead n={4} title="加入列表" state={state} sub="最后一步" />
+      <StepHead n={4} title="加入列表" state={state} sub={pending ? '合并以后才能开需求' : '最后一步'} />
       {!r && (
         <div className="imp-final">
-          <button type="button" className="br-btn is-primary is-big" disabled={add.busy} onClick={() => void run()}>
-            <RoleIcon role="list" size={18} />{add.busy ? '正在加入…' : '加入列表'}
+          <button type="button" className={`br-btn is-big${pending ? '' : ' is-primary'}`} disabled={busy} onClick={onAdd}>
+            <RoleIcon role="list" size={18} />{busy ? '正在加入…' : pending ? '先加入列表' : '加入列表'}
           </button>
-          <span className="br-hint">{pending ? `加入以后，列表里这个仓库会显示「${pending.text}」：${pending.next}。` : '加入以后，交付总览和开需求就能用它。'}</span>
+          <span className="br-hint">{pending ? `加入以后，列表里这个仓库会显示「${pending.text}」；合并以后才能开需求。` : '加入以后，交付总览和开需求就能用它。'}</span>
         </div>
       )}
       {r && (
@@ -711,23 +873,25 @@ function AddCard({ path, pending, state, onAdded, go }: {
           <span className="imp-mark" aria-hidden="true">✓</span>
           <div>
             <b>{r.text}</b>
-            <small>{r.status.repos.find((x) => x.id === r.id)?.ok ? '现在就能开需求了。' : r.status.repos.find((x) => x.id === r.id)?.pending?.next ?? '装好以后就能用。'}</small>
+            <small>{info?.ok ? '现在就能开需求了。' : info?.pending?.next ?? '装好以后就能用。'}</small>
           </div>
           <div className="br-row">
-            {r.status.repos.find((x) => x.id === r.id)?.ok && (
+            {info?.ok && (
               <button type="button" className="br-btn is-primary" onClick={() => go({ kind: 'new', repo: r.id })}><RoleIcon role="new" size={16} />开需求</button>
             )}
             <button type="button" className="br-btn" onClick={() => go({ kind: 'overview' })}><RoleIcon role="list" size={16} />去交付总览</button>
           </div>
         </div>
       )}
-      {add.error && <p className="br-error" role="alert">{add.error}</p>}
+      {error && <p className="br-error" role="alert">{error}</p>}
     </section>
   )
 }
 
-/** 导入仓库's own look: the option cards, the check rows, the install form and its preview, the job, the result. */
+/** 导入仓库's own look: the option cards, the check rows, the install form and its preview, the job, the result. Its
+ * breakpoints follow the view's own width (a container), not the window: the app sits next to KiroCrew's sidebar. */
 const IMP_CSS = `
+.imp-root { container: imp / inline-size; }
 .imp-hero { gap: 16px; padding: 22px 26px; }
 .imp-hero h2 { margin-bottom: 4px; }
 .imp-sec { gap: 14px; }
@@ -747,7 +911,7 @@ const IMP_CSS = `
 
 /* 从哪来: two big option cards */
 .imp-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 800px) { .imp-options { grid-template-columns: minmax(0, 1fr); } }
+@container imp (max-width: 760px) { .imp-options { grid-template-columns: minmax(0, 1fr); } }
 .imp-option { position: relative; display: grid; grid-template-columns: 46px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: center;
   padding: 14px 44px 14px 18px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-elevated, var(--card)); cursor: pointer; transition: border-color .15s, box-shadow .15s; }
 .imp-option:hover { border-color: var(--accent); }
@@ -773,19 +937,28 @@ const IMP_CSS = `
 .imp-inline input { flex: 1 1 24em; min-width: 0; }
 .imp-stale { margin: 0; display: inline-flex; align-items: center; gap: 8px; color: var(--kt-warn); font-weight: 700; }
 .imp-stale i { font-style: normal; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--kt-warn); font-size: .8em; }
+.imp-found { display: grid; gap: 6px; }
+.imp-found ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19em), 1fr)); gap: 6px; }
+.imp-found-btn { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; cursor: pointer; text-align: left;
+  border: 1px solid var(--border); background: var(--kt-glass); color: var(--text); font: inherit; min-width: 0; }
+.imp-found-btn:hover:not(:disabled) { border-color: var(--accent); }
+.imp-found-btn b { color: var(--text-strong); white-space: nowrap; }
+.imp-found-btn code { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: .84em; }
+.imp-found-btn .br-chip { flex: none; font-size: .78em; }
 .imp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; align-content: start; align-items: start; }
 .imp-grid > .br-field { align-content: start; }
 .imp-grid > .is-full { grid-column: 1 / -1; }
-@media (max-width: 800px) { .imp-grid { grid-template-columns: minmax(0, 1fr); } }
+@container imp (max-width: 760px) { .imp-grid { grid-template-columns: minmax(0, 1fr); } }
 .imp-grid :is(input[type="text"], input:not([type]), select) { width: 100%; }
 
 /* 检查: one row per check, two columns */
 .imp-checks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; align-items: stretch; }
-@media (max-width: 1000px) { .imp-checks { grid-template-columns: minmax(0, 1fr); } }
-.imp-check { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 3px 10px; align-items: start; padding: 9px 12px; border-radius: 12px;
+@container imp (max-width: 960px) { .imp-checks { grid-template-columns: minmax(0, 1fr); } }
+.imp-check { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 3px 10px; align-items: start; align-content: start; padding: 9px 12px; border-radius: 12px;
   border: 1px solid var(--border); background: var(--kt-glass); }
 .imp-check.is-FAIL { border-color: color-mix(in srgb, var(--kt-bad) 50%, var(--border)); background: color-mix(in srgb, var(--kt-bad) 7%, transparent); }
 .imp-check.is-WARN { border-color: color-mix(in srgb, var(--kt-warn) 50%, var(--border)); background: color-mix(in srgb, var(--kt-warn) 6%, transparent); }
+.imp-check.is-next { border-color: color-mix(in srgb, var(--kt-info) 50%, var(--border)); background: color-mix(in srgb, var(--kt-info) 6%, transparent); }
 .imp-glyph { grid-row: span 2; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 8px; font-weight: 900; font-size: 13px;
   color: var(--kt-tone); border: 2px solid var(--kt-tone); background: color-mix(in srgb, var(--kt-tone) 14%, transparent); }
 .imp-check.is-OK .imp-glyph { background: var(--kt-ok-solid); border-color: var(--kt-ok-solid); color: #fff; }
@@ -802,9 +975,9 @@ const IMP_CSS = `
 .imp-verdict { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--kt-bad);
   background: color-mix(in srgb, var(--kt-bad) 9%, var(--card)); color: var(--kt-bad); }
 
-/* 装到新分支: the field grid and its live preview */
-.imp-install { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 18px; align-items: start; }
-@media (max-width: 1100px) { .imp-install { grid-template-columns: minmax(0, 1fr); } }
+/* 安装: the field grid and its live preview */
+.imp-install { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 18px; align-items: start; }
+@container imp (max-width: 1060px) { .imp-install { grid-template-columns: minmax(0, 1fr); } }
 .imp-seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .imp-opt { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 9px; border-radius: 999px; cursor: pointer; font-size: .92em; font-weight: 650;
   border: 1px solid var(--border-strong, var(--border)); background: var(--card); color: var(--text); }
@@ -815,6 +988,7 @@ const IMP_CSS = `
 .imp-preview { display: grid; gap: 12px; padding: 14px 16px; border-radius: 14px; border: 1px dashed color-mix(in srgb, var(--kt-info) 55%, var(--border));
   background: color-mix(in srgb, var(--kt-info) 5%, var(--card)); }
 .imp-preview > b { color: var(--text-strong); font-weight: 750; }
+.imp-preview > b small { color: var(--muted); font-weight: 500; font-size: .8em; margin-left: 6px; }
 .imp-kv { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .imp-kv li { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--kt-info) 50%, var(--border)); background: color-mix(in srgb, var(--kt-info) 9%, transparent); }
@@ -839,7 +1013,7 @@ const IMP_CSS = `
 /* the install's result */
 .imp-result { display: grid; gap: 14px; }
 .imp-facts { display: grid; grid-template-columns: repeat(3, minmax(0, auto)); justify-content: start; gap: 8px 28px; margin: 0; }
-@media (max-width: 1100px) { .imp-facts { grid-template-columns: minmax(0, 1fr); } }
+@container imp (max-width: 1060px) { .imp-facts { grid-template-columns: minmax(0, 1fr); } }
 .imp-facts dt { font-size: .82em; color: var(--muted); font-weight: 700; }
 .imp-facts dd { margin: 3px 0 0; color: var(--text); word-break: break-word; }
 .imp-facts code { color: var(--text-strong); font-weight: 650; }
@@ -857,6 +1031,7 @@ const IMP_CSS = `
 .imp-mark { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-weight: 900; color: #fff; background: var(--kt-ok-solid); }
 .imp-commit.is-bad .imp-mark { background: var(--kt-bad-solid); }
 .imp-more > summary { cursor: pointer; color: var(--muted); font-size: .9em; }
+.imp-more > summary b { color: var(--text-strong); font-weight: 750; }
 .imp-more[open] > summary { margin-bottom: 8px; }
 
 /* pending, publish, the last step */
@@ -869,8 +1044,12 @@ const IMP_CSS = `
 .imp-final { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
 .imp-done { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 18px; border-radius: 14px; border: 1px solid var(--kit-ok);
   background: radial-gradient(70% 140% at 0% 0%, color-mix(in srgb, var(--kt-ok) 14%, transparent), transparent 60%), var(--card); }
+.imp-done.is-wait { align-items: flex-start; border-color: var(--kit-wait);
+  background: radial-gradient(70% 140% at 0% 0%, color-mix(in srgb, var(--kt-approve) 12%, transparent), transparent 60%), var(--card); }
+.imp-done.is-wait .imp-mark { background: var(--kt-approve); box-shadow: none; }
 .imp-done .imp-mark { width: 40px; height: 40px; border-radius: 12px; font-size: 1.3em; box-shadow: 0 0 24px -6px var(--kt-ok); }
-.imp-done > div:not(.br-row) { display: grid; gap: 2px; flex: 1 1 14em; min-width: 0; }
+.imp-done > div:not(.br-row) { display: grid; gap: 6px; flex: 1 1 14em; min-width: 0; }
 .imp-done b { font-size: 1.2em; font-weight: 850; color: var(--text-strong); }
 .imp-done small { color: var(--muted); }
+.imp-done .br-confirm b, .imp-done .imp-block b { font-size: 1em; }
 `

@@ -323,6 +323,9 @@ export interface ImportDefaults {
   token: boolean
   brainkit_ok: boolean
 }
+/** A git checkout under ~/workplace or ~/workspace that 导入仓库 offers to pick (importer.found_repos), sent as
+ * ImportDefaults' `found` once the backend's GET /import/defaults has it */
+export interface FoundRepo { path: string; name: string; installed: boolean; listed: boolean }
 
 /** One row of 检查: ✓ OK, ! WARN (worth knowing, stops nothing), ✗ FAIL; why, and what to do. */
 export interface ImportCheck { id: string; level: Level; label: string; why: string; todo: string }
@@ -753,7 +756,14 @@ export const CLASS_LABEL: Record<Classification, string> = {
   unsure: '不确定（按机密处理）',
 }
 
-export interface IntakeNext { repo: string; key: string | null; tracker: string; prefix: string; error: string }
+export interface IntakeNext {
+  repo: string; key: string | null; tracker: string; prefix: string; error: string
+  /** kit.json intake.allow_confidential: gate 2 takes confidential material here (brain-kit's default: no) */
+  allow_confidential?: boolean
+  /** brain-kit is on the default branch in this checkout only, not on origin, where `brain start` branches from (an
+   * in-place install not pushed yet): 推送 first. null: nothing waits */
+  push?: { branch: string; remote_url: string } | null
+}
 
 export interface IntakeBody {
   repo: string
@@ -787,8 +797,12 @@ export interface IntakeCheck {
    * a password but may as well be a word. Not masked and not stopping anything: if it is one, change the document
    * and check again */
   review: string[]
-  /** gates that would stop the start, verbatim */
+  /** gates that would stop the start, said as what to do on this page (「第 2 关：这个仓库不收机密材料…」) */
   blocking: string[]
+  /** the same, as brain-kit said them (shown folded) */
+  blocking_raw?: string[]
+  /** the findings per file, said plainly: what was found and what happened to it, 请你确认, why a file was not taken */
+  files?: { id: string; name: string; items: string[]; review: string; refused: string }[]
   refused: { id: string; name: string; reason: string }[]
   /** a hard stop before any finding (no consent, nothing to take in …), verbatim */
   error: string

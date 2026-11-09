@@ -11,6 +11,7 @@
  *     &focus=accept|checks|lanes|feed             …scrolled to 验收, the check wall, the lanes or the events
  *     &from=overview|item|todo                    …opened from that view: the crumb says the way back
  *   ?view=new&repo=<id>                           开需求
+ *     &key=<KEY>&title=<title>                    …开工 of a requirement claimed already: its key fixed, its title filled
  *   ?view=brain&repo=<id>&file=<FILE>&id=<entry>&reflect=<KEY>   Brain: that file, that entry picked out, that
  *                                                 requirement picked in the reflect card
  *   ?view=todo                                    待办
@@ -61,6 +62,9 @@ const FROM: readonly string[] = ['overview', 'todo', 'brain', 'board']
 const BOARD_FROM: readonly string[] = ['overview', 'item', 'todo']
 const FOCUS: readonly string[] = ['accept', 'checks', 'lanes', 'feed']
 
+/** a requirement's title as a link may carry it: one line, no control characters, at most 200 characters */
+const titleOf = (t: string | null | undefined): string => (t ?? '').replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ').trim().slice(0, 200)
+
 const repoOf = (q: URLSearchParams) => {
   const r = q.get('repo') ?? ''
   return REPO_RE.test(r) ? { repo: r } : {}
@@ -90,7 +94,16 @@ export function parseView(search: string): View {
     if (Number.isInteger(at) && at > 1e9 && at < 1e10) v.at = at
     return v
   }
-  if (view === 'new') return { kind: 'new', ...repoOf(q) }
+  if (view === 'new') {
+    const v: View = { kind: 'new', ...repoOf(q) }
+    const key = q.get('key') ?? ''
+    if (v.repo && KEY_RE.test(key)) {
+      v.key = key
+      const title = titleOf(q.get('title'))
+      if (title) v.title = title
+    }
+    return v
+  }
   if (view === 'brain') {
     const v: View = { kind: 'brain', ...repoOf(q) }
     const file = q.get('file') ?? ''
@@ -139,6 +152,10 @@ export function searchOf(v: View): string {
     case 'new':
       q.set('view', 'new')
       put('repo', v.repo)
+      if (v.repo && v.key && KEY_RE.test(v.key)) {
+        q.set('key', v.key)
+        put('title', titleOf(v.title))
+      }
       break
     case 'brain':
       q.set('view', 'brain')

@@ -61,7 +61,7 @@ export const sourceName = (s: string | null | undefined): string => (s ? SOURCE_
 
 /** how a document is classified (gate 2) */
 export const CLASS_NAME: Record<string, string> = {
-  public: '公开', internal: '内部', confidential: '机密', restricted: '严格受限', unsure: '不确定',
+  public: '公开', internal: '内部', confidential: '机密', restricted: '严格受限', unsure: '不确定', secret: '绝密',
 }
 
 /** 4 done · 6 skipped · next: 发布 — the one way the whole app says Lean's progress (#8) */
@@ -100,3 +100,11 @@ const MISSING_SOURCE: [RegExp, string][] = [
   [/^bridge ledger/i, '桥的账本'], [/^vouchers/i, '回答凭证'], [/^pushes/i, '推送记录'], [/^CI pipelines/i, 'GitLab 上的 CI'], [/^runnerd/i, '运行机的记录'],
 ]
 export const missingSourceName = (raw: string): string => MISSING_SOURCE.find(([re]) => re.test(raw))?.[1] ?? '别的记录'
+
+/** brain-kit's optional modules (Status.brainkit.modules) → what they do for a person */
+export const MODULE_NAME: Record<string, string> = {
+  trace: '需求时间线', evaluate: '交付评估', golden: '标准考题', intents: '需求来源', mrdesc: '变更说明',
+}
+
+/** kit.json tracker → one word (设置, 导入仓库) */
+export const TRACKER_NAME: Record<string, string> = { none: '不用 Jira', jira: '用 Jira' }
