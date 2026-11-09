@@ -779,6 +779,16 @@ describe('需求详情', () => {
     expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item', focus: 'checks' })
   })
 
+  test('检查 with one check so far says it as the board does: 1 项过了, not 都过', async () => {
+    const b = fx.board()
+    b.checks.cells = b.checks.cells.filter((c) => c.id === 'gate-REQUIREMENTS' || c.status === 'skip')
+    b.checks = { ...b.checks, passed: 1, failed: 0, total: 1, todo: ['发布审批'] }
+    installFixtureRoutes({ [`GET ${API}/board/*`]: () => b })
+    renderDetail()
+    const card = await screen.findByRole('article', { name: '检查' })
+    await waitFor(() => expect(within(card).getByTestId('checks-say')).toHaveTextContent(/^目前 1 项过了 · 还剩 发布审批$/))
+  })
+
   test('检查 after the merge: the 14 days are watched, not waited on', async () => {
     withDetail((d) => { d.row.state = 'merged' }, { [`GET ${API}/board/*`]: () => fx.boardMerged() })
     renderDetail()

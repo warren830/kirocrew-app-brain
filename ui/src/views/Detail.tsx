@@ -748,7 +748,7 @@ function ChecksCard({ board, localOnly, sent, blocked, onBoard }: {
   const ok = !!w && w.total > 0 && w.passed === w.total && !todo.length && !waiting.length
   const say = !w ? '看板的数据还没来'
     : w.total === 0 && !todo.length ? '还没有检查结果'
-      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed} 项都过`, waiting.length ? `${board && PERSON.has(board.row.waits.who) ? whoWord(board.row.waits.who, board.person.owner) : '等人'}：${waiting.join('、')}` : '',
+      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed === 1 ? '1 项过了' : `${w.passed} 项都过`}`, waiting.length ? `${board && PERSON.has(board.row.waits.who) ? whoWord(board.row.waits.who, board.person.owner) : '等人'}：${waiting.join('、')}` : '',
         watching.length ? `观察中：${watching.join('、')}` : '', todo.length ? `还剩 ${todo.join('、')}` : '']
         .filter(Boolean).join(' · ')
   return (
