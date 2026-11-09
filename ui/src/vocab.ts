@@ -48,6 +48,8 @@ export const ACT = {
   openBoard: '需求看板',
   openDetail: '需求详情',
   me: '你是谁',
+  acceptOnMr: '去 MR 上验收',
+  viewMr: '看 MR',
 } as const
 
 /** where a requirement came from (Requirement.source, brainkit.intents) */
