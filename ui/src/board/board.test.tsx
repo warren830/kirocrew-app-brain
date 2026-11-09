@@ -5,7 +5,7 @@ import { fx } from '../test/data'
 import { API, fixtureRoutes, installFixtureRoutes } from '../test/routes'
 import { apiCalls, apiError, navigations, setApiRoutes } from '../test/stubs/app-sdk'
 import type { BoardEntry } from '../nav'
-import type { ReqBoard } from '../types'
+import type { ChildStartResult, FamilyActs, ReqBoard, ReqFamily, SplitResult } from '../types'
 import { TYPE_IT_YOURSELF } from '../ui'
 import type { ViewProps } from '../views/props'
 import { BoardPage } from './BoardPage'
@@ -525,5 +525,191 @@ describe('需求看板 · 回放', () => {
     expect(within(card).queryByTestId('accept-step')).toBeNull()
     fireEvent.click(within(card).getByRole('button', { name: '需求详情 ↗' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-2', from: 'board' })
+  })
+})
+
+// ---------------------------------------------------------------- 大需求拆成小需求 on the board
+
+const NO_ACTS: FamilyActs = { split: null, claim: null, release: null, start: null, start_on: null, sync: null }
+const famBase = (role: ReqFamily['role']): ReqFamily => ({
+  role, parent: 'PAY-1', parent_title: '退款大需求', branch: 'ai/alice/PAY-1-big', unit: null, state: null, state_label: '', owner: null,
+  depends_on: [], blocked_by: [], paths: [], contracts: [], children: [], progress: null, family_state: null, family_label: '', released: false,
+  acts: { ...NO_ACTS }, source: 'brainkit', at: fx.board().at,
+})
+/** PAY-3, the web unit of PAY-1: in carol's hands (its run going), or nobody's yet */
+function childBoard(state: 'in_progress' | 'unclaimed' = 'in_progress', acts: Partial<FamilyActs> = {}): ReqBoard {
+  const b = fx.board()
+  if (state === 'unclaimed') {
+    b.row.state = 'unclaimed'
+    b.row.state_label = '待认领'
+    b.row.owner = null
+  }
+  b.row.family = {
+    ...famBase('child'), unit: 'web', state, state_label: state === 'unclaimed' ? '待认领' : 'carol 在做', owner: state === 'unclaimed' ? null : 'carol',
+    paths: ['web/**'], depends_on: [{ key: 'PAY-2', unit: 'api', state: 'merged', owner: 'alice', merged: true, text: 'PAY-2（api，已合并）' }],
+    acts: { ...NO_ACTS, ...acts },
+  }
+  return b
+}
+function parentBoard(): ReqBoard {
+  const b = fx.board()
+  b.row.key = 'PAY-1'
+  b.row.title = '退款大需求'
+  b.row.family = {
+    ...famBase('parent'), family_state: 'in_progress', family_label: '小需求在做', acts: { ...NO_ACTS, split: { ok: true, why: '' } },
+    progress: { merged: 1, total: 3, unclaimed: 1, claimed: 0, in_progress: 1, closed: 0, text: '1/3 merged' },
+    children: [
+      { key: 'PAY-2', unit: 'api', title: '通过接口提交退款', state: 'merged', state_label: '已合并', owner: 'alice', depends_on: [], blocked_by: [] },
+      { key: 'PAY-3', unit: 'web', title: '在订单页看到退款状态', state: 'in_progress', state_label: 'carol 在做', owner: 'carol', depends_on: ['PAY-2'], blocked_by: [] },
+      { key: 'PAY-4', unit: 'jobs', title: '每晚自动对账', state: 'unclaimed', state_label: '待认领', owner: null, depends_on: [], blocked_by: [] },
+    ],
+  }
+  const n = (commits: number, credits: number | null) => ({ stages_done: 5, verify_rounds: 2, verify_failed: 0, commits_bot: commits, commits_person: 0, blocked: 0,
+    human_at_judgment: 2, human_outside_judgment: 0, decisions: 1, questions: 0, credits })
+  b.rollup = {
+    own: n(4, 10), total: n(15, null), unknown: ['PAY-4 credits'],
+    children: [{ key: 'PAY-2', unit: 'api', merged: true, numbers: n(6, 8.2) }, { key: 'PAY-3', unit: 'web', merged: false, numbers: n(5, 3.1) }],
+  }
+  return b
+}
+const PAY1: BoardEntry = { repo: 'r1', key: 'PAY-1' }
+const famCard = () => screen.getByTestId('fam-panel')
+const topBar = () => within(document.querySelector('header.kt-top') as HTMLElement)
+
+describe('需求看板 · 大需求拆成小需求', () => {
+  test('a small one names its big one in the crumb and the top bar (that one’s board) with its unit; its family card sits under the conveyor, before its lanes', async () => {
+    installFixtureRoutes(boardRoute(() => childBoard()))
+    const p = renderBoard()
+    await loaded()
+    const top = topBar()
+    expect(top.getByTestId('br-board-unit')).toHaveTextContent('单元 web')
+    fireEvent.click(top.getByRole('button', { name: '大需求 PAY-1' }))
+    expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-1' })
+    expect(screen.getByRole('navigation', { name: '位置' })).toHaveTextContent('交付总览›PAY-1›PAY-3›需求看板')
+    fireEvent.click(crumb().getByRole('button', { name: 'PAY-1' }))
+    expect(p.go).toHaveBeenCalledTimes(2)
+    expect(famCard()).toHaveClass('kt-card')
+    expect(screen.getByTestId('kt-conveyor').compareDocumentPosition(famCard()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(famCard().compareDocumentPosition(screen.getByTestId('kt-lanes')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(screen.getByRole('complementary', { name: '检查、问题和事件' })).queryByTestId('fam-panel')).toBeNull()
+    expect(within(famCard()).getByRole('heading', { level: 2, name: 'PAY-1 的小需求 · 单元 web' })).toBeInTheDocument()
+    expect(famCard()).toHaveTextContent('PAY-2（api，已合并）')
+  })
+
+  test('the actions are there too: 同步 posts and shows its answer; the board reads itself again', async () => {
+    installFixtureRoutes({
+      ...boardRoute(() => childBoard('in_progress', { sync: { ok: true, why: '' } })),
+      [`POST ${API}/requirements/r1/PAY-3/sync`]: () => ({ ok: true, result: 'up_to_date', text: '已经是最新的', conflicts: [], problem: null, output: '' }),
+    })
+    const p = renderBoard()
+    await loaded()
+    const before = boardCalls().length
+    fireEvent.click(within(famCard()).getByRole('button', { name: '同步' }))
+    expect(await within(famCard()).findByTestId('fam-sync-result')).toHaveTextContent('已经是最新的')
+    expect(apiCalls.filter((c) => c.method === 'POST')).toEqual([{ method: 'POST', path: `${API}/requirements/r1/PAY-3/sync`, body: {} }])
+    await waitFor(() => expect(boardCalls().length).toBeGreaterThan(before))
+    expect(p.reloadStatus).toHaveBeenCalled()
+  })
+
+  test('a small one nobody has: its own way, no 开需求; 开工 from its card, and the answer (打开会话) stays when the board becomes the run’s', async () => {
+    const started: ChildStartResult = {
+      ok: true, key: 'PAY-3', branch: 'ai/carol/PAY-3-web', worktree: '/Users/carol/.brain/worktrees/shop-pay/PAY-3', on: null, text: '开工了：PAY-3',
+      blocked: [], can_on: null, problem: null, output: '', slot: 'brain-PAY-3-a1b2', url: '/chat?sid=brain-PAY-3-a1b2', session_error: '',
+    }
+    let snap = childBoard('unclaimed', { claim: { ok: true, why: '' }, start: { ok: true, why: '' } })
+    installFixtureRoutes({
+      [`GET ${API}/board/*`]: () => snap,
+      [`POST ${API}/requirements/r1/PAY-3/start`]: () => {
+        snap = childBoard('in_progress', { sync: { ok: true, why: '' } })
+        return started
+      },
+    })
+    renderBoard()
+    const intro = await screen.findByTestId('br-board-intro')
+    expect(within(intro).getByRole('heading', { name: 'PAY-3 待认领' })).toBeInTheDocument()
+    expect(intro).toHaveTextContent('MR 交给大需求的负责人合并（小需求不交给运行机）')
+    const way = within(intro).getByRole('list', { name: '一个小需求的路，从左到右' })
+    expect(Array.from(way.querySelectorAll('.kt-intro-phase-head b')).map((b) => b.textContent)).toEqual(['0 认领', '1 开工', '2 做 · 同步', '3 交接', '4 合并'])
+    expect(screen.queryByRole('button', { name: '去开需求，开工' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '去开工' })).toBeNull()
+    // the card comes first, with 认领 and 开工
+    expect(famCard().compareDocumentPosition(intro) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(famCard()).getByRole('button', { name: '认领' })).toHaveClass('is-primary')
+    fireEvent.click(within(famCard()).getByRole('button', { name: '开工' }))
+    await loaded()   // the run's board now: graph, counters, the card under the conveyor
+    const out = within(famCard()).getByTestId('fam-start-result')
+    expect(screen.queryByTestId('br-board-intro')).toBeNull()
+    expect(out).toHaveTextContent('开工了：PAY-3')
+    expect(within(out).queryByRole('button', { name: '看需求看板' })).toBeNull()   // it is this one
+    fireEvent.click(within(out).getByRole('button', { name: '打开会话' }))
+    expect(navigations).toEqual(['/chat?sid=brain-PAY-3-a1b2'])
+  })
+
+  test('a big one split into small ones: the small ones as lanes with the roll-up and the trace numbers, under the conveyor, before its own lanes', async () => {
+    installFixtureRoutes(boardRoute(parentBoard))
+    const p = renderBoard(PAY1)
+    await loaded()
+    const card = screen.getByRole('region', { name: '拆成的小需求' })
+    expect(card).toHaveClass('kt-card')
+    expect(within(card).getByTestId('fam-merged')).toHaveAccessibleName('已合并 1/3')
+    expect(within(card).getAllByTestId('fam-child').map((l) => `${l.dataset.key} ${l.dataset.state}`)).toEqual(['PAY-2 merged', 'PAY-3 in_progress', 'PAY-4 unclaimed'])
+    expect(within(card).getAllByTestId('fam-child')[0]).toHaveClass('kt-lane')
+    expect(within(card).getByRole('group', { name: '整个大需求加起来' })).toHaveTextContent('提交15')
+    expect(within(card).getByTestId('fam-unknown')).toHaveTextContent('PAY-4 credits')
+    const belt = screen.getByTestId('kt-conveyor')
+    expect(belt.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(card.compareDocumentPosition(screen.getByTestId('kt-lanes')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // the top bar says how far, and jumps there
+    const scroll = vi.mocked(HTMLElement.prototype.scrollIntoView)
+    scroll.mockClear()
+    fireEvent.click(topBar().getByRole('button', { name: '大需求 · 已合并 1/3' }))
+    expect(scroll.mock.contexts[0]).toBe(card)
+    fireEvent.click(within(card).getAllByTestId('fam-child')[2])
+    expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-4' })
+    expect(within(card).getByRole('button', { name: '拆成小需求' })).toBeEnabled()
+  })
+
+  test('a big one not split yet: what comes next under the counters; 拆成小需求 previews first', async () => {
+    const b = fx.board()
+    b.row.key = 'PAY-1'
+    b.row.family = { ...famBase('big'), acts: { ...NO_ACTS, split: { ok: true, why: '' } } }
+    const preview: SplitResult = {
+      ok: true, dry_run: true, parent: 'PAY-1', branch: 'ai/alice/PAY-1-big', units_sha: '31369169', design_sha: '4a037c33', warnings: [], problems: [], output: '',
+      text: '会拆成 2 个小需求。',
+      actions: ['api', 'web'].map((unit) => ({ unit, kind: 'new', kind_label: '新登记（待认领）', key: null, title: unit, paths: [`${unit}/**`], depends_on: [], contracts: [], why: [], attention: false })),
+    }
+    installFixtureRoutes({ ...boardRoute(() => b), [`POST ${API}/requirements/r1/PAY-1/split`]: () => preview })
+    renderBoard(PAY1)
+    await loaded()
+    const card = screen.getByRole('region', { name: '大需求' })
+    expect(screen.getByRole('group', { name: '指标' }).compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(card.compareDocumentPosition(screen.getByTestId('kt-graph')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(topBar().getByRole('button', { name: '大需求 · 还没拆' })).toBeInTheDocument()
+    fireEvent.click(within(card).getByRole('button', { name: '拆成小需求' }))
+    expect(await within(card).findByRole('table', { name: '会拆成这些小需求' })).toBeInTheDocument()
+    expect(apiCalls.filter((c) => c.method === 'POST').map((c) => c.body)).toEqual([{ apply: false }])
+  })
+
+  test('while it replays the family card offers nothing; after the replay its actions are back', async () => {
+    installFixtureRoutes(boardRoute(() => childBoard('in_progress', { sync: { ok: true, why: '' }, release: { ok: true, why: '' }, start_on: 'PAY-2' })))
+    renderBoard()
+    await loaded()
+    expect(within(famCard()).getByRole('group', { name: '小需求的操作' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '▶ 回放' }))
+    expect(screen.getByRole('group', { name: '回放' })).toBeInTheDocument()
+    expect(within(famCard()).queryByRole('group', { name: '小需求的操作' })).toBeNull()
+    expect(within(famCard()).getAllByRole('button').map((b) => b.textContent)).toEqual(['PAY-1'])
+    fireEvent.click(within(screen.getByRole('group', { name: '回放' })).getByRole('button', { name: '退出回放' }))
+    expect(within(famCard()).getByRole('button', { name: '同步' })).toBeEnabled()
+    expect(apiCalls.some((c) => c.method === 'POST')).toBe(false)
+  })
+
+  test('a requirement outside a family: no family card, no family pill', async () => {
+    installFixtureRoutes()
+    renderBoard()
+    await loaded()
+    expect(screen.queryByTestId('fam-panel')).toBeNull()
+    expect(screen.queryByTestId('br-board-unit')).toBeNull()
+    expect(topBar().queryByRole('button', { name: /大需求/ })).toBeNull()
   })
 })

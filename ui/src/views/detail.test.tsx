@@ -7,6 +7,7 @@ import { fmtCredits } from '../format'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import { TYPE_IT_YOURSELF } from '../ui'
+import type { ChildStartResult, FamilyActs, ReqFamily } from '../types'
 import { DetailView, MR_DESC_COPY_HINT } from './Detail'
 import type { ViewProps } from './props'
 
@@ -448,5 +449,91 @@ describe('需求详情', () => {
     const { go } = renderDetail()
     fireEvent.click(await screen.findByRole('button', { name: '▶ 回放 ↗' }))
     expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item', replay: true })
+  })
+})
+
+// ---------------------------------------------------------------- 大需求拆成小需求: the family panel
+
+const NO_ACTS: FamilyActs = { split: null, claim: null, release: null, start: null, start_on: null, sync: null }
+const famBase = (role: ReqFamily['role']): ReqFamily => ({
+  role, parent: 'PAY-1', parent_title: '退款大需求', branch: 'ai/alice/PAY-1-big', unit: null, state: null, state_label: '', owner: null,
+  depends_on: [], blocked_by: [], paths: [], contracts: [], children: [], progress: null, family_state: null, family_label: '', released: false,
+  acts: { ...NO_ACTS }, source: 'brainkit', at: fx.overview().at,
+})
+
+/** PAY-3 as the web unit of PAY-1, claimed by carol, its dependency PAY-2 merged: 开工 offered */
+function childDetail() {
+  const d = fx.detail()
+  d.row.state = 'claimed'
+  d.row.state_label = 'carol 认领了'
+  d.row.family = {
+    ...famBase('child'), unit: 'web', state: 'claimed', state_label: 'carol 认领了', owner: 'carol', paths: ['web/**'],
+    depends_on: [{ key: 'PAY-2', unit: 'api', state: 'merged', owner: 'alice', merged: true, text: 'PAY-2（api，已合并）' }],
+    acts: { ...NO_ACTS, start: { ok: true, why: '' }, release: { ok: true, why: '' } },
+  }
+  return d
+}
+
+describe('需求详情 · 大需求拆成小需求', () => {
+  beforeEach(() => installFixtureRoutes())
+
+  test('a small one: its family panel under the four numbers; 开工 posts start, then 打开会话 and 看需求看板; the detail reads itself again', async () => {
+    const started: ChildStartResult = {
+      ok: true, key: 'PAY-3', branch: 'ai/carol/PAY-3-web', worktree: '/Users/carol/.brain/worktrees/shop-pay/PAY-3', on: null, text: '开工了：PAY-3',
+      blocked: [], can_on: null, problem: null, output: 'Started PAY-3', slot: 'brain-PAY-3-a1b2', url: '/chat?sid=brain-PAY-3-a1b2', session_error: '',
+    }
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => childDetail(), [`POST ${API}/requirements/r1/PAY-3/start`]: () => started })
+    const { go, reloadStatus } = renderDetail()
+    const panel = await screen.findByRole('region', { name: 'PAY-1 的小需求' })
+    expect(panel).toHaveClass('cto-card')
+    expect(within(panel).getByRole('heading', { level: 3, name: 'PAY-1 的小需求 · 单元 web' })).toBeInTheDocument()
+    expect(panel).toHaveTextContent('PAY-2（api，已合并）')
+    // under the four numbers, before the value stream and Lean
+    const cards = screen.getByRole('region', { name: '这个需求的四个数' })
+    expect(cards.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(panel.compareDocumentPosition(screen.getByRole('region', { name: 'Lean 进度' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const gets = () => apiCalls.filter((c) => c.method === 'GET' && c.path === `${API}/requirements/r1/PAY-3`).length
+    const before = gets()
+    fireEvent.click(within(panel).getByRole('button', { name: '开工' }))
+    const out = await within(panel).findByTestId('fam-start-result')
+    expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/requirements/r1/PAY-3/start`, body: { open_session: true, trust: true } })
+    await waitFor(() => expect(gets()).toBeGreaterThan(before))
+    expect(reloadStatus).toHaveBeenCalled()
+    fireEvent.click(within(out).getByRole('button', { name: '打开会话' }))
+    expect(navigations).toEqual(['/chat?sid=brain-PAY-3-a1b2'])
+    fireEvent.click(within(out).getByRole('button', { name: '看需求看板' }))
+    expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item' })
+    // its big one: that one's 需求看板
+    fireEvent.click(within(panel).getByRole('button', { name: 'PAY-1' }))
+    expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-1', from: 'item' })
+  })
+
+  test('a big one split into small ones: its lanes with the roll-up; a lane opens that one’s 需求看板; no trace numbers here', async () => {
+    const d = fx.detail()
+    d.row.key = 'PAY-1'
+    d.row.family = {
+      ...famBase('parent'), family_state: 'in_progress', family_label: '小需求在做',
+      progress: { merged: 0, total: 2, unclaimed: 1, claimed: 0, in_progress: 1, closed: 0, text: '0/2 merged' },
+      children: [
+        { key: 'PAY-2', unit: 'api', title: '通过接口提交退款', state: 'in_progress', state_label: 'alice 在做', owner: 'alice', depends_on: [], blocked_by: [] },
+        { key: 'PAY-3', unit: 'web', title: '在订单页看到退款状态', state: 'unclaimed', state_label: '待认领', owner: null, depends_on: ['PAY-2'], blocked_by: ['PAY-2'] },
+      ],
+    }
+    const b = fx.board()
+    b.rollup = { own: null, total: null, unknown: [], children: [] }
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d, [`GET ${API}/board/*`]: () => b })
+    const { go } = renderDetail({ repo: 'r1', key: 'PAY-1', from: 'overview' })
+    const panel = await screen.findByRole('region', { name: '拆成的小需求' })
+    expect(within(panel).getByTestId('fam-merged')).toHaveAccessibleName('已合并 0/2')
+    expect(within(panel).getAllByTestId('fam-child').map((l) => l.getAttribute('aria-label'))).toEqual(['PAY-2：alice 在做', 'PAY-3：待认领'])
+    expect(within(panel).queryByTestId('fam-rollup')).toBeNull()
+    fireEvent.click(within(panel).getAllByTestId('fam-child')[1])
+    expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item' })
+  })
+
+  test('a requirement outside a family has no family panel', async () => {
+    renderDetail()
+    await screen.findByRole('region', { name: '需求' })
+    expect(screen.queryByTestId('fam-panel')).toBeNull()
   })
 })

@@ -10,6 +10,10 @@
  *
  * Polls GET /requirements/{repo}/{key} every 5 s, and the board's snapshot (GET /board/{repo}/{key}) for the value
  * stream (its actors' spans); without a board the cards that need it say so.
+ *
+ * A requirement of a family (row.family: a big one split into small ones, one of those, or a big one not split yet)
+ * has its family panel under the four numbers (Family.tsx): the small ones as lanes with the roll-up, or the big one
+ * and its dependencies, with 认领 / 放弃认领 / 开工 / 同步 / 拆成小需求 as brain-kit offers them.
  */
 import { useState } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
@@ -20,6 +24,7 @@ import { ago, fmtCredits, fmtIso, fmtSpan, fmtTime, isoDay } from '../format'
 import type { ItemEntry, ItemFrom } from '../nav'
 import type { Decision, OpenSessionBody, OpenSessionResult, ReqBoard, RequirementDetail, SessionRow, Stage, TimelineItem, TimelineKind } from '../types'
 import { APPROVAL_META, Icon, LoadState, MrLink, STAGE_META, StateChip, TypeLine } from '../ui'
+import { FamilyPanel, useFamily } from './Family'
 import type { ViewProps } from './props'
 import { EntryChip, MrDescCard, QuestionCard } from './Question'
 
@@ -132,6 +137,10 @@ export function DetailView({ entry, onBack, ...props }: { entry: ItemEntry; onBa
     d.reload()
     props.reloadStatus()
   }
+  const family = useFamily(entry.repo, entry.key, () => {
+    after()
+    b.reload()
+  })
   const x = d.data
   const board = b.data
   const live = x ? x.sessions.find((s) => s.kind === 'local' && !s.error) ?? null : null
@@ -159,6 +168,7 @@ export function DetailView({ entry, onBack, ...props }: { entry: ItemEntry; onBa
           <Header x={x} />
           <Cards x={x} board={board} onBoard={() => toBoard()} />
           {(canOpen || opened) && <OpenSession repo={entry.repo} reqKey={entry.key} opened={opened} onOpened={(r) => { setOpened(r); after() }} />}
+          {x.row.family && <FamilyPanel f={x.row.family} repo={entry.repo} reqKey={entry.key} ctl={family} look="detail" go={props.go} />}
           <StreamCard board={board} onBoard={() => toBoard()} />
           <LeanCard x={x} sessionUrl={live?.url ?? null} />
           <div className="br-twocol">

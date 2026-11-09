@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { apiCalls, badges, navigations } from '../test/stubs/app-sdk'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
+import type { ChildStartResult, Todo, TodoItem } from '../types'
 import { TYPE_IT_YOURSELF } from '../ui'
 import type { ViewProps } from './props'
 import { TEAM_SENTENCE, TodoView } from './Todo'
@@ -172,4 +173,93 @@ describe('待办', () => {
     fireEvent.click(within(hero).getByRole('button', { name: '看交付总览' }))
     expect(go).toHaveBeenCalledWith({ kind: 'overview' })
   })
+
+  // ---------------------------------------------------------------- 大需求拆成小需求
+
+  const SINCE = fx.overview().at - 600
+  const item = (over: Partial<TodoItem>): TodoItem => ({
+    kind: 'child_start', repo: 'r1', key: 'PAY-3', title: '在订单页看到退款状态', text: 'PAY-1 的单元 web：你认领了，依赖都合进来了：可以开工',
+    line: null, approval: null, mr_url: null, question: null, session: null, since: SINCE, ...over,
+  })
+  const CHILD = item({})
+  const PARENT = item({ kind: 'parent_release', key: 'PAY-1', title: '退款大需求', text: 'PAY-1 的 3 个小需求都合并了：评审、发布（lean verify、lean release，再批 RELEASE）' })
+  const withFamily = (): Todo => {
+    const t = fx.todo()
+    t.items = [...t.items, CHILD, PARENT]
+    return t
+  }
+  const STARTED: ChildStartResult = {
+    ok: true, key: 'PAY-3', branch: 'ai/alice/PAY-3-web', worktree: '/Users/alice/.brain/worktrees/shop-pay/PAY-3', on: null, text: '开工了：PAY-3',
+    blocked: [], can_on: null, problem: null, output: 'Started PAY-3', slot: 'brain-PAY-3-a1b2', url: '/chat?sid=brain-PAY-3-a1b2', session_error: '',
+  }
+
+  test('two family groups in the waiting ones: 可以开工的小需求 and 等评审、发布的大需求; the counter card and its jumps count them', async () => {
+    installFixtureRoutes({ [`GET ${API}/todo`]: () => withFamily() })
+    const { go } = renderTodo()
+    await screen.findByRole('region', { name: '可以开工的小需求' })
+    expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(
+      ['Lean 审批', '运行机上的问题', '本地澄清', '等验收', '可以开工的小需求', '等评审、发布的大需求', '接手被拒', '没交出去的交接', 'KiroCrew 的问题'])
+    const count = screen.getByTestId('todo-count')
+    expect(count).toHaveTextContent('9件')
+    expect(Array.from(count.querySelectorAll('.td-cells i')).map((i) => i.className)).toEqual(
+      ['is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-bad', 'is-warn', 'is-bad'])
+    const jumps = within(screen.getByRole('navigation', { name: '待办的种类' })).getAllByRole('button')
+    expect(jumps.map((b) => b.textContent)).toContain('可以开工的小需求 1')
+    const scroll = vi.mocked(HTMLElement.prototype.scrollIntoView)
+    scroll.mockClear()
+    fireEvent.click(within(screen.getByRole('navigation', { name: '待办的种类' })).getByRole('button', { name: '等评审、发布的大需求 1' }))
+    expect(scroll.mock.contexts[0]).toBe(group('等评审、发布的大需求'))
+
+    const kid = group('可以开工的小需求')
+    expect(kid).toHaveTextContent('你认领了，依赖都合进来了')
+    expect(within(kid).getByTestId('todo-item')).toHaveClass('is-wait')
+    expect(within(kid).getByRole('button', { name: '开工' })).toHaveClass('is-primary')
+    const big = group('等评审、发布的大需求')
+    expect(big).toHaveTextContent('PAY-1 的 3 个小需求都合并了：评审、发布')
+    expect(within(big).queryByRole('button', { name: '开工' })).toBeNull()
+    const board = within(big).getByRole('button', { name: '看板' })
+    expect(board).toHaveClass('is-primary')
+    fireEvent.click(board)
+    expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-1', from: 'todo' })
+  })
+
+  test('开工 posts start with its session; the answer (打开会话) stays when the list no longer has the item', async () => {
+    const user = userEvent.setup()
+    let started = false
+    installFixtureRoutes({
+      [`GET ${API}/todo`]: () => (started ? fx.todo() : withFamily()),
+      [`POST ${API}/requirements/r1/PAY-3/start`]: () => { started = true; return STARTED },
+    })
+    const { reloadStatus } = renderTodo()
+    const kid = await screen.findByRole('region', { name: '可以开工的小需求' })
+    await user.click(within(kid).getByRole('button', { name: '开工' }))
+    expect(await within(group('可以开工的小需求')).findByTestId('fam-start-result')).toHaveTextContent('开工了：PAY-3')
+    expect(apiCalls.filter((c) => c.method === 'POST')).toEqual([{ method: 'POST', path: `${API}/requirements/r1/PAY-3/start`, body: { open_session: true } }])
+    expect(reloadStatus).toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('region', { name: '等评审、发布的大需求' })).toBeNull())   // the list was read again
+    const out = within(group('可以开工的小需求')).getByTestId('fam-start-result')
+    expect(out).toHaveTextContent('ai/alice/PAY-3-web')
+    expect(within(group('可以开工的小需求')).queryByRole('button', { name: '开工' })).toBeNull()
+    expect(screen.getByTestId('todo-count')).toHaveTextContent('7件')   // it no longer waits on you
+    await user.click(within(out).getByRole('button', { name: '打开会话' }))
+    expect(navigations).toEqual(['/chat?sid=brain-PAY-3-a1b2'])
+  })
+
+  test('a start brain-kit refused says why, with brain start’s output; 开工 stays', async () => {
+    const user = userEvent.setup()
+    installFixtureRoutes({
+      [`GET ${API}/todo`]: () => withFamily(),
+      [`POST ${API}/requirements/r1/PAY-3/start`]: () => ({ ...STARTED, ok: false, branch: null, worktree: null, url: null, slot: null, text: '没开成',
+        problem: { level: 'FAIL', text: '设了 AIDLC_LEAN_TEAM，和单元对不上', todo: '先 unset AIDLC_LEAN_TEAM' }, output: 'AIDLC_LEAN_TEAM=api does not match unit web' }),
+    })
+    renderTodo()
+    const kid = await screen.findByRole('region', { name: '可以开工的小需求' })
+    await user.click(within(kid).getByRole('button', { name: '开工' }))
+    const out = await within(group('可以开工的小需求')).findByTestId('fam-start-result')
+    expect(out).toHaveClass('is-bad')
+    expect(within(out).getByTestId('check-rows')).toHaveTextContent('设了 AIDLC_LEAN_TEAM，和单元对不上做什么先 unset AIDLC_LEAN_TEAM')
+    expect(within(out).getByText('brain start 的输出')).toBeInTheDocument()
+    expect(within(group('可以开工的小需求')).getByRole('button', { name: '开工' })).toBeEnabled()
+  })
 })
+

@@ -3,14 +3,18 @@
  * actions (回放, 跟随, 需求详情, 打开会话), and the live counters: checks passed, Lean's stages, a person's acts (at the
  * judgment points and outside them), the steps of the way done, credits. Also the introduction a requirement shows
  * before its run started: the way it will go, and how to start it.
+ *
+ * A small requirement (row.family role child) names its big one in the top bar (a link to that one's board) and its
+ * unit; a big one says how many of its small ones merged (a jump to its family card), or that it is not split yet. A
+ * small one's introduction is its own way: 认领, 开工 from the big one's branch, 同步, its MR to the big one's owner.
  */
-import type { ReqBoard } from '../types'
+import type { ReqBoard, ReqFamily } from '../types'
 import { StateChip } from '../ui'
 import { WORKING, actorMeta, fmtCredits, fmtWhen } from './format'
 import { useChangeCount, useTween } from './hooks'
 import { RoleIcon } from './RoleIcon'
 
-export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail, onSession, onStart }: {
+export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail, onSession, onStart, onParent, onFamily }: {
   board: ReqBoard
   replaying: boolean
   follow: boolean
@@ -19,6 +23,10 @@ export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail,
   onDetail?: () => void
   onSession?: (url: string) => void
   onStart?: () => void
+  /** a small one: its big one's board */
+  onParent?: (key: string) => void
+  /** a big one: its family card */
+  onFamily?: () => void
 }) {
   const r = board.row
   const local = board.actors.find((a) => a.key === 'local')?.session ?? null
@@ -34,6 +42,7 @@ export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail,
         )}
         <span className="kt-pill tone-info kt-mono" data-testid="br-board-key">{r.key}</span>
         <StateChip state={r.state} label={r.state_label} />
+        {r.family && <FamilyPills f={r.family} onParent={onParent} onFamily={onFamily} />}
         {board.live && !replaying && <span className="kt-pill tone-run is-live"><i aria-hidden="true">●</i>此刻有人在做</span>}
         <span className="kt-run-meta kt-mono" title={r.worktree ?? undefined}>
           {board.branch ? `${board.branch} ← ${board.base}` : `还没有运行分支（${board.base}）`}{r.owner ? ` · ${r.owner}` : ''}
@@ -59,6 +68,27 @@ export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail,
       </div>
     </header>
   )
+}
+
+/** The family in the top bar: a small one's big one and unit; a big one's 已合并 n/m, or not split yet. */
+function FamilyPills({ f, onParent, onFamily }: { f: ReqFamily; onParent?: (key: string) => void; onFamily?: () => void }) {
+  if (f.role === 'child') {
+    return (
+      <>
+        {onParent ? (
+          <button type="button" className="kt-pill kt-pill-btn tone-handoff br-fam-parent" onClick={() => onParent(f.parent)}
+            title={`大需求 ${f.parent}${f.parent_title ? `：${f.parent_title}` : ''}（它的需求看板）`}>
+            <i aria-hidden="true">↑</i>大需求 {f.parent}
+          </button>
+        ) : <span className="kt-pill tone-handoff"><i aria-hidden="true">↑</i>大需求 {f.parent}</span>}
+        {f.unit && <span className="kt-pill tone-info" data-testid="br-board-unit">单元 {f.unit}</span>}
+      </>
+    )
+  }
+  const text = f.role === 'big' ? '大需求 · 还没拆' : `大需求 · 已合并 ${f.progress ? `${f.progress.merged}/${f.progress.total}` : `${f.children.filter((c) => c.state === 'merged').length}/${f.children.filter((c) => c.state !== 'closed').length}`}`
+  return onFamily ? (
+    <button type="button" className="kt-pill kt-pill-btn tone-handoff br-fam-parent" onClick={onFamily} title="看它的小需求">{text}</button>
+  ) : <span className="kt-pill tone-handoff">{text}</span>
 }
 
 export function Kpis({ board, reducedMotion, onActor }: { board: ReqBoard; reducedMotion: boolean; onActor?: (key: string) => void }) {
@@ -206,18 +236,41 @@ const WAY: { phase: string; title: string; steps: { icon: string; title: string;
   { phase: '4 回写', title: '学到的写回 Brain', steps: [[{ icon: 'brain', title: '回写 Brain', does: 'brain reflect' }]] },
 ]
 
+/** A small requirement's way (docs/安装和使用.md §4.7): it has no hand-over to the runner; its MR goes to the big one. */
+const CHILD_WAY: typeof WAY = [
+  { phase: '0 认领', title: '谁做哪个单元', steps: [[{ icon: 'person', title: '认领', does: '先推上去的算' }]] },
+  { phase: '1 开工', title: '从大需求的分支开', steps: [[{ icon: 'laptop', title: '本机会话', does: '自己的工作目录、自己的 Lean 团队' }]] },
+  { phase: '2 做 · 同步', title: 'Lean 推进，合并前同步', steps: [
+    [{ icon: 'ci', title: 'lean verify', does: '跑检查' }],
+    [{ icon: 'merge', title: '同步', does: 'brain sync：把大需求的分支合进来' }],
+  ] },
+  { phase: '3 交接', title: 'MR 交给大需求的负责人', steps: [[{ icon: 'handover', title: 'brain handoff', does: '开 MR 到大需求的分支' }]] },
+  { phase: '4 合并', title: '合进大需求', steps: [[{ icon: 'release', title: '合并', does: '大需求的负责人评审、合并' }]] },
+]
+
 export function Intro({ board, onStart }: { board: ReqBoard; onStart?: () => void }) {
+  const f = board.row.family
+  const child = f?.role === 'child' ? f : null
+  const way = child ? CHILD_WAY : WAY
+  const title = !child ? `${board.row.key} 认领了，还没开工`
+    : child.state === 'unclaimed' || !child.owner ? `${board.row.key} 待认领` : `${board.row.key} ${child.owner} 认领了，还没开工`
   return (
     <section className="kt-empty" data-testid="br-board-intro" aria-label="这个需求还没开工">
       <div className="kt-empty-hero">
-        <h2>{board.row.key} 认领了，还没开工</h2>
-        <p>
-          开工以后，这里一屏看完它怎么走：本机的 brain-dev 会话带着 AI-DLC Lean 推进，需求和设计由你在会话里自己批准；交给运行机以后，桥核对交接，签名服务签合同，运行机无人值守地做，有问题停下来在 MR 上问人；检查过了，产品在 MR 上验收；合并以后，学到的东西写回 Brain。
-        </p>
-        <p className="kt-empty-punch">人只在判断点上出手：批准、回答、验收。</p>
+        <h2>{title}</h2>
+        {child ? (
+          <p>
+            {child.parent} 的小需求{child.unit ? `，单元 ${child.unit}` : ''}。认领以后开工：从大需求的分支 {child.branch ?? ''} 开一个分支，放在它自己的工作目录里，brain-dev 会话带着 Lean 推进；合并之前同步一次，把大需求的分支合进来；做完交接，MR 交给大需求的负责人合并（小需求不交给运行机）。
+          </p>
+        ) : (
+          <p>
+            开工以后，这里一屏看完它怎么走：本机的 brain-dev 会话带着 AI-DLC Lean 推进，需求和设计由你在会话里自己批准；交给运行机以后，桥核对交接，签名服务签合同，运行机无人值守地做，有问题停下来在 MR 上问人；检查过了，产品在 MR 上验收；合并以后，学到的东西写回 Brain。
+          </p>
+        )}
+        <p className="kt-empty-punch">{child ? '各做各的单元，做完合回大需求。' : '人只在判断点上出手：批准、回答、验收。'}</p>
       </div>
-      <ol className="kt-team-intro is-phased br-way" aria-label="一个需求的路，从左到右">
-        {WAY.map((ph) => (
+      <ol className="kt-team-intro is-phased br-way" aria-label={child ? '一个小需求的路，从左到右' : '一个需求的路，从左到右'}>
+        {way.map((ph) => (
           <li key={ph.phase} className="kt-intro-phase">
             <div className="kt-intro-phase-head">
               <b>{ph.phase}</b>
