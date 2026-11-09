@@ -161,6 +161,36 @@
       "question": null,
       "session": null,
       "since": 1794146360
+    },
+    {
+      "repo": "r1",
+      "key": "PAY-8",
+      "title": "退款失败的提醒",
+      "line": null,
+      "approval": null,
+      "mr_url": null,
+      "question": null,
+      "session": null,
+      "since": 1794128400.0,
+      "kind": "start",
+      "text": "已认领，还没开工"
+    },
+    {
+      "repo": "r1",
+      "key": "PAY-1",
+      "title": "退款原因统计",
+      "line": null,
+      "approval": null,
+      "mr_url": null,
+      "question": null,
+      "session": {
+        "slot": "brain-PAY-1-3d8e",
+        "title": "PAY-1 退款原因统计",
+        "url": "/chat?sid=brain-PAY-1-3d8e"
+      },
+      "since": 1794133620.0,
+      "kind": "reply",
+      "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）"
     }
   ]
 }

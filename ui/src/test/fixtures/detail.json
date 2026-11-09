@@ -15,27 +15,27 @@
       "stage_label": "代码生成",
       "stage_n": 9,
       "stage_state": "started",
-      "done": 8,
+      "done": 6,
       "total": 11,
-      "done_n": 8,
-      "skipped_n": 0,
+      "done_n": 2,
+      "skipped_n": 4,
       "next": {
         "id": "code-generation",
         "label": "代码生成",
         "n": 9
       }
     },
-    "stage": "9/11 代码生成",
+    "stage": "做完 2 · 跳过 4 · 下一步：代码生成",
     "waits": {
       "who": "you",
-      "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
+      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
       "line": "approve PLAN 5d1e7a90",
       "raw": "",
       "do": "approve",
-      "since": null,
+      "since": 1794146040.0,
       "where": "session"
     },
-    "summary": "退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。",
+    "summary": "退款单可以导出成 CSV，给财务对账用（规模中）。",
     "credits": 12.4,
     "updated_at": 1794146040,
     "mr": null,
@@ -50,7 +50,8 @@
       "src/refund/",
       "src/export/csv.py"
     ],
-    "local_only": false
+    "local_only": false,
+    "session_url": "/chat?sid=brain-PAY-3-7f3a"
   },
   "where_label": "本机的工作目录",
   "run": {
@@ -452,7 +453,7 @@
       }
     ],
     "missing": [
-      "runnerd"
+      "CI 流水线（在 GitLab 上，这里读不到）"
     ],
     "error": ""
   },

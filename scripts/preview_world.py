@@ -8,10 +8,15 @@ lean_view and detail, and 交付总览's numbers by deliveries.cto_numbers. So t
 shapes the backend answers with, and timelines that look like real work: hours and days, waits for people, a rejection,
 a failed verify, questions on the MR.
 
+Each row's state, Lean progress and what it waits on (who, the step, where, since when) are worked out by
+deliveries.classify from the same records, as the backend does; 待办 is todo.build over those rows; 交付总览 is made
+for 全部 and for each repo, with and without brainkit.evaluate, the way the backend makes it.
+
 The world (times relative to 2026-11-08 14:00 UTC, the fixtures' `at`; the preview moves them to now):
-  shop-pay (r1, GitLab shop/shop-pay): PAY-3 本机 · waits for its PLAN approval; PAY-4 on the runner · parked on D-2;
-      PAY-5 waits for its acceptance (D-3); PAY-7 hand-over refused; PAY-6 claimed only; PAY-2 merged, with a whole
-      trace for 回放 (a rejection, a question, a red verify, the acceptance, the write-back into the Brain).
+  shop-pay (r1, GitLab shop/shop-pay): PAY-3 本机 · waits for its PLAN approval; PAY-1 本机 · its session idle, the
+      release next (a review in a new session first); PAY-4 on the runner · parked on D-2 for the product; PAY-5 waits
+      for its acceptance (D-3); PAY-7 hand-over refused; PAY-6 carol's claim, PAY-8 alice's, neither started; PAY-2
+      merged, with a whole trace for 回放 (a rejection, a question, a red verify, the acceptance, the write-back).
   shop-web (r2): brain-kit not installed yet.
   shop-order (r3, GitLab shop/shop-order): ORD-1 … ORD-9 merged over ten weeks (most unattended), ORD-10 running now.
   shop-tools (r4, no GitLab: local only): TOOL-1, the AI at work on this machine; its hook adapter is the old one
@@ -35,6 +40,9 @@ import backend.routes  # noqa: E402,F401  (the private namespace the app's modul
 import importlib  # noqa: E402
 
 board = importlib.import_module("_brainapp_backend.core.board")
+problems = importlib.import_module("_brainapp_backend.core.problems")
+todo = importlib.import_module("_brainapp_backend.core.todo")
+mrdesc_view = importlib.import_module("_brainapp_backend.core.mrdesc_view")
 detail = importlib.import_module("_brainapp_backend.core.detail")
 lean_view = importlib.import_module("_brainapp_backend.core.lean_view")
 deliveries = importlib.import_module("_brainapp_backend.core.deliveries")
@@ -45,6 +53,18 @@ FIX = ROOT / "ui" / "src" / "test" / "fixtures"
 T0 = 1794146400          # 2026-11-08 14:00 UTC: the fixtures' `at`
 M, H, D = 60, 3600, 86400
 GL = "https://gitlab.example.com"
+ME = "alice"
+NO_KIT = "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"     # service.reload_sync's words for a repo without it
+CFG = {"default_branch": "main", "handoff_label": "ai-handoff", "running_label": "ai-running",
+       "rejected_label": "ai-handoff-rejected"}
+# what brainkit.trace says it could not read on a person's machine (its own words)
+TRACE_MISSING = ["bridge ledger (--ledger not given)", "vouchers (--vouchers not given and no intake store)",
+                 "pushes (git keeps no push log; person commits after hand-over stand in for them)",
+                 "CI pipelines (GitLab, not readable here)"]
+
+
+def _epoch(ts: str) -> float:
+    return float(lean_view.epoch(ts))
 
 
 def iso(t: float) -> str:
@@ -74,6 +94,7 @@ class Req:
         self.merge_how = "merge commit"
         self.after14: dict | None = None
         self.app: list[dict] = []
+        self.proposals = 0
 
     # Lean's ledger
     def _lean(self, at: float, event: str, **data) -> None:
@@ -155,7 +176,7 @@ class Req:
         for kind, e in last.items():
             st = {"APPROVAL_REQUESTED": "pending", "APPROVED": "approved", "REJECTED": "rejected"}[e["event"]]
             h = e["data"]["sha256"]
-            approvals.append({"kind": kind, "unit": None, "state": st, "sha8": h[:8], "at": e["_at"],
+            approvals.append({"kind": kind, "unit": e["data"].get("unit"), "state": st, "sha8": h[:8], "at": e["_at"],
                               "line": "approve %s %s" % (kind, h[:8]) if st == "pending" else None, "path": e["data"].get("path"), "via": None})
         run = None
         if self.start_at is not None:
@@ -168,7 +189,10 @@ class Req:
                                            "source": "product"},
                 "where": "main" if self.merged_at else "worktree" if self.hand_at is None else "branch", "branch": self.branch if run else None,
                 "owner": self.owner, "worktree": None, "run": run, "park": park, "merged": bool(self.merged_at),
-                "tip_at": self.merged_at, "events": self.events, "approvals": approvals, "stages": lean_view.stages(self.events)}
+                "merged_at": self.merged_at, "tip_at": self.merged_at or (_epoch(self.commits[-1]["at"]) if self.commits else None),
+                "park_at": _epoch(self.park[-1]["at"]) if self.park else None, "review": None,
+                "decisions_text": "```brain-proposal\n```\n" * self.proposals, "events": self.events, "approvals": approvals,
+                "stages": lean_view.stages(self.events)}
 
     def trace(self, brain: dict) -> dict:
         stages = []
@@ -266,12 +290,29 @@ def merged(r: Req, t: float, h: str, did: str, how: str = "merge commit") -> Non
     r.merge(t + 35 * M, how)
 
 
+STAGES: dict[str, list] = {}   # each requirement's Lean stages as lean_view reads them (the 需求详情 the preview makes)
+
+
+def classified(r: Req, row: dict, *, park: dict | None = None, mr: dict | None = None, slot: dict | None = None,
+               local_only: bool = False, reflected: bool = False) -> dict:
+    """*row* with what the backend works out of *r*'s records (service._row: deliveries.base_row and classify): its
+    state, Lean progress and what it waits on. The rest of *row* (title, summary, credits, the MR link) stays."""
+    f = r.facts(park)
+    got = deliveries.base_row(r.repo, f, local_only=local_only)
+    deliveries.classify(got, f, mr=mr, slot=slot, cfg=CFG, me=ME, reflected=reflected, now=T0)
+    row.update({k: got[k] for k in ("state", "state_label", "lean", "stage", "waits", "local_only")})
+    row["session_url"] = slot["url"] if slot else None
+    row["summary"] = mrdesc_view.plain_line(row.get("summary"))     # what service._row shows of the 变更说明
+    return row
+
+
 def snapshot(r: Req, row: dict, *, park: dict | None = None, sessions: list | None = None, decisions: list | None = None,
              brain: dict | None = None, local_only: bool = False, kit_rows: list | None = None, reflect: list | None = None,
              mr: dict | None = None, me: str = "alice", mr_desc: dict | None = None, questions: list | None = None,
              credits: float | None = None) -> dict:
     """The board snapshot the backend answers (service._board_sync), built the same way."""
     f = r.facts(park)
+    STAGES["%s/%s" % (r.repo, r.key)] = f["stages"]
     brain = brain or {"loaded": 9, "cited": [], "stale": [], "unknown": [], "proposals": 0}
     t = r.trace(brain) if r.start_at is not None else None
     subjects = {c["sha"]: c["subject"] for c in r.commits}
@@ -286,9 +327,10 @@ def snapshot(r: Req, row: dict, *, park: dict | None = None, sessions: list | No
             "events": g["events"], "belt": g["belt"], "checks": g["checks"], "accept": g["accept"], "brain": brain,
             "decisions": decisions or [], "questions": questions or [],
             "mr_desc": mr_desc or {"available": True, "text": "", "first": None, "source": None, "path": None, "ref": None,
-                                   "error": "还没有 run（只有认领）：开工以后才有变更说明"},
+                                   "error": "还没开工：开工以后才有变更说明"},
             "sessions": sessions, "credits": {"total": credits, "note": detail.NO_TOKENS},
-            "source": "trace" if t else "app", "missing": ["CI pipelines (GitLab, not readable here)"] if t else [], "error": ""}
+            "source": "trace" if t else "app", "error": "",
+            "missing": detail.missing_text(TRACE_MISSING, handed_over=r.hand_at is not None, local_only=local_only) if t else []}
 
 
 def main() -> None:
@@ -296,6 +338,11 @@ def main() -> None:
     det = json.loads((FIX / "detail.json").read_text(encoding="utf-8"))
     status = json.loads((FIX / "status.json").read_text(encoding="utf-8"))
     rows = {r["key"]: r for r in ov["rows"]}
+    for q in ov["eval"]["queue"]:
+        q["reasons"] = [deliveries.acts_in_words(x) for x in q["reasons"]]
+    for e in ov["errors"] + [r_ for r_ in status["repos"] if r_.get("error")]:
+        if "还没装 brain-kit" in e["error"]:
+            e["error"] = NO_KIT
     tmpl = copy.deepcopy(rows["PAY-2"])
     boards: dict[str, dict] = {}
     details: dict[str, dict] = {}
@@ -316,12 +363,14 @@ def main() -> None:
     end, h = runner_half(p2, t + 20 * M, iid=37, question=("D-1", "clarify", 41 * M, "A"), verify_fail=True)
     merged(p2, end, h, "D-2")
     p2.app.append({"at": iso(p2.merged_at + 15 * H), "label": "brain reflect --apply：成功", "detail": "brain/PAY-2-reflect-1"})
-    row = rows["PAY-2"]
+    p2.proposals = 1
+    p2_sess = dict(det["sessions"][0], slot="brain-PAY-2-1c4e", url="/chat?sid=brain-PAY-2-1c4e", title="PAY-2 退款单号校验",
+                   credits=8.3, turns=19, busy=False, awaiting=False, last_activity=p2.hand_at)
+    row = classified(p2, rows["PAY-2"], reflected=True, slot=p2_sess)
     row.update(updated_at=p2.merged_at + 35 * M, credits=22.7)
     boards["r1/PAY-2"] = snapshot(p2, row, decisions=det["decisions"][:3], brain={"loaded": 12, "cited": ["P-PAY-2-1", "T-12"], "stale": [], "unknown": [], "proposals": 1},
                                   reflect=[("brain/PAY-2-reflect-1", p2.merged_at + 15 * H)],
-                                  sessions=[dict(det["sessions"][0], slot="brain-PAY-2-1c4e", url="/chat?sid=brain-PAY-2-1c4e", title="PAY-2 退款单号校验",
-                                                 credits=8.3, turns=19, busy=False, awaiting=False, last_activity=p2.hand_at),
+                                  sessions=[p2_sess,
                                             dict(det["sessions"][0], slot="brain-run-RUN-PAY-2-1", url="/chat?sid=brain-run-RUN-PAY-2-1", title="RUN-PAY-2-1",
                                                  agent="brain-run", kind="runner", credits=14.4, turns=41, busy=False, awaiting=False, last_activity=p2.merged_at)],
                                   mr_desc=mrdesc("PAY-2", row.get("summary") or "退款单号加上校验位，重复和非法单号在入口就拒掉"), credits=22.7)
@@ -338,8 +387,14 @@ def main() -> None:
     p3.question_park(T0 - 20 * M, "waiting", "clarify")
     p3.request(T0 - 6 * M, "PLAN")
     p3.events[-1]["data"]["sha256"] = "5d1e7a90" + p3.events[-1]["data"]["sha256"][8:]
-    row = rows["PAY-3"]
-    boards["r1/PAY-3"] = snapshot(p3, row, park={"status": "waiting", "kind": "clarify", "question": "导出文件里的时间用商户所在地的时区，还是 UTC？"},
+    p3.events[-1]["data"]["unit"] = "refund-api"
+    q3 = det["questions"][0]
+    p3_park = {"status": "waiting", "kind": "clarify", "ask": "owner", "question": q3["question"], "options": q3["options"],
+               "recommend": q3["recommend"], "refs": q3["refs"]}
+    row = classified(p3, rows["PAY-3"], park=p3_park, slot=det["sessions"][0])
+    det["row"] = row
+    det["timeline"]["missing"] = detail.missing_text(TRACE_MISSING, handed_over=False, local_only=False)
+    boards["r1/PAY-3"] = snapshot(p3, row, park=p3_park,
                                   sessions=det["sessions"], decisions=det["decisions"], brain=det["brain"], questions=det["questions"],
                                   mr_desc=det["mr_desc"], credits=row.get("credits"))
     details["r1/PAY-3"] = det
@@ -355,8 +410,10 @@ def main() -> None:
     p4.commit(t + 2 * H, "bot", "PAY-4：拆分任务的骨架（split-job）", files=5)
     p4.question_park(T0 - 3 * H - 2 * M, "waiting", "design")
     p4.ask("D-2", "design", T0 - 3 * H)
-    row = rows["PAY-4"]
-    boards["r1/PAY-4"] = snapshot(p4, row, park={"status": "waiting", "kind": "design"}, decisions=det["decisions"][1:3],
+    p4_park = {"status": "waiting", "kind": "design", "ask": "product"}
+    row = classified(p4, rows["PAY-4"], park=p4_park, mr={"state": "opened", "labels": ["ai-running"], "questions": [
+        {"id": "D-2", "kind": "design", "state": "open", "lean_request": None, "at": iso(T0 - 3 * H)}]})
+    boards["r1/PAY-4"] = snapshot(p4, row, park=p4_park, decisions=det["decisions"][1:3],
                                   questions=[{"source": "mr", "id": "D-2", "kind": "design", "kind_label": "设计", "question": "按商户拆分时，一个商户一天超过 10 万行要不要再按小时切？",
                                               "options": [{"id": "A", "text": "按小时切成多份"}, {"id": "B", "text": "一份，压缩成 zip"}], "recommend": "A",
                                               "lean_request": None, "refs": ["D01#S002"], "state": "open", "answer": None, "answerer": None, "voucher_id": None,
@@ -372,8 +429,10 @@ def main() -> None:
     t = standard(p5, T0 - 2 * D - 20 * H)
     end, h = runner_half(p5, t + 25 * M, iid=44)
     p5.ask("D-3", "acceptance", T0 - 1 * D - 1 * H)
-    row = rows["PAY-5"]
-    boards["r1/PAY-5"] = snapshot(p5, row, park={"status": "waiting", "kind": "acceptance", "lean_request": "RELEASE 0c9a7e21"},
+    p5_park = {"status": "waiting", "kind": "acceptance", "lean_request": "RELEASE 0c9a7e21"}
+    row = classified(p5, rows["PAY-5"], park=p5_park, mr={"state": "opened", "labels": ["ai-running"], "questions": [
+        {"id": "D-3", "kind": "acceptance", "state": "open", "lean_request": "RELEASE 0c9a7e21", "at": iso(T0 - 1 * D - 1 * H)}]})
+    boards["r1/PAY-5"] = snapshot(p5, row, park=p5_park,
                                   questions=[{"source": "mr", "id": "D-3", "kind": "acceptance", "kind_label": "验收", "question": "验收：回调失败后最多重试 5 次、间隔翻倍，第 6 次转人工。",
                                               "options": [], "recommend": None, "lean_request": "RELEASE 0c9a7e21", "refs": [], "state": "open", "answer": None, "answerer": None,
                                               "voucher_id": None, "mr_url": "%s/shop/shop-pay/-/merge_requests/44" % GL, "at": T0 - 1 * D - 1 * H, "answerable_here": False, "answer_via": None}],
@@ -382,7 +441,7 @@ def main() -> None:
                                                  kind="runner", credits=24.2, turns=52, busy=False, awaiting=False, last_activity=T0 - 1 * D - 1 * H)])
     runs.append({"key": "PAY-5", "repo": "r1", "how": "pending", "beyond": [], "at_points": 2, "outside": 0, "credits": 31.0, "merged_at": None})
 
-    # PAY-7: the hand-over was refused (bob added the label, and run.json has no hand-over)
+    # PAY-7: the hand-over was refused (bob added the label, not the owner alice)
     p7 = Req("r1", "PAY-7", "退款原因下拉框", "alice", "refund-reason", "261108-refund-reason", project="shop/shop-pay")
     p7.claim_at = T0 - 9 * H
     t = standard(p7, T0 - 8 * H - 30 * M)
@@ -391,16 +450,52 @@ def main() -> None:
     p7.stage(t + 70 * M, "code-generation", "done", unit="refund-ui", note="代码写完")
     p7.verify(t + 80 * M, [("pytest -q", 0), ("npm test", 0)])
     p7.stage(t + 81 * M, "build-and-test", "done", note="verify PASS：2 项")
-    p7.rejected(T0 - 5 * H - 30 * M, rows["PAY-7"]["waits"]["text"].replace("接手被拒：", ""))
-    row = rows["PAY-7"]
+    p7.handoff(t + 85 * M)
+    why, raw = problems.reasons_text(["label 'ai-handoff' was added by bob, not by the branch owner alice"])
+    p7.rejected(T0 - 5 * H - 30 * M, why)
+    p7_sess = dict(det["sessions"][0], slot="brain-PAY-7-2b9f", url="/chat?sid=brain-PAY-7-2b9f", title="PAY-7 退款原因下拉框",
+                   credits=18.2, turns=27, busy=False, awaiting=False, last_activity=T0 - 5 * H)
+    row = classified(p7, rows["PAY-7"], slot=p7_sess, mr={"state": "opened", "labels": ["ai-handoff-rejected"], "questions": [],
+                                                          "rejected_reason": why, "rejected_raw": raw})
     boards["r1/PAY-7"] = snapshot(p7, row, decisions=det["decisions"][1:2], mr_desc=mrdesc("PAY-7", "退款时选原因，原因列表在后台维护"), credits=18.2,
-                                  sessions=[dict(det["sessions"][0], slot="brain-PAY-7-2b9f", url="/chat?sid=brain-PAY-7-2b9f", title="PAY-7 退款原因下拉框",
-                                                 credits=18.2, turns=27, busy=False, awaiting=False, last_activity=T0 - 5 * H)])
+                                  sessions=[p7_sess])
 
     # PAY-6: claimed, not started
     p6 = Req("r1", "PAY-6", "商户结算周报", "carol", "weekly-report", "", project="shop/shop-pay")
     p6.claim_at = T0 - 2 * D
-    boards["r1/PAY-6"] = snapshot(p6, rows["PAY-6"])
+    boards["r1/PAY-6"] = snapshot(p6, classified(p6, rows["PAY-6"]))
+    extra_rows = []
+
+    # PAY-8: alice's own claim, not started (开工)
+    p8 = Req("r1", "PAY-8", "退款失败的提醒", "alice", "refund-alert", "", project="shop/shop-pay")
+    p8.claim_at = T0 - 5 * H
+    row = copy.deepcopy(rows["PAY-6"])
+    row.update(key="PAY-8", title=p8.title, owner="alice", summary=None, credits=None, updated_at=None)
+    extra_rows.append(classified(p8, row))
+    boards["r1/PAY-8"] = snapshot(p8, row)
+
+    # PAY-1: on this machine, built and verified; its session is idle since; Lean's next is the release, after a
+    # review in a new session (the one that wrote the code cannot review it)
+    p1 = Req("r1", "PAY-1", "退款原因统计", "alice", "refund-stats", "261107-refund-stats", project="shop/shop-pay")
+    p1.claim_at = T0 - 7 * H
+    t = standard(p1, T0 - 6 * H - 30 * M)
+    p1.stage(t, "functional-design", "skipped", unit="stats", note="规则在需求里写清了")
+    p1.stage(t + 1 * M, "nfr-design", "skipped", unit="stats", note="没有新的指标")
+    p1.stage(t + 2 * M, "infrastructure-design", "skipped", unit="stats", note="不动基础设施")
+    p1.stage(t + 3 * M, "code-generation", "started", unit="stats")
+    p1.commit(t + 40 * M, "person", "PAY-1：按原因汇总的查询和接口", files=3)
+    p1.stage(t + 42 * M, "code-generation", "done", unit="stats", note="代码写完，计划 3 步全打勾")
+    p1.verify(t + 50 * M, [("pytest -q", 0)])
+    p1.stage(t + 51 * M, "build-and-test", "done", note="verify PASS：1 项")
+    p1_idle = t + 53 * M
+    p1_sess = dict(det["sessions"][0], slot="brain-PAY-1-3d8e", url="/chat?sid=brain-PAY-1-3d8e", title="PAY-1 退款原因统计",
+                   credits=9.8, turns=14, busy=False, awaiting=False, last_activity=p1_idle, opened_at=p1.start_at)
+    row = copy.deepcopy(rows["PAY-3"])
+    row.update(key="PAY-1", title=p1.title, owner="alice", branch=p1.branch, intent=p1.intent, credits=9.8, updated_at=p1_idle,
+               summary="按退款原因汇总金额和笔数，给运营看哪类退款最多（规模小）。", sessions=1, expected_paths=["src/refund/stats/"], overlap=[],
+               worktree="/Users/alice/workplace/brain-app/shop-pay/refund-stats")
+    extra_rows.append(classified(p1, row, slot=p1_sess))
+    boards["r1/PAY-1"] = snapshot(p1, row, sessions=[p1_sess], credits=9.8, mr_desc=mrdesc("PAY-1", row["summary"]))
 
     # ---------------------------------------------------------------- shop-order: ten weeks of deliveries, and one running now
     order_rows = []
@@ -422,6 +517,7 @@ def main() -> None:
             r.stage(t + 96 * M, "build-and-test", "done")
             h = r.request(t + 100 * M, "RELEASE")
             r.approve(t + 115 * M, "RELEASE", h)
+            r.stage(t + 116 * M, "release", "done", note="发布批准了")
             r.merge(t + 140 * M, "fast-forward")
         else:
             end, h = runner_half(r, t + 30 * M, iid=10 + i, question=("D-1", "clarify", 35 * M, "B") if how == "people" and i % 2 else None,
@@ -432,9 +528,10 @@ def main() -> None:
                    credits=cr, updated_at=r.merged_at + 35 * M, summary="%s：做完了，合并进 main" % title,
                    mr={"iid": 10 + i, "url": "%s/shop/shop-order/-/merge_requests/%d" % (GL, 10 + i), "state": "merged"},
                    run_ids=["RUN-%s-1" % key] if how != "local" else [], open_questions=[], overlap=[], expected_paths=[], worktree=None, where="main")
-        order_rows.append(row)
+        r.proposals = 1 if key == "ORD-9" else i % 2      # ORD-9: merged 3 days ago, its knowledge not written back yet
+        order_rows.append(classified(r, row, reflected=bool(i % 2 and ago_d > 5)))
         boards["r3/%s" % key] = snapshot(r, row, credits=cr, mr_desc=mrdesc(key, "%s：做完了，合并进 main" % title),
-                                         brain={"loaded": 8 + i, "cited": ["T-ORD-%d-1" % max(1, i)], "stale": [], "unknown": [], "proposals": i % 2},
+                                         brain={"loaded": 8 + i, "cited": ["T-ORD-%d-1" % max(1, i)], "stale": [], "unknown": [], "proposals": r.proposals},
                                          reflect=[("brain/%s-reflect-1" % key, r.merged_at + 20 * H)] if i % 2 and ago_d > 5 else [])
         n_hum = sum(1 for h in r.humans if h["judgment_point"])
         runs.append({"key": key, "repo": "r3", "how": how, "beyond": ["交接后推代码"] if how == "people" and not i % 2 else (["回答问题"] if how == "people" else []),
@@ -454,9 +551,8 @@ def main() -> None:
     row.update(repo="r3", key="ORD-10", title="订单状态推送到企业微信", owner="erin", branch=r.branch, intent=r.intent, state="running", state_label="运行机在跑",
                credits=7.4, updated_at=T0 - 4 * M, summary=None, waits={"who": "runner", "text": "运行机在跑", "line": None, "raw": ""},
                mr={"iid": 19, "url": "%s/shop/shop-order/-/merge_requests/19" % GL, "state": "opened"}, run_ids=["RUN-ORD-10-1"], where="branch",
-               lean={"stage": "code-generation", "stage_label": "代码生成", "stage_n": 9, "stage_state": "started", "done": 7, "total": 11},
-               stage="9/11 代码生成", open_questions=[], overlap=[], expected_paths=[], worktree=None)
-    order_rows.append(row)
+               open_questions=[], overlap=[], expected_paths=[], worktree=None)
+    order_rows.append(classified(r, row, mr={"state": "opened", "labels": ["ai-running"], "questions": []}))
     boards["r3/ORD-10"] = snapshot(r, row, credits=7.4, sessions=[dict(det["sessions"][0], slot="brain-run-RUN-ORD-10-1", url="/chat?sid=brain-run-RUN-ORD-10-1",
                                                                        title="RUN-ORD-10-1", agent="brain-run", kind="runner", credits=7.4, turns=21, busy=True,
                                                                        awaiting=False, last_activity=T0 - 1 * M)],
@@ -477,20 +573,20 @@ def main() -> None:
     row = copy.deepcopy(tmpl)
     row.update(repo="r4", key="TOOL-1", title="价格表批量导入", owner="alice", branch=r.branch, intent=r.intent, state="local", state_label="本地开发中",
                credits=4.9, updated_at=T0 - 1 * M, summary=None, waits={"who": "agent", "text": "agent 在做", "line": None, "raw": ""}, mr=None, run_ids=[],
-               where="worktree", lean={"stage": "application-design", "stage_label": "应用设计", "stage_n": 4, "stage_state": "started", "done": 3, "total": 11},
-               stage="4/11 应用设计", open_questions=[], overlap=[], expected_paths=["tools/price"], worktree="/Users/alice/workplace/brain-app/shop-tools/price-import")
-    tool_rows = [row]
+               where="worktree", open_questions=[], overlap=[], expected_paths=["tools/price"],
+               worktree="/Users/alice/workplace/brain-app/shop-tools/price-import")
+    tool_sess = dict(det["sessions"][0], slot="brain-TOOL-1-5a2c", url="/chat?sid=brain-TOOL-1-5a2c", title="TOOL-1 价格表批量导入",
+                     credits=4.9, turns=11, busy=True, awaiting=False, last_activity=T0 - 1 * M)
+    tool_rows = [classified(r, row, slot=tool_sess, local_only=True)]
     tool_kit = [r_ for r_ in status["crew"]["rows"] if r_.get("fix") == "kit"]
     for k in tool_kit:
         k["repo"] = "/Users/alice/workplace/shop-tools"
         k["text"] = k["text"]
-    boards["r4/TOOL-1"] = snapshot(r, row, local_only=True, kit_rows=tool_kit, credits=4.9,
-                                   sessions=[dict(det["sessions"][0], slot="brain-TOOL-1-5a2c", url="/chat?sid=brain-TOOL-1-5a2c", title="TOOL-1 价格表批量导入",
-                                                  credits=4.9, turns=11, busy=True, awaiting=False, last_activity=T0 - 1 * M)],
+    boards["r4/TOOL-1"] = snapshot(r, row, local_only=True, kit_rows=tool_kit, credits=4.9, sessions=[tool_sess],
                                    mr_desc={"available": True, "text": "", "first": None, "source": None, "path": None, "ref": None, "error": "还没有提交：做完第一步以后才有变更说明"})
 
     # ---------------------------------------------------------------- the overview of the world, and its numbers
-    all_rows = list(rows.values()) + order_rows + tool_rows
+    all_rows = list(rows.values()) + extra_rows + order_rows + tool_rows
     parts = [("r1", {"runs": [x for x in runs if x["repo"] == "r1"], "unattended": None, "judgment": None, "kinds": [], "ref": "origin/main"}),
              ("r3", {"runs": [x for x in runs if x["repo"] == "r3"], "unattended": None, "judgment": None, "kinds": [], "ref": "origin/main"})]
     judged = [x for x in runs if x["how"] in ("unattended", "people")]
@@ -501,17 +597,48 @@ def main() -> None:
                        judgment=[at_points - 5, at_points - 5 + outside],
                        kinds=[{"label": "批准", "n": at_points - 7, "point": True}, {"label": "回答问题", "n": 2, "point": True},
                               {"label": "交接后推代码", "n": outside, "point": False}])
-    cto = deliveries.cto_numbers(parts, all_rows, available=True, now=T0)
-    world_ov = copy.deepcopy(ov)
-    world_ov["rows"] = all_rows
-    world_ov["cto"] = cto
-    world_ov["counts"] = deliveries.counts(all_rows)
-    for m in world_ov["eval"]["metrics"]:
-        if m["id"] == "autonomy":
-            m["value"] = cto["unattended"]
-        if m["id"] == "judgment":
-            m["value"] = [cto["stepped_in"]["at_points"], cto["stepped_in"]["at_points"] + cto["stepped_in"]["outside"]]
-    world_ov["eval"]["ref"] = "origin/main"
+    names = {"r1": "shop-pay", "r2": "shop-web", "r3": "shop-order", "r4": "shop-tools"}
+    local = {"r4"}      # no GitLab: done only on this machine (shop-web, r2, is not loaded)
+
+    def overview_of(repo: str, evaluated: bool) -> dict:
+        """交付总览 for 全部 or one repo, as service._overview_sync makes it: its rows, its repos' numbers; without
+        brainkit.evaluate the funnel is the app's own count and every merge is still 还没评."""
+        ids = [x for x in ("r1", "r3", "r4") if repo in ("all", x)]
+        o = copy.deepcopy(ov)
+        o["rows"] = [r_ for r_ in all_rows if r_["repo"] in ids]
+        o["overlaps"] = [x for x in ov["overlaps"] if any(r_["key"] == x["keys"][0] for r_ in o["rows"])]
+        o["counts"] = deliveries.counts(o["rows"])
+        o["errors"] = [e for e in ov["errors"] if repo in ("all", e["repo"])]
+        mine = [p_ for p_ in parts if p_[0] in ids] if evaluated else []
+        o["cto"] = deliveries.cto_numbers(mine, o["rows"], available=evaluated, now=T0, names=names, repos=len(ids),
+                                          local_repos=sum(1 for x in ids if x in local))
+        if not evaluated:
+            o["eval"] = {"available": False, "error": "brain-kit 还没有 evaluate 模块", "ref": None, "metrics": [], "queue": [],
+                         "skipped": [], "notes": []}
+            o["funnel"] = deliveries.funnel_app([dict(d_, key="PAY-3") for d_ in det["decisions"]] if "r1" in ids else [],
+                                                {"asked": 0, "answered": 0, "delivered": 0})
+            return o
+        o["eval"]["ref"] = o["cto"]["ref"]
+        for m in o["eval"]["metrics"]:
+            if m["id"] == "autonomy":
+                m["value"] = o["cto"]["unattended"]
+            if m["id"] == "judgment":
+                st = o["cto"]["stepped_in"]
+                m["value"] = [st["at_points"], st["at_points"] + st["outside"]] if st else None
+        return o
+
+    world_ov = overview_of("all", True)
+    overviews = {e: {x: overview_of(x, e == "eval") for x in ("all", "r1", "r2", "r3", "r4")} for e in ("eval", "noeval")}
+    # 待办 on alice's machine (todo.build over the same rows): what waits for her, with the session to open
+    sessions = {"PAY-3": det["sessions"][0], "PAY-1": p1_sess, "PAY-7": boards["r1/PAY-7"]["sessions"][0], "TOOL-1": tool_sess}
+    facts = {"PAY-3": p3.facts(p3_park), "PAY-1": p1.facts(), "PAY-7": p7.facts()}
+    entries = [{"row": r_, "facts": facts.get(r_["key"], {}), "own": r_["owner"] == ME, "has_session": r_["key"] in sessions,
+                "can_post": False, "mr": None,
+                "session": {k: sessions[r_["key"]][k] for k in ("slot", "title", "url")} if r_["key"] in sessions else None}
+               for r_ in all_rows if r_["state"] not in ("merged", "closed")]
+    crew_fail = {"level": "FAIL", "text": "没有 ~/.kiro/agents/brain-dev.json", "todo": "点「装上 brain-dev」：app 装上 brain-kit 带的那一份",
+                 "fix": "agent", "repo": None, "raw": ""}
+    world_todo = {"ok": todo.build(entries, team=False, crew_rows=[]), "crewfail": todo.build(entries, team=False, crew_rows=[crew_fail])}
     world_status = copy.deepcopy(status)
     world_status["repos"] = status["repos"] + [
         {"id": "r3", "path": "/Users/alice/workplace/shop-order", "name": "shop-order", "ok": True, "error": "", "pending": None,
@@ -527,15 +654,31 @@ def main() -> None:
     # KiroCrew is fine in the world (the 「KiroCrew 有 FAIL」 switch shows a failing row); shop-tools keeps its ! reminder
     ok_hook = {"level": "OK", "text": "brain-dev.json 的 Lean hook 都在", "todo": "", "fix": None, "repo": None, "raw": ""}
     world_status["crew"]["rows"] = [ok_hook if r_["level"] == "FAIL" else r_ for r_ in status["crew"]["rows"] if r_.get("fix") != "kit"] + tool_kit
+    world_status["counts"]["todo"] = len(world_todo["ok"]["items"])
+    for r_ in world_status["repos"]:
+        r_["remote"] = r_["id"] not in local and r_["id"] != "r2"
     world = {"note": "made by scripts/preview_world.py: do not edit by hand", "at": T0, "status": world_status, "overview": world_ov,
-             "boards": boards, "details": details}
+             "overviews": overviews, "todo": world_todo, "boards": boards, "details": details, "stages": STAGES}
     (ROOT / "ui" / "preview" / "world.json").write_text(json.dumps(world, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     # the contract fixtures the UI tests read: the overview's numbers for its own rows, one live board and one merged
-    ov["cto"] = deliveries.cto_numbers([("r1", parts[0][1])], list(rows.values()), available=True, now=T0)
+    ov["cto"] = deliveries.cto_numbers([("r1", parts[0][1])], list(rows.values()), available=True, now=T0, names=names, repos=1)
+    ov["eval"]["ref"] = ov["cto"]["ref"]
     (FIX / "overview.json").write_text(json.dumps(ov, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (FIX / "detail.json").write_text(json.dumps(det, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # 待办's fixture keeps an item of every kind (team mode's and the KiroCrew one included) for the UI tests; the
+    # kinds a row's own step makes (reply, start) are added as todo.build makes them
+    tj = json.loads((FIX / "todo.json").read_text(encoding="utf-8"))
+    tj["items"] = [i for i in tj["items"] if i["kind"] not in ("reply", "start")] + \
+        [i for i in world_todo["ok"]["items"] if i["kind"] in ("reply", "start")][:2]
+    (FIX / "todo.json").write_text(json.dumps(tj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    st = json.loads((FIX / "status.json").read_text(encoding="utf-8"))   # as read: the world changed its crew rows
+    for r_ in st["repos"]:
+        r_["error"] = NO_KIT if "还没装 brain-kit" in r_["error"] else r_["error"]
+    (FIX / "status.json").write_text(json.dumps(st, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (FIX / "board.json").write_text(json.dumps(boards["r1/PAY-3"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (FIX / "board-merged.json").write_text(json.dumps(boards["r1/PAY-2"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print("world: %d rows, %d boards; fixtures: overview.json (cto), board.json, board-merged.json" % (len(all_rows), len(boards)))
+    print("world: %d rows, %d boards; fixtures: overview.json, detail.json, todo.json, board.json, board-merged.json" % (
+        len(all_rows), len(boards)))
 
 
 if __name__ == "__main__":

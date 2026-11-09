@@ -139,8 +139,9 @@ def test_overlaps_and_the_funnel_fallback():
 
 
 def test_the_lean_stage_of_a_row():
-    """The overview row's current stage n/11 (the same stages the detail view lists): started, the next one to do,
-    every stage done; null only before Lean recorded a stage."""
+    """The overview row's current stage (the same stages the detail view lists) and its progress said the one way the
+    app says it (vocab.leanProgress): stages done, stages skipped, the next one to do. A stage not started is never
+    「11/11」 (UI问题清单 #8: 4 done and 6 skipped read as 10/11 done)."""
     lv = mod("lean_view")
 
     def ev(event, stage, unit=None, ts="2026-11-09T00:00:00Z"):
@@ -148,19 +149,49 @@ def test_the_lean_stage_of_a_row():
 
     def at(evs):
         lean = lv.summary(lv.stages(evs))
-        return lean["stage"], lean["stage_n"], lean["stage_state"], lean["done"], lv.stage_text(lean)
+        nxt = (lean["next"] or {}).get("id")
+        return lean["stage"], lean["stage_state"], lean["done_n"], lean["skipped_n"], nxt, lv.stage_text(lean)
 
-    assert at([]) == (None, None, None, 0, None)
-    assert at([ev("STAGE_STARTED", "requirements")]) == ("requirements", 2, "started", 0, "2/11 需求分析")
+    assert at([]) == (None, None, 0, 0, "reverse-engineering", None)
+    assert at([ev("STAGE_STARTED", "requirements")]) == ("requirements", "started", 0, 0, "requirements",
+                                                         "做完 0 · 下一步：需求分析")
     done = [ev("STAGE_COMPLETED", s) for s in ("reverse-engineering", "requirements")] + \
         [ev("STAGE_SKIPPED", s) for s in ("user-stories", "application-design", "units")] + \
         [ev("STAGE_SKIPPED", s, "app") for s in ("functional-design", "nfr-design", "infrastructure-design")] + \
         [ev("STAGE_COMPLETED", "code-generation", "app"), ev("STAGE_COMPLETED", "build-and-test")]
-    assert at(done) == ("release", 11, "todo", 10, "11/11 发布（下一步）")
-    assert at(done + [ev("STAGE_STARTED", "release")]) == ("release", 11, "started", 10, "11/11 发布")
-    # every stage done: before, the row said null (0/11 还没开始) while the detail view listed them all done
-    assert at(done + [ev("STAGE_COMPLETED", "release")]) == ("release", 11, "done", 11, "11/11 发布（做完）")
-    assert at([ev("STAGE_SKIPPED", "reverse-engineering")]) == ("requirements", 2, "todo", 1, "2/11 需求分析（下一步）")
+    assert at(done) == ("release", "todo", 4, 6, "release", "做完 4 · 跳过 6 · 下一步：发布")
+    assert at(done + [ev("STAGE_STARTED", "release")]) == ("release", "started", 4, 6, "release",
+                                                           "做完 4 · 跳过 6 · 下一步：发布")
+    assert at(done + [ev("STAGE_COMPLETED", "release")]) == ("release", "done", 5, 6, None, "做完 5 · 跳过 6 · 全部做完")
+    assert at([ev("STAGE_SKIPPED", "reverse-engineering")]) == ("requirements", "todo", 0, 1, "requirements",
+                                                                "做完 0 · 跳过 1 · 下一步：需求分析")
+
+
+def test_an_idle_session_says_what_to_tell_it_from_lean():
+    """「轮到你回话」 says what to say (UI问题清单 #4): the stage it stopped in, the next one, or, before the release,
+    the review in a new session (the session that wrote the code cannot review it), as Lean's release skill asks."""
+    lv = mod("lean_view")
+
+    def ev(event, stage, unit=None, at=100.0):
+        return {"event": event, "data": {"stage": stage, "unit": unit}, "ts": "2026-11-09T00:00:00Z", "_at": at}
+
+    built = [ev("STAGE_COMPLETED", s) for s in ("reverse-engineering", "requirements")] + \
+        [ev("STAGE_SKIPPED", s) for s in ("user-stories", "application-design", "units", "functional-design",
+                                          "nfr-design", "infrastructure-design")] + \
+        [ev("STAGE_COMPLETED", "code-generation"), ev("STAGE_COMPLETED", "build-and-test"),
+         {"event": "VERIFY", "data": {"ok": True}, "_at": 200.0}]
+
+    def step(evs, review_ok=False):
+        return lv.idle_step(lv.stages(evs), review_ok=review_ok, default_branch="main")
+
+    assert step(built) == "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）"
+    assert lv.review_current(150.0, True, built) is False and lv.review_current(250.0, True, built) is True
+    assert lv.review_current(None, True, built) is True and lv.review_current(None, False, built) is False
+    assert step(built, review_ok=True) == "审查写好了，下一步是发布：回会话让它接着发布（它会请你批准发布）"
+    assert step(built[:1] + [ev("STAGE_STARTED", "requirements")]) == "「需求分析」做到一半，会话停下了：看它最后问了什么，回它"
+    assert step(built[:2]) == "需求分析做完了，下一步是用户故事：在会话里让它接着做"
+    assert step(built + [ev("STAGE_COMPLETED", "release")]) == "Lean 的阶段都做完了：可以把分支合并进 main 了"
+    assert step([]) == "会话停下了，Lean 还没记下阶段：看它最后说了什么，回它"
 
 
 def test_the_lean_audit_files_are_shown_by_label_not_by_host():
@@ -293,3 +324,89 @@ def test_review_findings_are_listed_per_file():
                 "- **D02 b.md**：无", "- **D03 c.md**：%s" % part.replace("2 处", "1 处").split("、")[0]]
     assert intake.review_items(findings) == ["D01 需求.md：" + part,
                                              "D03 c.md：" + part.replace("2 处", "1 处").split("、")[0]]
+
+
+def test_every_row_says_whose_turn_the_step_where_and_since_when():
+    """One judgment of whose turn it is (UI问题清单 #1), read by 待办, the badges, the overview's lanes and the board:
+    each state carries who, the step, where it is taken and since when (the claim, the moment the session went idle,
+    the question on the MR), never "now"."""
+    lv = mod("lean_view")
+    cfg = {"default_branch": "main", "rejected_label": "ai-handoff-rejected", "running_label": "ai-running",
+           "handoff_label": "ai-handoff"}
+    claim = {"owner": "alice", "title": "退款", "created_at": "2026-11-09T00:51:25Z"}
+
+    def row_of(f, me="alice", **kw):
+        f = dict({"key": "PAY-1", "owner": "alice", "claim": claim, "approvals": [], "park": None,
+                  "stages": lv.stages(f.get("events") or [])}, **f)
+        row = deliveries.base_row("r1", f)
+        deliveries.classify(row, f, cfg=cfg, me=me, now=1794186500.0, **dict({"mr": None, "slot": None}, **kw))
+        return row["state"], row["waits"]
+
+    st, w = row_of({})
+    assert (st, w["who"], w["do"], w["where"], w["text"]) == ("claimed", "you", "start", "app", "已认领，还没开工")
+    assert w["since"] == lv.epoch("2026-11-09T00:51:25Z")
+    _, w = row_of({}, me="bob")
+    assert (w["who"], w["do"], w["text"]) == ("people", "start", "等 alice 开工")
+    _, w = row_of({"owner": None, "claim": dict(claim, owner=None)})     # filed for others: not yours until you start it
+    assert (w["who"], w["do"], w["text"]) == ("people", "start", "待认领：谁开工就归谁")
+
+    run = {"intent": "261109-pay-1-refund", "branch": "ai/alice/PAY-1-refund"}
+    ev = [{"event": "STAGE_COMPLETED", "data": {"stage": "requirements"}, "ts": "2026-11-09T01:00:00Z", "_at": 1.0}]
+    idle = {"busy": False, "awaiting": False, "last_activity": 1794186428.5}
+    st, w = row_of({"run": run, "events": ev, "worktree": "/w"}, slot=idle)
+    assert (st, w["who"], w["do"], w["where"], w["since"]) == ("local", "you", "reply", "session", 1794186428.5)
+    assert w["text"] == "需求分析做完了，下一步是用户故事：在会话里让它接着做"
+    _, w = row_of({"run": run, "events": ev, "worktree": "/w"}, slot=dict(idle, busy=True))
+    assert (w["who"], w["do"], w["where"]) == ("agent", "none", None) and w["text"] == "AI 在做「用户故事」"
+    approval = {"kind": "REQUIREMENTS", "state": "pending", "line": "approve REQUIREMENTS 1a2b3c4d", "at": 1794186000.0}
+    _, w = row_of({"run": run, "approvals": [approval]}, slot=idle)
+    assert (w["do"], w["where"], w["line"], w["since"]) == ("approve", "session", approval["line"], 1794186000.0)
+
+    handed = dict(run, handoff={"local_head": "a" * 40})
+    acc = {"state": "opened", "labels": ["ai-running"], "questions": [
+        {"id": "D-3", "kind": "acceptance", "state": "open", "lean_request": "RELEASE 0c9a7e21", "at": "2026-11-09T02:00:00Z"}]}
+    st, w = row_of({"run": handed}, mr=acc)
+    assert (st, w["who"], w["do"], w["where"]) == ("acceptance", "product", "accept", "mr")
+    assert w["text"] == "等产品在 MR 上验收 D-3（approve / reject）" and w["since"] == lv.epoch("2026-11-09T02:00:00Z")
+    plan = {"state": "opened", "labels": [], "questions": [
+        {"id": "D-4", "kind": "plan", "state": "open", "lean_request": "PLAN 5d1e7a90"}]}
+    _, w = row_of({"run": handed, "park": {"status": "waiting", "kind": "plan", "ask": "owner"}}, mr=plan)
+    assert (w["who"], w["do"], w["where"], w["text"]) == ("you", "answer", "mr", "等你在 MR 上回答 D-4（approve / reject）")
+
+    merged = {"run": run, "merged": True, "merged_at": 1794186000.0,
+              "decisions_text": "```brain-proposal\nfile: TECH\n---\n对账按自然日。\n```\n"}
+    st, w = row_of(merged)
+    assert (st, w["who"], w["do"], w["where"]) == ("merged", "you", "write_back", "app")
+    assert w["text"] == "已合并，有 1 条新知识等你回写 Brain"
+    _, w = row_of(merged, reflected=True)
+    assert (w["who"], w["do"], w["since"]) == ("nobody", "watch", 1794186000.0) and "观察合并后的 14 天" in w["text"]
+
+
+def test_todo_lists_what_waits_for_you_the_way_the_rows_say_it():
+    """待办 is every row waiting for you (REST-1): an idle session (open it), a claim not started (开工); a question
+    for the product is not yours. The badge counts the same items."""
+    todo = mod("todo")
+
+    def entry(key, who, do, state="local", text="t", session=None, since=None):
+        row = {"repo": "r1", "key": key, "title": key, "state": state, "mr": None, "updated_at": 5.0,
+               "waits": deliveries.waits(who, do, text, since=since)}
+        return {"row": row, "facts": {}, "own": True, "has_session": bool(session), "can_post": False, "mr": None,
+                "session": session}
+
+    sess = {"slot": "s1", "title": "PAY-1", "url": "/chat?sid=s1"}
+    got = todo.build([entry("PAY-1", "you", "reply", text="下一步是发布", session=sess, since=9.0),
+                      entry("PAY-2", "you", "start", state="claimed", text="已认领，还没开工"),
+                      entry("PAY-3", "product", "accept", state="acceptance"),
+                      entry("PAY-4", "agent", "none"), entry("PAY-5", "people", "start", state="claimed")],
+                     team=False, crew_rows=[])
+    assert [(i["kind"], i["key"], i["text"]) for i in got["items"]] == [("reply", "PAY-1", "下一步是发布"),
+                                                                      ("start", "PAY-2", "已认领，还没开工")]
+    assert got["items"][0]["session"] == sess and got["items"][0]["since"] == 9.0 and got["items"][1]["since"] == 5.0
+
+
+def test_the_eval_queue_says_what_people_did_in_words():
+    """brain-kit's reasons name an act by its code name in brackets: a person sees the act (OVERVIEW-19)."""
+    assert deliveries.acts_in_words("判断点之外有人介入 2 次（push_after_handover）") == "判断点之外有人介入 2 次（交接后推代码）"
+    assert deliveries.acts_in_words("判断点之外有人介入 2 次（allow_test_change、platform_merge）") == \
+        "判断点之外有人介入 2 次（允许改验收测试、平台上的手动操作）"
+    assert deliveries.acts_in_words("验收被驳回 1 次（RELEASE）") == "验收被驳回 1 次（RELEASE）"

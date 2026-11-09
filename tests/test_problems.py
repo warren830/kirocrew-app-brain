@@ -248,7 +248,7 @@ REASONS = [
     ("alice is not in brain-authz identities", "alice 不在 brain-authz 的身份表里"),
     ("PAY-3 has no claim (branch claim/PAY-3); run `brain claim`", "PAY-3 没认领"),
     ("run.json missing at 0123456789ab", "这次提交里没有 run.json"),
-    ("run.json has no hand-over (run `brain handoff`)", "run.json 里没有交接记录"),
+    ("run.json has no hand-over (run `brain handoff`)", "这个分支还没交接过"),
     ("run.json: intent must be a Lean intent folder name (yymmdd-slug)", "run.json 有问题"),
     ("the MR head 0123456789ab is a merge, not the hand-over commit `brain handoff` makes: run it again",
      "MR 最新的提交是一个合并，不是交接提交"),
@@ -281,7 +281,7 @@ def test_handover_and_signer_reasons(raw, text):
 
 def test_reasons_joined_for_one_field_keep_the_raw():
     text, raw = P.reasons_text(["run.json has no hand-over (run `brain handoff`)", "MR 不是打开的", ""])
-    assert text == "run.json 里没有交接记录；MR 不是打开的"
+    assert text == "这个分支还没交接过；MR 不是打开的"
     assert raw == "run.json has no hand-over (run `brain handoff`); MR 不是打开的"
 
 

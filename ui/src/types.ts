@@ -160,6 +160,9 @@ export interface Requirement {
   /** its repo has no remote: it is done only on this machine, never handed over (no runner, no MR). The backend
    * always sends it */
   local_only?: boolean
+  /** its brain-dev session on this machine (KiroCrew's chat URL: 打开会话), null when there is none. The backend always
+   * sends it */
+  session_url?: string | null
 }
 
 // ---------------------------------------------------------------- GET /status
@@ -892,6 +895,8 @@ export interface ReflectApplyResult {
 /** reply: a local session idle, your turn to talk (opens it); start: claimed by you, no run yet (开工) */
 export type TodoKind = 'lean_approval' | 'question' | 'clarify' | 'acceptance' | 'handoff_rejected' | 'handoff_unlabelled' | 'crew'
   | 'reply' | 'start'
+  /** write_back: merged, its Brain proposals not written back yet (回写 Brain) */
+  | 'write_back'
 export interface TodoItem {
   kind: TodoKind
   repo: string
@@ -981,7 +986,13 @@ export interface TeamLoopResult { ok: boolean; summary: Record<string, number>; 
 
 // ---------------------------------------------------------------- POST /refresh {repo}
 
-export interface RefreshResult { ok: boolean; text: string }
+export interface RefreshResult {
+  ok: boolean
+  /** what happened and what to do, plain Chinese */
+  text: string
+  /** git's own words when the fetch failed (shown folded under 细节); '' otherwise */
+  raw?: string
+}
 
 // ---------------------------------------------------------------- GET /board/{repo}/{key}: 需求看板
 
