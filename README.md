@@ -1,6 +1,6 @@
 # Brain 交付: brain-kit on Kiro Crew
 
-**安装（中文）：见 [INSTALL.md](INSTALL.md)。** KiroCrew → Apps → Discover → 齿轮 Sources，添加 `https://github.com/warren830/kirocrew-app-brain`；app 从 `release` 分支装（`scripts/release.sh --push` 生成）。
+**安装（中文）：见 [INSTALL.md](INSTALL.md)。** KiroCrew → Apps → Discover → 齿轮 Sources，添加 `https://github.com/warren830/kirocrew-app-brain`，分支填 `release`（`scripts/release.sh --push` 生成）。
 
 A Kiro Crew app for [brain-kit](../brain-kit): claim a requirement, take its documents through the five gates,
 develop it with AI-DLC Lean in a `brain-dev` session, hand it over to the team runner, follow its questions (D-n on

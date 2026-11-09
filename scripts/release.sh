@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Build the release of the Brain app (`brain`) onto this repo's `release` branch, the branch KiroCrew installs from.
-# KiroCrew's App Store reads this repo as a source (Apps → Discover → gear → Sources, the repo URL, branch main):
-# main's app-registry.json lists `brain` at branch `release`. The release branch holds the app at its root: app.json,
+# KiroCrew's App Store reads this repo as a source (Apps → Discover → gear → Sources, the repo URL, branch release):
+# the release branch's app-registry.json lists `brain` (KiroCrew installs a same-repo entry from the source's own branch,
+# whatever the entry says: indexes.py), and the branch holds the app at its root: app.json,
 # backend/, the built ui/dist/ and the brain-kit the app runs on (vendor/brain-kit, with its AI-DLC Lean), and no
 # package.json / pyproject.toml / setup.py / requirements.txt, so KiroCrew's install runs no npm or pip: the installer
 # needs no node and no brain-kit checkout. One commit per release on top of the last one.
@@ -88,6 +89,16 @@ cp "$SRC/INSTALL.md" "$A/README.md"
 cp "$SRC/release/gitignore" "$A/.gitignore"
 cp "$SRC/LICENSE" "$A/LICENSE"
 cp "$SRC/app.json" "$A/app.json"
+cat > "$A/app-registry.json" <<'EOF'
+[
+  {
+    "name": "brain",
+    "gitUrl": "https://github.com/warren830/kirocrew-app-brain",
+    "repo": "https://github.com/warren830/kirocrew-app-brain",
+    "branch": "release"
+  }
+]
+EOF
 cp -R "$SRC/backend" "$A/backend"
 cp -R "$SRC/ui/dist" "$A/ui/dist"
 git -C "$BRAINKIT_REPO" archive "$BK" | tar -x -C "$A/vendor/brain-kit"
