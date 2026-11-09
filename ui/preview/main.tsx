@@ -200,13 +200,14 @@ setApiRoutes({
 function importRoutes() {
   const FIXTURE_PATH = fx.importInspect().path as string
   const pendingPaths = new Set<string>()
+  const readyPaths = new Set<string>()      // installed in place, or merged / pulled: brain-kit is in the checkout
   const jobs = new Map<string, { job: ImportJob<unknown>; at: number; path: string }>()
   const at = (p: string) => <T,>(x: T): T => JSON.parse(JSON.stringify(x).split(FIXTURE_PATH).join(p)) as T
   const inspect = (path: string): ImportInspect => {
     const listed = repos.find((r) => r.path === path)
     if (pendingPaths.has(path)) return { ...at(path)(fx.importInspectPending()), ...(listed ? { next: 'listed' as const, listed: listed.id } : {}) }
     const c = at(path)(fx.importInspect())
-    if (path.endsWith('/ready') || listed) {
+    if (path.endsWith('/ready') || listed || readyPaths.has(path)) {
       c.next = listed ? 'listed' : 'add'
       c.listed = listed?.id ?? null
       c.kit = { state: 'checkout', values: { tracker: 'none', req_prefix: 'READY', default_branch: 'main', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/ready' } }
@@ -230,7 +231,7 @@ function importRoutes() {
       j.ended_at = null
       j.steps = j.steps.map((s, i) => (i < done ? s : { ...s, state: i === done ? 'running' : 'todo', detail: '' }))
     } else if (j.kind === 'install') {
-      pendingPaths.add(got.path)
+      ((j.result as { mode?: string } | null)?.mode === 'inplace' ? readyPaths : pendingPaths).add(got.path)
     }
     return j
   }
@@ -243,8 +244,37 @@ function importRoutes() {
       return start(at(path)(fx.importCloneJob()), path)
     },
     [`POST ${API}/import/install`]: (body: unknown) => {
+      const b = body as { path: string; mode?: string }
+      return start(at(b.path)(b.mode === 'inplace' ? fx.importInplaceJob() : fx.importJob()), b.path)
+    },
+    [`POST ${API}/import/choices`]: (body: unknown) => at((body as { path: string }).path)(fx.importChoices()),
+    [`POST ${API}/import/upgrade`]: (body: unknown) => {
+      const b = body as { path: string; mode?: string }
+      const j = fx.importUpgradeJob()
+      if (b.mode === 'inplace') {
+        j.steps = [{ id: 'check', label: '看能不能直接装', state: 'ok', detail: '在 main 上，检出是干净的' }, ...j.steps.slice(1)]
+        j.result = { ...j.result!, mode: 'inplace', branch: 'main', base: 'main', worktree: null,
+          text: '预览：没有真的提交。提交在 main 上了，现在就生效。远端还没有它：要推送就点「推送」' }
+      }
+      return start(j, b.path)
+    },
+    [`POST ${API}/import/merge`]: (body: unknown) => {
       const path = (body as { path: string }).path
-      return start(at(path)(fx.importJob()), path)
+      pendingPaths.delete(path)
+      readyPaths.add(path)
+      const r = fx.importMerge()
+      return { ...r, text: `预览：没有真的合并。${r.text}` }
+    },
+    [`POST ${API}/import/pull`]: (body: unknown) => {
+      const path = (body as { path: string }).path
+      pendingPaths.delete(path)
+      readyPaths.add(path)
+      const r = fx.importPull()
+      return { ...r, text: `预览：没有真的拉取。${r.text}` }
+    },
+    [`POST ${API}/import/push`]: () => {
+      const r = fx.importPush()
+      return { ...r, text: `预览：没有真的推送。${r.text}` }
     },
     [`GET ${API}/import/jobs/*`]: (_b: unknown, path: string) => progress(path.split('/').pop() ?? ''),
     [`POST ${API}/import/commit`]: () => ({ ok: true, sha: 'e'.repeat(40), blocked: false, text: '提交了 eeeeeeee（作者 alice）', output: '' }),
@@ -258,8 +288,17 @@ function importRoutes() {
       const id = `r${repos.length + 1}`
       const pending = pendingPaths.has(path) ? at(path)(fx.importInspectPending()).pending : null
       repos = [...repos, { id, path, name: path.split('/').pop() ?? path, ok: !pending, error: '', pending,
-        kit: pending ? null : { tracker: 'none', req_prefix: 'READY', default_branch: 'main', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/ready' } }]
+        kit: pending ? null : { tracker: 'none', req_prefix: 'READY', default_branch: 'main', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/ready' },
+        me: pending ? null : at(path)(fx.importInspect()).me }]
       return { ok: true, id, text: `预览：加入了（${id}）${pending ? `：${pending.text}` : ''}`, status: status() }
+    },
+    [`POST ${API}/me/name`]: (body: unknown) => {
+      const b = body as { path: string; name: string }
+      const name = String(b.name || '').trim().toLowerCase()
+      if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) throw new StubApiError(400, { error: '名字只能用小写字母、数字和 . _ -（字母或数字开头，最多 64 个）', code: 'invalid_name' })
+      const me = { name, source: 'git' as const, gitlab: '', text: `${name}（git config brain.user）`, ask: false, label: '', why: '', suggest: '', error: '' }
+      repos = repos.map((r) => (r.path === b.path && r.me ? { ...r, me: { ...me, gitlab: r.me.gitlab } } : r))
+      return { ok: true, text: `预览：没有真的写。这个仓库的 git config brain.user 设成了 ${name}`, me, status: status() }
     },
     [`POST ${API}/repos/remove`]: (body: unknown) => {
       const path = (body as { path: string }).path

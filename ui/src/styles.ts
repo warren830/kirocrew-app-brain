@@ -137,6 +137,16 @@ button.br-tag:hover { border-color: var(--accent); color: var(--text-strong); }
 .br-raw pre { margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); white-space: pre-wrap; word-break: break-word;
   font-family: var(--mono, ui-monospace, monospace); font-size: 1em; }
 .br-fixjob { display: grid; gap: 6px; margin-top: 6px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); }
+/* where an install goes: the options of a kit fix, one line each, the recommended one marked */
+.br-modes { display: grid; gap: 6px; justify-items: start; }
+.br-me { display: flex; align-items: center; gap: 6px; margin: 0; }
+.br-me.is-bad { color: var(--kt-warn); }
+.br-me-ask { display: grid; gap: 4px; max-width: 34em; }
+.br-me-ask label { font-weight: 650; font-size: .9em; }
+.br-me-ask .br-row { flex-wrap: nowrap; }
+.br-me-ask input { flex: 1; min-width: 0; }
+.br-mode { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
+.br-mode.is-off .br-hint { color: var(--kt-warn); }
 
 /* ---------- tables: the CTO view's ---------- */
 .br-scroll { overflow-x: auto; }

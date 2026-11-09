@@ -7,17 +7,19 @@
  * All repo, agent and document text is rendered as plain text. The Lean approval line is shown, copied and its session
  * opened; it is never sent anywhere (no request carries it, no chat is prefilled with it).
  */
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import icons from 'lucide-react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { paths, useAction } from './api'
 import { fmtRate } from './format'
+import { useLatest } from './hooks'
 import { JOB_POLL_MS, useJob } from './jobs'
 import { RoleIcon } from './board/RoleIcon'
 import type { Tone } from './styles'
 import type {
-  AnswerBody, AnswerResult, ApprovalState, CheckRow, CommitResult, CrewFixBody, CrewFixResult, FileChange, ImportJob, JobStart,
-  JobStepState, LeanSummary, Level, MrRef, PublishResult, Question, ReqState, RepoInfo, StageState,
+  AnswerBody, AnswerResult, ApprovalState, CheckRow, CommitResult, CrewFixBody, CrewFixResult, FileChange, ImportJob, ImportPurpose,
+  InstallChoices, InstallMode, JobStart, JobStepState, LeanSummary, Level, MeNameResult, MergeResult, MrRef, PendingInstall, PublishResult,
+  PullResult, PushResult, Question, ReqState, RepoInfo, RepoMe, StageState,
 } from './types'
 import { STATE_LABEL } from './types'
 
@@ -180,7 +182,7 @@ export function TypeLine({ line, sessionUrl }: { line: string; sessionUrl?: stri
 }
 
 const FIX_LABEL: Record<CrewFixBody['what'], string> = { agent: '补上 brain-dev 的 Lean hook', engine: '把引擎换成 kas' }
-export const KIT_FIX_LABEL = '重装到新分支'
+export const KIT_FIX_LABEL = '重装 kit 文件'
 
 /** The fix a row offers: its own (`fix`), else the old per-check flags (an older backend's rows have no `fix`). */
 function fixOf(r: CheckRow, flags?: { agent: boolean; engine: boolean }): CheckRow['fix'] {
@@ -194,31 +196,50 @@ function fixOf(r: CheckRow, flags?: { agent: boolean; engine: boolean }): CheckR
 /**
  * The problem rows of KiroCrew's checks, `brain doctor`, brain lint …: per row the level as a glyph (✓ / ! / ✕), what
  * it is in plain Chinese, 做什么, the one-click fix when the app can do it (brain-dev's hooks and the engine: POST
- * /crew/fix; the repo's kit files: 重装到新分支, POST /import/upgrade), and brain-kit's own words folded (for
+ * /crew/fix; the repo's kit files: 重装 kit 文件, POST /import/upgrade), and brain-kit's own words folded (for
  * debugging). *only*: which levels to list (default all). onFixed gets the rows a crew fix answered.
+ * A kit fix's row stays while the fix runs or waits for the person (再提交一次, 推送), also when a reload of *rows* no
+ * longer has it (the fix worked); *onHold* says whether one does, for a page that would drop the whole list.
  */
-export function CheckRows({ rows, fix, only, onFixed, empty }: {
+export function CheckRows({ rows, fix, only, onFixed, onHold, empty }: {
   rows: CheckRow[]
   fix?: { agent: boolean; engine: boolean }
   only?: Level[]
   onFixed?: (rows: CheckRow[]) => void
+  onHold?: (on: boolean) => void
   empty?: string
 }) {
   const api = useAppApi()
   const act = useAction((body: CrewFixBody) => api.post<CrewFixResult>(paths.crewFix(), body))
+  const [held, setHeld] = useState<Record<string, CheckRow>>({})
+  const holdRef = useLatest(onHold)
+  const holding = Object.keys(held).length > 0
+  useEffect(() => { holdRef.current?.(holding) }, [holding, holdRef])
+  useEffect(() => () => holdRef.current?.(false), [holdRef])
+  const hold = (r: CheckRow, on: boolean) => setHeld((h) => {
+    const n = { ...h }
+    if (on) n[r.repo as string] = r
+    else delete n[r.repo as string]
+    return n
+  })
   const shown = only ? rows.filter((r) => only.includes(r.level)) : rows
+  const kitHere = new Set(shown.filter((r) => r.repo && fixOf(r, fix) === 'kit').map((r) => r.repo as string))
+  const list = [...shown, ...Object.values(held).filter((r) => !kitHere.has(r.repo as string))]
+  const seen = new Set<string>()
   const doFix = async (what: CrewFixBody['what']) => {
     const r = await act.run({ what })
     if (r) onFixed?.(r.rows)
   }
-  if (!shown.length) return empty ? <p className="br-empty">{empty}</p> : null
+  if (!list.length) return empty ? <p className="br-empty">{empty}</p> : null
   return (
     <div className="br-stack" style={{ gap: 6 }} data-testid="check-rows">
       <ul className="br-probs">
-        {shown.map((r, i) => {
+        {list.map((r, i) => {
           const f = fixOf(r, fix)
+          const kit = f === 'kit' && !!r.repo && !seen.has(r.repo)
+          if (kit) seen.add(r.repo as string)
           return (
-            <li key={i} className={`br-prob is-${r.level}`} data-level={r.level}>
+            <li key={kit ? `kit:${r.repo}` : `${i}:${r.level}:${r.text}`} className={`br-prob is-${r.level}`} data-level={r.level}>
               <span className={`br-prob-glyph tone-${LEVEL_TONE[r.level] ?? 'idle'}`} role="img" aria-label={LEVEL_LABEL[r.level] ?? r.level}>
                 {LEVEL_GLYPH[r.level] ?? '•'}
               </span>
@@ -231,7 +252,7 @@ export function CheckRows({ rows, fix, only, onFixed, empty }: {
                       <Icon name="Wrench" size={13} />{FIX_LABEL[f]}
                     </button>
                   )}
-                  {f === 'kit' && r.repo && <KitFix repo={r.repo} onDone={() => onFixed?.(rows)} />}
+                  {kit && <KitFix repo={r.repo as string} onHold={(on) => hold(r, on)} onDone={() => onFixed?.(rows)} />}
                   {r.raw && (
                     <details className="br-raw">
                       <summary>brain-kit 的原话</summary>
@@ -252,6 +273,7 @@ export function CheckRows({ rows, fix, only, onFixed, empty }: {
 
 /** What an upgrade job answers (the kit fix): like an install, with what the page needs for the next step. */
 interface UpgradeOut {
+  mode?: InstallMode
   path: string
   branch: string
   base: string | null
@@ -288,35 +310,70 @@ export function JobSteps({ job }: { job: ImportJob<unknown> }) {
 }
 
 /**
- * 重装到新分支 (a row's kit fix): `brain install` again on a new branch of the repo in its own worktree (the person's
- * checkout is not touched), committed with their identity; then, when the repo has a remote, 推送并开 MR after a confirm
- * that says which branch goes where. Without a remote it says the branch is on this machine only.
+ * 重装 kit 文件 (a row's kit fix): `brain install` again, committed with the person's identity. Where it goes comes from POST
+ * /import/choices: in place on the checkout's branch (the default; no choice to make when the repo has no remote and
+ * nothing uncommitted: one click), or a new branch for an MR (recommended for a team repo, offered when the checkout
+ * has uncommitted changes); each option says in one line what it means, the recommended one is marked. Afterwards:
+ * in place, 推送 when there is a remote (asked first, never by itself); on a branch, 推送并开 MR (a remote) or 「合并到
+ * <default>」 (none).
  */
-export function KitFix({ repo, onDone }: { repo: string; onDone?: () => void }) {
+export function KitFix({ repo, onDone, onHold }: { repo: string; onDone?: () => void; onHold?: (on: boolean) => void }) {
   const api = useAppApi()
   const [asking, setAsking] = useState(false)
-  const start = useAction(() => api.post<JobStart>(paths.importUpgrade(), { path: repo }))
-  const job = useJob<UpgradeOut>(JOB_POLL_MS, (j) => j.state === 'done' && onDone?.())
+  const [plan, setPlan] = useState<InstallChoices | null>(null)
+  const choices = useAction(() => api.post<InstallChoices>(paths.importChoices(), { path: repo, purpose: 'upgrade' }))
+  const start = useAction((mode: InstallMode) => api.post<JobStart>(paths.importUpgrade(), { path: repo, mode }))
+  const finish = () => {
+    onHold?.(false)
+    onDone?.()
+  }
+  // the page moves on (onDone) when nothing is left to do here: in place, 再提交一次 and 推送 (a team repo) first
+  const job = useJob<UpgradeOut>(JOB_POLL_MS, (j) => {
+    if (j.state !== 'done') return onHold?.(false)
+    const x = j.result
+    if (x?.mode === 'inplace' && (!x.commit.ok || x.remote_url)) return
+    finish()
+  })
   const again = useAction(() => api.post<CommitResult>(paths.importCommit(), { path: repo, purpose: 'upgrade' }))
   const pub = useAction((b: Record<string, unknown>) => api.post<PublishResult>(paths.importPublish(), b))
   const j = job.job
   const r = j?.result ?? null
   const commit = again.result ?? r?.commit
-  const run = async () => {
-    const got = await start.run()
-    if (got) job.start(got.job as ImportJob<UpgradeOut>)
+  const go = async (mode: InstallMode) => {
+    const got = await start.run(mode)
+    if (!got) return
+    onHold?.(true)
+    job.start(got.job as ImportJob<UpgradeOut>)
   }
+  const commitAgain = async () => {
+    const x = await again.run()
+    if (x?.ok && !(r?.mode === 'inplace' && r.remote_url)) finish()
+  }
+  const ask = async () => {
+    const c = await choices.run()
+    if (!c) return
+    if (c.options.length === 1 && c.options[0].ok) return void go(c.options[0].mode)   // nothing to choose
+    setPlan(c)
+  }
+  const busy = choices.busy || start.busy
   if (!j) {
     return (
-      <span className="br-row" style={{ gap: 6 }}>
-        <button type="button" className="br-btn is-small is-primary" disabled={start.busy} onClick={() => void run()}
-          title="在新分支上重跑 brain install（单独的工作目录，不动你现在的检出），用你的 git 身份提交">
-          <Icon name="GitBranchPlus" size={13} />{start.busy ? '正在开始…' : KIT_FIX_LABEL}
-        </button>
-        {start.error && <span className="br-error br-small" role="alert">{start.error}</span>}
+      <span className="br-stack" style={{ gap: 6 }} data-testid="kit-fix-start">
+        {!plan ? (
+          <span className="br-row" style={{ gap: 6 }}>
+            <button type="button" className="br-btn is-small is-primary" disabled={busy} onClick={() => void ask()}
+              title="重跑 brain install，用你的 git 身份提交：默认直接在当前分支上，团队仓库可以选新分支开 MR">
+              <Icon name="Wrench" size={13} />{busy ? '正在开始…' : KIT_FIX_LABEL}
+            </button>
+          </span>
+        ) : (
+          <ModePick choices={plan} busy={busy} onPick={(m) => void go(m)} onCancel={() => setPlan(null)} />
+        )}
+        {(choices.error || start.error) && <span className="br-error br-small" role="alert">{choices.error || start.error}</span>}
       </span>
     )
   }
+  const inplace = r?.mode === 'inplace'
   return (
     <div className="br-fixjob" data-testid="kit-fix">
       <JobSteps job={j} />
@@ -328,11 +385,16 @@ export function KitFix({ repo, onDone }: { repo: string; onDone?: () => void }) 
             <div className="br-banner is-error" role="alert">
               <p className="br-pre">{commit.text}</p>
               <div className="br-row">
-                <button type="button" className="br-btn is-small" disabled={again.busy} onClick={() => void again.run()}>{again.busy ? '正在提交…' : '再提交一次'}</button>
+                <button type="button" className="br-btn is-small" disabled={again.busy} onClick={() => void commitAgain()}>{again.busy ? '正在提交…' : '再提交一次'}</button>
               </div>
             </div>
           )}
-          {commit?.ok && r.remote_url && !pub.result?.ok && (
+          {commit?.ok && inplace && r.remote_url && <PushBox path={repo} branch={r.branch} remoteUrl={r.remote_url} onDone={finish} onLater={finish} />}
+          {commit?.ok && !inplace && !r.remote_url && r.target && (
+            <PendingActions path={repo} purpose="upgrade" onDone={onDone}
+              p={{ merge: { ok: true, why: '', confirm: false }, pull: null, mr_url: null, target: r.target, remote_url: '' }} />
+          )}
+          {commit?.ok && !inplace && r.remote_url && !pub.result?.ok && (
             asking ? (
               <div className="br-confirm" role="group" aria-label="确认推送">
                 <p>会把分支 <code>{r.branch}</code> 推到 origin（<code>{r.remote_url}</code>）{r.gitlab_project ? <>，在 <code>{r.gitlab_project}</code> 上开 MR：<code>{r.branch}</code> → <code>{r.target}</code></> : ''}。</p>
@@ -361,6 +423,135 @@ export function KitFix({ repo, onDone }: { repo: string; onDone?: () => void }) 
           {again.error && <p className="br-error" role="alert">{again.error}</p>}
         </>
       )}
+    </div>
+  )
+}
+
+/** The two places an install (or a kit update) can go, one plain line each, the recommended one marked; one that cannot
+ * be done now says why and is off. */
+export function ModePick({ choices, busy, onPick, onCancel }: {
+  choices: InstallChoices
+  busy?: boolean
+  onPick: (mode: InstallMode) => void
+  onCancel?: () => void
+}) {
+  return (
+    <div className="br-modes" role="group" aria-label="装在哪" data-testid="mode-pick">
+      {choices.options.map((o) => (
+        <div key={o.mode} className={`br-mode${o.mode === choices.recommend ? ' is-rec' : ''}${o.ok ? '' : ' is-off'}`} data-mode={o.mode}>
+          <button type="button" className={`br-btn is-small${o.mode === choices.recommend ? ' is-primary' : ''}`} disabled={busy || !o.ok} onClick={() => onPick(o.mode)}>
+            {o.title}
+          </button>
+          {o.mode === choices.recommend && <span className="br-chip tone-ok">推荐</span>}
+          <span className="br-hint">{o.ok ? o.line : o.why}</span>
+        </div>
+      ))}
+      {onCancel && <button type="button" className="br-link br-small" onClick={onCancel}>取消</button>}
+    </div>
+  )
+}
+
+/**
+ * 推送 of a branch the app committed on in the person's checkout (in place, or a local merge): asked first, never by
+ * itself, no force. *onLater*: 「先不推送」, for a page that waits for the person's answer before it moves on.
+ */
+export function PushBox({ path, branch, remoteUrl, onDone, onLater }: { path: string; branch: string; remoteUrl: string; onDone?: () => void; onLater?: () => void }) {
+  const api = useAppApi()
+  const [asking, setAsking] = useState(false)
+  const push = useAction(() => api.post<PushResult>(paths.importPush(), { path, branch, remote_url: remoteUrl, confirm: true }))
+  const r = push.result
+  const send = async () => {
+    const x = await push.run()
+    setAsking(false)
+    if (x?.ok) onDone?.()
+  }
+  return (
+    <div className="br-stack" style={{ gap: 6 }} data-testid="push-box">
+      {!asking && !r?.ok && (
+        <span className="br-row">
+          <button type="button" className="br-btn is-small" onClick={() => setAsking(true)}><Icon name="Upload" size={13} />{r ? '再推一次' : `推送 ${branch}`}</button>
+          {onLater && <button type="button" className="br-btn is-small" onClick={onLater}>先不推送</button>}
+          <span className="br-hint">可选：本机已经能用，推不推你说了算。</span>
+        </span>
+      )}
+      {asking && (
+        <div className="br-confirm" role="group" aria-label="确认推送" data-testid="push-confirm">
+          <p>会把分支 <code>{branch}</code> 推到 origin（<code>{remoteUrl}</code>），不强推。</p>
+          <div className="br-row">
+            <button type="button" className="br-btn is-small is-primary" disabled={push.busy} onClick={() => void send()}>{push.busy ? '正在推送…' : '确定推送'}</button>
+            <button type="button" className="br-btn is-small" disabled={push.busy} onClick={() => setAsking(false)}>取消</button>
+          </div>
+        </div>
+      )}
+      {r && <p className={`br-pre br-small ${r.ok ? 'br-ok-text' : 'br-bad-text'}`} role="status">{r.text}</p>}
+      {push.error && <p className="br-error" role="alert">{push.error}</p>}
+    </div>
+  )
+}
+
+type PendingActionsOf = Pick<PendingInstall, 'merge' | 'pull' | 'mr_url' | 'target' | 'remote_url'>
+
+/**
+ * A branch install's way forward (on the repo's row and in 导入仓库): when an MR is open, its link first (merging there is
+ * the team's way); 「合并到 <default>」 (a fast-forward here; for a repo with a remote only after a confirm that the remote
+ * does not have it until pushed, and then 推送); 「拉取」 after the MR was merged. What cannot be done now says why in one
+ * line.
+ */
+export function PendingActions({ path, p, purpose, onDone }: { path: string; p: PendingActionsOf; purpose?: ImportPurpose; onDone?: () => void }) {
+  const api = useAppApi()
+  const [asking, setAsking] = useState(false)
+  const merge = useAction((confirm: boolean) => api.post<MergeResult>(paths.importMerge(), { path, confirm, ...(purpose ? { purpose } : {}) }))
+  const pull = useAction(() => api.post<PullResult>(paths.importPull(), { path }))
+  const m = merge.result
+  const target = p.target || '默认分支'
+  const doMerge = async (confirm: boolean) => {
+    const x = await merge.run(confirm)
+    setAsking(false)
+    if (x?.ok && !x.remote_url) onDone?.()   // with a remote: after 推送 or 先不推送
+  }
+  const doPull = async () => {
+    const x = await pull.run()
+    if (x?.ok) onDone?.()
+  }
+  return (
+    <div className="br-stack" style={{ gap: 6 }} data-testid="pending-actions">
+      {p.mr_url && (
+        <p className="br-small">MR 开着：<ExtLink href={p.mr_url}>在 GitLab 上看 MR</ExtLink>（在那里合并是团队的做法，合并以后点「拉取」）</p>
+      )}
+      {p.merge && !m?.ok && (
+        !p.merge.ok ? <p className="br-small br-warn-text" data-testid="merge-why">{p.merge.why}</p>
+          : asking ? (
+            <div className="br-confirm" role="group" aria-label="确认合并" data-testid="merge-confirm">
+              <p>在本机把它快进合并到 <code>{target}</code>。远端（<code>{p.remote_url}</code>）还没有它，要你自己推送。</p>
+              <div className="br-row">
+                <button type="button" className="br-btn is-small is-primary" disabled={merge.busy} onClick={() => void doMerge(true)}>{merge.busy ? '正在合并…' : '确定合并'}</button>
+                <button type="button" className="br-btn is-small" disabled={merge.busy} onClick={() => setAsking(false)}>取消</button>
+              </div>
+            </div>
+          ) : (
+            <span className="br-row">
+              <button type="button" className={`br-btn is-small${p.merge.confirm ? '' : ' is-primary'}`} disabled={merge.busy}
+                onClick={() => (p.merge?.confirm ? setAsking(true) : void doMerge(false))}>
+                <Icon name="GitMerge" size={13} />{merge.busy ? '正在合并…' : p.merge.confirm ? `在本机合并到 ${target}` : `合并到 ${target}`}
+              </button>
+              <span className="br-hint">快进合并，不多一个提交；装用的工作目录和分支随后删掉。</span>
+            </span>
+          )
+      )}
+      {m && <p className={`br-pre br-small ${m.ok ? 'br-ok-text' : 'br-bad-text'}`} role="status">{m.text}</p>}
+      {m?.ok && m.remote_url && <PushBox path={path} branch={m.branch} remoteUrl={m.remote_url} onDone={onDone} onLater={onDone} />}
+      {p.pull && !pull.result?.ok && (
+        !p.pull.ok ? <p className="br-small br-warn-text" data-testid="pull-why">{p.pull.why}</p> : (
+          <span className="br-row">
+            <button type="button" className="br-btn is-small is-primary" disabled={pull.busy} onClick={() => void doPull()}>
+              <Icon name="Download" size={13} />{pull.busy ? '正在拉取…' : '拉取'}
+            </button>
+            <span className="br-hint">git pull --ff-only：只快进，不合并、不变基。</span>
+          </span>
+        )
+      )}
+      {pull.result && <p className={`br-pre br-small ${pull.result.ok ? 'br-ok-text' : 'br-bad-text'}`} role="status">{pull.result.text}</p>}
+      {(merge.error || pull.error) && <p className="br-error" role="alert">{merge.error || pull.error}</p>}
     </div>
   )
 }
@@ -440,13 +631,13 @@ export function AnswerForm({ question, repo, reqKey, onDone }: { question: Quest
   )
 }
 
-export const IMPORT_WHY = '先导入一个项目仓库：本机的目录，或者从 GitLab 克隆。app 会先检查它；没装 brain-kit 的，可以装到一个新分支上，不动你现在的检出。'
+export const IMPORT_WHY = '先导入一个项目仓库：本机的目录，或者从 GitLab 克隆。app 会先检查它；没装 brain-kit 的，直接装在当前分支并提交，马上能用（团队仓库也可以装到新分支、开 MR）。'
 
 /** The way a repo gets in, as the steps of 导入仓库 (the empty states show it). */
 export const IMPORT_FLOW: FlowStep[] = [
   { icon: 'import', title: '从哪来', text: '本机目录，或从 GitLab 克隆' },
   { icon: 'lint', title: '检查', text: '只读：git、brain-kit、Lean、KiroCrew' },
-  { icon: 'handover', title: '装到新分支', text: '没装 brain-kit 的，不动你的检出' },
+  { icon: 'handover', title: '安装', text: '没装 brain-kit 的：装上并提交' },
   { icon: 'list', title: '加入列表', text: '交付总览、开需求就能用了' },
 ]
 
@@ -468,18 +659,71 @@ export function ImportCta({ onImport, title = '还没有仓库' }: { onImport: (
   )
 }
 
-/** A listed repo whose brain-kit is on its way: what it waits for, and the MR or the way to 导入仓库. */
-export function PendingRepo({ repo, onOpen, banner = false }: { repo: RepoInfo; onOpen: () => void; banner?: boolean }) {
-  const p = repo.pending
-  if (!p) return null
+/** A listed repo whose brain-kit is on its way: where it is, what to do, and the way forward right here (the MR,
+ * 「合并到 <default>」, 「拉取」), else the way to 导入仓库. */
+export function PendingRepo({ repo, onOpen, onDone, banner = false }: { repo: RepoInfo; onOpen: () => void; onDone?: () => void; banner?: boolean }) {
+  const p0 = repo.pending
+  if (!p0) return null
+  // a local merge in a team repo goes on with 推送: that is 导入仓库's, where it stays on the page (a row is redrawn
+  // every half minute)
+  const p = p0.remote_url ? { ...p0, merge: null } : p0
+  const acts = !!(p.merge || p.pull || p.mr_url)
+  // what only the wizard does: 再提交一次, 推送并开 MR, a local merge in a team repo
+  const wizard = !acts || p.state === 'uncommitted' || (p.state === 'branch' && !!p.remote_url)
   return (
-    <div className={banner ? 'br-banner is-info' : 'br-stack'} style={banner ? undefined : { gap: 2 }} role="status" data-testid="repo-pending" data-repo={repo.id}>
+    <div className={banner ? 'br-banner is-info' : 'br-stack'} style={banner ? undefined : { gap: 4 }} role="status" data-testid="repo-pending" data-repo={repo.id}>
       <div className="br-row">
         <span>{banner && <b className="br-strong">{repo.name}：</b>}{p.text}。{p.next}</span>
-        {p.mr_url ? <ExtLink href={p.mr_url}>看 MR</ExtLink> : (
-          <button type="button" className="br-btn is-small" onClick={onOpen}>去导入仓库</button>
-        )}
+        {wizard && <button type="button" className="br-btn is-small" onClick={onOpen}>去导入仓库</button>}
       </div>
+      {acts && <PendingActions key={`${p.state}:${p.branch}`} path={repo.path} p={p} onDone={onDone} />}
+    </div>
+  )
+}
+
+/** brain-kit's USER_RE (common.py): what git config brain.user may be, lowercased. The backend checks it again. */
+export const USER_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
+export const NAME_RULE = '只能用小写字母、数字和 . _ -（字母或数字开头）'
+
+/**
+ * 你是谁 in a repo: the name brain-kit goes by there (me.text); or, when brain-kit would not know, a small input
+ * (「你的 GitLab 用户名」 with GitLab, 「你的名字」 without), prefilled with the login name, with one line why. 保存: git
+ * config brain.user <name> in that repo (POST /me/name). No token is asked for. Not a <form>: it sits in 开需求's.
+ */
+export function MeLine({ path, me, onSaved }: { path: string; me: RepoMe; onSaved?: (r: MeNameResult) => void }) {
+  const api = useAppApi()
+  const [name, setName] = useState(me.suggest)
+  const save = useAction((n: string) => api.post<MeNameResult>(paths.meName(), { path, name: n }))
+  const v = name.trim().toLowerCase()
+  const bad = !!v && !USER_RE.test(v)
+  const got = save.result
+  if (got || !me.ask) {
+    const m = got?.me ?? me
+    return (
+      <p className={`br-me${m.error ? ' is-bad' : ''}`} data-testid="me-line">
+        <RoleIcon role="person" size={15} /><span>{m.text || m.error}</span>
+        {got && <span className="br-ok-text br-small" role="status">已保存</span>}
+      </p>
+    )
+  }
+  const id = `me-${path.replace(/[^A-Za-z0-9]+/g, '-')}`
+  const send = async () => {
+    const r = await save.run(v)
+    if (r) onSaved?.(r)
+  }
+  const can = !save.busy && !!v && !bad
+  return (
+    <div className="br-me-ask" role="group" aria-label={me.label} data-testid="me-ask">
+      <label htmlFor={id}>{me.label}</label>
+      <span className="br-row">
+        <input id={id} type="text" className="br-mono" value={name} spellCheck={false} autoComplete="off"
+          aria-invalid={bad || undefined} onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (can) void send() } }} />
+        <button type="button" className="br-btn is-small is-primary" disabled={!can} onClick={() => void send()}>{save.busy ? '正在保存…' : '保存'}</button>
+      </span>
+      {me.error && <span className="br-warn-text br-small">{me.error}</span>}
+      <span className="br-hint">{bad ? NAME_RULE : me.why}</span>
+      {save.error && <span className="br-error" role="alert">{save.error}</span>}
     </div>
   )
 }

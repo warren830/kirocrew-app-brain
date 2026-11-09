@@ -29,9 +29,9 @@ export interface CheckRow {
   /** 做什么: one plain Chinese line ('' for an OK row, or when there is nothing to do) */
   todo?: string
   /** the one-click fix: agent (add Lean's hooks to ~/.kiro/agents/brain-dev.json) and engine (kirocrew engine kas),
-   * both POST /crew/fix {what}; kit (reinstall brain-kit onto a new branch of `repo`: POST /import/upgrade {path:
-   * repo}); null: none */
-  fix?: 'agent' | 'engine' | 'kit' | null
+   * both POST /crew/fix {what}; kit (reinstall brain-kit in `repo`: POST /import/upgrade {path: repo}); me (the name
+   * brain-kit goes by in `repo`: the page's input, POST /me/name); null: none */
+  fix?: 'agent' | 'engine' | 'kit' | 'me' | null
   /** the repo (its path) the row is about; null for a machine-wide row */
   repo?: string | null
   /** what brain-kit (or the app's older code) said, verbatim, for debugging (shown folded); '' when there is nothing
@@ -151,7 +151,35 @@ export interface RepoInfo {
   kit: KitView | null
   /** not usable yet, but brain-kit is on its way (导入仓库): the install branch, or merged and not pulled */
   pending: PendingInstall | null
+  /** who brain-kit says the person is there (a loaded repo; null otherwise) */
+  me: RepoMe | null
 }
+
+/**
+ * Who brain-kit says the person is in a repo, by its own rule: a GitLab token (GitLab's username), $BRAIN_USER or git
+ * config brain.user, else the login name in a repo without GitLab (a brain-kit that falls back to it). Never a token.
+ */
+export interface RepoMe {
+  /** the name brain-kit goes by there; null: GitLab's (with a token), or brain-kit would not know */
+  name: string | null
+  source: 'token' | 'env' | 'git' | 'login' | 'none'
+  /** kit.json gitlab.base ('' without GitLab) */
+  gitlab: string
+  /** one line for the page, e.g. 「alice（这台机器的登录名：这个仓库不用 GitLab）」 */
+  text: string
+  /** brain-kit would not know: the page shows a small input (label 「你的 GitLab 用户名」 or 「你的名字」, prefilled with
+   * suggest, the login name; why: one line) */
+  ask: boolean
+  label: string
+  why: string
+  suggest: string
+  /** what is wrong with the name that is set ('' when nothing) */
+  error: string
+}
+
+/** POST /me/name: git config brain.user <name> in that repo (brain-kit's USER_RE, lowercased; no token, ever). */
+export interface MeNameBody { path: string; name: string }
+export interface MeNameResult { ok: true; text: string; me: RepoMe; status: Status }
 
 export interface Status {
   app: { name: string; version: string; team: boolean }
@@ -191,6 +219,8 @@ export interface TeamStatus {
  * no), or already on the default branch and not pulled into this checkout (merged).
  */
 export interface PendingInstall {
+  /** branch: on the install branch (「合并到 <default>」 when it fast-forwards); uncommitted: a hook said no; merged:
+   * the default branch has it (「拉取」, or switch to it) */
   state: 'branch' | 'uncommitted' | 'merged'
   /** the install branch (brain/install); for merged, where it is (origin/main) */
   branch: string
@@ -204,6 +234,9 @@ export interface PendingInstall {
   text: string
   /** what to do next, one sentence */
   next: string
+  /** the short state the list shows (「还没合进 main」, 「还没推送」, 「MR 等合并」, 「要拉取」 …); a repo without a remote
+   * never says it waits for a merge */
+  word: string
   /** 推送并开 MR: the MR's target (the default branch), origin's URL (never a password), the GitLab project */
   target: string
   remote_url: string
@@ -211,7 +244,42 @@ export interface PendingInstall {
   gitlab_project: string
   /** a GitLab token is on this machine and the project is known: the app opens the MR itself */
   can_open_mr: boolean
+  /** state branch: 「合并到 <target>」 (POST /import/merge): can it fast-forward now, why not, and whether it asks first
+   * (a repo with a remote: the remote does not have it until pushed) */
+  merge: { ok: boolean; why: string; confirm: boolean } | null
+  /** state merged, on origin only: 「拉取」 (POST /import/pull) can run now, why not */
+  pull: { ok: boolean; why: string } | null
 }
+
+/** Where an install (or a kit update) goes: inplace (the default: in the checkout, on its branch, committed there, as
+ * brain-kit's CLI does) or branch (a new branch in its own worktree, for an MR). */
+export type InstallMode = 'inplace' | 'branch'
+export interface InstallChoice {
+  mode: InstallMode
+  /** 「直接装在 main」, 「装到新分支，开 MR 给团队看」 */
+  title: string
+  /** one plain line: what it means */
+  line: string
+  ok: boolean
+  /** why it cannot be done now ('' when ok) */
+  why: string
+}
+/** POST /import/choices {path, purpose} (and ImportInspect.install): the options in order (in place first; one only when
+ * there is nothing to choose: no remote, nothing uncommitted), the recommended one, and why. */
+export interface InstallChoices {
+  options: InstallChoice[]
+  recommend: InstallMode
+  /** the checkout's branch (null: detached) */
+  current: string | null
+  /** the default branch */
+  target: string
+  /** origin's URL ('' without a remote) */
+  remote_url: string
+  /** the person's uncommitted changes (up to 10), and the ones that touch what brain install writes */
+  dirty: string[]
+  overlap: string[]
+}
+export interface ChoicesBody { path: string; purpose?: ImportPurpose }
 
 /** GET /import/defaults */
 export interface ImportDefaults {
@@ -265,6 +333,10 @@ export interface ImportInspect {
   /** the install branch's default name */
   branch: string
   pending: PendingInstall | null
+  /** next 'install': where it can go */
+  install: InstallChoices | null
+  /** who brain-kit will say the person is here (kit.json's GitLab, or the form's before an install) */
+  me: RepoMe | null
   origin: { url: string; base: string; project: string } | null
   default_branch: string | null
   current_branch: string | null
@@ -296,7 +368,8 @@ export interface JobStart { job: ImportJob }
 export interface CloneBody { url: string; parent: string; name: string }
 export interface CloneResult { path: string | null; output: string; kind: string }
 
-export interface InstallBody { path: string; branch: string; kit: KitForm }
+/** POST /import/install; mode left out: the recommended one. branch: the new branch's name (mode branch only). */
+export interface InstallBody { path: string; branch: string; kit: KitForm; mode?: InstallMode }
 export interface FileChange { change: 'added' | 'modified' | 'deleted' | 'other'; path: string }
 /** The install's (or upgrade's) commit (git add -A, git commit with the person's identity; their hooks run). blocked:
  * a hook said no (text has what it said); POST /import/commit {path, purpose} tries again. */
@@ -307,7 +380,9 @@ export type ImportPurpose = 'install' | 'upgrade'
 /** POST /import/commit: 再提交一次 after a hook said no */
 export interface CommitBody { path: string; purpose?: ImportPurpose }
 export interface InstallResult {
+  mode: InstallMode
   path: string
+  /** the new branch (branch), or the checkout's branch the commit is on (inplace) */
   branch: string
   /** what the branch was made from (origin/main) and its commit */
   base: string | null
@@ -319,6 +394,10 @@ export interface InstallResult {
   doctor: { ran: boolean; rows: CheckRow[]; output: string }
   files: FileChange[]
   commit: CommitResult
+  /** origin's URL ('' without a remote): in place, 推送 is offered (POST /import/push), never done by itself */
+  remote_url: string
+  /** the default branch */
+  target: string
 }
 
 /**
@@ -329,20 +408,15 @@ export interface InstallResult {
  * added to lean.json), `brain doctor --offline`, a commit with the person's identity and hooks. The person's checkout is
  * never touched. Answers {job} (kind 'upgrade'); then /import/commit and /import/publish with purpose 'upgrade'.
  */
-export interface UpgradeBody { path: string; branch?: string }
+export interface UpgradeBody { path: string; branch?: string; mode?: InstallMode }
 export interface UpgradeResult extends InstallResult {
-  /** false: brain install changed nothing (text 「已经是最新的：没有要提交的改动」; the worktree and branch were taken back,
-   * worktree null, files []) */
+  /** false: brain install changed nothing (text 「已经是最新的：没有要提交的改动」; what it wrote was taken back) */
   changed: boolean
-  /** origin's URL (never a password); '' when the repo has no origin */
-  remote_url: string
-  /** the default branch the MR goes into */
-  target: string
   gitlab_project: string
   /** a GitLab token is on this machine and the project and origin are known: 推送并开 MR opens the MR itself */
   can_open_mr: boolean
-  /** one plain sentence: where the commit is and what to do next, e.g. 「提交在本机分支 brain/upgrade-kit 上（这个仓库没有
-   * 远端）：在本机把它合进 main」 */
+  /** one plain sentence: where the commit is and what to do next, e.g. 「提交在 main 上了，现在就生效」 (in place) or
+   * 「提交在本机分支 brain/upgrade-kit 上（这个仓库没有远端）：点「合并到 main」就生效」 */
   text: string
 }
 
@@ -364,6 +438,27 @@ export interface PublishResult {
   /** GitLab's new-MR page for the branch */
   new_mr_url: string | null
 }
+
+/** POST /import/merge: 「合并到 <default>」, a fast-forward in the checkout; confirm true for a repo with a remote. */
+export interface MergeBody { path: string; confirm?: boolean; purpose?: ImportPurpose }
+export interface MergeResult {
+  ok: boolean
+  text: string
+  /** the default branch it went into */
+  branch: string
+  sha: string | null
+  /** the install worktree and branch, taken away or kept (and why) */
+  removed: string[]
+  kept: string[]
+  /** origin's URL: the remote does not have it yet ('' without a remote) */
+  remote_url: string
+  output: string
+}
+/** POST /import/pull: 「拉取」 (git pull --ff-only of the default branch) after the MR was merged. */
+export interface PullResult { ok: boolean; text: string; output: string; removed: string[]; kept: string[] }
+/** POST /import/push: the checkout's branch to origin, only with confirm true and what the person saw. */
+export interface PushBody { path: string; branch: string; remote_url: string; confirm: true }
+export interface PushResult { ok: boolean; pushed: boolean; branch: string; remote_url: string; text: string; output: string }
 
 export interface AddResult { ok: boolean; id: string; text: string; status: Status }
 export interface RemoveResult { ok: boolean; text: string; status: Status }
@@ -684,6 +779,9 @@ export interface StartResult {
   slot: string | null
   url: string | null
   session_error: string
+  /** brain-kit did not know who the person is (fix 'me'), and who it says they are there now (the input) */
+  problem: CheckRow | null
+  me: RepoMe | null
 }
 
 // ---------------------------------------------------------------- GET /crew, POST /crew/fix

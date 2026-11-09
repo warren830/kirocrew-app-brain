@@ -5,7 +5,7 @@ import { clone, fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import { apiCalls, apiError, type RouteHandler } from '../test/stubs/app-sdk'
 import type { ImportInspect, ImportJob } from '../types'
-import { ImportView, SAFE_INSTALL, nameFromUrl } from './Import'
+import { ImportView, SAFE_BRANCH, SAFE_INPLACE, nameFromUrl } from './Import'
 import type { ViewProps } from './props'
 
 const REPO = '/Users/alice/workplace/refund'
@@ -55,7 +55,7 @@ async function inspectPath(user: ReturnType<typeof userEvent.setup>, path = REPO
 describe('导入仓库', () => {
   test('an installed repo is one click: 检查, each row ✓ / ! / ✗ with why and what to do, then 加入列表', async () => {
     const status = fx.status()
-    status.repos.push({ id: 'r3', path: REPO, name: 'refund', ok: true, error: '', kit: installed().kit.values, pending: null })
+    status.repos.push({ id: 'r3', path: REPO, name: 'refund', ok: true, error: '', kit: installed().kit.values, pending: null, me: null })
     const { user, props } = setup({
       [`POST ${API}/import/inspect`]: () => installed(),
       [`POST ${API}/import/add`]: () => ({ ok: true, id: 'r3', text: '加入了（r3）', status }),
@@ -84,7 +84,7 @@ describe('导入仓库', () => {
     expect(props.go).toHaveBeenCalledWith({ kind: 'new', repo: 'r3' })
   })
 
-  test('not installed: the prefilled form, 安装到新分支 as a job with its steps, the result, then the pending state', async () => {
+  test('not installed, a team repo: the new branch is recommended, the prefilled form, the job with its steps, the result, then the pending state', async () => {
     let inspected = 0
     const { user, props } = setup({
       [`POST ${API}/import/inspect`]: () => (++inspected === 1 ? fx.importInspect() : fx.importInspectPending()),
@@ -101,7 +101,10 @@ describe('导入仓库', () => {
     expect(within(form).getByText('从 origin 的地址猜的：检查一下。')).toBeInTheDocument()
     expect(within(form).getByLabelText('默认分支')).toHaveValue('main')
     expect(within(form).getByLabelText('新分支名')).toHaveValue('brain/install')
-    expect(screen.getByTestId('install-safe')).toHaveTextContent(SAFE_INSTALL)
+    const modes = screen.getByRole('radiogroup', { name: '装在哪' })
+    expect(within(modes).getByLabelText(/装到新分支，开 MR 给团队看/)).toBeChecked()                    // recommended for a repo with a remote
+    expect(within(modes).getByText('推荐').closest('label')).toHaveAttribute('data-mode', 'branch')
+    expect(screen.getByTestId('install-safe')).toHaveTextContent(SAFE_BRANCH)
     await user.clear(within(form).getByLabelText('需求号前缀'))
     await user.type(within(form).getByLabelText('需求号前缀'), 'ref')
     expect(within(form).getByText('需求号会是 REF-1、REF-2 …')).toBeInTheDocument()
@@ -112,7 +115,7 @@ describe('导入仓库', () => {
     expect(within(preview).getByLabelText('新分支从哪来')).toHaveTextContent('origin/main→brain/install')
     await user.click(within(form).getByRole('button', { name: '安装到新分支' }))
     expect(apiCalls.find((c) => c.path === `${API}/import/install`)?.body).toEqual({
-      path: REPO, branch: 'brain/install',
+      path: REPO, branch: 'brain/install', mode: 'branch',
       kit: { req_prefix: 'REF', tracker: 'none', jira_base: '', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/refund', default_branch: 'main', team: '退款组' },
     })
     const job = await screen.findByRole('group', { name: '安装的进度' })
@@ -136,10 +139,10 @@ describe('导入仓库', () => {
     expect(props.reloadStatus).toHaveBeenCalled()
     // checked again: on the install branch now
     const pending = await screen.findByTestId('pending')
-    expect(pending).toHaveTextContent('安装在 brain/install 分支上，合并后生效')
+    expect(pending).toHaveTextContent('装在 brain/install 分支上，还没推送：合进 main 以后生效')
     expect(inspected).toBe(2)
     expect(within(screen.getByTestId('add')).getByRole('heading', { name: '加入列表' }).closest('header')).toHaveAttribute('data-step', '4')
-    expect(screen.getByTestId('add')).toHaveTextContent('列表里这个仓库会显示「安装在 brain/install 分支上，合并后生效」')
+    expect(screen.getByTestId('add')).toHaveTextContent('列表里这个仓库会显示「装在 brain/install 分支上，还没推送：合进 main 以后生效」：推送并开 MR 给团队看')
     expect(flowStates()).toEqual(['done', 'done', 'done', 'now'])
   })
 
@@ -295,7 +298,7 @@ describe('导入仓库', () => {
     const { user } = setup({ [`POST ${API}/import/inspect`]: () => c }, { path: REPO })
     await user.click(screen.getByRole('button', { name: '检查' }))
     expect(await screen.findByTestId('next-listed')).toHaveTextContent('已经在列表里（r2）。')
-    expect(screen.getByTestId('pending')).toHaveTextContent('安装在 brain/install 分支上，合并后生效')
+    expect(screen.getByTestId('pending')).toHaveTextContent('装在 brain/install 分支上，还没推送：合进 main 以后生效')
     expect(screen.getByRole('button', { name: '推送并开 MR' })).toBeInTheDocument()
     expect(screen.queryByTestId('add')).toBeNull()
   })
@@ -316,5 +319,161 @@ describe('导入仓库', () => {
     const preview = within(form).getByRole('complementary', { name: '会写进 .brain/kit.json' })
     expect(within(preview).getAllByRole('listitem')[0]).toHaveTextContent('需求号Jira 上的号')
     expect(within(preview).getAllByRole('listitem')[1]).toHaveTextContent('跟踪Jira')
+  })
+  test('安装 in place: picked over the recommended new branch, the button and the safety line say so, the body carries the mode', async () => {
+    const { user } = setup({
+      [`POST ${API}/import/inspect`]: () => fx.importInspect(),
+      [`POST ${API}/import/install`]: () => running(fx.importInplaceJob()),
+      [`GET ${API}/import/jobs/*`]: jobRoute(fx.importInplaceJob(), 1),
+    })
+    await inspectPath(user)
+    const modes = await screen.findByRole('radiogroup', { name: '装在哪' })
+    const inplace = within(modes).getByLabelText(/直接装在 main/)
+    expect(inplace.closest('label')).toHaveTextContent('装在你现在的检出里，提交在 main 上，马上能用；只提交 brain install 写的文件，你自己没提交的改动不动；不会自己推送')
+    await user.click(inplace)
+    const form = screen.getByRole('form', { name: 'kit.json' })
+    expect(within(form).queryByLabelText('新分支名')).toBeNull()                         // no branch to name
+    expect(within(form).getByLabelText('提交在哪')).toHaveTextContent('main')
+    expect(screen.getByTestId('install-safe')).toHaveTextContent(SAFE_INPLACE)
+    await user.click(within(form).getByRole('button', { name: '直接装在 main' }))
+    expect(apiCalls.find((c) => c.path === `${API}/import/install`)?.body).toMatchObject({ path: REPO, branch: '', mode: 'inplace' })
+    const job = await screen.findByRole('group', { name: '安装的进度' })
+    expect(within(job).getAllByRole('listitem').map((li) => li.dataset.step)).toEqual(['check', 'install', 'kit', 'doctor', 'commit'])
+    const out = await screen.findByTestId('install-result')
+    expect(out).toHaveTextContent('提交在main（你现在的检出）')
+    expect(within(out).getByTestId('commit-ok')).toHaveTextContent('在 main 上')
+    expect(within(out).getByTestId('commit-ok')).toHaveTextContent('这个仓库现在就能用。')
+    expect(within(out).getByText(`提交了 ${fx.importInplaceJob().result!.files.length} 个文件`)).toBeInTheDocument()
+    expect(apiCalls.some((c) => c.path === `${API}/import/push`)).toBe(false)              // never pushed by itself
+  })
+
+  test('in place on a team repo: 推送 asks first, saying which branch goes where', async () => {
+    const pushed = fx.importPush()
+    const { user } = setup({
+      [`POST ${API}/import/inspect`]: () => fx.importInspect(),
+      [`POST ${API}/import/install`]: () => ({ job: fx.importInplaceJob() }),
+      [`POST ${API}/import/push`]: () => pushed,
+    })
+    await inspectPath(user)
+    await user.click(within(await screen.findByRole('radiogroup', { name: '装在哪' })).getByLabelText(/直接装在 main/))
+    await user.click(screen.getByRole('button', { name: '直接装在 main' }))
+    const box = await screen.findByTestId('push-box')
+    await user.click(within(box).getByRole('button', { name: '推送 main' }))
+    expect(within(box).getByTestId('push-confirm')).toHaveTextContent('会把分支 main 推到 origin（git@gitlab.example.com:shop/refund.git），不强推。')
+    expect(apiCalls.some((c) => c.path === `${API}/import/push`)).toBe(false)
+    await user.click(within(box).getByRole('button', { name: '确定推送' }))
+    expect(await within(box).findByText('推上去了：main → origin')).toBeInTheDocument()
+    expect(apiCalls.find((c) => c.path === `${API}/import/push`)?.body).toEqual({
+      path: REPO, branch: 'main', remote_url: 'git@gitlab.example.com:shop/refund.git', confirm: true,
+    })
+  })
+
+  test('a repo without a remote and nothing uncommitted: one way only, said in one line; in place refused says why', async () => {
+    const alone = fx.importInspect()
+    alone.origin = null
+    alone.install = { ...alone.install!, recommend: 'inplace', remote_url: '', dirty: [],
+      options: [{ mode: 'inplace', title: '直接装在 main', line: '装在你现在的检出里，提交在 main 上，马上能用', ok: true, why: '' }] }
+    const busy = fx.importInspect()
+    busy.install = { ...busy.install!, recommend: 'branch', overlap: ['.gitignore'],
+      options: [{ ...busy.install!.options[0], ok: false, why: '你没提交的改动碰到了 brain install 要写的文件（.gitignore）：直接装会混在一起' }, busy.install!.options[1]] }
+    let n = 0
+    const { user } = setup({ [`POST ${API}/import/inspect`]: () => (++n === 1 ? alone : busy) })
+    await inspectPath(user)
+    expect(await screen.findByTestId('install-where')).toHaveTextContent('直接装在 main装在你现在的检出里，提交在 main 上，马上能用')
+    expect(screen.queryByRole('radiogroup', { name: '装在哪' })).toBeNull()
+    expect(screen.getByRole('button', { name: '直接装在 main' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: '再检查一遍' }))
+    const modes = await screen.findByRole('radiogroup', { name: '装在哪' })
+    const off = within(modes).getByLabelText(/直接装在 main/)
+    expect(off).toBeDisabled()
+    expect(off.closest('label')).toHaveTextContent('碰到了 brain install 要写的文件（.gitignore）')
+    expect(within(modes).getByLabelText(/装到新分支，开 MR 给团队看/)).toBeChecked()
+  })
+
+  test('a branch install waiting here: 「合并到 main」 without a remote; refused with its reason; 「拉取」 after the MR', async () => {
+    const local = fx.importInspectPending()
+    local.origin = null
+    local.pending = { ...local.pending!, remote_url: '', gitlab_base: '', gitlab_project: '', can_open_mr: false, word: '还没合进 main',
+      text: '装在本机分支 brain/install 上，还没合进 main', next: '点「合并到 main」就能用（快进，不多一个提交）', merge: { ok: true, why: '', confirm: false } }
+    const moved = clone(local)
+    moved.pending!.merge = { ok: false, why: 'main 在装的时候是 04174d9a，后来有了新提交（现在是 9e8d7c6b）：快进不了。可以直接装在 main 上', confirm: false }
+    const merged = fx.importInspectPending()
+    merged.pending = { ...merged.pending!, state: 'merged', branch: 'origin/main', word: '要拉取', text: '已经合进 origin/main，这个目录还没更新',
+      next: '点「拉取」更新这个目录（git pull --ff-only）', merge: null, pull: { ok: true, why: '' } }
+    const seq = [local, installed(), moved, merged, installed()]
+    let n = 0
+    const landed = { ...fx.importMerge(), remote_url: '', text: '合进 main 了（快进到 d6342283）：这个仓库现在就能用。' }
+    const { user, props } = setup({
+      [`POST ${API}/import/inspect`]: () => seq[Math.min(n++, seq.length - 1)],
+      [`POST ${API}/import/merge`]: () => landed,
+      [`POST ${API}/import/pull`]: () => fx.importPull(),
+    })
+    await inspectPath(user)
+    const card = await screen.findByTestId('pending')
+    expect(card).toHaveTextContent('还没合进 main')
+    expect(card).not.toHaveTextContent('等合并')
+    expect(within(card).queryByRole('button', { name: '推送并开 MR' })).toBeNull()          // no remote: nothing to push
+    await user.click(within(card).getByRole('button', { name: '合并到 main' }))
+    expect(apiCalls.find((c) => c.path === `${API}/import/merge`)?.body).toEqual({ path: REPO, confirm: false })
+    await waitFor(() => expect(screen.queryByTestId('pending')).toBeNull())                 // checked again: nothing waits
+    expect(props.reloadStatus).toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: '再检查一遍' }))
+    expect(await screen.findByTestId('merge-why')).toHaveTextContent('后来有了新提交（现在是 9e8d7c6b）：快进不了')
+    expect(within(screen.getByTestId('pending')).queryByRole('button', { name: '合并到 main' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: '再检查一遍' }))
+    await waitFor(() => expect(screen.getByTestId('pending')).toHaveTextContent('要拉取'))
+    await user.click(within(screen.getByTestId('pending')).getByRole('button', { name: '拉取' }))
+    expect(apiCalls.find((c) => c.path === `${API}/import/pull`)?.body).toEqual({ path: REPO })
+    await waitFor(() => expect(screen.queryByTestId('pending')).toBeNull())
+  })
+
+  test('a team repo: the MR link first; the local merge asks first, then 推送 stays until answered', async () => {
+    const c = fx.importInspectPending()
+    c.pending = { ...c.pending!, pushed: true, mr_url: 'https://gitlab.example.com/shop/refund/-/merge_requests/7', word: 'MR 等合并',
+      text: '装在 brain/install 分支上，MR 开着：合进 main 以后生效', next: '在 GitLab 上合并 MR（团队的做法），合并以后点「拉取」',
+      merge: { ok: true, why: '', confirm: true } }
+    let n = 0
+    const { user, props } = setup({
+      [`POST ${API}/import/inspect`]: () => (n++ === 0 ? c : installed()),
+      [`POST ${API}/import/merge`]: () => fx.importMerge(),
+    })
+    await inspectPath(user)
+    const card = await screen.findByTestId('pending')
+    const acts = within(card).getByTestId('pending-actions')
+    expect(acts.firstElementChild).toHaveTextContent('在 GitLab 上看 MR')
+    await user.click(within(card).getByRole('button', { name: '在本机合并到 main' }))
+    expect(within(card).getByTestId('merge-confirm')).toHaveTextContent('在本机把它快进合并到 main。远端（git@gitlab.example.com:shop/refund.git）还没有它，要你自己推送。')
+    expect(apiCalls.some((c) => c.path === `${API}/import/merge`)).toBe(false)
+    await user.click(within(card).getByRole('button', { name: '确定合并' }))
+    expect(await within(card).findByText(fx.importMerge().text)).toBeInTheDocument()
+    expect(apiCalls.find((c) => c.path === `${API}/import/merge`)?.body).toEqual({ path: REPO, confirm: true })
+    const box = within(card).getByTestId('push-box')
+    expect(props.reloadStatus).not.toHaveBeenCalled()                                      // the page waits for the answer
+    await user.click(within(box).getByRole('button', { name: '先不推送' }))
+    await waitFor(() => expect(screen.queryByTestId('pending')).toBeNull())
+    expect(props.reloadStatus).toHaveBeenCalled()
+    expect(apiCalls.some((c) => c.path === `${API}/import/push`)).toBe(false)
+  })
+  test('检查 says who brain-kit will say you are; without a name, 「你的 GitLab 用户名」 under the checks, then checked again', async () => {
+    const named = fx.importInspect()
+    named.me = { ...named.me!, name: 'alice', source: 'git', text: 'alice（git config brain.user）', ask: false }
+    named.checks = named.checks.map((c) => (c.id === 'me' ? { ...c, level: 'OK' as const, why: 'alice（git config brain.user）', todo: '' } : c))
+    let n = 0
+    const { user, props } = setup({
+      [`POST ${API}/import/inspect`]: () => (n++ === 0 ? fx.importInspect() : named),
+      [`POST ${API}/me/name`]: () => ({ ok: true, text: '这个仓库的 git config brain.user 设成了 alice', me: named.me, status: fx.status() }),
+    })
+    const card = await inspectPath(user)
+    const row = card.querySelector('[data-check="me"]') as HTMLElement
+    expect(row).toHaveAttribute('data-level', 'WARN')
+    expect(row).toHaveTextContent('brain-kit 还不知道你是谁：认领需求时要用')
+    const who = within(card).getByRole('group', { name: '你的 GitLab 用户名' })
+    expect(within(who).getByLabelText('你的 GitLab 用户名')).toHaveValue('alice')
+    await user.click(within(who).getByRole('button', { name: '保存' }))
+    expect(apiCalls.find((c) => c.path === `${API}/me/name`)?.body).toEqual({ path: REPO, name: 'alice' })
+    await waitFor(() => expect(card.querySelector('[data-check="me"]')).toHaveAttribute('data-level', 'OK'))
+    expect(card.querySelector('[data-check="me"]')).toHaveTextContent('alice（git config brain.user）')
+    expect(within(screen.getByTestId('inspect')).queryByRole('group', { name: '你的 GitLab 用户名' })).toBeNull()
+    expect(props.reloadStatus).toHaveBeenCalled()
   })
 })

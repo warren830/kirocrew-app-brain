@@ -34,16 +34,28 @@
      "gitlab_base": "https://gitlab.example.com",
      "gitlab_project": "shop/shop-pay"
     },
-    "pending": null
+    "pending": null,
+    "me": {
+     "name": "alice",
+     "source": "git",
+     "gitlab": "https://gitlab.example.com",
+     "text": "alice（git config brain.user）",
+     "ask": false,
+     "label": "",
+     "why": "",
+     "suggest": "",
+     "error": ""
+    }
    },
    {
     "id": "r2",
     "path": "/Users/alice/workplace/shop-web",
     "name": "shop-web",
     "ok": false,
-    "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装到一个新分支上",
+    "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用",
     "kit": null,
-    "pending": null
+    "pending": null,
+    "me": null
    },
    {
     "id": "r3",
@@ -58,6 +70,17 @@
      "default_branch": "main",
      "gitlab_base": "https://gitlab.example.com",
      "gitlab_project": "shop/shop-order"
+    },
+    "me": {
+     "name": null,
+     "source": "none",
+     "gitlab": "https://gitlab.example.com",
+     "text": "",
+     "ask": true,
+     "label": "你的 GitLab 用户名",
+     "why": "这个仓库用 GitLab：认领的分支 ai/<名字>/… 和交接都按这个名字认人，要和你在 GitLab 上的用户名一样",
+     "suggest": "alice",
+     "error": ""
     }
    },
    {
@@ -73,6 +96,17 @@
      "default_branch": "main",
      "gitlab_base": "",
      "gitlab_project": ""
+    },
+    "me": {
+     "name": "alice",
+     "source": "login",
+     "gitlab": "",
+     "text": "alice（这台机器的登录名：这个仓库不用 GitLab）",
+     "ask": false,
+     "label": "",
+     "why": "",
+     "suggest": "",
+     "error": ""
     }
    }
   ],
@@ -97,7 +131,7 @@
     {
      "level": "WARN",
      "text": ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）",
-     "todo": "只有把需求交给运行机时才要紧（运行机靠新版停下来问人）。要交的话点「修复」：在新分支上重装 brain-kit",
+     "todo": "只有把需求交给运行机时才要紧（运行机靠新版停下来问人）。要交的话点「修复」：重装 brain-kit",
      "fix": "kit",
      "repo": "/Users/alice/workplace/shop-tools",
      "raw": ".kiro/brain/lean-hook.py is an older adapter (version 0, needs 2): the team runner could not write runs/<KEY>/park.json, its only way to ask a person, before the Lean approvals; run `brain install` and commit it on main through an MR"
@@ -112,7 +146,7 @@
   "me": {
    "user": "alice",
    "token": true,
-   "how": "git config brain.user；GitLab token 已配置（不显示）"
+   "how": "GitLab token（有）；alice（git config brain.user）"
   },
   "team": {
    "enabled": false,
@@ -1022,7 +1056,7 @@
   "errors": [
    {
     "repo": "r2",
-    "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装到一个新分支上"
+    "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用"
    }
   ],
   "cto": {
@@ -20617,7 +20651,7 @@
       "name": ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）",
       "status": "skip",
       "at": null,
-      "detail": "只在本机做，现在不碍事；只有把需求交给运行机时才要紧（运行机靠新版停下来问人）。要交的话点「修复」：在新分支上重装 brain-kit",
+      "detail": "只在本机做，现在不碍事；只有把需求交给运行机时才要紧（运行机靠新版停下来问人）。要交的话点「修复」：重装 brain-kit",
       "actor": null
      },
      {

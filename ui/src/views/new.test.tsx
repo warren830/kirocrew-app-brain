@@ -4,7 +4,8 @@ import { describe, expect, test, vi } from 'vitest'
 import { apiCalls, apiError, navigations } from '../test/stubs/app-sdk'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
-import type { IntakeCheck } from '../types'
+import type { IntakeCheck, RepoMe, Status } from '../types'
+import { NAME_RULE } from '../ui'
 import { GATE4, GATE5, HERO_TEXT, NewView, REVIEW_HINT } from './NewReq'
 
 function setup(routes: Parameters<typeof installFixtureRoutes>[0] = {}) {
@@ -299,5 +300,53 @@ describe('开需求', () => {
     expect(within(out).getByText('claim/PAY-8 已经被 bob 认领了')).toBeInTheDocument()
     expect(within(out).queryByRole('button', { name: '打开会话' })).toBeNull()
     expect(flowStates()[2]).toBe('bad')
+  })
+  test('认领人: the name brain-kit goes by; with GitLab and no name 开工 waits for 「你的 GitLab 用户名」, saved with git config', async () => {
+    const ask: RepoMe = { name: null, source: 'none', gitlab: 'https://gitlab.example.com', text: '', ask: true, label: '你的 GitLab 用户名',
+      why: '这个仓库用 GitLab：认领的分支 ai/<名字>/… 和交接都按这个名字认人，要和你在 GitLab 上的用户名一样', suggest: 'alice', error: '' }
+    const asking = fx.status()
+    asking.repos[0] = { ...asking.repos[0], me: ask }
+    const saved: Status = fx.status()
+    const named: RepoMe = { ...ask, name: 'alice-w', source: 'git', text: 'alice-w（git config brain.user）', ask: false, label: '', why: '', suggest: '' }
+    saved.repos[0] = { ...saved.repos[0], me: named }
+    installFixtureRoutes({ [`POST ${API}/me/name`]: () => ({ ok: true, text: '这个仓库的 git config brain.user 设成了 alice-w', me: named, status: saved }) })
+    const user = userEvent.setup()
+    const props = { status: asking, go: vi.fn(), replace: vi.fn(), reloadStatus: vi.fn(), setStatus: vi.fn() }
+    const { rerender } = render(<NewView entry={{}} {...props} />)
+    await fillBasics(user)
+    expect(startBtn()).toBeDisabled()
+    expect(screen.getByTestId('start-why')).toHaveTextContent('先在第 1 步填上你的 GitLab 用户名')
+    const who = screen.getByRole('group', { name: '你的 GitLab 用户名' })
+    const input = within(who).getByLabelText('你的 GitLab 用户名')
+    expect(input).toHaveValue('alice')                                              // the login name
+    expect(who).toHaveTextContent(ask.why)
+    await user.clear(input)
+    await user.type(input, 'Alice W')
+    expect(within(who).getByRole('button', { name: '保存' })).toBeDisabled()
+    expect(who).toHaveTextContent(NAME_RULE)
+    await user.clear(input)
+    await user.type(input, 'Alice-W{Enter}')                                      // Enter saves; the 开需求 form is not sent
+    await waitFor(() => expect(props.setStatus).toHaveBeenCalledWith(saved))
+    expect(apiCalls.find((c) => c.path === `${API}/me/name`)?.body).toEqual({ path: '/Users/alice/workplace/shop-pay', name: 'alice-w' })
+    expect(apiCalls.some((c) => c.path === `${API}/intake/start`)).toBe(false)
+    expect(screen.getByTestId('new-me')).toHaveTextContent('alice-w（git config brain.user）已保存')
+    rerender(<NewView entry={{}} {...props} status={saved} />)
+    expect(startBtn()).toBeEnabled()
+    expect(screen.getByTestId('new-me')).toHaveTextContent('认领人')
+  })
+
+  test('a start brain-kit refused because it did not know who you are: the why in Chinese and the input right there', async () => {
+    const r = { ...fx.start(), ok: false, key: null, branch: null, intent: null, worktree: null, slot: null, url: null,
+      output: 'brain: who are you? set GITLAB_TOKEN (preferred) or `git config brain.user <gitlab-username>`',
+      problem: { level: 'FAIL' as const, text: 'brain-kit 不知道你是谁', todo: '填上你的名字（用 GitLab 的仓库填 GitLab 用户名）。在下面填上，存进这个仓库的 git config brain.user',
+        fix: 'me' as const, repo: '/Users/alice/workplace/shop-pay', raw: 'brain: who are you? …' },
+      me: { name: null, source: 'none' as const, gitlab: '', text: '', ask: true, label: '你的名字', why: '这个 brain-kit 要一个名字，认领和分支 ai/<名字>/… 用：这个仓库不用 GitLab，用登录名就行', suggest: 'alice', error: '' } }
+    const { user } = setup({ [`POST ${API}/intake/start`]: () => r })
+    await fillBasics(user)
+    await user.click(startBtn())
+    const who = await screen.findByTestId('start-who')
+    expect(who).toHaveTextContent('brain-kit 不知道你是谁')
+    expect(who).toHaveTextContent('存进这个仓库的 git config brain.user')
+    expect(within(who).getByRole('textbox', { name: '你的名字' })).toHaveValue('alice')
   })
 })

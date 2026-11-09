@@ -38,6 +38,7 @@ board = importlib.import_module("_brainapp_backend.core.board")
 detail = importlib.import_module("_brainapp_backend.core.detail")
 lean_view = importlib.import_module("_brainapp_backend.core.lean_view")
 deliveries = importlib.import_module("_brainapp_backend.core.deliveries")
+identity = importlib.import_module("_brainapp_backend.core.identity")
 service = importlib.import_module("_brainapp_backend.core.service")
 
 FIX = ROOT / "ui" / "src" / "test" / "fixtures"
@@ -514,9 +515,15 @@ def main() -> None:
     world_status = copy.deepcopy(status)
     world_status["repos"] = status["repos"] + [
         {"id": "r3", "path": "/Users/alice/workplace/shop-order", "name": "shop-order", "ok": True, "error": "", "pending": None,
-         "kit": {"tracker": "none", "req_prefix": "ORD", "default_branch": "main", "gitlab_base": GL, "gitlab_project": "shop/shop-order"}},
+         "kit": {"tracker": "none", "req_prefix": "ORD", "default_branch": "main", "gitlab_base": GL, "gitlab_project": "shop/shop-order"},
+         # 你是谁: GitLab, no token, no brain.user there: the page asks for the GitLab username
+         "me": {"name": None, "source": "none", "gitlab": GL, "text": "", "ask": True, "label": identity.LABEL_GITLAB,
+                "why": identity.WHY_GITLAB, "suggest": "alice", "error": ""}},
         {"id": "r4", "path": "/Users/alice/workplace/shop-tools", "name": "shop-tools", "ok": True, "error": "", "pending": None,
-         "kit": {"tracker": "none", "req_prefix": "TOOL", "default_branch": "main", "gitlab_base": "", "gitlab_project": ""}}]
+         "kit": {"tracker": "none", "req_prefix": "TOOL", "default_branch": "main", "gitlab_base": "", "gitlab_project": ""},
+         # no GitLab: the login name (brain-kit 91e2fee)
+         "me": {"name": "alice", "source": "login", "gitlab": "", "text": "alice（这台机器的登录名：这个仓库不用 GitLab）",
+                "ask": False, "label": "", "why": "", "suggest": "", "error": ""}}]
     # KiroCrew is fine in the world (the 「KiroCrew 有 FAIL」 switch shows a failing row); shop-tools keeps its ! reminder
     ok_hook = {"level": "OK", "text": "brain-dev.json 的 Lean hook 都在", "todo": "", "fix": None, "repo": None, "raw": ""}
     world_status["crew"]["rows"] = [ok_hook if r_["level"] == "FAIL" else r_ for r_ in status["crew"]["rows"] if r_.get("fix") != "kit"] + tool_kit

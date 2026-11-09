@@ -22,8 +22,8 @@ import { paths, useAction, usePoll } from '../api'
 import { lines, splitPaths } from '../format'
 import { KEY_RE, type NewEntry } from '../nav'
 import type { Tone } from '../styles'
-import { CLASS_LABEL, type Classification, type CrewChecks, type IntakeBody, type IntakeCheck, type IntakeNext, type StartBody, type StartResult } from '../types'
-import { CheckRows, Flow, ImportCta, RoleIcon, type FlowStep } from '../ui'
+import { CLASS_LABEL, type Classification, type CrewChecks, type IntakeBody, type IntakeCheck, type IntakeNext, type MeNameResult, type StartBody, type StartResult } from '../types'
+import { CheckRows, Flow, ImportCta, MeLine, RoleIcon, type FlowStep } from '../ui'
 import type { ViewProps } from './props'
 
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,39}$/
@@ -58,6 +58,8 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
   const repos = (props.status?.repos ?? []).filter((r) => r.ok)
   const [repoPick, setRepoPick] = useState(entry.repo ?? '')
   const repo = repoPick && (!props.status || repos.some((r) => r.id === repoPick)) ? repoPick : repos[0]?.id ?? ''
+  const picked = repos.find((r) => r.id === repo) ?? null
+  const me = picked?.me ?? null     // who brain-kit will say claims it (认领人)
   const repoInfo = repos.find((r) => r.id === repo)
 
   const next = usePoll<IntakeNext>(repo ? paths.intakeNext(repo) : null, 0)
@@ -118,6 +120,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
       : !SLUG_RE.test(body.slug) ? 'slug 不对'
         : keyMissing ? '这个仓库用 Jira：要填需求号'
           : keyBad ? '需求号的格式不对'
+            : me?.ask ? `先在第 1 步填上${me.label}`
             : started?.ok ? '已经开工了'
               : noDocs ? ''
                 : !checked ? '有文档：先检查一遍（不写入）'
@@ -142,7 +145,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
     s === 'ok' ? (passed ? '过了' : '好了') : s === 'wait' ? waiting : s === 'bad' ? '拦下了' : s === 'warn' ? '请你确认' : s === 'auto' ? '自动' : '不用'
 
   // ---- the flow
-  const basicsOk = !!repo && !!body.title && SLUG_RE.test(body.slug) && !keyMissing && !keyBad
+  const basicsOk = !!repo && !!body.title && SLUG_RE.test(body.slug) && !keyMissing && !keyBad && !me?.ask
   const ok = !!started?.ok
   const docsBad = (!!current && !clean(current)) || failedAt === print
   const flow: FlowStep[] = [
@@ -254,6 +257,12 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
               <textarea id="new-paths" rows={2} value={expected} placeholder="src/refund/" onChange={(e) => setExpected(e.target.value)} />
               <p className="br-hint">别的需求也改到这里时会提醒你。</p>
             </div>
+            {picked && me && (
+              <div className="br-field is-full" data-testid="new-me">
+                {!me.ask && <span className="br-label">认领人</span>}
+                <MeLine key={picked.id} path={picked.path} me={me} onSaved={(x) => props.setStatus(x.status)} />
+              </div>
+            )}
           </div>
         </section>
 
@@ -343,7 +352,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
           </div>
           {start.error && <p className="br-error" role="alert">{start.error}</p>}
           {started && (
-            <StartOut r={started} onOpen={navigate}
+            <StartOut r={started} onOpen={navigate} path={picked?.path ?? ''} onMe={(x) => props.setStatus(x.status)}
               onBoard={(k) => props.go({ kind: 'board', repo, key: k })}
               onItem={(k) => props.go({ kind: 'item', repo, key: k })} />
           )}
@@ -451,7 +460,14 @@ function Cell({ n, label, tone }: { n: number; label: string; tone?: 'ok' | 'bad
   )
 }
 
-function StartOut({ r, onOpen, onBoard, onItem }: { r: StartResult; onOpen: (url: string) => void; onBoard: (key: string) => void; onItem: (key: string) => void }) {
+function StartOut({ r, path, onOpen, onBoard, onItem, onMe }: {
+  r: StartResult
+  path: string
+  onOpen: (url: string) => void
+  onBoard: (key: string) => void
+  onItem: (key: string) => void
+  onMe: (x: MeNameResult) => void
+}) {
   return (
     <div className={`nr-started ${r.ok ? 'is-ok' : 'is-bad'}`} data-testid="start-result">
       <div className="nr-started-head">
@@ -480,6 +496,13 @@ function StartOut({ r, onOpen, onBoard, onItem }: { r: StartResult; onOpen: (url
           </>
         )}
       </div>
+      {!r.ok && r.problem && (
+        <div className="br-banner is-error nr-who" role="alert" data-testid="start-who">
+          <b>{r.problem.text}</b>
+          {r.problem.todo && <span>{r.problem.todo}</span>}
+          {r.me && path && <MeLine path={path} me={r.me} onSaved={onMe} />}
+        </div>
+      )}
       {!r.url && r.session_error && <p className="br-error br-pre" role="alert">会话没开成：{r.session_error}</p>}
       {r.output && (
         <details className="br-raw nr-out" open={!r.ok}>
@@ -520,6 +543,7 @@ const NR_CSS = `
 .nr-grid :is(input[type="text"], input:not([type]), select, textarea) { width: 100%; }
 .nr-grid > .br-field { align-content: start; }
 .nr-grid textarea { min-height: 2.9em; }
+.nr-who { display: grid; gap: 6px; }
 
 /* the five gates: a row of cards, arrows between them (the board's team introduction) */
 .nr-gates { list-style: none; margin: 0; padding: 0; display: grid; gap: 20px;

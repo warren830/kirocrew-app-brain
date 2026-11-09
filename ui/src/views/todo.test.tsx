@@ -136,6 +136,32 @@ describe('待办', () => {
     expect(reloadStatus).toHaveBeenCalled()
   })
 
+  test('重装 kit 文件 in place on a team repo: its group stays while 推送 waits, even when the list no longer has the problem', async () => {
+    const user = userEvent.setup()
+    const todo = fx.todo()
+    const later = { ...todo, items: todo.items.filter((i) => i.kind !== 'crew') }
+    const job = fx.importUpgradeJob()
+    job.result = { ...job.result!, mode: 'inplace', branch: 'main', base: 'main', worktree: null, target: 'main',
+      remote_url: 'git@gitlab.example.com:shop/shop-pay.git', text: '提交在 main 上了，现在就生效。远端还没有它：要推送就点「推送」' }
+    let fixed = false
+    installFixtureRoutes({
+      [`GET ${API}/todo`]: () => (fixed ? later : todo),
+      [`POST ${API}/import/choices`]: () => fx.importChoices(),
+      [`POST ${API}/import/upgrade`]: () => { fixed = true; return { job } },
+    })
+    const { reloadStatus } = renderTodo({ pollMs: 20 })
+    const crew = await screen.findByRole('region', { name: 'KiroCrew 的问题' })
+    await user.click(within(crew).getByRole('button', { name: '重装 kit 文件' }))
+    await user.click(await within(crew).findByRole('button', { name: '直接更新在 main' }))
+    expect(await within(crew).findByText(job.result!.text)).toBeInTheDocument()
+    await waitFor(() => expect(apiCalls.filter((c) => c.path === `${API}/todo`).length).toBeGreaterThan(3))   // reloaded since
+    expect(screen.getByRole('region', { name: 'KiroCrew 的问题' })).toBeInTheDocument()
+    expect(screen.queryByTestId('todo-empty')).toBeNull()
+    await user.click(within(screen.getByTestId('push-box')).getByRole('button', { name: '先不推送' }))
+    expect(reloadStatus).toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'KiroCrew 的问题' })).toBeNull())
+  })
+
   test('nothing to do says so, and what will show up here', async () => {
     installFixtureRoutes({ [`GET ${API}/todo`]: () => ({ items: [], team: false }) })
     const { go } = renderTodo()

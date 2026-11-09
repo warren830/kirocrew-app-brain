@@ -7,14 +7,16 @@
  *              pills, the time it took) and the new folder is checked next.
  *   2 检查     POST /import/inspect, read only: each check as a row with its ✓ / ! / ✗ chip, why and what to do;
  *              KiroCrew's checks with their fixes (CheckRows).
- *   3 装到新分支 not installed: the kit.json values `brain install` asks you to check, in a field grid with a live
- *              preview of what goes into .brain/kit.json, then 「安装到新分支」 (POST /import/install, a job): a new
- *              branch in its own worktree, brain doctor, the changed files, a commit with the person's own git
- *              identity. A hook that says no is shown as it said it; 「再提交一次」 (POST /import/commit).
- *              「推送并开 MR」 is optional and asks first, saying which branch goes where (POST /import/publish): the
- *              MR, or the commands and the link to open it.
- *   4 加入列表  POST /import/add. A repo whose brain-kit is only on the install branch is listed as 「安装在 … 分支上，
- *              合并后生效」.
+ *   3 安装     not installed: where it goes (ImportInspect.install: 「直接装在 <branch>」, the default, committed right
+ *              there and usable at once; or 「装到新分支，开 MR 给团队看」, recommended for a repo with a remote and
+ *              offered when the checkout has uncommitted changes; one plain line each, the recommended one marked, one
+ *              that cannot be done says why), the kit.json values `brain install` asks you to check in a field grid with
+ *              a live preview, then the install (POST /import/install with the mode, a job): brain doctor, the changed
+ *              files, a commit with the person's own git identity. A hook that says no is shown as it said it;
+ *              「再提交一次」 (POST /import/commit). In place: 推送 is offered when there is a remote, asked first, never
+ *              done by itself. On a new branch: 「推送并开 MR」 (asked first), or 「合并到 <default>」 (a fast-forward
+ *              here, POST /import/merge), and 「拉取」 once the MR was merged (POST /import/pull).
+ *   4 加入列表  POST /import/add. A repo whose brain-kit is only on the install branch is listed with what to do.
  *
  * A path from the URL (?path=) only fills the box: nothing runs before 检查.
  */
@@ -27,13 +29,16 @@ import type { ImportEntry } from '../nav'
 import type { Tone } from '../styles'
 import type {
   AddResult, CloneBody, CloneResult, CommitResult, FileChange, ImportCheck, ImportDefaults, ImportInspect, ImportJob,
-  InstallBody, InstallResult, JobStart, KitForm, Level, PendingInstall, PublishBody, PublishResult,
+  InstallBody, InstallChoice, InstallMode, InstallResult, JobStart, KitForm, Level, PendingInstall, PublishBody, PublishResult,
 } from '../types'
-import { CheckRows, ExtLink, Flow, IMPORT_FLOW, Icon, JobSteps, LEVEL_LABEL, LEVEL_TONE, RoleIcon, type FlowStep } from '../ui'
+import {
+  CheckRows, ExtLink, Flow, IMPORT_FLOW, Icon, JobSteps, LEVEL_LABEL, LEVEL_TONE, MeLine, PendingActions, PushBox, RoleIcon, type FlowStep,
+} from '../ui'
 import type { ViewProps } from './props'
 
-export const HERO_TEXT = '把一个项目仓库导进来：先只读地检查它；没装 brain-kit 的，装到一个新分支上，不动你现在的检出；最后加入列表，交付总览和开需求就能用它了。'
-export const SAFE_INSTALL = '只装在新分支上：从默认分支建，放在单独的工作目录里（work_root 下面）。你现在的检出、分支和改动都不动。提交用你自己的 git 身份，你的 git hook 照常跑。'
+export const HERO_TEXT = '把一个项目仓库导进来：先只读地检查它；没装 brain-kit 的，直接装在当前分支并提交（团队仓库也可以装到新分支、开 MR）；最后加入列表，交付总览和开需求就能用它了。'
+export const SAFE_INPLACE = '只提交 brain install 写的文件，你自己没提交的改动不碰；用你自己的 git 身份提交，你的 git hook 照常跑；不会自己推送。'
+export const SAFE_BRANCH = '只装在新分支上：从默认分支建，放在单独的工作目录里（work_root 下面）。你现在的检出、分支和改动都不动。提交用你自己的 git 身份，你的 git hook 照常跑。'
 const GLYPH: Record<Level, string> = { OK: '✓', WARN: '!', FAIL: '✗' }
 const CHANGE: Record<FileChange['change'], string> = { added: '新增', modified: '改动', deleted: '删除', other: '其他' }
 const CHANGE_TONE: Record<FileChange['change'], Tone> = { added: 'ok', modified: 'warn', deleted: 'bad', other: 'idle' }
@@ -74,6 +79,7 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
   // ---- the four steps, as the wizard stands
   const installState = (): StepState => {
     if (!shown || shown.next === 'fix') return undefined
+    if (installFor && installFor.state === 'done' && installFor.result?.commit.ok) return 'done'
     if (shown.next === 'add' || (shown.next === 'listed' && !shown.pending)) return 'off'
     if (shown.next === 'pending' || shown.next === 'listed') return shown.pending?.state === 'uncommitted' ? 'wait' : 'done'
     if (!installFor || installFor.state === 'running') return 'now'
@@ -131,7 +137,7 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
         <InstallCard key={`install:${shown.path}`} c={shown} job={installFor} state={s3} readError={install.readError} onStart={install.start} onCommitted={recheck} />
       )}
       {shown && (shown.next === 'pending' || shown.next === 'listed') && shown.pending && shown.path && (
-        <PendingCard key={`pending:${shown.path}`} path={shown.path} p={shown.pending} title={installFor ? '推送并开 MR（可选）' : undefined}
+        <PendingCard key={`pending:${shown.path}`} path={shown.path} p={shown.pending} title={installFor ? '下一步' : undefined}
           onChanged={() => { reloadStatus(); recheck() }} />
       )}
       {shown && shown.next === 'listed' && (
@@ -141,7 +147,7 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
             <span className="imp-mark" aria-hidden="true">✓</span>
             <div>
               <b>已经在列表里（{shown.listed}）。</b>
-              <small>{shown.pending ? '合并以后就能用。' : '交付总览、开需求都能用它。'}</small>
+              <small>{shown.pending ? shown.pending.next : '交付总览、开需求都能用它。'}</small>
             </div>
             <button type="button" className="br-btn" onClick={() => go({ kind: 'overview' })}><RoleIcon role="list" size={16} />去交付总览</button>
           </div>
@@ -288,6 +294,7 @@ function InspectCard({ c, busy, state, onRecheck, onFixed }: { c: ImportInspect;
       {c.note && <p className="br-hint">{c.note}</p>}
       {c.error && <p className="br-error" role="alert">{c.error}</p>}
       <CheckList rows={c.checks} />
+      {c.me?.ask && c.path && <MeLine key={c.path} path={c.path} me={c.me} onSaved={onFixed} />}
       {c.crew.rows.length > 0 && (
         <div className="imp-block">
           <div className="imp-block-head"><RoleIcon role="settings" size={18} /><b>KiroCrew</b><Counts levels={c.crew.rows.map((r) => r.level)} /></div>
@@ -334,87 +341,117 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted }: {
   const api = useAppApi()
   const [form, setForm] = useState<KitForm>(() => c.form ?? EMPTY_FORM)
   const [branch, setBranch] = useState(c.branch)
+  const choice = c.install
+  // what the person picked, while it is still possible (a re-check can refuse it); else the recommended way
+  const [want, setMode] = useState<InstallMode | null>(null)
+  const can = choice?.options.filter((o) => o.ok) ?? []
+  const mode: InstallMode = (can.some((o) => o.mode === want) ? want : null)
+    ?? can.find((o) => o.mode === choice?.recommend)?.mode ?? can[0]?.mode ?? 'inplace'
   const start = useAction((b: InstallBody) => api.post<JobStart>(paths.importInstall(), b))
   const edit = (f: Partial<KitForm>) => setForm((x) => ({ ...x, ...f }))
   const running = job?.state === 'running'
   const done = job?.state === 'done' && !!job.result?.commit.ok
+  const here = choice?.current || c.current_branch || '当前分支'
+  const picked = choice?.options.find((o) => o.mode === mode)
   const run = async () => {
     if (!c.path) return
-    const r = await start.run({ path: c.path, branch: branch.trim(), kit: { ...form, req_prefix: form.req_prefix.trim().toUpperCase() } })
+    const r = await start.run({ path: c.path, branch: mode === 'branch' ? branch.trim() : '', mode, kit: { ...form, req_prefix: form.req_prefix.trim().toUpperCase() } })
     if (r) onStart(r.job as ImportJob<InstallResult>)
   }
   const fromOrigin = !!c.origin?.project && form.gitlab_project === c.origin.project
   const jira = form.tracker === 'jira'
   return (
-    <section className={`br-card imp-sec${done ? ' is-ok' : ''}`} aria-label="装到新分支" data-testid="install">
-      <StepHead n={3} title="装到新分支" state={state} sub="这个仓库还没装 brain-kit" />
+    <section className={`br-card imp-sec${done ? ' is-ok' : ''}`} aria-label="安装" data-testid="install">
+      <StepHead n={3} title="安装" state={state} sub="这个仓库还没装 brain-kit" />
       {!job && (
-        <form className="imp-install" aria-label="kit.json" onSubmit={(e) => { e.preventDefault(); void run() }}>
-          <div className="imp-grid">
-            <div className="br-field">
-              <label htmlFor="imp-prefix">需求号前缀</label>
-              <input id="imp-prefix" type="text" className="br-mono" value={form.req_prefix} onChange={(e) => edit({ req_prefix: e.target.value.toUpperCase() })} />
-              <p className="br-hint">{form.req_prefix ? `需求号会是 ${form.req_prefix}-1、${form.req_prefix}-2 …` : '大写字母开头，最多 10 个，比如 PAY'}</p>
+        <>
+          {choice && choice.options.length > 1 ? (
+            <div className="imp-options" role="radiogroup" aria-label="装在哪" data-testid="install-modes">
+              {choice.options.map((o) => (
+                <ModeOption key={o.mode} o={o} on={mode === o.mode} rec={o.mode === choice.recommend} onPick={() => setMode(o.mode)} />
+              ))}
             </div>
-            <div className="br-field">
-              <span className="br-label" id="imp-tracker-l">跟踪方式</span>
-              <div className="imp-seg" role="radiogroup" aria-labelledby="imp-tracker-l">
-                <label className={`imp-opt${!jira ? ' is-on' : ''}`}>
-                  <input type="radio" name="imp-tracker" checked={!jira} onChange={() => edit({ tracker: 'none' })} />
-                  <span>不用 Jira：按顺序给号</span>
-                </label>
-                <label className={`imp-opt${jira ? ' is-on' : ''}`}>
-                  <input type="radio" name="imp-tracker" checked={jira} onChange={() => edit({ tracker: 'jira' })} />
-                  <span>用 Jira 的号</span>
-                </label>
+          ) : (
+            <p className="imp-where" data-testid="install-where"><RoleIcon role="commit" size={18} /><b>{picked?.title ?? `直接装在 ${here}`}</b><span>{picked?.line ?? ''}</span></p>
+          )}
+          <form className="imp-install" aria-label="kit.json" onSubmit={(e) => { e.preventDefault(); void run() }}>
+            <div className="imp-grid">
+              <div className="br-field">
+                <label htmlFor="imp-prefix">需求号前缀</label>
+                <input id="imp-prefix" type="text" className="br-mono" value={form.req_prefix} onChange={(e) => edit({ req_prefix: e.target.value.toUpperCase() })} />
+                <p className="br-hint">{form.req_prefix ? `需求号会是 ${form.req_prefix}-1、${form.req_prefix}-2 …` : '大写字母开头，最多 10 个，比如 PAY'}</p>
               </div>
-            </div>
-            {jira && (
-              <div className="br-field is-full">
-                <label htmlFor="imp-jira">Jira 地址</label>
-                <input id="imp-jira" type="text" className="br-mono" value={form.jira_base} placeholder="https://jira.example.com" onChange={(e) => edit({ jira_base: e.target.value })} />
+              <div className="br-field">
+                <span className="br-label" id="imp-tracker-l">跟踪方式</span>
+                <div className="imp-seg" role="radiogroup" aria-labelledby="imp-tracker-l">
+                  <label className={`imp-opt${!jira ? ' is-on' : ''}`}>
+                    <input type="radio" name="imp-tracker" checked={!jira} onChange={() => edit({ tracker: 'none' })} />
+                    <span>不用 Jira：按顺序给号</span>
+                  </label>
+                  <label className={`imp-opt${jira ? ' is-on' : ''}`}>
+                    <input type="radio" name="imp-tracker" checked={jira} onChange={() => edit({ tracker: 'jira' })} />
+                    <span>用 Jira 的号</span>
+                  </label>
+                </div>
               </div>
-            )}
-            <div className="br-field">
-              <label htmlFor="imp-gl-base">GitLab 地址</label>
-              <input id="imp-gl-base" type="text" className="br-mono" value={form.gitlab_base} placeholder="https://gitlab.example.com" onChange={(e) => edit({ gitlab_base: e.target.value })} />
+              {jira && (
+                <div className="br-field is-full">
+                  <label htmlFor="imp-jira">Jira 地址</label>
+                  <input id="imp-jira" type="text" className="br-mono" value={form.jira_base} placeholder="https://jira.example.com" onChange={(e) => edit({ jira_base: e.target.value })} />
+                </div>
+              )}
+              <div className="br-field">
+                <label htmlFor="imp-gl-base">GitLab 地址</label>
+                <input id="imp-gl-base" type="text" className="br-mono" value={form.gitlab_base} placeholder="https://gitlab.example.com" onChange={(e) => edit({ gitlab_base: e.target.value })} />
+              </div>
+              <div className="br-field">
+                <label htmlFor="imp-gl-project">GitLab 项目</label>
+                <input id="imp-gl-project" type="text" className="br-mono" value={form.gitlab_project} placeholder="组/仓库" onChange={(e) => edit({ gitlab_project: e.target.value })} />
+                <p className="br-hint">{fromOrigin ? '从 origin 的地址猜的：检查一下。' : '交接和开 MR 用。不用 GitLab 就两个都空着。'}</p>
+              </div>
+              <div className="br-field">
+                <label htmlFor="imp-default">默认分支</label>
+                <input id="imp-default" type="text" className="br-mono" value={form.default_branch} onChange={(e) => edit({ default_branch: e.target.value })} />
+              </div>
+              <div className="br-field">
+                <label htmlFor="imp-team">团队（可不填）</label>
+                <input id="imp-team" type="text" value={form.team} onChange={(e) => edit({ team: e.target.value })} />
+              </div>
+              {mode === 'branch' && (
+                <div className="br-field">
+                  <label htmlFor="imp-branch">新分支名</label>
+                  <input id="imp-branch" type="text" className="br-mono" value={branch} onChange={(e) => setBranch(e.target.value)} />
+                </div>
+              )}
             </div>
-            <div className="br-field">
-              <label htmlFor="imp-gl-project">GitLab 项目</label>
-              <input id="imp-gl-project" type="text" className="br-mono" value={form.gitlab_project} placeholder="组/仓库" onChange={(e) => edit({ gitlab_project: e.target.value })} />
-              <p className="br-hint">{fromOrigin ? '从 origin 的地址猜的：检查一下。' : '交接和开 MR 用。不用 GitLab 就两个都空着。'}</p>
-            </div>
-            <div className="br-field">
-              <label htmlFor="imp-default">默认分支</label>
-              <input id="imp-default" type="text" className="br-mono" value={form.default_branch} onChange={(e) => edit({ default_branch: e.target.value })} />
-            </div>
-            <div className="br-field">
-              <label htmlFor="imp-team">团队（可不填）</label>
-              <input id="imp-team" type="text" value={form.team} onChange={(e) => edit({ team: e.target.value })} />
-            </div>
-            <div className="br-field">
-              <label htmlFor="imp-branch">新分支名</label>
-              <input id="imp-branch" type="text" className="br-mono" value={branch} onChange={(e) => setBranch(e.target.value)} />
-            </div>
-          </div>
-          <aside className="imp-preview" aria-label="会写进 .brain/kit.json">
-            <b>会写进 .brain/kit.json</b>
-            <KitChips k={form} />
-            <div className="imp-route" aria-label="新分支从哪来">
-              <code>{c.origin ? 'origin/' : ''}{form.default_branch.trim() || 'main'}</code>
-              <span className="imp-arrow" aria-hidden="true">→</span>
-              <code className="is-new">{branch.trim() || '—'}</code>
-              <small>新分支，单独的工作目录</small>
-            </div>
-            <p className="imp-safe" data-testid="install-safe"><RoleIcon role="security" size={18} /><span>{SAFE_INSTALL}</span></p>
-            <div className="br-row">
-              <button type="submit" className="br-btn is-primary is-big" disabled={start.busy || !form.req_prefix.trim() || !form.default_branch.trim() || !branch.trim()}>
-                <RoleIcon role="handover" size={17} />{start.busy ? '正在开始…' : '安装到新分支'}
-              </button>
-            </div>
-            {start.error && <p className="br-error" role="alert">{start.error}</p>}
-          </aside>
-        </form>
+            <aside className="imp-preview" aria-label="会写进 .brain/kit.json">
+              <b>会写进 .brain/kit.json</b>
+              <KitChips k={form} />
+              {mode === 'branch' ? (
+                <div className="imp-route" aria-label="新分支从哪来">
+                  <code>{c.origin ? 'origin/' : ''}{form.default_branch.trim() || 'main'}</code>
+                  <span className="imp-arrow" aria-hidden="true">→</span>
+                  <code className="is-new">{branch.trim() || '—'}</code>
+                  <small>新分支，单独的工作目录</small>
+                </div>
+              ) : (
+                <div className="imp-route" aria-label="提交在哪">
+                  <code className="is-new">{here}</code>
+                  <small>你现在的检出，提交在这里，马上能用</small>
+                </div>
+              )}
+              <p className="imp-safe" data-testid="install-safe"><RoleIcon role="security" size={18} /><span>{mode === 'branch' ? SAFE_BRANCH : SAFE_INPLACE}</span></p>
+              <div className="br-row">
+                <button type="submit" className="br-btn is-primary is-big"
+                  disabled={start.busy || !picked?.ok && !!choice || !form.req_prefix.trim() || !form.default_branch.trim() || (mode === 'branch' && !branch.trim())}>
+                  <RoleIcon role={mode === 'branch' ? 'handover' : 'commit'} size={17} />
+                  {start.busy ? '正在开始…' : mode === 'branch' ? '安装到新分支' : `直接装在 ${here}`}
+                </button>
+              </div>
+              {start.error && <p className="br-error" role="alert">{start.error}</p>}
+            </aside>
+          </form>
+        </>
       )}
       {job && <JobBox job={job} what="安装" readError={readError} />}
       {job && !running && job.result && <InstallOut r={job.result} onCommitted={onCommitted} />}
@@ -424,6 +461,21 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted }: {
         </div>
       )}
     </section>
+  )
+}
+
+/** One of the two places an install goes, as a big card (like 从哪来's): the title, its one line (or why it cannot be
+ * done now), 推荐 on the recommended one. */
+function ModeOption({ o, on, rec, onPick }: { o: InstallChoice; on: boolean; rec: boolean; onPick: () => void }) {
+  const id = `imp-mode-${o.mode}`
+  return (
+    <label className={`imp-option${on ? ' is-on' : ''}${o.ok ? '' : ' is-off'}`} data-mode={o.mode}>
+      <input type="radio" name="imp-mode" value={o.mode} checked={on} disabled={!o.ok} onChange={onPick} aria-labelledby={`${id}-t`} aria-describedby={`${id}-d`} />
+      <RoleIcon role={o.mode === 'branch' ? 'handover' : 'commit'} size={30} />
+      <b id={`${id}-t`}>{o.title}{rec && <span className="br-chip tone-ok imp-rec">推荐</span>}</b>
+      <small id={`${id}-d`}>{o.ok ? o.line : o.why}</small>
+      <span className="imp-tick" aria-hidden="true">{on ? '✓' : ''}</span>
+    </label>
   )
 }
 
@@ -437,17 +489,22 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
   }
   const groups = CHANGE_ORDER.map((ch) => [ch, r.files.filter((f) => (CHANGE[f.change] ? f.change : 'other') === ch)] as const).filter(([, fs]) => fs.length > 0)
   const okRows = r.doctor.rows.filter((x) => x.level === 'OK')
+  const inplace = r.mode === 'inplace'
   return (
     <div className="imp-result" data-testid="install-result">
       <dl className="imp-facts">
-        <div><dt>新分支</dt><dd><code>{r.branch}</code>{r.base ? `（从 ${r.base} 建）` : ''}</dd></div>
+        {inplace ? (
+          <div><dt>提交在</dt><dd><code>{r.branch}</code>（你现在的检出）</dd></div>
+        ) : (
+          <div><dt>新分支</dt><dd><code>{r.branch}</code>{r.base ? `（从 ${r.base} 建）` : ''}</dd></div>
+        )}
         {r.worktree && <div><dt>工作目录</dt><dd><code>{r.worktree}</code></dd></div>}
         <div><dt>kit.json</dt><dd><KitChips k={r.kit} /></dd></div>
       </dl>
       {commit.ok ? (
         <div className="imp-commit is-ok" role="status" data-testid="commit-ok">
           <span className="imp-mark" aria-hidden="true">✓</span>
-          <div><b>{commit.text}</b></div>
+          <div><b>{commit.text}</b>{inplace && <small>这个仓库现在就能用。</small>}</div>
         </div>
       ) : commit.text ? (
         <div className="imp-commit is-bad" role="alert" data-testid="commit-blocked">
@@ -462,6 +519,7 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
           </div>
         </div>
       ) : null}
+      {commit.ok && inplace && r.remote_url && <PushBox path={r.path} branch={r.branch} remoteUrl={r.remote_url} />}
       {again.error && <p className="br-error" role="alert">{again.error}</p>}
       {r.doctor.ran && (
         <div className="imp-block" data-testid="doctor">
@@ -481,7 +539,7 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
       )}
       {r.files.length > 0 && (
         <div className="imp-block">
-          <div className="imp-block-head"><RoleIcon role="file" size={18} /><b>改了 {r.files.length} 个文件</b></div>
+          <div className="imp-block-head"><RoleIcon role="file" size={18} /><b>{inplace ? `提交了 ${r.files.length} 个文件` : `改了 ${r.files.length} 个文件`}</b></div>
           <div className="imp-files" data-testid="changed-files">
             {groups.map(([ch, fs]) => (
               <div key={ch} className="imp-fgroup" data-change={ch}>
@@ -502,20 +560,20 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
   )
 }
 
-const PENDING_WORD: Record<PendingInstall['state'], string> = { branch: '等合并', uncommitted: '等你提交', merged: '等你拉取' }
+/** the chip of an older backend's pending state, which has no word of its own */
+const PENDING_WORD: Record<PendingInstall['state'], string> = { branch: '在分支上', uncommitted: '还没提交', merged: '要拉取' }
 
 function PendingCard({ path, p, title, onChanged }: { path: string; p: PendingInstall; title?: string; onChanged: () => void }) {
   const api = useAppApi()
   const again = useAction(() => api.post<CommitResult>(paths.importCommit(), { path }))
   return (
     <section className="br-card imp-sec is-wait" aria-label="装在新分支上" data-testid="pending">
-      <StepHead n={3} title={title ?? (p.state === 'merged' ? '已经合并' : '装在新分支上')}
+      <StepHead n={3} title={title ?? (p.state === 'merged' ? `已经合进 ${p.target || '默认分支'}` : '装在新分支上')}
         state={title ? (p.pushed ? 'done' : undefined) : p.state === 'uncommitted' ? 'wait' : 'done'} />
       <div className="imp-pend">
-        <span className="br-chip kt-pill tone-wait is-live"><i aria-hidden="true">✋</i>{PENDING_WORD[p.state]}</span>
+        <span className="br-chip kt-pill tone-wait is-live"><i aria-hidden="true">✋</i>{p.word || PENDING_WORD[p.state]}</span>
         <b>{p.text}</b>
         {p.commit && <code className="br-tag" title="提交">{p.commit.slice(0, 8)}</code>}
-        {p.mr_url && <ExtLink href={p.mr_url}>在 GitLab 上看 MR</ExtLink>}
       </div>
       {(p.worktree || p.next) && (
         <dl className="imp-facts">
@@ -532,8 +590,8 @@ function PendingCard({ path, p, title, onChanged }: { path: string; p: PendingIn
           {again.error && <p className="br-error" role="alert">{again.error}</p>}
         </div>
       )}
-      {p.state === 'branch' && p.remote_url && <PublishBox path={path} p={p} onDone={onChanged} />}
-      {p.state === 'branch' && !p.remote_url && <p className="br-note">这个仓库没有 origin：推送和开 MR 用不了，可以在本机合并。</p>}
+      {(p.merge || p.pull || p.mr_url) && <PendingActions key={`${p.state}:${p.branch}`} path={path} p={p} onDone={onChanged} />}
+      {p.state === 'branch' && p.remote_url && !p.mr_url && <PublishBox path={path} p={p} onDone={onChanged} />}
     </section>
   )
 }
@@ -645,7 +703,7 @@ function AddCard({ path, pending, state, onAdded, go }: {
           <button type="button" className="br-btn is-primary is-big" disabled={add.busy} onClick={() => void run()}>
             <RoleIcon role="list" size={18} />{add.busy ? '正在加入…' : '加入列表'}
           </button>
-          <span className="br-hint">{pending ? `加入以后，列表里这个仓库会显示「${pending.text}」，合并以后就能用。` : '加入以后，交付总览和开需求就能用它。'}</span>
+          <span className="br-hint">{pending ? `加入以后，列表里这个仓库会显示「${pending.text}」：${pending.next}。` : '加入以后，交付总览和开需求就能用它。'}</span>
         </div>
       )}
       {r && (
@@ -653,7 +711,7 @@ function AddCard({ path, pending, state, onAdded, go }: {
           <span className="imp-mark" aria-hidden="true">✓</span>
           <div>
             <b>{r.text}</b>
-            <small>{r.status.repos.find((x) => x.id === r.id)?.ok ? '现在就能开需求了。' : '合并以后就能用。'}</small>
+            <small>{r.status.repos.find((x) => x.id === r.id)?.ok ? '现在就能开需求了。' : r.status.repos.find((x) => x.id === r.id)?.pending?.next ?? '装好以后就能用。'}</small>
           </div>
           <div className="br-row">
             {r.status.repos.find((x) => x.id === r.id)?.ok && (
@@ -700,6 +758,13 @@ const IMP_CSS = `
 .imp-option small { color: var(--muted); font-size: .88em; }
 .imp-option.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--card)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent); }
 .imp-option.is-on > .kt-role-icon { color: var(--accent); opacity: 1; }
+.imp-option.is-off { opacity: .62; cursor: not-allowed; }
+.imp-option.is-off small { color: var(--kt-warn); }
+.imp-rec { margin-left: 8px; vertical-align: 2px; font-size: .78em; }
+.imp-where { margin: 0; display: flex; align-items: baseline; gap: 6px 10px; flex-wrap: wrap; }
+.imp-where b { color: var(--text-strong); font-weight: 800; }
+.imp-where span { color: var(--muted); font-size: .92em; }
+.imp-where .kt-role-icon { align-self: center; color: var(--kt-ok); }
 .imp-tick { position: absolute; top: 50%; right: 16px; transform: translateY(-50%); width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
   border: 2px solid var(--border-strong, var(--border)); font-size: 11px; font-weight: 900; }
 .imp-option.is-on .imp-tick { background: var(--accent); border-color: var(--accent); color: var(--accent-fg, #fff); }

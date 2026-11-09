@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import { apiCalls, apiError } from '../test/stubs/app-sdk'
-import type { Settings } from '../types'
+import type { RepoMe, Settings } from '../types'
 import type { ViewProps } from './props'
 import { SettingsView } from './Settings'
 
@@ -53,16 +53,95 @@ describe('设置', () => {
     expect(apiCalls.find((c) => c.path === `${API}/repos/remove`)?.body).toEqual({ path: '/Users/alice/workplace/shop-pay' })
   })
 
-  test('a repo whose brain-kit is on the install branch says so, with its MR', () => {
+  test('a team repo whose brain-kit is on the install branch with an open MR: the MR first; a local merge is 导入仓库’s', async () => {
+    const user = userEvent.setup()
     const s = fx.status()
-    s.repos[1] = { ...s.repos[1], error: '', pending: { ...fx.importInspectPending().pending!, mr_url: 'https://gitlab.example.com/shop/shop-web/-/merge_requests/3', next: '在 GitLab 上审核并合并 MR，然后在这个目录里 git pull' } }
-    installFixtureRoutes({})
+    s.repos[1] = { ...s.repos[1], error: '', pending: { ...fx.importInspectPending().pending!, pushed: true, word: 'MR 等合并',
+      mr_url: 'https://gitlab.example.com/shop/shop-web/-/merge_requests/3', text: '装在 brain/install 分支上，MR 开着：合进 main 以后生效',
+      next: '在 GitLab 上合并 MR（团队的做法），合并以后点「拉取」', merge: { ok: true, why: '', confirm: true } } }
+    const p = props({ status: s })
+    render(<SettingsView {...p} />)
+    const r2 = screen.getByRole('region', { name: '仓库' }).querySelector('[data-repo="r2"]') as HTMLElement
+    expect(r2).toHaveTextContent('MR 等合并')
+    expect(r2).toHaveTextContent('装在 brain/install 分支上，MR 开着：合进 main 以后生效。在 GitLab 上合并 MR（团队的做法），合并以后点「拉取」')
+    expect(within(r2).getByRole('link', { name: /在 GitLab 上看 MR/ })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-web/-/merge_requests/3')
+    expect(r2).not.toHaveTextContent('读不到')
+    // its 推送 must stay on the page, and a row is redrawn every half minute
+    expect(within(r2).queryByRole('button', { name: /合并到 main/ })).toBeNull()
+    await user.click(within(r2).getByRole('button', { name: '去导入仓库' }))
+    expect(p.go).toHaveBeenCalledWith({ kind: 'import', path: '/Users/alice/workplace/shop-web' })
+  })
+
+  test('重装 kit 文件 on a team repo: where it goes is asked (推荐 marked); in place, 推送 stays even when a reload drops the row', async () => {
+    const user = userEvent.setup()
+    const job = fx.importUpgradeJob()
+    job.steps = [{ id: 'check', label: '看能不能直接装', state: 'ok', detail: '在 main 上，检出是干净的' }, ...job.steps.slice(1)]
+    job.result = { ...job.result!, mode: 'inplace', branch: 'main', base: 'main', worktree: null, target: 'main',
+      remote_url: 'git@gitlab.example.com:shop/shop-pay.git', text: '提交在 main 上了，现在就生效。远端还没有它：要推送就点「推送」' }
+    installFixtureRoutes({
+      [`POST ${API}/import/choices`]: () => fx.importChoices(),
+      [`POST ${API}/import/upgrade`]: () => ({ job }),
+    })
+    const p = props()
+    const { rerender } = render(<SettingsView {...p} />)
+    const crew = screen.getByRole('region', { name: 'KiroCrew' })
+    await user.click(within(crew).getByRole('button', { name: '重装 kit 文件' }))
+    expect(apiCalls.find((c) => c.path === `${API}/import/choices`)?.body).toEqual({ path: '/Users/alice/workplace/shop-pay', purpose: 'upgrade' })
+    const pick = await within(crew).findByTestId('mode-pick')
+    const rec = pick.querySelector('[data-mode="branch"]') as HTMLElement
+    expect(rec).toHaveTextContent('更新到新分支，开 MR 给团队看推荐')
+    expect(pick.querySelector('[data-mode="inplace"]')).toHaveTextContent('更新在你现在的检出里，提交在 main 上，马上生效；不会自己推送')
+    await user.click(within(pick).getByRole('button', { name: '直接更新在 main' }))
+    expect(apiCalls.find((c) => c.path === `${API}/import/upgrade`)?.body).toEqual({ path: '/Users/alice/workplace/shop-pay', mode: 'inplace' })
+    expect(await within(crew).findByText(job.result!.text)).toBeInTheDocument()
+    expect(p.reloadStatus).not.toHaveBeenCalled()                       // 推送 first: the page waits
+    const fixed = fx.status()
+    fixed.crew.rows = fixed.crew.rows.filter((r) => r.fix !== 'kit')     // the next status: the kit files are fine now
+    rerender(<SettingsView {...p} status={fixed} />)
+    const box = within(screen.getByRole('region', { name: 'KiroCrew' })).getByTestId('push-box')
+    await user.click(within(box).getByRole('button', { name: '先不推送' }))
+    expect(p.reloadStatus).toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByTestId('push-box')).toBeNull())
+    expect(screen.getByRole('region', { name: 'KiroCrew' })).not.toHaveTextContent('lean-hook.py 是旧版')
+    expect(apiCalls.some((c) => c.path === `${API}/import/push`)).toBe(false)
+  })
+
+  test('重装 kit 文件 with one way only (no remote, nothing uncommitted): one click, then the page moves on', async () => {
+    const user = userEvent.setup()
+    const one = { ...fx.importChoices(), recommend: 'inplace' as const, remote_url: '',
+      options: [{ mode: 'inplace' as const, title: '直接更新在 main', line: '更新在你现在的检出里，提交在 main 上，马上生效', ok: true, why: '' }] }
+    const job = fx.importUpgradeJob()
+    job.result = { ...job.result!, mode: 'inplace', branch: 'main', base: 'main', worktree: null, remote_url: '', text: '提交在 main 上了，现在就生效' }
+    installFixtureRoutes({
+      [`POST ${API}/import/choices`]: () => one,
+      [`POST ${API}/import/upgrade`]: () => ({ job }),
+    })
+    const p = props()
+    render(<SettingsView {...p} />)
+    await user.click(within(screen.getByRole('region', { name: 'KiroCrew' })).getByRole('button', { name: '重装 kit 文件' }))
+    await waitFor(() => expect(p.reloadStatus).toHaveBeenCalled())
+    expect(screen.queryByTestId('mode-pick')).toBeNull()
+    expect(apiCalls.find((c) => c.path === `${API}/import/upgrade`)?.body).toEqual({ path: '/Users/alice/workplace/shop-pay', mode: 'inplace' })
+    expect(screen.queryByTestId('push-box')).toBeNull()
+  })
+
+  test('a repo without a remote, on its install branch: no waiting for a merge, 「合并到 main」 right on the row', async () => {
+    const user = userEvent.setup()
+    const s = fx.status()
+    s.repos[1] = { ...s.repos[1], error: '', pending: { ...fx.importInspectPending().pending!, remote_url: '', gitlab_base: '', gitlab_project: '',
+      can_open_mr: false, word: '还没合进 main', text: '装在本机分支 brain/install 上，还没合进 main', next: '点「合并到 main」就能用（快进，不多一个提交）',
+      merge: { ok: true, why: '', confirm: false } } }
+    const merged = { ...fx.importMerge(), remote_url: '', text: '合进 main 了（快进到 d6342283）：这个仓库现在就能用。' }
+    installFixtureRoutes({ [`POST ${API}/import/merge`]: () => merged })
     render(<SettingsView {...props({ status: s })} />)
     const r2 = screen.getByRole('region', { name: '仓库' }).querySelector('[data-repo="r2"]') as HTMLElement
-    expect(r2).toHaveTextContent('等合并')
-    expect(r2).toHaveTextContent('安装在 brain/install 分支上，合并后生效。在 GitLab 上审核并合并 MR，然后在这个目录里 git pull')
-    expect(within(r2).getByRole('link', { name: /看 MR/ })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-web/-/merge_requests/3')
-    expect(r2).not.toHaveTextContent('读不到')
+    expect(r2).toHaveTextContent('还没合进 main')
+    expect(r2).not.toHaveTextContent('等合并')
+    expect(within(r2).queryByRole('button', { name: '去导入仓库' })).toBeNull()
+    await user.click(within(r2).getByRole('button', { name: '合并到 main' }))
+    expect(await within(r2).findByText(merged.text)).toBeInTheDocument()
+    expect(apiCalls.find((c) => c.path === `${API}/import/merge`)?.body).toEqual({ path: '/Users/alice/workplace/shop-web', confirm: false })
+    expect(within(r2).queryByTestId('push-box')).toBeNull()
   })
 
   test('team mode asks for bridge.json and runnerd.json only: the signer is named inside bridge.json, never a key', async () => {
@@ -147,5 +226,36 @@ describe('设置', () => {
     expect(card).toHaveTextContent('签名服务和 app 是同一个系统用户')
     await user.click(within(card).getByRole('button', { name: '看运行机' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'team' })
+  })
+  test('你是谁 per repo: the login name without GitLab; 「你的 GitLab 用户名」 where brain-kit would not know, saved into that repo', async () => {
+    const user = userEvent.setup()
+    const s = fx.status()
+    const login: RepoMe = { name: 'alice', source: 'login', gitlab: '', text: 'alice（这台机器的登录名：这个仓库不用 GitLab）', ask: false,
+      label: '', why: '', suggest: '', error: '' }
+    const ask: RepoMe = { name: null, source: 'none', gitlab: 'https://gitlab.example.com', text: '', ask: true, label: '你的 GitLab 用户名',
+      why: '这个仓库用 GitLab：认领的分支 ai/<名字>/… 和交接都按这个名字认人，要和你在 GitLab 上的用户名一样', suggest: 'alice', error: '' }
+    s.me = { user: null, token: false, how: 'GitLab token（没有）' }
+    s.repos = [{ ...s.repos[0], me: login }, { ...s.repos[0], id: 'r2', path: '/Users/alice/workplace/shop-web', name: 'shop-web', me: ask }]
+    const after = fx.status()
+    installFixtureRoutes({ [`POST ${API}/me/name`]: () => ({ ok: true, text: '这个仓库的 git config brain.user 设成了 alice',
+      me: { ...ask, name: 'alice', source: 'git', text: 'alice（git config brain.user）', ask: false }, status: after }) })
+    const p = props({ status: s })
+    render(<SettingsView {...p} />)
+    const kpi = screen.getByRole('region', { name: '我是谁' })
+    expect(kpi).toHaveTextContent('alice')
+    expect(kpi).toHaveTextContent('1 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」里填上')
+    const card = screen.getByRole('region', { name: '仓库' })
+    const r1 = card.querySelector('[data-repo="r1"]') as HTMLElement
+    expect(within(r1).getByTestId('me-line')).toHaveTextContent('alice（这台机器的登录名：这个仓库不用 GitLab）')
+    expect(within(r1).queryByRole('textbox')).toBeNull()
+    const r2 = card.querySelector('[data-repo="r2"]') as HTMLElement
+    const who = within(r2).getByRole('group', { name: '你的 GitLab 用户名' })
+    expect(within(who).getByLabelText('你的 GitLab 用户名')).toHaveValue('alice')
+    expect(who).toHaveTextContent(ask.why)
+    await user.click(within(who).getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(p.setStatus).toHaveBeenCalledWith(after))
+    expect(apiCalls.find((c) => c.path === `${API}/me/name`)?.body).toEqual({ path: '/Users/alice/workplace/shop-web', name: 'alice' })
+    expect(within(r2).getByTestId('me-line')).toHaveTextContent('alice（git config brain.user）已保存')
+    for (const c of apiCalls) expect(JSON.stringify(c.body ?? '')).not.toMatch(/token/i)    // nothing asks for a token
   })
 })

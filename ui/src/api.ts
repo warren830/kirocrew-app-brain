@@ -36,12 +36,17 @@ export const paths = {
   importClone: () => `${BASE}/import/clone`,
   importInstall: () => `${BASE}/import/install`,
   importJob: (id: string) => `${BASE}/import/jobs/${enc(id)}`,
+  importChoices: () => `${BASE}/import/choices`,
+  importMerge: () => `${BASE}/import/merge`,
+  importPull: () => `${BASE}/import/pull`,
+  importPush: () => `${BASE}/import/push`,
   importCommit: () => `${BASE}/import/commit`,
   /** the kit fix: brain install again on a new branch (the old adapter, runs/** in lean.json) */
   importUpgrade: () => `${BASE}/import/upgrade`,
   importPublish: () => `${BASE}/import/publish`,
   importAdd: () => `${BASE}/import/add`,
   repoRemove: () => `${BASE}/repos/remove`,
+  meName: () => `${BASE}/me/name`,
 }
 
 /** The API error's text in Chinese (the SDK rejects with `API <status>: <body>`, the body `{"error", "code"}`). */

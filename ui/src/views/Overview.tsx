@@ -56,7 +56,7 @@ export const OV_CSS = `
 .br-ov .cto-table tr.cto-row-pick.is-merged td { color: var(--text); }
 `
 
-export function OverviewView({ entry, status, go, replace, pollMs }: { entry: OverviewEntry } & ViewProps) {
+export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs }: { entry: OverviewEntry } & ViewProps) {
   const [repo, setRepo] = useState(entry.repo ?? 'all')
   const [state, setState] = useState<ReqState | undefined>(entry.state)
   const [limit, setLimit] = useState(14)
@@ -101,7 +101,7 @@ export function OverviewView({ entry, status, go, replace, pollMs }: { entry: Ov
         {scope.map((r) => <RefreshButton key={r.id} repo={r.id} name={scope.length > 1 ? r.name : ''} onDone={ov.reload} />)}
       </header>
       {repos.filter((r) => r.pending && (repo === 'all' || r.id === repo)).map((r) => (
-        <PendingRepo key={r.id} repo={r} banner onOpen={() => go({ kind: 'import', path: r.path })} />
+        <PendingRepo key={r.id} repo={r} banner onOpen={() => go({ kind: 'import', path: r.path })} onDone={reloadStatus} />
       ))}
       <LoadState loading={ov.loading} error={ov.error} has={!!data} />
       {data?.errors.map((e) => (
@@ -123,7 +123,7 @@ export function OverviewView({ entry, status, go, replace, pollMs }: { entry: Ov
               {[{ id: 'all', name: '全部' }, ...repos].map((r) => (
                 <button type="button" key={r.id} aria-pressed={repo === r.id} disabled={'ok' in r && !r.ok} onClick={() => pick(r.id, state)}>
                   <b>{r.name}</b>
-                  {'ok' in r && !r.ok ? <span>{r.pending ? '等合并' : '读不到'}</span> : null}
+                  {'ok' in r && !r.ok ? <span>{r.pending ? r.pending.word || '在分支上' : '读不到'}</span> : null}
                 </button>
               ))}
             </nav>

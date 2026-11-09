@@ -237,12 +237,12 @@ describe('the app: one bar over the views', () => {
     installFixtureRoutes({ [`GET ${API}/status`]: () => s, [`GET ${API}/overview*`]: () => ov })
     render(<BrainApp pollMs={60_000} />)
     const note = await screen.findByTestId('repo-pending')
-    expect(note).toHaveTextContent('shop-web：安装在 brain/install 分支上，合并后生效。推送并开 MR（在「导入仓库」里），合并以后就能用了')
+    expect(note).toHaveTextContent('shop-web：装在 brain/install 分支上，还没推送：合进 main 以后生效。推送并开 MR 给团队看；只有你一个人用的话，也可以在本机合并')
     expect(note).toHaveAttribute('role', 'status') // a note, not an alert
     expect(note).toHaveAttribute('data-repo', 'r2')
     // its repo pill says it waits for the merge, and cannot be picked yet
     const pill = within(await screen.findByRole('navigation', { name: '仓库' })).getByRole('button', { name: /^shop-web/ })
-    expect(pill).toHaveTextContent('shop-web等合并')
+    expect(pill).toHaveTextContent('shop-web还没推送')
     expect(pill).toBeDisabled()
     await user.click(within(note).getByRole('button', { name: '去导入仓库' }))
     expect(parseView(window.location.search)).toEqual({ kind: 'import', path: '/Users/alice/workplace/shop-web' })

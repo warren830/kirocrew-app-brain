@@ -10,7 +10,7 @@ import { useAppApi } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
 import { ago } from '../format'
 import type { RemoveResult, RepoInfo, Settings, Status } from '../types'
-import { CheckRows, Flow, IMPORT_FLOW, LEVEL_TONE, LoadState, PendingRepo, RoleIcon } from '../ui'
+import { CheckRows, Flow, IMPORT_FLOW, LEVEL_TONE, LoadState, MeLine, PendingRepo, RoleIcon } from '../ui'
 import type { ViewProps } from './props'
 import { SIGNER_SAME_USER } from './Team'
 
@@ -121,7 +121,7 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
       {status && <StatCards status={status} onTeam={() => go({ kind: 'team' })} />}
       <div className="st-main">
         <div className="st-col">
-          {status && <ReposCard repos={status.repos} onImport={onImport} onRemoved={setStatus} />}
+          {status && <ReposCard repos={status.repos} onImport={onImport} onRemoved={setStatus} onChanged={reloadStatus} />}
           {formCard}
         </div>
         <div className="st-col">
@@ -136,6 +136,10 @@ const yes = (b: boolean) => (b ? '有' : '没有')
 
 function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }) {
   const team = !s.team.enabled ? { label: '没开', tone: 'idle' } : s.team.ok ? { label: '正常', tone: 'ok' } : { label: '有问题', tone: 'bad' }
+  // the names brain-kit goes by in the repos (each repo has its own: brain.user, the login name, GitLab's)
+  const names = [...new Set(s.repos.map((r) => r.me?.name).filter((n): n is string => !!n))]
+  const user = names.join('、') || s.me.user || (s.repos.some((r) => r.me?.source === 'token') ? 'GitLab 账号' : '')
+  const asks = s.repos.filter((r) => r.me?.ask).length
   return (
     <div className="br-kpis st-stats">
       <section className={`br-kpi st-stat ${s.brainkit.ok ? 'is-good' : 'is-broken'}`} aria-label="brain-kit">
@@ -155,13 +159,14 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
         {s.brainkit.error && <p className="br-error br-small">{s.brainkit.error}</p>}
       </section>
 
-      <section className={`br-kpi st-stat ${s.me.user ? 'is-good' : 'is-warn'}`} aria-label="我是谁">
+      <section className={`br-kpi st-stat ${user && !asks ? 'is-good' : 'is-warn'}`} aria-label="我是谁">
         <div className="st-stat-head">
           <RoleIcon role="person" size={18} />
           <span className="br-kpi-label">我是谁</span>
         </div>
-        <div><span className="br-kpi-big st-user">{s.me.user ?? '没设置'}</span></div>
-        {!s.me.user && <p className="br-warn-text br-small">在终端里：<code>git config --global brain.user 你的用户名</code></p>}
+        <div><span className="br-kpi-big st-user">{user || '没设置'}</span></div>
+        {asks > 0 && <p className="br-warn-text br-small">{asks} 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」里填上</p>}
+        {!user && !s.repos.some((r) => r.me) && <p className="br-warn-text br-small">在终端里：<code>git config --global brain.user 你的用户名</code></p>}
         <div className="st-mods">
           <span className={`br-chip tone-${s.me.token ? 'ok' : 'warn'}`}><i aria-hidden="true">{s.me.token ? '✓' : '!'}</i>GitLab token {yes(s.me.token)}</span>
         </div>
@@ -195,7 +200,12 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
   )
 }
 
-function ReposCard({ repos, onImport, onRemoved }: { repos: RepoInfo[]; onImport: (path?: string) => void; onRemoved: (s: Status) => void }) {
+function ReposCard({ repos, onImport, onRemoved, onChanged }: {
+  repos: RepoInfo[]
+  onImport: (path?: string) => void
+  onRemoved: (s: Status) => void
+  onChanged: () => void
+}) {
   const ok = repos.filter((r) => r.ok).length
   return (
     <section className="br-card" aria-label="仓库">
@@ -213,7 +223,7 @@ function ReposCard({ repos, onImport, onRemoved }: { repos: RepoInfo[]; onImport
         </div>
       ) : (
         <ul className="st-repos">
-          {repos.map((r) => <RepoRow key={r.path} r={r} onImport={onImport} onRemoved={onRemoved} />)}
+          {repos.map((r) => <RepoRow key={r.path} r={r} onImport={onImport} onRemoved={onRemoved} onChanged={onChanged} />)}
         </ul>
       )}
     </section>
@@ -222,7 +232,12 @@ function ReposCard({ repos, onImport, onRemoved }: { repos: RepoInfo[]; onImport
 
 /** One repo of the list: whether the app can use it, why not, what waits (the install branch), and 「移出列表」 after a
  * confirm that says what it does (the app's list only: no file, branch or worktree changes). */
-function RepoRow({ r, onImport, onRemoved }: { r: RepoInfo; onImport: (path?: string) => void; onRemoved: (s: Status) => void }) {
+function RepoRow({ r, onImport, onRemoved, onChanged }: {
+  r: RepoInfo
+  onImport: (path?: string) => void
+  onRemoved: (s: Status) => void
+  onChanged: () => void
+}) {
   const api = useAppApi()
   const [asking, setAsking] = useState(false)
   const rm = useAction(() => api.post<RemoveResult>(paths.repoRemove(), { path: r.path }))
@@ -236,7 +251,7 @@ function RepoRow({ r, onImport, onRemoved }: { r: RepoInfo; onImport: (path?: st
       <div className="st-repo-top">
         <span className="st-repo-icon"><RoleIcon role="file" size={18} /></span>
         <b className="st-repo-name">{r.name}</b>
-        <span className={`br-chip tone-${state}`}>{r.ok ? '能用' : r.pending ? '等合并' : '读不到'}</span>
+        <span className={`br-chip tone-${state}`}>{r.ok ? '能用' : r.pending ? r.pending.word || '在分支上' : '读不到'}</span>
         <code className="st-path" title={r.path}>{r.path}</code>
         <span className="br-grow" />
         {!asking && <button type="button" className="br-btn is-small" onClick={() => setAsking(true)}>移出列表</button>}
@@ -255,7 +270,10 @@ function RepoRow({ r, onImport, onRemoved }: { r: RepoInfo; onImport: (path?: st
           <button type="button" className="br-btn is-small" onClick={() => onImport(r.path)}>去检查</button>
         </div>
       )}
-      {r.pending && <PendingRepo repo={r} onOpen={() => onImport(r.path)} />}
+      {r.pending && <PendingRepo repo={r} onOpen={() => onImport(r.path)} onDone={onChanged} />}
+      {r.me && (
+        <div className="st-me"><span className="br-dim br-small">你是谁</span><MeLine path={r.path} me={r.me} onSaved={(x) => onRemoved(x.status)} /></div>
+      )}
       {asking && (
         <div className="br-confirm is-danger" role="group" aria-label={`移出 ${r.name}`}>
           <span>只从 app 的列表里去掉 {r.name}：不删文件，不动分支和工作目录。以后可以再导入。</span>
@@ -331,6 +349,8 @@ const ST_CSS = `
 .st-kit .br-tag { color: var(--muted); }
 .st-kit .br-tag b { color: var(--text-strong); font-weight: 650; margin-left: .3em; }
 .st-repo-why { display: flex; align-items: center; gap: .5em .8em; flex-wrap: wrap; font-size: .93em; }
+.st-me { display: flex; align-items: flex-start; gap: .4em .8em; flex-wrap: wrap; font-size: .93em; }
+.st-me > .br-dim { padding-top: .2em; }
 .st-norepo { display: grid; gap: .8em; }
 .st-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(18em, 1fr)); gap: .8em 1.2em; align-items: start; }
 .st-team { gap: .8em; }

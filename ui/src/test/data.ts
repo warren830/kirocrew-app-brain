@@ -7,18 +7,24 @@
 import type {
   BrainView, ReqBoard, CloneResult, CrewChecks, ImportDefaults, ImportInspect, ImportJob, InstallResult, IntakeCheck, IntakeNext, Overview,
   PublishResult, ReflectPreview, RequirementDetail, Settings, StartResult, Status, TeamView, Todo, UpgradeResult,
+  InstallChoices, MergeResult, PullResult, PushResult,
 } from '../types'
 import boardJson from './fixtures/board.json'
 import boardMergedJson from './fixtures/board-merged.json'
 import brainJson from './fixtures/brain.json'
 import crewJson from './fixtures/crew.json'
 import detailJson from './fixtures/detail.json'
+import importChoicesJson from './fixtures/import-choices.json'
 import importCloneJobJson from './fixtures/import-clone-job.json'
 import importDefaultsJson from './fixtures/import-defaults.json'
 import importInspectPendingJson from './fixtures/import-inspect-pending.json'
+import importInplaceJobJson from './fixtures/import-inplace-job.json'
 import importInspectJson from './fixtures/import-inspect.json'
 import importJobJson from './fixtures/import-job.json'
+import importMergeJson from './fixtures/import-merge.json'
 import importPublishJson from './fixtures/import-publish.json'
+import importPullJson from './fixtures/import-pull.json'
+import importPushJson from './fixtures/import-push.json'
 import importUpgradeJobJson from './fixtures/import-upgrade-job.json'
 import intakeCheckJson from './fixtures/intake-check.json'
 import intakeNextJson from './fixtures/intake-next.json'
@@ -71,6 +77,11 @@ const files = {
   importCloneJob: exact<ImportJob<CloneResult>>()(importCloneJobJson),
   importPublish: exact<PublishResult>()(importPublishJson),
   importUpgradeJob: exact<ImportJob<UpgradeResult>>()(importUpgradeJobJson),
+  importInplaceJob: exact<ImportJob<InstallResult>>()(importInplaceJobJson),
+  importChoices: exact<InstallChoices>()(importChoicesJson),
+  importMerge: exact<MergeResult>()(importMergeJson),
+  importPull: exact<PullResult>()(importPullJson),
+  importPush: exact<PushResult>()(importPushJson),
 }
 
 export const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T

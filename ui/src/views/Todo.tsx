@@ -7,7 +7,7 @@
  * pushed but carries no label on its MR (nothing handed over) says what to do. A key opens 需求详情, 看板 opens 需求看板.
  * Polls GET /todo every 10 s. The sidebar badge and the tab's count come from /status (the app shell).
  */
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from '@kirocrew/app-sdk'
 import { paths, usePoll } from '../api'
 import { ago } from '../format'
@@ -55,7 +55,9 @@ export function TodoView(props: ViewProps) {
   }
   const now = Date.now() / 1000
   const rootRef = useRef<HTMLElement | null>(null)
-  const groups = x ? GROUPS.map((g) => ({ ...g, items: x.items.filter((i) => i.kind === g.kind) })).filter((g) => g.items.length > 0) : []
+  const [holding, setHolding] = useState(false)   // a kit fix runs or waits for the person: its group stays
+  const groups = x ? GROUPS.map((g) => ({ ...g, items: x.items.filter((i) => i.kind === g.kind) }))
+    .filter((g) => g.items.length > 0 || (g.kind === 'crew' && holding)) : []
   const jump = (kind: TodoKind) => rootRef.current?.querySelector(`[data-testid="todo-${kind}"]`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
   return (
     <main className="kt-root br-view td-root" data-testid="br-todo" ref={rootRef}>
@@ -69,7 +71,7 @@ export function TodoView(props: ViewProps) {
       </header>
       {x?.team && <p className="br-banner" data-testid="todo-team">{TEAM_SENTENCE}</p>}
       <LoadState loading={t.loading} error={t.error} has={!!x} />
-      {x && x.items.length === 0 && (
+      {x && x.items.length === 0 && !holding && (
         <EmptyHero
           testid="todo-empty"
           title="现在没有等你做的事"
@@ -110,7 +112,7 @@ export function TodoView(props: ViewProps) {
           </header>
           {g.kind === 'crew' && props.status ? (
             <article className="td-item is-bad td-crew" data-kind="crew">
-              <CheckRows rows={props.status.crew.rows} only={['FAIL', 'WARN']} fix={props.status.crew.fix} onFixed={after} />
+              <CheckRows rows={props.status.crew.rows} only={['FAIL', 'WARN']} fix={props.status.crew.fix} onFixed={after} onHold={setHolding} />
             </article>
           ) : (
             <div className="td-items">
