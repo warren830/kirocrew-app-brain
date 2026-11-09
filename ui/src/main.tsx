@@ -6,9 +6,11 @@
  *
  * The app reads GET /status for what every view shares: the repos, KiroCrew's checks, team mode, the 待办 count (the
  * tab's count and the sidebar badge). Above every view: a banner when /status cannot be read (what it is in words: the
- * login, the backend), when brain-kit cannot be used (by its cause: not found, too old, broken), and KiroCrew's failing
- * checks (FAIL only: a ! reminder stays in 设置 and on the page it is about) with their fix buttons, except on 开需求,
- * 设置 and 待办, which list those rows themselves. Each says what it is and 做什么; the original words are folded.
+ * login, the backend; api.ts httpProblem) with 再试一次, when brain-kit cannot be used (by its cause: not found, too old,
+ * broken; ui.tsx brainkitProblem, the words 设置 says too) with the line to type and the way to 设置, but not on 设置,
+ * which asks for brain-kit's place at its top, and KiroCrew's failing checks (FAIL only: a ! reminder stays in 设置 and
+ * on the page it is about) with their fix buttons, except on 开需求, 设置 and 待办, which list those rows themselves.
+ * Each says what it is and 做什么; the original words are folded under 细节.
  *
  * The app root is a size container (`br-app`): a view's breakpoints follow the app's own width, not the window's
  * (inside KiroCrew the dashboard's sidebar takes ~230 px of it).
@@ -19,7 +21,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavBadge, useNavigate } from '@kirocrew/app-sdk'
-import { paths, usePoll } from './api'
+import { httpProblem, paths, usePoll } from './api'
 import { useAppApi } from '@kirocrew/app-sdk'
 import { AppBar } from './AppBar'
 import { BoardPage } from './board/BoardPage'
@@ -29,7 +31,7 @@ import { KIT_CSS } from './kit'
 import { parseView, searchOf, type View, type ViewKind } from './nav'
 import { APP_CSS } from './styles'
 import type { Overview, Requirement, Status } from './types'
-import { CheckRows } from './ui'
+import { CheckRows, CommandLine, brainkitProblem } from './ui'
 import { BrainPage } from './views/Brain'
 import { DetailView } from './views/Detail'
 import { ImportView } from './views/Import'
@@ -183,8 +185,8 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
   const s = status.data
   // 开需求, 设置 and 待办 show KiroCrew's rows themselves, with the same fix buttons: no banner over them there.
   const failing = s && v.kind !== 'new' && v.kind !== 'settings' && v.kind !== 'todo' ? s.crew.rows.filter((r) => r.level === 'FAIL') : []
-  const off = status.error ? statusProblem(status.status, !!s) : null
-  const kit = s && !s.brainkit.ok ? brainkitProblem(s.brainkit.error) : null
+  const off = status.error ? httpProblem(status.status) : null
+  const kit = s && !s.brainkit.ok && v.kind !== 'settings' ? brainkitProblem(s.brainkit.error, s.brainkit.path) : null
   return (
     <div ref={rootRef} className="br-app" data-testid="br-app">
       <style>{BOARD_CSS}</style>
@@ -195,13 +197,14 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
       <AppBar view={v.kind} onView={onTab} item={held?.key} picking={picking} todo={todoCount} team={!!s?.app.team} />
       <div className="br-banners" data-testid="br-banners">
         {off && (
-          <Banner p={off} raw={status.error} bad={!s} testid="br-status-error">
+          <Banner text={`${s ? '状态刷新没成：' : ''}${off.text}`} todo={off.todo} raw={status.raw} bad={!s} testid="br-status-error">
             <button type="button" className="br-btn is-small" onClick={() => status.reload()}>再试一次</button>
           </Banner>
         )}
         {kit && (
-          <Banner p={kit} raw={s?.brainkit.error ?? ''} bad testid="br-no-brainkit">
-            {v.kind !== 'settings' && <button type="button" className="br-btn is-small" onClick={() => go({ kind: 'settings' })}>去设置</button>}
+          <Banner text={kit.text} todo={kit.todo} raw={kit.raw} bad testid="br-no-brainkit">
+            {kit.cmd && <CommandLine cmd={kit.cmd} />}
+            <button type="button" className="br-btn is-small is-primary" onClick={() => go({ kind: 'settings' })}>{kit.kind === 'missing' ? '去填位置' : '去设置'}</button>
           </Banner>
         )}
         {failing.length > 0 && (
@@ -225,37 +228,13 @@ const SHELL_CSS = `
 .br-shell-row .br-prob-todo b { color: var(--muted); font-weight: 650; }
 `
 
-interface Problem { text: string; todo: string }
-
-/** What a /status that cannot be read means for the person, by the HTTP status (0: no answer at all). */
-export function statusProblem(code: number, before: boolean): Problem {
-  const head = before ? '状态刷新没成：' : ''
-  if (code === 401 || code === 403) return { text: `${head}登录过期了`, todo: '重新打开 KiroCrew 仪表盘，登录以后再回来' }
-  if (code === 0) return { text: `${head}连不上 app 的后端`, todo: 'KiroCrew 或这个 app 可能停了，网络也可能断了：等一会儿点「再试一次」' }
-  if (code === 404) return { text: `${head}app 的后端和页面版本对不上`, todo: '在 KiroCrew 里重新装一次这个 app' }
-  return { text: `${head}app 的后端出错了`, todo: '点「再试一次」；还不行就在 KiroCrew 里重启这个 app' }
-}
-
-/** Why brain-kit cannot be used (backend/core/bk.py says it in one of three ways) and what to do. 设置's 保存 reads
- * brain-kit again, so each way ends there. */
-export function brainkitProblem(error: string): Problem {
-  if (/^brain-kit 太旧/.test(error)) {
-    const need = /要 (\S+?) 或更新的版本/.exec(error)?.[1]
-    return { text: 'brain-kit 太旧了：位置是对的', todo: `把 brain-kit 更新到${need ? ` ${need} 或更新的` : '最新的'}版本（在它的目录里拉取最新的），再到设置里点「保存」重新读它` }
-  }
-  if (/^brain-kit 导入失败/.test(error)) {
-    return { text: 'brain-kit 装得不完整：位置是对的，读它的时候出错了', todo: '把 brain-kit 重新装一遍（或拉取完整的代码），再到设置里点「保存」重新读它' }
-  }
-  return { text: '找不到 brain-kit', todo: '在设置里写对 brain-kit 的位置，点「保存」' }
-}
-
 /** A problem above every view: what it is, 做什么, the buttons, the original words folded. */
-function Banner({ p, raw, bad, testid, children }: { p: Problem; raw: string; bad: boolean; testid: string; children?: ReactNode }) {
+function Banner({ text, todo, raw, bad, testid, children }: { text: string; todo: string; raw: string; bad: boolean; testid: string; children?: ReactNode }) {
   return (
     <div className={`br-banner${bad ? ' is-error' : ''}`} role="alert" data-testid={testid}>
       <div className="br-shell-row">
-        <b className="br-strong">{p.text}</b>
-        <span className="br-prob-todo"><b>做什么</b>{p.todo}</span>
+        <b className="br-strong">{text}</b>
+        <span className="br-prob-todo"><b>做什么</b>{todo}</span>
         {children}
         {raw && (
           <details className="br-raw">

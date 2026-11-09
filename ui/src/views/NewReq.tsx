@@ -14,7 +14,7 @@
  *   3 开工      the session options, 「开工」 (POST /intake/start), big, with why it is off next to it: KiroCrew cannot
  *              open the session (a ✗ above), the default branch not on origin yet (推送 right there), the form, a check
  *              of exactly what the form says now. The answer: a success card (branch, worktree) saying what happens in
- *              the session, with 打开会话, 看需求看板, 看需求详情; a failure says why in words and what to do.
+ *              the session, with 打开会话, 需求看板, 需求详情; a failure says why in words and what to do.
  *
  * KiroCrew's failing or doubtful checks are listed above the form with their fix buttons: /status has them at once,
  * GET /crew checks again. Without a usable repo there is no form: 导入仓库, or the way forward of a repo on its way.
@@ -26,7 +26,7 @@ import { lines, splitPaths } from '../format'
 import { KEY_RE, type NewEntry } from '../nav'
 import type { Tone } from '../styles'
 import { CLASS_LABEL, type CheckRow, type Classification, type CrewChecks, type IntakeBody, type IntakeCheck, type IntakeNext, type MeNameResult, type StartBody, type StartResult } from '../types'
-import { CheckRows, Flow, ImportCta, MeLine, PendingRepo, PushBox, RoleIcon, type FlowStep } from '../ui'
+import { CheckRows, Flow, Icon, ImportCta, MeLine, PendingRepo, PushBox, RoleIcon, repoLabel, type FlowStep } from '../ui'
 import { ACT, CLASS_NAME } from '../vocab'
 import type { ViewProps } from './props'
 
@@ -35,7 +35,10 @@ export const REVIEW_HINT = '这些没打码，也不拦开工：可能是人名�
 /** 第 4 关 and 第 5 关: what brain-kit masks by itself */
 export const GATE4 = '证件号、电话、卡号、邮箱：整份打码。标签后面、姓名列里的人名：在找到的地方打码。看不准是人名（或密码）还是普通词的不打码，列在「请你确认」里。'
 export const GATE5 = '密钥打码。私钥和云访问密钥：整份不收。'
-export const HERO_TEXT = '认领一个需求，带上它的文档开工。文档先过五关，原件不进任何仓库。开工时在它自己的工作目录里开一个 AI 开发会话（brain-dev），按 AI-DLC Lean 的步骤（需求 → 设计 → 代码 → 测试 → 发布）一步步做，需求和设计由你批准；团队仓库做完可以交给运行机（团队的服务器）接着跑。'
+const HERO_HEAD = '认领一个需求，带上它的文档开工。文档先过五关，原件不进任何仓库。开工时在它自己的工作目录里开一个 AI 开发会话（brain-dev），按 AI-DLC Lean 的步骤（需求 → 设计 → 代码 → 测试 → 发布）一步步做，需求和设计由你批准'
+export const HERO_TEXT = `${HERO_HEAD}；团队仓库做完可以交给运行机（团队的服务器）接着跑。`
+/** a repo without a remote is done only on this machine: no word of the runner */
+export const HERO_LOCAL = `${HERO_HEAD}，做完在这台机器上发布、合并。`
 export const NO_CONFIDENTIAL = '这个仓库不收机密材料：机密、绝密和「不确定」的文档，要先请产品写一份脱敏摘要，交摘要。'
 export const STARTED_NEXT = '打开会话：AI 先写需求文档；写好会请你批准（待办和需求看板会提醒，批准那一行要你在会话里自己打）。'
 const CLASSES = Object.keys(CLASS_LABEL) as Classification[]
@@ -77,6 +80,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
   const repo = repoPick && (!props.status || repos.some((r) => r.id === repoPick)) ? repoPick : repos[0]?.id ?? ''
   const picked = repos.find((r) => r.id === repo) ?? null
   const me = picked?.me ?? null     // who brain-kit will say claims it (认领人)
+  const localOnly = picked?.remote === false
   // a requirement claimed already (from 需求看板 / 需求详情): its key is fixed, in its own repo only
   const claimed = !!entry.key && (!entry.repo || entry.repo === repo) ? entry.key : ''
 
@@ -197,7 +201,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
     },
     { icon: 'laptop', title: '开工', text: '在它自己的工作目录里开 AI 开发会话', state: ok ? 'done' : started ? 'bad' : canStart ? 'now' : undefined },
     { icon: 'req', title: 'Lean 推进', text: '需求和设计由你批准', state: ok ? 'now' : undefined },
-    { icon: 'runner', title: '交给运行机', text: '团队仓库：交接以后它接着做' },
+    localOnly ? { icon: 'runner', title: '交给运行机', text: '这次不需要：这个仓库只在本机做', state: 'off' } : { icon: 'runner', title: '交给运行机', text: '团队仓库：交接以后它接着做' },
   ]
   const stepOf = (i: number) => flow[i].state
 
@@ -248,7 +252,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
       <section className="br-hero nr-hero" aria-label="开需求">
         <div>
           <h2>{claimed ? `开工：${claimed}` : '开需求'}</h2>
-          <p>{claimed ? `${claimed} 已经认领了，还没开工。看一眼英文短名，有文档的话填上，点「开工」。` : HERO_TEXT}</p>
+          <p>{claimed ? `${claimed} 已经认领了，还没开工。看一眼英文短名，有文档的话填上，点「开工」。` : localOnly ? HERO_LOCAL : HERO_TEXT}</p>
         </div>
         <Flow steps={flow} label="开需求的步骤" />
       </section>
@@ -278,7 +282,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
                 setKey('')
                 props.replace({ kind: 'new', repo: e.target.value })
               }}>
-                {repos.map((r) => <option key={r.id} value={r.id}>{r.name}（{r.id}）</option>)}
+                {repos.map((r) => <option key={r.id} value={r.id}>{repoLabel(r, repos)}</option>)}
               </select>
             </div>
             <div className="br-field is-4">
@@ -395,7 +399,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
         </section>
 
         <section className={`br-card nr-sec${ok ? ' is-ok' : ''}`} aria-label="开工">
-          <StepHead n={3} title="开工" state={stepOf(2)} sub="认领、建分支和工作目录、开会话" />
+          <StepHead n={3} title="开工" state={stepOf(2)} sub={claimed ? '建分支和工作目录、开会话' : '认领、建分支和工作目录、开会话'} />
           <div className="nr-toggles">
             <label className={`nr-toggle${openSession ? ' is-on' : ''}`}>
               <input type="checkbox" checked={openSession} onChange={(e) => setOpenSession(e.target.checked)} />
@@ -548,7 +552,7 @@ function StartOut({ r, path, onOpen, onBoard, onItem, onMe }: {
         <div>
           <b role="status">{r.ok ? `开工了${r.key ? `：${r.key}` : ''}` : r.problem ? `没开成：${r.problem.text}` : '没开成'}</b>
           <small>{r.ok ? (r.url ? STARTED_NEXT : '分支和工作目录都好了。要开会话时，在需求详情里点「打开会话」。')
-            : r.problem?.todo || '看下面 brain start 的输出。'}</small>
+            : r.problem?.todo || '原因在下面「细节」里（开工时 brain-kit 的原话）：照它改好，再点「开工」。'}</small>
         </div>
       </div>
       {r.ok && (
@@ -565,8 +569,8 @@ function StartOut({ r, path, onOpen, onBoard, onItem, onMe }: {
         )}
         {r.key && r.ok && (
           <>
-            <button type="button" className="br-btn" onClick={() => onBoard(r.key as string)}><RoleIcon role="runner" size={16} />看{ACT.openBoard}</button>
-            <button type="button" className="br-btn" onClick={() => onItem(r.key as string)}><RoleIcon role="file" size={16} />看{ACT.openDetail}</button>
+            <button type="button" className="br-btn" onClick={() => onBoard(r.key as string)}><Icon name="LayoutDashboard" size={15} />{ACT.openBoard}</button>
+            <button type="button" className="br-btn" onClick={() => onItem(r.key as string)}><RoleIcon role="file" size={16} />{ACT.openDetail}</button>
           </>
         )}
       </div>
@@ -578,7 +582,7 @@ function StartOut({ r, path, onOpen, onBoard, onItem, onMe }: {
       {!r.url && r.session_error && <p className="br-error br-pre" role="alert">会话没开成：{r.session_error}</p>}
       {r.output && (
         <details className="br-raw nr-out" open={!r.ok && !r.problem}>
-          <summary>细节：brain start 的输出</summary>
+          <summary>细节：开工时 brain-kit 的原话</summary>
           <pre>{r.output}</pre>
         </details>
       )}

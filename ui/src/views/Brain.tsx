@@ -8,7 +8,8 @@
  * run's use of the Brain (the numbers count the runs merged into the default branch: a run not merged yet is listed on
  * its own, with what 需求详情 says for it), and 回写 as steps: pick a requirement → 预览 → the changes → confirm →
  * written on a new branch (and an MR, linked). An empty Brain says what fills it and leads to 开需求; no repo leads to
- * 导入仓库. Breakpoints follow the app's own width (the `br-app` container).
+ * 导入仓库. Breakpoints follow the view's own width (its root is the `kt-root` container), not the window: inside
+ * KiroCrew the dashboard's sidebar takes ~230 px of it.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppApi } from '@kirocrew/app-sdk'
@@ -17,7 +18,7 @@ import { fmtRate } from '../format'
 import { useReducedMotion } from '../hooks'
 import { fileOfEntry, type BrainEntryRef, type BrainFile } from '../nav'
 import type { BrainEntry, BrainFileView, BrainView, CheckRow, ReflectApplyBody, ReflectApplyResult, ReflectPreview } from '../types'
-import { CheckRows, EmptyHero, ExtLink, Icon, Kpi, LoadState, RoleIcon, Segs, StateChip, type FlowStep } from '../ui'
+import { CheckRows, EmptyHero, ExtLink, Icon, Kpi, LoadState, RoleIcon, Segs, StateChip, brainkitProblem, repoLabel, type FlowStep } from '../ui'
 import { ACT, GAP_KIND_NAME } from '../vocab'
 import type { ViewProps } from './props'
 
@@ -53,13 +54,6 @@ const lintRows = (lint: BrainView['lint']): CheckRow[] => [...lint.errors, ...li
 export function InlineCode({ text }: { text: string }) {
   const parts = text.split(/(`[^`\n]+`)/)
   return <>{parts.map((x, i) => (x.length > 2 && x.startsWith('`') && x.endsWith('`') ? <code key={i} className="bv-code">{x.slice(1, -1)}</code> : x))}</>
-}
-
-/** A repo by its name; by its name and folder when two listed repos share a name. */
-function repoLabel(r: { name: string; path: string }, all: { name: string }[]): string {
-  if (all.filter((x) => x.name === r.name).length < 2) return r.name
-  const dir = r.path.replace(/\/+$/, '').split('/').slice(-2, -1)[0]
-  return dir ? `${r.name}（${dir}/）` : r.name
 }
 
 /** What fills an empty Brain. */
@@ -180,28 +174,24 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
                 {repos.map((r) => <option key={r.id} value={r.id}>{repoLabel(r, repos)}</option>)}
               </select>
             </label>
-            {data?.ref && <span className="bv-ref" title="Brain 读的是默认分支上的这个版本">读的是 <code>{data.ref}</code></span>}
+            {data?.ref && <span className="bv-ref" title={`Brain 读的是默认分支上的这个版本：${data.ref}`}>读的是 <code>{data.ref.split('@')[0]}</code></span>}
             <button type="button" className="br-btn" onClick={brain.reload} disabled={!repo}>
               <Icon name="RefreshCw" size={14} />重新读取
             </button>
           </>
         )}
       </header>
-      {props.status && repos.length === 0 && props.status.repos.length > 0 && (
+      {props.status && repos.length === 0 && props.status.repos.length > 0 && (props.status.brainkit.ok ? (
         <EmptyHero testid="repos-unusable" title="列表里的仓库现在都读不了"
           text={props.status.repos.map((r) => `${r.name}：${r.pending ? r.pending.text : r.error || '读不了'}`)}
           punch="按上面的提示修好以后，这里就能看到它的 Brain。">
-          {props.status.brainkit.ok ? (
-            <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'import' })}>
-              <RoleIcon role="import" size={17} />去导入仓库检查
-            </button>
-          ) : (
-            <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'settings' })}>
-              <RoleIcon role="settings" size={17} />去设置
-            </button>
-          )}
+          <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'import' })}>
+            <RoleIcon role="import" size={17} />去导入仓库检查
+          </button>
         </EmptyHero>
-      )}
+      ) : (
+        <NoKit status={props.status} onSettings={() => props.go({ kind: 'settings' })} />
+      ))}
       {props.status && props.status.repos.length === 0 && (
         <EmptyHero testid="import-cta" label="导入仓库" title="还没有能用的仓库"
           text={['Brain 是一个仓库里大家共用的知识：做需求时定下的原则、决定和踩过的坑。每次运行会加载它，用上了就引用。']}
@@ -295,6 +285,26 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
         </>
       )}
     </main>
+  )
+}
+
+/** No repo readable because brain-kit cannot be used: that one cause once (the banner above says what to do), the
+ * repos with a cause of their own, and the same way on as the banner. */
+function NoKit({ status, onSettings }: { status: NonNullable<ViewProps['status']>; onSettings: () => void }) {
+  const p = brainkitProblem(status.brainkit.error)
+  const waiting = status.repos.filter((r) => !r.pending && /没装载/.test(r.error))
+  const own = status.repos.filter((r) => !waiting.includes(r))
+  return (
+    <EmptyHero testid="repos-unusable" title={`${p.text}：这里还看不了 Brain`}
+      text={[
+        `${waiting.length === status.repos.length ? '列表里的 ' : ''}${waiting.length} 个仓库的 Brain 都要 brain-kit 才读得出来。`,
+        ...own.map((r) => `${r.name}：${r.pending ? r.pending.text : r.error || '读不了'}`),
+      ]}
+      punch={p.kind === 'missing' ? '写对 brain-kit 的位置以后，这里就能看到它们的 Brain。' : 'brain-kit 修好以后，这里就能看到它们的 Brain。'}>
+      <button type="button" className="br-btn is-primary is-big" onClick={onSettings}>
+        <RoleIcon role="settings" size={17} />{p.kind === 'missing' ? '去填位置' : '去设置'}
+      </button>
+    </EmptyHero>
   )
 }
 
@@ -744,9 +754,11 @@ const BV_CSS = `
 .bv-repo select { padding: .35em .7em; border-radius: .7em; }
 .bv-ref { font-size: .86em; color: var(--muted); padding: .2em .7em; border-radius: 999px; background: var(--kt-glass); border: 1px solid var(--border); }
 .bv-ref code { color: var(--text-strong); }
+/* five cards: one row; three over two (a grid of six, so each row is full); two by two, the last one as wide as two */
 .bv-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-@container br-app (max-width: 1200px) { .bv-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@container br-app (max-width: 760px) { .bv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container kt-root (max-width: 1200px) { .bv-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); } .bv-kpis > * { grid-column: span 2; } .bv-kpis > :nth-child(n+4) { grid-column: span 3; } }
+@container kt-root (max-width: 760px) { .bv-kpis > *, .bv-kpis > :nth-child(n+4) { grid-column: span 3; } .bv-kpis > :last-child:nth-child(odd) { grid-column: span 6; } }
+@container kt-root (max-width: 460px) { .bv-kpis > *, .bv-kpis > :nth-child(n+4), .bv-kpis > :last-child:nth-child(odd) { grid-column: span 6; } }
 .bv-kpis .br-kpi-big { font-size: 2.6em; }
 .bv-stack { display: flex; gap: 2px; height: .8em; margin-top: .2em; border-radius: .3em; overflow: hidden; }
 .bv-stack i { flex: 1 1 0; min-width: .4em; background: var(--muted); }
@@ -768,10 +780,10 @@ const BV_CSS = `
 .bv-meter.is-cand { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kt-warn) 70%, transparent); }
 
 .bv-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(22em, 30em); gap: var(--kit-gap-block, 16px); align-items: start; }
-@container br-app (max-width: 1200px) { .bv-main { grid-template-columns: minmax(0, 1fr); } }
+@container kt-root (max-width: 1200px) { .bv-main { grid-template-columns: minmax(0, 1fr); } }
 .bv-col { display: grid; gap: var(--kit-gap-row, 12px); min-width: 0; align-content: start; }
 .bv-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6em; }
-@container br-app (max-width: 700px) { .bv-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container kt-root (max-width: 700px) { .bv-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .bv-tab { appearance: none; font: inherit; display: grid; grid-template-columns: 2.3em minmax(0, 1fr) auto; align-items: center; gap: .7em; padding: .6em .9em;
   border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; text-align: left; }
 .bv-tab:hover { border-color: var(--border-strong); }
@@ -827,7 +839,7 @@ const BV_CSS = `
 .bv-load { display: inline-flex; align-items: center; gap: .5em; white-space: nowrap; }
 
 .bv-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; counter-reset: s; }
-@container br-app (max-width: 760px) { .bv-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container kt-root (max-width: 760px) { .bv-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .bv-steps li { position: relative; display: flex; align-items: center; gap: .55em; padding: .5em .6em; font-weight: 650; color: var(--muted); }
 .bv-steps li:not(:last-child)::after { content: ''; flex: 1; height: 2px; margin: 0 .2em 0 .4em; border-radius: 1px; background: color-mix(in srgb, var(--muted) 30%, transparent); }
 .bv-steps li i { font-style: normal; flex: none; display: grid; place-items: center; width: 1.8em; height: 1.8em; border-radius: 50%; font-size: .86em; font-weight: 850;

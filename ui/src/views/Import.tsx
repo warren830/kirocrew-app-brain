@@ -48,8 +48,6 @@ const CHANGE_TONE: Record<FileChange['change'], Tone> = { added: 'ok', modified:
 const CHANGE_ORDER: FileChange['change'][] = ['added', 'modified', 'deleted', 'other']
 const EMPTY_FORM: KitForm = { req_prefix: '', tracker: 'none', jira_base: '', gitlab_base: '', gitlab_project: '', default_branch: 'main', team: '' }
 type StepState = FlowStep['state']
-/** GET /import/defaults, with the checkouts found on this machine when the backend sends them */
-type Defaults = ImportDefaults & { found?: FoundRepo[] }
 
 /** The folder name a clone of *url* gets when the name is left empty (as the backend makes it). */
 export function nameFromUrl(url: string): string {
@@ -63,7 +61,7 @@ const isNext = (c: ImportInspect, x: ImportCheck) => x.id === 'kit' && c.next ==
 export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { entry: ImportEntry } & ViewProps) {
   const api = useAppApi()
   const jobMs = Math.min(pollMs ?? JOB_POLL_MS, JOB_POLL_MS)
-  const defaults = usePoll<Defaults>(paths.importDefaults(), 0)
+  const defaults = usePoll<ImportDefaults>(paths.importDefaults(), 0)
   const [source, setSource] = useState<'local' | 'clone'>('local')
   const [path, setPath] = useState(entry.path ?? '')
   const [checked, setChecked] = useState<{ path: string; result: ImportInspect } | null>(null)
@@ -187,7 +185,7 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
           <div className="imp-done" role="status" data-testid="next-listed">
             <span className="imp-mark" aria-hidden="true">✓</span>
             <div>
-              <b>已经在列表里（{shown.listed}）。</b>
+              <b>已经在列表里。</b>
               <small>{shown.pending ? shown.pending.next : '交付总览、开需求都能用它。'}</small>
             </div>
             <div className="br-row">
@@ -598,13 +596,13 @@ function NextBox({ r, c, added, addBusy, addError, onAdd, onChanged, go }: {
   const ready = inplace && (!r.remote_url || pushed)
   const head = inplace ? `装好了，提交在 ${r.branch} 上` : `装在 ${r.branch} 分支上`
   const line = ready ? '现在就能开需求了。'
-    : inplace ? `推送 ${r.branch} 以后就能开需求：开工从 origin 上的 ${r.branch} 建分支。`
+    : inplace ? `推送 ${r.branch} 以后就能开需求。`
       : `合进 ${target} 以后才能开需求。${p?.next ? `下一步：${p.next}。` : ''}`
   return (
     <div className={`imp-done${ready ? '' : ' is-wait'}`} role="status" data-testid="install-next">
       <span className="imp-mark" aria-hidden="true">{ready ? '✓' : '✋'}</span>
       <div>
-        <b>{head}{listedId ? `，已经加入列表（${listedId}）` : ''}</b>
+        <b>{head}{listedId ? '，已经加入列表' : ''}</b>
         <small>{line}</small>
         {!listedId && (
           <span className="br-row">
@@ -717,7 +715,7 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
       )}
       {(r.output || r.doctor.output) && (
         <details className="imp-more">
-          <summary>细节：brain install 和 brain doctor 的原始输出</summary>
+          <summary>细节：安装和自检时 brain-kit 的原话</summary>
           <pre className="br-findings">{[r.output, r.doctor.output].filter(Boolean).join('\n\n')}</pre>
         </details>
       )}
@@ -837,7 +835,7 @@ function PublishOut({ r }: { r: PublishResult }) {
         )}
         {r.output && (
           <details className="imp-more">
-            <summary>细节：git push 的输出</summary>
+            <summary>细节：推送时 git 的原话</summary>
             <pre className="br-findings">{r.output}</pre>
           </details>
         )}

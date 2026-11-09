@@ -1,7 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test } from 'vitest'
-import BrainApp, { brainkitProblem, pickRequirement, statusProblem } from './main'
+import BrainApp, { pickRequirement } from './main'
+import { brainkitProblem } from './ui'
 import { AppBar } from './AppBar'
 import { parseView, type View } from './nav'
 import { fx } from './test/data'
@@ -183,7 +184,7 @@ describe('the app: one bar over the views', () => {
     expect(bar().getByRole('tab', { name: '交付总览' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  test('banner on every view: brain-kit not found → 去设置; KiroCrew FAIL rows with their fix button, but not on 开需求, 设置 and 待办, which list them', async () => {
+  test('banner on every view but 设置: brain-kit not found → where to get it and 去填位置; KiroCrew FAIL rows with their fix button, but not on 开需求, 设置 and 待办, which list them', async () => {
     const user = userEvent.setup()
     const s = fx.status()
     s.app.team = true
@@ -197,7 +198,8 @@ describe('the app: one bar over the views', () => {
     })
     render(<BrainApp pollMs={60_000} />)
     const nokit = await screen.findByTestId('br-no-brainkit')
-    expect(nokit).toHaveTextContent('找不到 brain-kit做什么在设置里写对 brain-kit 的位置，点「保存」')
+    expect(nokit).toHaveTextContent('找不到 brain-kit做什么在设置的「brain-kit 在哪」写上它的目录，点「保存」；这台机器上还没有的话，先在终端里克隆一份（点「复制」拿命令），再写它的位置')
+    expect(within(nokit).getByTestId('cmd-line')).toHaveTextContent('git clone https://github.com/warren830/brain-kit.git ~/brain-kit复制')
     expect(within(nokit).getByText('细节').closest('details')).not.toHaveAttribute('open')
     expect(within(nokit).getByText(s.brainkit.error)).toBeInTheDocument()
     const crew = screen.getByTestId('br-crew-fail')
@@ -207,10 +209,11 @@ describe('the app: one bar over the views', () => {
     await user.click(within(crew).getByRole('button', { name: FIX }))
     expect(await within(crew).findByText('装好了')).toBeInTheDocument()
     expect(apiCalls.some((c) => c.method === 'POST' && c.path === `${API}/crew/fix`)).toBe(true)
-    await user.click(within(nokit).getByRole('button', { name: '去设置' }))
+    await user.click(within(nokit).getByRole('button', { name: '去填位置' }))
     expect(parseView(window.location.search)).toEqual({ kind: 'settings' })
-    expect(await screen.findByTestId('br-no-brainkit')).toBeInTheDocument() // still there on 设置 …
-    expect(within(screen.getByTestId('br-no-brainkit')).queryByRole('button', { name: '去设置' })).toBeNull() // … without the way to it
+    // 设置 asks for brain-kit's place at its top, with the same words: no banner over it saying them again
+    expect(await screen.findByTestId('settings-no-brainkit')).toHaveTextContent('找不到 brain-kit')
+    expect(screen.queryByTestId('br-no-brainkit')).toBeNull()
     // 设置 and 开需求 list KiroCrew's rows themselves, with the fix: no banner over them
     expect(screen.queryByTestId('br-crew-fail')).toBeNull()
     const card = screen.getByRole('region', { name: 'KiroCrew' })
@@ -221,7 +224,7 @@ describe('the app: one bar over the views', () => {
     expect(checks).toHaveTextContent('找不到 brain-dev agent')
     expect(within(checks).getByRole('button', { name: FIX })).toBeInTheDocument()
     expect(screen.queryByTestId('br-crew-fail')).toBeNull()
-    expect(within(screen.getByTestId('br-no-brainkit')).getByRole('button', { name: '去设置' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('br-no-brainkit')).getByRole('button', { name: '去填位置' })).toBeInTheDocument()
     // 待办 lists them in its KiroCrew group, once
     await user.click(bar().getByRole('tab', { name: '待办 6' }))
     expect(within(await screen.findByRole('region', { name: 'KiroCrew 的问题' })).getByRole('button', { name: FIX })).toBeInTheDocument()
@@ -293,19 +296,43 @@ describe('the app: one bar over the views', () => {
     installFixtureRoutes({ [`GET ${API}/status`]: () => { if (fail) throw apiError(403, 'forbidden', 'Token required'); return fx.status() } })
     render(<BrainApp pollMs={60_000} />)
     const b = await screen.findByTestId('br-status-error')
-    expect(b).toHaveTextContent('登录过期了做什么重新打开 KiroCrew 仪表盘，登录以后再回来')
+    expect(b).toHaveTextContent('登录过期了做什么重新打开 KiroCrew 仪表盘，登录以后点「再试一次」')
+    expect(b).not.toHaveTextContent(/Token required.*细节/)              // the host's English only under 细节
     expect(within(b).getByText('细节').closest('details')).not.toHaveAttribute('open')
-    expect(within(b).getByText('Token required（403）')).toBeInTheDocument()
+    expect(b.querySelector('details pre')).toHaveTextContent('API 403: {"error":"Token required","code":"forbidden"}')
     fail = false
     await user.click(within(b).getByRole('button', { name: '再试一次' }))
     await waitFor(() => expect(screen.queryByTestId('br-status-error')).toBeNull())
   })
 
-  test('brain-kit that cannot be used says its own cause: not found → its place; too old → update it; broken → install it again', () => {
-    expect(brainkitProblem('brain-kit 太旧（没有 trace.build）：要 0.4 或更新的版本')).toEqual({ text: 'brain-kit 太旧了：位置是对的', todo: '把 brain-kit 更新到 0.4 或更新的版本（在它的目录里拉取最新的），再到设置里点「保存」重新读它' })
-    expect(brainkitProblem('brain-kit 导入失败：ModuleNotFoundError: No module named \'yaml\'')).toMatchObject({ text: 'brain-kit 装得不完整：位置是对的，读它的时候出错了' })
-    expect(brainkitProblem('这里没有 brain-kit（找不到 /x/brainkit/__init__.py）')).toEqual({ text: '找不到 brain-kit', todo: '在设置里写对 brain-kit 的位置，点「保存」' })
-    expect(statusProblem(0, true).text).toBe('状态刷新没成：连不上 app 的后端')
-    expect(statusProblem(401, false).text).toBe('登录过期了')
+  test('no answer at all says so in words, with 再试一次; the browser’s own words folded', async () => {
+    installFixtureRoutes({ [`GET ${API}/status`]: () => { throw new TypeError('Failed to fetch') } })
+    render(<BrainApp pollMs={60_000} />)
+    const b = await screen.findByTestId('br-status-error')
+    expect(b).toHaveTextContent('连不上 app 的后端做什么KiroCrew 或这个 app 可能停了，网络也可能断了：等一会儿点「再试一次」')
+    expect(within(b).getByRole('button', { name: '再试一次' })).toBeInTheDocument()
+    expect(b.querySelector('details pre')).toHaveTextContent('Failed to fetch')
+  })
+
+  test('brain-kit that cannot be used says its own cause, the same in the banner and in 设置', async () => {
+    const old = brainkitProblem('brain-kit 太旧（没有 trace.build）：要 72b278e 或更新的版本', '/Users/alice/src/brain-kit')
+    expect(old).toMatchObject({ kind: 'old', text: 'brain-kit 太旧了（位置是对的）', cmd: 'git -C /Users/alice/src/brain-kit pull --ff-only' })
+    expect(old.todo).not.toMatch(/72b278e|git/)                                    // the version and the command: not in the words
+    const broken = brainkitProblem('brain-kit 导入失败：ModuleNotFoundError: No module named \'yaml\'', '/Users/alice/my kit')
+    expect(broken).toMatchObject({ kind: 'broken', text: 'brain-kit 读不进来（位置是对的）', cmd: "git -C '/Users/alice/my kit' pull --ff-only" })
+    expect(broken.todo).not.toMatch(/ModuleNotFoundError/)
+    expect(brainkitProblem('这里没有 brain-kit（找不到 /x/brainkit/__init__.py）')).toMatchObject({ kind: 'missing', text: '找不到 brain-kit', cmd: 'git clone https://github.com/warren830/brain-kit.git ~/brain-kit' })
+    // too old: the banner leads to 设置 (not to its place, which is right) with the line to pull it
+    const user = userEvent.setup()
+    const s = fx.status()
+    s.brainkit = { ...s.brainkit, ok: false, error: 'brain-kit 太旧（没有 sign.SpoolSigner）：要 72b278e 或更新的版本' }
+    installFixtureRoutes({ [`GET ${API}/status`]: () => s })
+    render(<BrainApp pollMs={60_000} />)
+    const b = await screen.findByTestId('br-no-brainkit')
+    expect(b).toHaveTextContent('brain-kit 太旧了（位置是对的）做什么在它的目录里拉取最新的代码（点「复制」拿命令），再到设置里点「保存」重新读它')
+    expect(within(b).getByTestId('cmd-line')).toHaveTextContent(`git -C ${s.brainkit.path} pull --ff-only`)
+    expect(within(b).queryByRole('button', { name: '去填位置' })).toBeNull()
+    await user.click(within(b).getByRole('button', { name: '去设置' }))
+    expect(within(await screen.findByTestId('settings-no-brainkit')).getByTestId('cmd-line')).toHaveTextContent(`git -C ${s.brainkit.path} pull --ff-only`)
   })
 })

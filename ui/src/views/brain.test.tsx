@@ -334,7 +334,11 @@ describe('Brain', () => {
     installFixtureRoutes()
     const go = vi.fn()
     render(<BrainPage entry={{}} status={status} go={go} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} />)
-    await userEvent.setup().click(within(screen.getByTestId('repos-unusable')).getByRole('button', { name: '去设置' }))
+    const hero = screen.getByTestId('repos-unusable')
+    expect(hero).toHaveTextContent('找不到 brain-kit：这里还看不了 Brain')
+    expect(hero).toHaveTextContent(`列表里的 ${status.repos.length} 个仓库的 Brain 都要 brain-kit 才读得出来。`)
+    expect(hero).not.toHaveTextContent('没装载')                                      // the one cause once, not per repo
+    await userEvent.setup().click(within(hero).getByRole('button', { name: '去填位置' }))
     expect(go).toHaveBeenCalledWith({ kind: 'settings' })
   })
 

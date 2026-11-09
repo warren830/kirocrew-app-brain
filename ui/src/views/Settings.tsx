@@ -12,7 +12,7 @@ import { useAppApi } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
 import { ago } from '../format'
 import type { RemoveResult, RepoInfo, Settings, Status } from '../types'
-import { BRAINKIT_CLONE, CheckRows, Flow, IMPORT_FLOW, LEVEL_TONE, LoadState, MeLine, PendingRepo, RoleIcon, brainkitProblem } from '../ui'
+import { CheckRows, CommandLine, Flow, IMPORT_FLOW, LEVEL_TONE, LoadState, MeLine, PendingRepo, RoleIcon, brainkitProblem } from '../ui'
 import { ACT, MODULE_NAME, TRACKER_NAME } from '../vocab'
 import type { ViewProps } from './props'
 import { SIGNER_SAME_USER } from './Team'
@@ -25,9 +25,10 @@ type Form = Omit<Settings, 'repos'>
 const formOf = (s: Settings): Form => ({ brainkit: s.brainkit, work_root: s.work_root, team: { ...s.team } })
 const settingsOf = (f: Form): Form => ({ brainkit: f.brainkit.trim(), work_root: f.work_root.trim(), team: { ...f.team } })
 
+/** the team runner's two config files (brain-kit's bridge.json and runnerd.json): the field's label, what is typed */
 const TEAM_FIELDS: [Exclude<keyof Settings['team'], 'enabled' | 'dev_same_user'>, string, string][] = [
-  ['bridge_config', 'bridge 的配置', 'bridge.json'],
-  ['runnerd_config', 'runnerd 的配置', 'runnerd.json'],
+  ['bridge_config', '桥的配置文件', '…/bridge.json'],
+  ['runnerd_config', '运行机的配置文件', '…/runnerd.json'],
 ]
 
 /** A repo's state in one word, by its reason (RepoInfo.error is the backend's sentence). */
@@ -85,7 +86,7 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
       {save.error && <span className="br-error" role="alert">{save.error}</span>}
     </div>
   )
-  const kitProblem = status && noKit ? brainkitProblem(status.brainkit.error) : null
+  const kitProblem = status && noKit ? brainkitProblem(status.brainkit.error, status.brainkit.path) : null
   const kitCard = kitProblem && status && (
     <section className="br-card st-kitfix is-bad" aria-label="找不到 brain-kit" data-testid="settings-no-brainkit">
       <header>
@@ -94,9 +95,7 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
         {status.brainkit.path && <code className="st-path" title={status.brainkit.path}>{status.brainkit.path}</code>}
       </header>
       <p className="st-kitfix-todo"><b>做什么</b>{kitProblem.todo}</p>
-      {kitProblem.kind === 'missing' && (
-        <div className="st-clone"><code>{BRAINKIT_CLONE}</code><CopyBtn text={BRAINKIT_CLONE} /></div>
-      )}
+      {kitProblem.cmd && <CommandLine cmd={kitProblem.cmd} />}
       {form && (
         <form className="br-form" onSubmit={(e) => { e.preventDefault(); void submit() }}>
           {kitField}
@@ -146,12 +145,12 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
                     <div key={k} className="br-field">
                       <label htmlFor={`set-${k}`}>{label}</label>
                       <input id={`set-${k}`} type="text" className="br-mono" value={form.team[k]} placeholder={hint} onChange={(e) => editTeam({ [k]: e.target.value })} />
-                      {k === 'bridge_config' && <p className="br-hint">签名服务的目录和公钥都写在这里面，不写签名私钥。</p>}
+                      <p className="br-hint">{k === 'bridge_config' ? '桥看 MR、发回答用的设置：签名服务的目录和公钥都写在这里面，不写签名私钥。' : '运行机派会话用的设置。'}</p>
                     </div>
                   ))}
                 </div>
                 <details className="br-raw">
-                  <summary>细节：bridge.json 里签名器那一段怎么写</summary>
+                  <summary>细节：桥的配置文件里，签名服务那一段怎么写</summary>
                   <pre>{BRIDGE_HINT}</pre>
                 </details>
                 <label className="br-check">
@@ -195,23 +194,6 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
 
 const yes = (b: boolean) => (b ? '有' : '没有')
 
-function CopyBtn({ text }: { text: string }) {
-  const [done, setDone] = useState('')
-  return (
-    <span className="br-row">
-      <button type="button" className="br-btn is-small" onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text)
-          setDone('已复制')
-        } catch {
-          setDone('没复制成：请手动选中')
-        }
-      }}>复制</button>
-      {done && <span className="br-small br-dim" role="status">{done}</span>}
-    </span>
-  )
-}
-
 function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }) {
   const team = !s.team.enabled ? { label: '没开', tone: 'idle' } : s.team.ok ? { label: '正常', tone: 'ok' } : { label: '有问题', tone: 'bad' }
   // the names brain-kit goes by in the repos (each repo has its own: brain.user, the login name, GitLab's)
@@ -236,7 +218,7 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
             ))}
           </div>
         )}
-        {!s.brainkit.ok && <p className="br-bad-text br-small">{brainkitProblem(s.brainkit.error).text}：看上面</p>}
+        {!s.brainkit.ok && <p className="br-bad-text br-small">{brainkitProblem(s.brainkit.error).text}：在上面改</p>}
       </section>
 
       <section className={`br-kpi st-stat ${user && !asks ? 'is-good' : 'is-warn'}`} aria-label={ACT.me}>
@@ -245,8 +227,13 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
           <span className="br-kpi-label">{ACT.me}</span>
         </div>
         <div><span className="br-kpi-big st-user">{user || '没设置'}</span></div>
-        {asks > 0 && <p className="br-warn-text br-small">{asks} 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」里填上</p>}
-        {!user && !s.repos.some((r) => r.me) && <p className="br-warn-text br-small">导入仓库时会问你的名字；也可以在终端里设：<code>git config --global brain.user 你的用户名</code></p>}
+        {asks > 0 && <p className="br-warn-text br-small">{asks} 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」那一行看一眼名字，点「保存」</p>}
+        {!user && !s.repos.some((r) => r.me) && (
+          <div className="st-ask">
+            <p className="br-warn-text br-small">导入仓库时会问你的名字；也可以在终端里一次设好（把最后的名字换成你的 GitLab 用户名）：</p>
+            <CommandLine cmd="git config --global brain.user 你的用户名" />
+          </div>
+        )}
         <div className="st-mods">
           <span className={`br-chip tone-${s.me.token ? 'ok' : 'warn'}`}><i aria-hidden="true">{s.me.token ? '✓' : '!'}</i>GitLab token {yes(s.me.token)}</span>
         </div>
@@ -268,7 +255,12 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
               <span className={`br-chip tone-${s.team.signer.refused ? 'bad' : 'idle'}`}>拒签 {s.team.signer.refused}</span>
               <button type="button" className="br-btn is-small" onClick={onTeam}>看运行机</button>
             </div>
-            {s.team.loop_error && <p className="br-bad-text br-pre br-small"><b>上一轮出错：</b>{s.team.loop_error}</p>}
+            {s.team.loop_error && (
+              <div className="st-ask">
+                <p className="br-bad-text br-small">上一轮有一步没成：点「看运行机」看是哪一步</p>
+                <details className="br-raw"><summary>细节</summary><pre>{s.team.loop_error}</pre></details>
+              </div>
+            )}
           </>
         ) : (
           <div className="br-kpi-note st-how">这台机器只在本机开发，不用开。</div>
@@ -353,7 +345,9 @@ function RepoRow({ r, onImport, onRemoved, onChanged }: {
       {r.error && (
         <div className="st-repo-why">
           <span className={tone === 'bad' ? 'br-bad-text' : 'br-dim'}>{r.error}</span>
-          <button type="button" className="br-btn is-small" onClick={() => onImport(r.path)}>{tone === 'idle' && !/没装载/.test(r.error) ? '去装' : '去检查'}</button>
+          {/没装载/.test(r.error)
+            ? <span className="br-dim">：先在最上面写对 brain-kit 的位置，这个仓库就能读了</span>
+            : <button type="button" className="br-btn is-small" onClick={() => onImport(r.path)}>{tone === 'idle' ? '去装' : '去检查'}</button>}
         </div>
       )}
       {r.pending && <PendingRepo repo={r} onOpen={() => onImport(r.path)} onDone={onChanged} />}
@@ -439,8 +433,8 @@ const ST_CSS = `
 .st-kitfix header h3 { color: var(--kt-bad); }
 .st-kitfix-todo { margin: 0; }
 .st-kitfix-todo b { color: var(--muted); font-weight: 650; margin-right: .5em; }
-.st-clone { display: flex; align-items: center; gap: .6em; flex-wrap: wrap; }
-.st-clone code { padding: .3em .7em; border-radius: 8px; border: 1px solid var(--border); background: var(--kt-glass); color: var(--text-strong); word-break: break-all; }
+.st-ask { display: grid; gap: .35em; justify-items: start; }
+.st-ask p { margin: 0; }
 .st-kit { display: flex; flex-wrap: wrap; gap: .35em; }
 .st-kit .br-tag { color: var(--muted); }
 .st-kit .br-tag b { color: var(--text-strong); font-weight: 650; margin-left: .3em; }

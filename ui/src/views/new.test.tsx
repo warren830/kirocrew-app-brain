@@ -7,7 +7,7 @@ import { API, installFixtureRoutes } from '../test/routes'
 import { parseView, searchOf } from '../nav'
 import type { CheckRow, CrewChecks, IntakeCheck, RepoMe, Status } from '../types'
 import { NAME_RULE } from '../ui'
-import { GATE4, GATE5, HERO_TEXT, NO_CONFIDENTIAL, NewView, REVIEW_HINT, STARTED_NEXT, slugFrom } from './NewReq'
+import { GATE4, GATE5, HERO_LOCAL, HERO_TEXT, NO_CONFIDENTIAL, NewView, REVIEW_HINT, STARTED_NEXT, slugFrom } from './NewReq'
 
 /** KiroCrew with nothing that stops a session (the fixtures' status has a ✗ row: the tests of it bring their own). */
 function calmCrew(): CrewChecks {
@@ -120,9 +120,9 @@ describe('开需求', () => {
 
     await user.click(within(out).getByRole('button', { name: '打开会话' }))
     expect(navigations).toEqual(['/chat?sid=brain-PAY-8-2c9d'])
-    await user.click(within(out).getByRole('button', { name: '看需求看板' }))
+    await user.click(within(out).getByRole('button', { name: '需求看板' }))
     expect(props.go).toHaveBeenCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-8' })
-    await user.click(within(out).getByRole('button', { name: '看需求详情' }))
+    await user.click(within(out).getByRole('button', { name: '需求详情' }))
     expect(props.go).toHaveBeenLastCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-8' })
   })
 
@@ -275,6 +275,7 @@ describe('开需求', () => {
     expect(screen.getByLabelText('需求号')).toHaveAttribute('readonly')
     expect(screen.getByLabelText('仓库')).toBeDisabled()
     expect(screen.getByLabelText('标题')).toHaveValue('对账单按自然日切分')
+    expect(screen.getByRole('region', { name: '开工' })).toHaveTextContent('开工建分支和工作目录、开会话')   // claimed already: not 认领 again
     await waitFor(() => expect(apiCalls.some((c) => c.path === `${API}/intake/next?repo=r1`)).toBe(true))
     expect(screen.getByLabelText('需求号')).toHaveValue('PAY-2')                        // not the next free key
     await user.type(screen.getByLabelText(SLUG), 'x')
@@ -347,6 +348,7 @@ describe('开需求', () => {
     render(<NewView entry={{}} status={status} go={vi.fn()} replace={replace} reloadStatus={vi.fn()} setStatus={vi.fn()} />)
     const user = userEvent.setup()
     await waitFor(() => expect(screen.getByLabelText('需求号')).toHaveValue('PAY-8'))
+    expect(within(screen.getByLabelText('仓库')).getAllByRole('option').map((o) => o.textContent)).toEqual(['shop-pay', 'shop-web']) // names, not the app's r1
     await user.selectOptions(screen.getByLabelText('仓库'), 'r2')
     expect(replace).toHaveBeenCalledWith({ kind: 'new', repo: 'r2' })
     await waitFor(() => expect(screen.getByLabelText('需求号')).toHaveValue('WEB-4'))
@@ -379,6 +381,18 @@ describe('开需求', () => {
     expect(go).toHaveBeenLastCalledWith({ kind: 'import', path: waiting.repos[0].path })
     await user.click(within(card).getByRole('button', { name: /导入别的仓库/ }))
     expect(go).toHaveBeenLastCalledWith({ kind: 'import' })
+  })
+
+  test('a repo without a remote: the hero and the steps say nothing of the runner, its step is 这次不需要', async () => {
+    const status = calmStatus()
+    status.repos[0] = { ...status.repos[0], remote: false }
+    setup({}, status)
+    const hero = screen.getByRole('region', { name: '开需求' })
+    expect(hero).toHaveTextContent(HERO_LOCAL)
+    expect(HERO_LOCAL).not.toMatch(/运行机|交接/)
+    const steps = within(screen.getByRole('list', { name: '开需求的步骤' })).getAllByRole('listitem')
+    expect(steps[4]).toHaveTextContent('交给运行机这次不需要：这个仓库只在本机做')
+    expect(flowStates()[4]).toBe('off')
   })
 
   test('the hero says what happens; its steps follow the form: 认领 → 文档过五关 (not needed without documents) → 开工 → Lean 推进', async () => {
