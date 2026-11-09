@@ -124,7 +124,7 @@ def test_an_installed_repo_is_one_click_inspect_then_add(tmp_path, home):
     assert [c[k]["level"] for k in ("path", "git", "branch", "default", "clean", "kit", "lean", "brain", "agents", "listed")] \
         == ["OK"] * 10, got["checks"]
     assert c["branch"]["why"] == "在 main 上" and c["default"]["why"].startswith("main")
-    assert c["kit"]["why"] == "装了，已提交（.brain/kit.json）" and c["listed"]["why"] == "还不在列表里"
+    assert c["kit"]["why"] == "装了，已提交" and c["listed"]["why"] == "还不在列表里"
     # a repo done only on this machine: no origin is no warning (UI问题清单 #5)
     assert c["origin"]["level"] == "OK" and c["origin"]["why"].startswith("没有 origin：这个仓库只在本机做")
     assert got["kit"]["state"] == "checkout" and got["kit"]["values"]["req_prefix"] == "PAY"
@@ -327,7 +327,8 @@ def test_install_goes_on_a_new_branch_in_its_own_worktree_and_never_touches_the_
         sh("git", "-C", repo, "rev-parse", "origin/main").stdout.strip()
     assert sh("git", "-C", wt, "status", "--porcelain").stdout == ""          # everything brain install wrote is committed
     assert sh("git", "-C", bare, "branch", "--list", "brain/install").stdout == ""   # nothing pushed
-    assert got["next"] == "pending" and got["kit"]["state"] == "branch"
+    # listed once its commit went in (SETUP-18); the install branch still waits to go in
+    assert got["next"] == "listed" and got["listed"] == "r1" and got["kit"]["state"] == "branch"
     p = got["pending"]
     assert p["text"] == "装在 brain/install 分支上，还没推送：合进 main 以后生效" and p["branch"] == "brain/install" and not p["pushed"]
     assert p["remote_url"] == str(bare.resolve()) and p["target"] == "main" and p["gitlab_project"] == "grp/pay"
@@ -444,7 +445,8 @@ def test_add_installed_and_pending_repos_then_merge_and_pull(tmp_path, home):
     assert got["refused"].code == "not_installed" and "还没装 brain-kit" in str(got["refused"])
     assert got["ready"]["status"]["repos"][0]["ok"] is True
     r2 = got["pending"]["status"]["repos"][1]
-    assert got["pending"]["id"] == "r2" and "装在 brain/install 分支上，还没推送：合进 main 以后生效" in got["pending"]["text"]
+    # the install listed it by itself (SETUP-18): 加入列表 afterwards only says so
+    assert got["pending"]["id"] == "r2" and got["pending"]["text"] == "已经在列表里了（r2）"
     assert r2["path"] == str(repo.resolve()) and r2["ok"] is False and r2["error"] == "" and r2["kit"] is None
     assert r2["pending"]["state"] == "branch" and r2["pending"]["text"] == "装在 brain/install 分支上，还没推送：合进 main 以后生效"
     assert "推送并开 MR" in r2["pending"]["next"]

@@ -336,7 +336,7 @@ def test_an_install_branch_main_moved_past_is_replaced_by_an_install_in_place(tm
 
     first, stuck, again, after = started(svc, go)
     wt = first["result"]["worktree"]
-    assert stuck["next"] == "pending" and stuck["pending"]["merge"]["ok"] is False
+    assert stuck["next"] == "listed" and stuck["pending"]["merge"]["ok"] is False   # listed by the install itself
     assert [o["mode"] for o in stuck["install"]["options"]] == ["inplace"] and stuck["install"]["recommend"] == "inplace"
     assert again["state"] == "done" and again["result"]["commit"]["ok"]
     assert "删掉了没推送的那次安装" in again["result"]["commit"]["text"] and "分支 brain/install" in again["result"]["commit"]["text"]
