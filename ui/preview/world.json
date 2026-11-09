@@ -16874,9 +16874,9 @@
    "accept": {
     "state": "not_yet",
     "step": {
-     "text": "会话空着，轮到你回话。Lean 做完了「构建测试」，下一步是「发布」。\n在会话里让它接着做「发布」（做完会请你批准发布）",
+     "text": "会话空着，轮到你回话。Lean 做完了「构建测试」，下一步是「发布」。\n先开一个新会话做审查（这个会话写了代码，不能自己审），审查写好再回这个会话接着发布",
      "who": "你",
-     "line": "接着做下一步：发布",
+     "line": "Review intent 261107-refund-stats against its requirements, design and plans, using the diff, and write construction/build-and-test/review.md.",
      "mr_url": null,
      "session_url": "/chat?sid=brain-PAY-1-3d8e"
     },
