@@ -160,10 +160,13 @@ class Service:
                     if pend:
                         self.repo_pending[rid] = (path, pend)
                         continue
-                    raise RuntimeError("还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用")
+                    raise RuntimeError("还没装 brain-kit：在「导入仓库」里检查它，装上就能用")
                 if not bk.ok():
                     raise RuntimeError("brain-kit 没装载")
-                cfg = bk.m("config").load(path)
+                try:
+                    cfg = bk.m("config").load(path)
+                except Exception as exc:  # noqa: BLE001 - brain-kit's own words: in the 检查 of 导入仓库
+                    raise RuntimeError("brain-kit 读不懂这个仓库的设置：在「导入仓库」里检查它，那里会说哪里不对") from exc
                 self.repos[rid] = Repo(rid, path, cfg)
             except Exception as exc:  # noqa: BLE001
                 self.repo_errors[rid] = (path, str(exc).split("\n", 1)[0][:300])
@@ -359,6 +362,7 @@ class Service:
         row["credits"] = snap["credits"].get(scope)
         row["sessions"] = len(sess)
         row["updated_at"] = deliveries.updated_at(f, live)
+        row["session_url"] = live["url"] if live else None
         job = self._desc_job(repo, f, row["credits"])
         row["summary"] = mrdesc_view.plain_line(self.desc.first(*job)) if job else None
         if mr:

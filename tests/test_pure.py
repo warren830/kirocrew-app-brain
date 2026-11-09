@@ -343,7 +343,7 @@ def test_every_row_says_whose_turn_the_step_where_and_since_when():
         return row["state"], row["waits"]
 
     st, w = row_of({})
-    assert (st, w["who"], w["do"], w["where"], w["text"]) == ("claimed", "you", "start", "app", "认领了，还没开工")
+    assert (st, w["who"], w["do"], w["where"], w["text"]) == ("claimed", "you", "start", "app", "已认领，还没开工")
     assert w["since"] == lv.epoch("2026-11-09T00:51:25Z")
     _, w = row_of({}, me="bob")
     assert (w["who"], w["do"], w["text"]) == ("people", "start", "等 alice 开工")
@@ -395,10 +395,18 @@ def test_todo_lists_what_waits_for_you_the_way_the_rows_say_it():
 
     sess = {"slot": "s1", "title": "PAY-1", "url": "/chat?sid=s1"}
     got = todo.build([entry("PAY-1", "you", "reply", text="下一步是发布", session=sess, since=9.0),
-                      entry("PAY-2", "you", "start", state="claimed", text="认领了，还没开工"),
+                      entry("PAY-2", "you", "start", state="claimed", text="已认领，还没开工"),
                       entry("PAY-3", "product", "accept", state="acceptance"),
                       entry("PAY-4", "agent", "none"), entry("PAY-5", "people", "start", state="claimed")],
                      team=False, crew_rows=[])
     assert [(i["kind"], i["key"], i["text"]) for i in got["items"]] == [("reply", "PAY-1", "下一步是发布"),
-                                                                      ("start", "PAY-2", "认领了，还没开工")]
+                                                                      ("start", "PAY-2", "已认领，还没开工")]
     assert got["items"][0]["session"] == sess and got["items"][0]["since"] == 9.0 and got["items"][1]["since"] == 5.0
+
+
+def test_the_eval_queue_says_what_people_did_in_words():
+    """brain-kit's reasons name an act by its code name in brackets: a person sees the act (OVERVIEW-19)."""
+    assert deliveries.acts_in_words("判断点之外有人介入 2 次（push_after_handover）") == "判断点之外有人介入 2 次（交接后推代码）"
+    assert deliveries.acts_in_words("判断点之外有人介入 2 次（allow_test_change、platform_merge）") == \
+        "判断点之外有人介入 2 次（允许改验收测试、平台上的手动操作）"
+    assert deliveries.acts_in_words("验收被驳回 1 次（RELEASE）") == "验收被驳回 1 次（RELEASE）"

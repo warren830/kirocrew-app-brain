@@ -46,7 +46,7 @@ def test_every_requirement_shows_where_it_is_and_what_it_waits_on(tmp_path, home
     assert rows["PAY-3"]["state"] == "claimed" and rows["PAY-3"]["title"] == "只认领"
     # a claim not started waits for its owner to start it, here in the app, since the claim (not since now)
     w3 = rows["PAY-3"]["waits"]
-    assert (w3["who"], w3["do"], w3["where"], w3["text"]) == ("you", "start", "app", "认领了，还没开工") and w3["since"]
+    assert (w3["who"], w3["do"], w3["where"], w3["text"]) == ("you", "start", "app", "已认领，还没开工") and w3["since"]
     assert all(r["local_only"] for r in rows.values())      # no remote: done only on this machine
     # overlap: src/pay contains src/pay/report
     assert view["overlaps"] == [{"keys": ["PAY-1", "PAY-2"], "paths": ["src/pay", "src/pay/report"]}] or \

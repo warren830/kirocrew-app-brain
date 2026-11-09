@@ -78,6 +78,7 @@ def base_row(repo_id: str, f: dict[str, Any], *, local_only: bool = False) -> di
         "overlap": [], "open_questions": [],
         "expected_paths": [p for p in run.get("expected_paths") or [] if isinstance(p, str)][:50],
         "local_only": bool(local_only),
+        "session_url": None,     # its brain-dev session on this machine (KiroCrew's chat URL), filled in by the service
     }
 
 
@@ -129,7 +130,7 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
         since = lean_view.epoch(claim.get("created_at"))
         if "owner" in claim and claim["owner"] is None:    # filed for others (brain-kit claims.unowned): anyone's
             return put("claimed", "people", "start", "待认领：谁开工就归谁", where="app", since=since)
-        return put("claimed", you, "start", "认领了，还没开工" if mine else "等 %s 开工" % owner, where="app",
+        return put("claimed", you, "start", "已认领，还没开工" if mine else "等 %s 开工" % owner, where="app",
                    since=since)
     if not run.get("handoff"):
         if pending:
@@ -395,7 +396,7 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
     for q in data.get("review_queue") or []:
         if isinstance(q, dict) and q.get("key"):
             queue.append({"key": str(q["key"]), "intent": q.get("intent"),
-                          "reasons": [str(r.get("text") if isinstance(r, dict) else r)[:200]
+                          "reasons": [acts_in_words(str(r.get("text") if isinstance(r, dict) else r))[:200]
                                       for r in q.get("reasons") or []][:10]})
     skipped = [{"key": str(x.get("key") or ""), "why": str(x.get("why") or "")[:300]}
                for x in data.get("skipped") or [] if isinstance(x, dict)][:50]
@@ -461,6 +462,12 @@ def act_label(kind: str) -> str:
     if k.startswith("platform_"):
         return "平台上的手动操作"
     return ACT_LABEL.get(k, k or "别的")
+
+
+def acts_in_words(text: str) -> str:
+    """brain-kit's act kinds in brackets (「判断点之外有人介入 2 次（push_after_handover）」) in words."""
+    return re.sub(r"[（(]([a-z_]+(?:[、,，][a-z_]+)*)[）)]",
+                  lambda m: "（%s）" % "、".join(act_label(k) for k in re.split(r"[、,，]", m.group(1))), text)
 
 
 def cto_part(data: dict[str, Any]) -> dict[str, Any]:

@@ -438,7 +438,7 @@ REASON_RULES: list[tuple[re.Pattern, str, str]] = [(re.compile(rx, re.S), t, d) 
     (r"^claim\.json (?P<f>key|owner) ", "{f} 和认领对不上", "看看 claim/<需求号> 分支上的 claim.json"),
     (r"^run\.json missing at (?P<sha>\w+)$", "这次提交里没有 run.json", "在 brain start 建的分支上" + HANDOFF[1:]),
     (r"^run\.json is not valid JSON$", "run.json 不是合法的 JSON", "改好它" + HANDOFF),
-    (r"^run\.json has no hand-over", "run.json 里没有交接记录", "在分支上跑 brain handoff"),
+    (r"^run\.json has no hand-over", "这个分支还没交接过", "在分支上跑 brain handoff"),
     (r"^run\.json: ", "run.json 有问题", "改好它" + HANDOFF),
     (r"^GitLab does not show the parent of", "GitLab 看不到这个提交的上一个", "过一会儿再打一次标签"),
     (r"^the MR head (?P<sha>\w+) is a merge", "MR 最新的提交是一个合并，不是交接提交", "在分支上" + HANDOFF[1:]),
