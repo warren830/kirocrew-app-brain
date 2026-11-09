@@ -914,8 +914,8 @@ class Service:
             raise AppError(str(exc), "invalid_intake")
         out = scrub_tree(out, self.scrub)
         if not out["ok"]:
-            out["problem"] = problems.who_row(out["output"], repo=repo.path)
-            if out["problem"]:
+            out["problem"] = out.get("problem") or problems.who_row(out["output"], repo=repo.path)
+            if (out["problem"] or {}).get("fix") == "me":
                 out["me"] = await asyncio.to_thread(self._me_view, repo, await asyncio.to_thread(self._token_present))
             return out
         scope = scope_of(repo.id, out["key"])
