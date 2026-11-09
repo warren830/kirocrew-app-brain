@@ -68,10 +68,11 @@ let crewFixed = false
  * four repos, seventeen requirements in every state, each with its board. */
 const W = world as unknown as {
   status: Status; overview: Overview; boards: Record<string, ReqBoard>; details: Record<string, RequirementDetail>
-  /** made by scripts/preview_world.py with the backend's own todo.build, when it does (person mode and team mode) */
-  todo?: Todo; todo_team?: Todo
-  /** /overview?repo=<id>: each repo's own numbers (deliveries.cto_numbers over its rows), when the world has them */
-  overviews?: Record<string, Overview>
+  /** 交付总览 for 全部 and each repo, with and without brainkit.evaluate, made by the backend (when the world has it) */
+  overviews?: Record<'eval' | 'noeval', Record<string, Overview>>
+  /** 待办 made by the backend's todo.build from the world's rows, without and with the KiroCrew FAIL (when it has it) */
+  todo?: Record<'ok' | 'crewfail', Todo>
+  stages?: Record<string, RequirementDetail['lean']['stages']>
 }
 let repos: RepoInfo[] = flags.has('norepos') ? [] : clone(W.status.repos)
 
@@ -82,7 +83,7 @@ function crewRows(): CheckRow[] {
   const rows = clone(W.status.crew.rows).filter((r) => !r.repo || listed.has(r.repo))
   if (!flags.has('crewfail') || crewFixed) return rows
   return rows.map((r) => (/^brain-dev\.json/.test(r.text) ? {
-    level: 'FAIL' as const, text: '没有 ~/.kiro/agents/brain-dev.json', todo: '点「修复」装上 brain-kit 带的版本：没有它，Lean 的 hook 在 KiroCrew 里不会跑',
+    level: 'FAIL' as const, text: '没有 ~/.kiro/agents/brain-dev.json', todo: '点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的 hook 在 KiroCrew 里不会跑',
     fix: 'agent' as const, repo: null, raw: 'KiroCrew: ~/.kiro/agents/brain-dev.json missing',
   } : r))
 }
@@ -111,7 +112,7 @@ function status(): Status {
  * kinds a runner has; KiroCrew's items from the FAIL rows, as backend/core/todo.py makes them. */
 function todo(): Todo {
   const team = flags.has('team')
-  const world = team ? W.todo_team : W.todo
+  const world = W.todo?.[flags.has('crewfail') && !crewFixed ? 'crewfail' : 'ok']
   const base = world ?? fx.todo()
   const listed = new Set(listedRepos().filter((r) => r.ok).map((r) => r.id))
   const kinds = team ? ['question', 'acceptance', 'handoff_rejected'] : null
@@ -178,7 +179,7 @@ function boardFor(path: string): ReqBoard {
 
 function overview(path: string): Overview {
   const repo = new URL(path, location.origin).searchParams.get('repo') ?? 'all'
-  const own = W.overviews?.[repo]
+  const own = W.overviews?.[flags.has('noeval') ? 'noeval' : 'eval']?.[repo]
   const o = clone(own ?? W.overview)
   const usable = new Set(listedRepos().filter((r) => r.ok).map((r) => r.id))
   if ((repo !== 'all' && !own) || usable.size < repos.filter((r) => r.ok).length) {
@@ -187,7 +188,7 @@ function overview(path: string): Overview {
     o.overlaps = o.overlaps.filter((x) => o.rows.some((r) => r.key === x.keys[0]))
   }
   o.errors = listedRepos().filter((r) => !r.ok && !r.pending && (repo === 'all' || r.id === repo)).map((r) => ({ repo: r.id, error: r.error }))
-  if (flags.has('noeval')) {
+  if (flags.has('noeval') && !own) {
     o.eval = { available: false, error: 'brain-kit 还没有 evaluate 模块', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     o.cto = { ...o.cto, available: false, unattended: null, stepped_in: null, runs: [], sentence: o.cto.credits.per_req !== null ? `每个需求平均 ${o.cto.credits.per_req} credits。` : o.cto.sentence }
   }
