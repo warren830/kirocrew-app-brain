@@ -189,7 +189,7 @@ describe('Brain', () => {
     const { user, props } = setup()
     const own = await screen.findByTestId('usage-unmerged')
     expect(own).toHaveTextContent('还没合并的（合并以后才算进上面的数）')
-    expect(own).toHaveTextContent('PAY-3还在本机做：加载 7 · 引用 2')
+    expect(own).toHaveTextContent('PAY-3还在本机做：加载 7 · 引用 3')
     expect(own).toHaveTextContent('PAY-4还在分支上：加载 7 · 引用 2')
     expect(within(screen.getByRole('table', { name: '每次运行' })).queryByRole('button', { name: 'PAY-4' })).toBeNull()
     await user.click(within(own).getByRole('button', { name: 'PAY-4' }))

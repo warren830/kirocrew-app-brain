@@ -294,7 +294,7 @@ for _i, _k in enumerate(("ORD-2", "ORD-4", "ORD-6", "ORD-8")):
     WRITTEN_BACK[_k] = [("TECH", "订单", "T-%s-1" % _k, "type:pitfall side:builder rel:new src:RUN-%s-1" % _k,
                          ("地址校验要先去掉全角空格。", "优惠券叠加先算满减再算折扣。", "取消订单的退款走原路返回。",
                           "运费分摊按商品金额比例，尾差记在最后一件。")[_i])]
-# what each run's Lean records cite (decisions.md), by key: the Brain it used
+# what each run's Lean records cite besides its decisions (its requirements document), by key: the Brain it used
 CITES = {"PAY-2": ["T-12", "P-7"], "PAY-3": ["T-12", "T-PAY-2-1", "T-PAY-9-1"], "PAY-1": ["P-PAY-2-1"],
          "PAY-4": ["T-PAY-2-1", "T-12"], "PAY-5": ["T-PAY-2-1"], "ORD-3": ["T-3", "T-ORD-2-1"], "ORD-5": ["P-2"],
          "ORD-7": ["T-ORD-4-1", "T-ORD-6-1"], "ORD-8": ["T-ORD-6-1"], "ORD-9": ["T-ORD-8-1", "T-3"], "ORD-10": ["T-ORD-8-1"]}
@@ -313,11 +313,12 @@ def no_trace_brain(r: Req) -> dict:
     return detail.brain_block(None, None, r.facts()["decisions_text"] if r.start_at is not None else None)
 
 
-def brain_views(reqs: dict[str, list[Req]], rows: list[dict]) -> tuple[dict[str, dict], dict[str, dict]]:
+def brain_views(reqs: dict[str, list[Req]], rows: list[dict], said: dict[str, list[dict]]) -> tuple[dict[str, dict], dict[str, dict]]:
     """Each repo's Brain page (GET /brain) as brainview.view makes it with brain-kit, on a scratch git repo that holds
     what the world says: the Brain on main, each merged run (its run.json at the Brain it loaded, its decisions.md
     citing what it used) and the write-back that followed it, each run not merged yet on its branch (a local one in
-    its worktree). And each run's Brain block, by "<repo>/<key>", as 需求详情 and 需求看板 get it: detail.brain_block of
+    its worktree). Its decisions.md holds the decisions 需求详情 shows for it (*said*, by "<repo>/<key>"), so its 决定
+    and its 用到的 Brain cite the same entries. And each run's Brain block, by "<repo>/<key>", as 需求详情 and 需求看板 get it: detail.brain_block of
     brainkit.trace's, the usage row of the run read where the service reads its trace (its worktree, else its ref), the
     very read and row the Brain page's numbers come from. ({}, {}) without brain-kit (BRAIN_TEST_BRAINKIT)."""
     if not (BRAINKIT / "brainkit" / "__init__.py").is_file():
@@ -363,11 +364,14 @@ def brain_views(reqs: dict[str, list[Req]], rows: list[dict]) -> tuple[dict[str,
                     {"key": r.key, "owner": r.owner, "branch": r.branch, "intent": r.intent, "brain_commit": brain_commit,
                      "created_at": iso(r.start_at or T0)}), encoding="utf-8")
                 d = top / "aidlc-docs" / r.intent
-                d.mkdir(parents=True, exist_ok=True)
-                cites = "".join("| D-%d | %s | requirements | 按 %s | Brain | agent |\n" % (i, iso(r.start_at or T0)[:10], c)
-                                for i, c in enumerate(CITES.get(r.key, []), 1))
+                (d / "inception" / "requirements").mkdir(parents=True, exist_ok=True)
+                table = "".join("| %s | %s | %s | %s | %s | %s |\n" % (x["id"], x["date"], x["stage"], x["text"], x["why"],
+                                                                      " ".join([x["who"] or x["by"]] + x["cites"]))
+                                for x in said.get("%s/%s" % (rid, r.key)) or [])
                 (d / "decisions.md").write_text("# Decisions\n\n| ID | Date | Stage | Decision | Why | Who |\n|---|---|---|---|---|---|\n"
-                                                + cites + "```brain-proposal\n```\n" * r.proposals, encoding="utf-8")
+                                                + table + "```brain-proposal\n```\n" * r.proposals, encoding="utf-8")
+                (d / "inception" / "requirements" / "requirements.md").write_text(
+                    "# %s\n\n" % r.title + "".join("- 照 Brain 的 %s\n" % c for c in CITES.get(r.key, [])), encoding="utf-8")
 
             write_brain()
             git("add", "-A")
@@ -892,12 +896,14 @@ def main() -> None:
     names = {"r1": "shop-pay", "r2": "shop-web", "r3": "shop-order", "r4": "shop-tools"}
     local = {"r4"}      # no GitLab: done only on this machine (shop-web, r2, is not loaded)
 
+    runner_rows: list[dict] = []     # the team runner's rows (service._team_rows), made below with team mode's 待办
+
     def overview_of(repo: str, evaluated: bool) -> dict:
         """交付总览 for 全部 or one repo, as service._overview_sync makes it: its rows, its repos' numbers; without
         brainkit.evaluate the funnel is the app's own count and every merge is still 还没评."""
         ids = [x for x in ("r1", "r3", "r4") if repo in ("all", x)]
         o = copy.deepcopy(ov)
-        o["rows"] = [r_ for r_ in all_rows if r_["repo"] in ids]
+        o["rows"] = [r_ for r_ in all_rows if r_["repo"] in ids] + (copy.deepcopy(runner_rows) if repo == "runner" else [])
         o["overlaps"] = [x for x in ov["overlaps"] if any(r_["key"] == x["keys"][0] for r_ in o["rows"])]
         o["counts"] = deliveries.counts(o["rows"])
         o["errors"] = [e for e in ov["errors"] if repo in ("all", e["repo"])]
@@ -937,7 +943,7 @@ def main() -> None:
                for r_ in all_rows if r_["state"] != "closed" and (r_["state"] != "merged" or r_["waits"]["who"] == "you")]
     crew_fail = problems.agent_missing()
     world_todo = {"ok": todo.build(entries, team=False, crew_rows=[]), "crewfail": todo.build(entries, team=False, crew_rows=[crew_fail])}
-    brains, uses = brain_views(reqs, all_rows)
+    brains, uses = brain_views(reqs, all_rows, {bid: kw.get("decisions") or [] for bid, (_, _, kw) in LATER.items()})
     for bid, (r_, row_, kw) in LATER.items():
         boards[bid] = snapshot(r_, row_, brain=uses.get(bid) or no_trace_brain(r_), **kw)
     det["brain"] = boards["r1/PAY-3"]["brain"]
@@ -973,9 +979,6 @@ def main() -> None:
         row_t = deliveries.base_row("runner", f)
         row_t["where"] = "runner"
         deliveries.team_classify(row_t, rr, decs, f.get("park"))
-        if rr["state"] in ("merged", "closed"):
-            row_t["state"] = "merged" if rr["state"] == "merged" else "closed"
-            row_t["state_label"] = deliveries.STATE_LABEL[row_t["state"]]
         bid = "%s/%s" % (q.repo, key)
         kw = LATER[bid][2] if bid in LATER else {}
         sess = [x for x in kw.get("sessions") or [] if x.get("kind") == "runner"]
@@ -984,6 +987,7 @@ def main() -> None:
                      mr={"iid": int(rr["iid"]), "url": url, "state": None}, updated_at=lean_view.epoch(rr.get("updated")),
                      summary=mrdesc_view.plain_line((kw.get("mr_desc") or {}).get("first")) if f.get("run") else None)
         team_entries.append({"row": row_t, "decisions": decs, "mr_url": url})
+        runner_rows.append(row_t)
         brain_t = boards[bid]["brain"] if path and bid in boards else no_trace_brain(Req("r1", key, "", "", "", ""))
         b = snapshot(q, row_t, brain=brain_t, park=park, facts=f, team_decisions=decs, sessions=sess, me=None,
                      decisions=kw.get("decisions") or [], reflect=kw.get("reflect") or [],
@@ -1012,6 +1016,8 @@ def main() -> None:
             "credits": {"total": row_t["credits"], "note": detail.NO_TOKENS}, "brain": brain_t, "mr_desc": b["mr_desc"]}
     world_todo["team"] = {"items": world_todo["ok"]["items"] + todo.build(team_entries, team=True, crew_rows=[])["items"],
                           "team": True}
+    for e in ("eval", "noeval"):   # 交付总览 of 运行机 (team mode's 全部 is the repos' and these together)
+        overviews[e]["runner"] = overview_of("runner", e == "eval")
     world_status = copy.deepcopy(status)
     world_status["repos"] = status["repos"] + [
         {"id": "r3", "path": "/Users/alice/workplace/shop-order", "name": "shop-order", "ok": True, "error": "", "pending": None,

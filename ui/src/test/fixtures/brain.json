@@ -27,7 +27,7 @@
                 "PAY-1"
               ],
               "text": "对商户的金额一律到分，不四舍五入到元。",
-              "cites": 1,
+              "cites": 3,
               "runs": 1,
               "loaded_by": 1,
               "candidate": false
@@ -79,7 +79,7 @@
                 "PAY-1"
               ],
               "text": "导出大文件分批写，一批不超过 5000 行。",
-              "cites": 1,
+              "cites": 2,
               "runs": 1,
               "loaded_by": 1,
               "candidate": false
@@ -275,6 +275,7 @@
         "key": "PAY-3",
         "loaded": 7,
         "cited": [
+          "P-PAY-2-1",
           "T-12",
           "T-PAY-2-1"
         ],
