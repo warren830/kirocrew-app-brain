@@ -11,7 +11,7 @@
     {
       "level": "WARN",
       "text": ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）",
-      "todo": "只有把需求交给运行机时才要紧（运行机靠新版停下来问人）。要交的话点「修复」：在新分支上重装 brain-kit",
+      "todo": "只有把需求交给运行机时才要紧（运行机靠新版停下来问人）。要交的话点「修复」：重装 brain-kit",
       "fix": "kit",
       "repo": "/Users/alice/workplace/shop-pay",
       "raw": ".kiro/brain/lean-hook.py is an older adapter (version 0, needs 2): the team runner could not write runs/<KEY>/park.json, its only way to ask a person, before the Lean approvals; run `brain install` and commit it on main through an MR"

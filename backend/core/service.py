@@ -16,7 +16,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from . import bk, brainview, crewcheck, deliveries, detail, importer, installer, intake, lean_view, mrdesc_view, mrinfo
+from . import (bk, brainview, crewcheck, deliveries, detail, identity, importer, inplace, installer, intake, landing,
+               lean_view, mrdesc_view, mrinfo)
 from . import problems
 from . import board as board_mod
 from . import settings as settings_mod
@@ -159,7 +160,7 @@ class Service:
                     if pend:
                         self.repo_pending[rid] = (path, pend)
                         continue
-                    raise RuntimeError("还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装到一个新分支上")
+                    raise RuntimeError("还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用")
                 if not bk.ok():
                     raise RuntimeError("brain-kit 没装载")
                 cfg = bk.m("config").load(path)
@@ -232,7 +233,9 @@ class Service:
             try:
                 await asyncio.sleep(MR_EVERY_S)
                 await self.refresh_mrs()
-                if self.repo_pending and await asyncio.to_thread(self._pending_changed):
+                cleared = await asyncio.to_thread(self._sweep)
+                if (set(cleared) & set(self.settings["repos"])) or (
+                        self.repo_pending and await asyncio.to_thread(self._pending_changed)):
                     await asyncio.to_thread(self.reload_sync)
                 if time.monotonic() - last_crew > CREW_EVERY_S:
                     last_crew = time.monotonic()
@@ -251,10 +254,14 @@ class Service:
             if os.path.isfile(os.path.join(path, importer.KIT)):
                 return True
             now = importer.pending_state(path, records.get(path), token=token)
-            keys = ("state", "branch", "commit", "pushed", "mr_url", "can_open_mr")
+            keys = ("state", "branch", "commit", "pushed", "mr_url", "can_open_mr", "word", "next", "merge", "pull")
             if now is None or any(now.get(k) != pend.get(k) for k in keys):
                 return True
         return False
+
+    def _sweep(self) -> list[str]:
+        """The install and upgrade records nothing waits for any more, cleared (landing.sweep): the repo tops."""
+        return landing.sweep(self.imports, "install") + landing.sweep(self.upgrades, "upgrade")
 
     async def _team_forever(self) -> None:
         while True:
@@ -275,14 +282,22 @@ class Service:
         return self.repos[rid]
 
     def me(self) -> str | None:
-        """Who this machine says the person is: $BRAIN_USER, else git config brain.user of a repo (never a token)."""
+        """Who this machine says the person is: $BRAIN_USER, else the name brain-kit goes by in a repo (never a token)."""
         who = os.environ.get("BRAIN_USER", "").strip().lower()
         if not who:
             for r in self.repos.values():
-                who = r.git.out("config", "brain.user").strip().lower()
+                who = self.me_in(r) or ""
                 if who:
                     break
         return who or None
+
+    def me_in(self, repo: Repo) -> str | None:
+        """The name brain-kit goes by in *repo* (identity.of): $BRAIN_USER, git config brain.user, or the login name in
+        a repo without GitLab when brain-kit falls back to it. GitLab's username (with a token) is not asked for."""
+        return identity.of(repo.path, self._gitlab_of(repo)[0], token=False)["name"]
+
+    def _me_view(self, repo: Repo, token: bool) -> dict[str, Any]:
+        return identity.of(repo.path, self._gitlab_of(repo)[0], token=token)
 
     def _sessions_snapshot(self) -> dict[str, Any]:
         """{scope: [session rows]} and credits per scope, read on the event loop."""
@@ -563,7 +578,7 @@ class Service:
         row = self._row(repo, f, snap)
         scope = scope_of(rid, key)
         run = f.get("run") or {}
-        me = self.me()
+        me = self.me_in(repo)
         own = bool(me) and me == (f.get("owner") or "")
         base, project = self._gitlab_of(repo)
         mr = self.mr.get(project, f["branch"]) if (base and project and f.get("branch")) else None
@@ -808,7 +823,7 @@ class Service:
         note = " ".join(str(note or "").split())[:300]
         repo = self._repo(rid)
         f = await asyncio.to_thread(self._facts, repo, key)
-        me = self.me()
+        me = await asyncio.to_thread(self.me_in, repo)
         if not me or me != f.get("owner"):
             raise AppError("只有需求负责人本人能在这里回答（git config brain.user）", "not_owner", 403)
         run = f.get("run") or {}
@@ -853,7 +868,8 @@ class Service:
 
     async def intake_check(self, body: dict[str, Any]) -> dict[str, Any]:
         repo = self._repo(str(body.get("repo") or ""))
-        return scrub_tree(await asyncio.to_thread(intake.check, repo, body, self.me()), self.scrub)
+        me = await asyncio.to_thread(self.me_in, repo)
+        return scrub_tree(await asyncio.to_thread(intake.check, repo, body, me), self.scrub)
 
     async def intake_start(self, body: dict[str, Any]) -> dict[str, Any]:
         repo = self._repo(str(body.get("repo") or ""))
@@ -863,6 +879,9 @@ class Service:
             raise AppError(str(exc), "invalid_intake")
         out = scrub_tree(out, self.scrub)
         if not out["ok"]:
+            out["problem"] = problems.who_row(out["output"], repo=repo.path)
+            if out["problem"]:
+                out["me"] = await asyncio.to_thread(self._me_view, repo, await asyncio.to_thread(self._token_present))
             return out
         scope = scope_of(repo.id, out["key"])
         await asyncio.to_thread(self.store.append, scope, "app", "在 app 里开工",
@@ -928,7 +947,6 @@ class Service:
 
     def _todo_sync(self, snap: dict[str, Any]) -> dict[str, Any]:
         entries = []
-        me = self.me()
         token = self._token_present()
         for rid, repo in self.repos.items():
             try:
@@ -936,6 +954,7 @@ class Service:
             except Exception:  # noqa: BLE001
                 continue
             base, project = self._gitlab_of(repo)
+            me = self.me_in(repo)
             for f in facts:
                 row = self._row(repo, f, snap)
                 if row["state"] in ("merged", "closed"):
@@ -976,24 +995,32 @@ class Service:
             r = self.repos.get(rid)
             if r is not None:
                 repos.append({"id": rid, "path": r.path, "name": r.name, "ok": True, "error": "",
-                              "kit": importer.kit_view(r.cfg), "pending": None})
+                              "kit": importer.kit_view(r.cfg), "pending": None, "me": None})
             elif rid in self.repo_pending:
                 p, pend = self.repo_pending[rid]
                 repos.append({"id": rid, "path": p, "name": os.path.basename(p), "ok": False, "error": "", "kit": None,
-                              "pending": pend})
+                              "pending": pend, "me": None})
             else:
                 p, err = self.repo_errors.get(rid, (path, "没装载"))
                 repos.append({"id": rid, "path": p, "name": os.path.basename(p), "ok": False, "error": err, "kit": None,
-                              "pending": None})
+                              "pending": None, "me": None})
         todo = await self.todo()
         token = await asyncio.to_thread(self._token_present)
-        me = await asyncio.to_thread(self.me)
+        loaded = {x["id"]: self.repos[x["id"]] for x in repos if x["ok"] and x["id"] in self.repos}
+        mes = await asyncio.to_thread(lambda: {rid: self._me_view(r, token) for rid, r in loaded.items()})
+        for x in repos:
+            x["me"] = mes.get(x["id"])
+        # machine-wide: $BRAIN_USER, else the name of the first repo that has one (each repo's is in its row)
+        env = os.environ.get("BRAIN_USER", "").strip().lower()
+        first = next((x["me"] for x in repos if x["me"] and x["me"]["name"]), None)
+        me = env or (first["name"] if first else None)
+        how = "GitLab token（%s）" % ("有" if token else "没有") + (
+            "；环境变量 BRAIN_USER = %s" % env if env else "；%s" % first["text"] if first else "")
         return {"app": {"name": self.name, "version": VERSION, "team": self.team is not None},
                 "brainkit": {"path": info["path"], "ok": info["ok"], "version": info["version"], "error": info["error"],
                              "modules": info["modules"]},
                 "repos": repos, "crew": self.crew,
-                "me": {"user": me, "token": token,
-                       "how": "GitLab token（%s）" % ("有" if token else "没有") + ("；git config brain.user = %s" % me if me else "")},
+                "me": {"user": me, "token": token, "how": how},
                 "team": self._team_status(), "counts": {"todo": len(todo["items"])}}
 
     def settings_view(self) -> dict[str, Any]:
@@ -1104,22 +1131,74 @@ class Service:
         except importer.ImportFail as exc:
             raise self._fail(exc)
 
+    async def _mode(self, top: str, body: dict[str, Any], purpose: str) -> str:
+        """The mode a request asks for ("inplace" | "branch"); none given: the recommended one (importer.choices). In
+        place when it cannot be done is refused here, before any job starts, with the one line why."""
+        mode = body.get("mode")
+        if mode is not None and mode not in ("inplace", "branch"):
+            raise AppError("mode 只能是 inplace（直接装在当前分支）或 branch（装到新分支）", "invalid_mode")
+        if mode == "branch":
+            return "branch"
+        cfg = await asyncio.to_thread(installer._kit_of, top) if purpose == "upgrade" else None
+        got = await asyncio.to_thread(lambda: importer.choices(top, purpose=purpose, cfg=cfg))
+        if mode is None:
+            return str(got["recommend"])
+        opt = got["options"][0]
+        if not opt["ok"]:
+            raise AppError("不能直接装：%s。可以装到新分支" % opt["why"], "inplace_refused", 409)
+        return "inplace"
+
+    async def me_name(self, body: dict[str, Any]) -> dict[str, Any]:
+        """「你的 GitLab 用户名」 (or 「你的名字」): git config brain.user <name> in the repo at body.path (identity.set_name:
+        brain-kit's USER_RE, no shell). Answers who brain-kit says the person is there now, and the status."""
+        top = await self._import_top(body.get("path"))
+        try:
+            name = await asyncio.to_thread(identity.set_name, top, body.get("name"))
+        except identity.NameRefused as exc:
+            raise AppError(str(exc), "invalid_name")
+        rid = importer.listed_id(top, list(self.settings["repos"]))
+        repo = self.repos.get(rid or "")
+        token = await asyncio.to_thread(self._token_present)
+        if repo is not None:
+            me = await asyncio.to_thread(self._me_view, repo, token)
+        else:
+            base = await asyncio.to_thread(lambda: ((installer._kit_of(top) or {}).get("gitlab") or {}).get("base") or "")
+            me = await asyncio.to_thread(lambda: identity.of(top, base, token=token))
+        self.log.info("brain: git config brain.user set in %s", top)
+        return {"ok": True, "text": "这个仓库的 git config brain.user 设成了 %s" % name, "me": me,
+                "status": await self.status()}
+
+    async def import_choices(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Where an install (or a kit update, purpose "upgrade") goes: in place or a new branch (importer.choices)."""
+        top = await self._import_top(body.get("path"))
+        purpose = body.get("purpose", "install")
+        if purpose not in installer.PURPOSES:
+            raise AppError("purpose 只能是 install 或 upgrade", "invalid_purpose")
+        cfg = await asyncio.to_thread(installer._kit_of, top) if purpose == "upgrade" else None
+        return scrub_tree(await asyncio.to_thread(lambda: importer.choices(top, purpose=purpose, cfg=cfg)), self.scrub)
+
     async def import_install(self, body: dict[str, Any]) -> dict[str, Any]:
-        """安装到新分支 (see installer.install), in the background; the page follows the job."""
+        """安装: in place on the checkout's branch (the default, inplace.install) or on a new branch for an MR
+        (installer.install), in the background; the page follows the job."""
         top = await self._import_top(body.get("path"))
         try:
             kit = installer.check_kit(body.get("kit"))
-            branch = await asyncio.to_thread(installer.check_branch, body.get("branch"))
+            mode = await self._mode(top, body, "install")
+            branch = await asyncio.to_thread(installer.check_branch, body.get("branch")) if mode == "branch" else ""
         except importer.ImportFail as exc:
             raise self._fail(exc)
         work_root = self.settings["work_root"]
 
         async def after(_res: Any) -> None:
-            if top in self.settings["repos"]:   # a listed repo that was not installed: now it is pending
+            if top in self.settings["repos"]:   # a listed repo that was not installed: usable now, or pending
                 await asyncio.to_thread(self.reload_sync)
 
-        jid = self._start_job("install", top, installer.INSTALL_STEPS,
-                              lambda step: installer.install(top, kit, branch, work_root, self.imports, step), after)
+        if mode == "inplace":
+            jid = self._start_job("install", top, inplace.INSTALL_STEPS,
+                                  lambda step: inplace.install(top, kit, self.imports, step), after)
+        else:
+            jid = self._start_job("install", top, installer.INSTALL_STEPS,
+                                  lambda step: installer.install(top, kit, branch, work_root, self.imports, step), after)
         return {"job": self.import_job(jid)}
 
     def _purpose(self, body: dict[str, Any]) -> tuple[str, "importer.Records"]:
@@ -1138,11 +1217,14 @@ class Service:
             self.crew = await asyncio.to_thread(self.crew_sync)
 
     async def import_upgrade(self, body: dict[str, Any]) -> dict[str, Any]:
-        """The 'kit' fix of a KiroCrew check row: brain install again on a new branch (see installer.upgrade), in the
-        background; the page follows the job, then commits again or publishes with purpose "upgrade"."""
+        """The 'kit' fix of a KiroCrew check row: brain install again, in place on the checkout's branch (the default,
+        inplace.install with purpose "upgrade") or on a new branch (installer.upgrade), in the background; the page
+        follows the job, then commits again, pushes, or publishes with purpose "upgrade"."""
         top = await self._import_top(body.get("path"))
         try:
-            branch = await asyncio.to_thread(installer.check_branch, body.get("branch"), installer.UPGRADE_BRANCH)
+            mode = await self._mode(top, body, "upgrade")
+            branch = (await asyncio.to_thread(installer.check_branch, body.get("branch"), installer.UPGRADE_BRANCH)
+                      if mode == "branch" else "")
         except importer.ImportFail as exc:
             raise self._fail(exc)
         work_root = self.settings["work_root"]
@@ -1151,22 +1233,69 @@ class Service:
         async def after(_res: Any) -> None:
             self.crew = await asyncio.to_thread(self.crew_sync)
 
-        jid = self._start_job("upgrade", top, installer.UPGRADE_STEPS,
-                              lambda step: installer.upgrade(top, branch, work_root, self.upgrades, step, token=token),
-                              after)
+        if mode == "inplace":
+            jid = self._start_job("upgrade", top, inplace.UPGRADE_STEPS,
+                                  lambda step: inplace.install(top, None, self.upgrades, step, purpose="upgrade",
+                                                               token=token), after)
+        else:
+            jid = self._start_job("upgrade", top, installer.UPGRADE_STEPS,
+                                  lambda step: installer.upgrade(top, branch, work_root, self.upgrades, step, token=token),
+                                  after)
         return {"job": self.import_job(jid)}
 
     async def import_commit(self, body: dict[str, Any]) -> dict[str, Any]:
         """再提交一次: the install's (or upgrade's) commit after a hook said no (the hooks run again)."""
         top = await self._import_top(body.get("path"))
         purpose, records = self._purpose(body)
+        rec = await asyncio.to_thread(records.get, top)
+        mod = inplace if (rec or {}).get("mode") == "inplace" else installer
         try:
-            got = await asyncio.to_thread(lambda: installer.commit(top, records, purpose=purpose))
+            got = await asyncio.to_thread(lambda: mod.commit(top, records, purpose=purpose))
         except importer.ImportFail as exc:
             raise self._fail(exc)
         if got["ok"]:
             await self._after_import(top, purpose)
         return scrub_tree(got, self.scrub)
+
+    async def import_merge(self, body: dict[str, Any]) -> dict[str, Any]:
+        """「合并到 <default>」: a branch install fast-forwarded into the checkout (landing.merge); a repo with a remote
+        only with confirm true."""
+        top = await self._import_top(body.get("path"))
+        purpose, records = self._purpose(body)
+        try:
+            got = await asyncio.to_thread(lambda: landing.merge(top, records, confirm=body.get("confirm") is True))
+        except importer.ImportFail as exc:
+            raise self._fail(exc)
+        await self._after_land(top)
+        return scrub_tree(got, self.scrub)
+
+    async def import_pull(self, body: dict[str, Any]) -> dict[str, Any]:
+        """「拉取」: git pull --ff-only of the default branch, after the MR was merged (landing.pull)."""
+        top = await self._import_top(body.get("path"))
+        try:
+            got = await asyncio.to_thread(landing.pull, top, self.imports)
+        except importer.ImportFail as exc:
+            raise self._fail(exc)
+        if got["ok"]:
+            await self._after_land(top)
+        return scrub_tree(got, self.scrub)
+
+    async def import_push(self, body: dict[str, Any]) -> dict[str, Any]:
+        """推送 after an in-place install or a local merge: the checkout's branch to origin, only as confirmed."""
+        top = await self._import_top(body.get("path"))
+        confirm = {k: body.get(k) for k in ("branch", "remote_url")}
+        try:
+            got = await asyncio.to_thread(inplace.push, top, confirm)
+        except importer.ImportFail as exc:
+            raise self._fail(exc)
+        return scrub_tree(got, self.scrub)
+
+    async def _after_land(self, top: str) -> None:
+        """After a merge or a pull: the list read again when the repo is listed, else the KiroCrew checks."""
+        if top in self.settings["repos"]:
+            await asyncio.to_thread(self.reload_sync)
+        else:
+            self.crew = await asyncio.to_thread(self.crew_sync)
 
     async def import_publish(self, body: dict[str, Any]) -> dict[str, Any]:
         """推送并开 MR: only with the branch, remote and target the person confirmed on the page."""
@@ -1200,7 +1329,7 @@ class Service:
                     return False, None, "kit.json 有问题：%s。改好再加" % str(exc).split("\n", 1)[0][:200]
                 return True, None, ""
             pend = importer.pending_state(top, self.imports.get(top), token=token)
-            return (True, pend, "") if pend else (False, None, "这个仓库还没装 brain-kit：先检查它，装到一个新分支上")
+            return (True, pend, "") if pend else (False, None, "这个仓库还没装 brain-kit：先检查它，装上再加入")
 
         ok, pend, why = await asyncio.to_thread(state)
         if not ok:

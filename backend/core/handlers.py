@@ -138,6 +138,21 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
     async def import_upgrade(request: Any) -> Any:
         return kit.json(await svc.import_upgrade(await kit.body(request)))
 
+    async def import_choices(request: Any) -> Any:
+        return kit.json(await svc.import_choices(await kit.body(request)))
+
+    async def import_merge(request: Any) -> Any:
+        return kit.json(await svc.import_merge(await kit.body(request)))
+
+    async def import_pull(request: Any) -> Any:
+        return kit.json(await svc.import_pull(await kit.body(request)))
+
+    async def import_push(request: Any) -> Any:
+        body = await kit.body(request)
+        if body.get("confirm") is not True:
+            raise AppError("推送要你先确认：哪个分支推到哪里", "not_confirmed")
+        return kit.json(await svc.import_push(body))
+
     async def import_job(request: Any) -> Any:
         jid = str(request.match_info.get("job", ""))
         if not re.fullmatch(r"[0-9a-f]{12}", jid):
@@ -158,6 +173,9 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
 
     async def repo_remove(request: Any) -> Any:
         return kit.json(await svc.repo_remove(await kit.body(request)))
+
+    async def me_name(request: Any) -> Any:
+        return kit.json(await svc.me_name(await kit.body(request)))
 
     async def team_loop(request: Any) -> Any:
         return kit.json(await svc.team_loop())
@@ -189,9 +207,14 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
         AppRoute("POST", "/import/clone", kit.guarded(import_clone)),
         AppRoute("POST", "/import/install", kit.guarded(import_install)),
         AppRoute("POST", "/import/upgrade", kit.guarded(import_upgrade)),
+        AppRoute("POST", "/import/choices", kit.guarded(import_choices)),
+        AppRoute("POST", "/import/merge", kit.guarded(import_merge)),
+        AppRoute("POST", "/import/pull", kit.guarded(import_pull)),
+        AppRoute("POST", "/import/push", kit.guarded(import_push)),
         AppRoute("GET", "/import/jobs/{job}", kit.guarded(import_job)),
         AppRoute("POST", "/import/commit", kit.guarded(import_commit)),
         AppRoute("POST", "/import/publish", kit.guarded(import_publish)),
         AppRoute("POST", "/import/add", kit.guarded(import_add)),
         AppRoute("POST", "/repos/remove", kit.guarded(repo_remove)),
+        AppRoute("POST", "/me/name", kit.guarded(me_name)),
     ]

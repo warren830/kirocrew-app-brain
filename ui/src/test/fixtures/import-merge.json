@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "text": "合进 main 了（快进到 d6342283）：这个仓库现在就能用。远端还没有它：要推送就点「推送」。",
+  "branch": "main",
+  "sha": "d634228300000000000000000000000000000000",
+  "removed": [
+    "工作目录 /Users/alice/workplace/brain-app/refund/_brain-install",
+    "分支 brain/install"
+  ],
+  "kept": [],
+  "remote_url": "git@gitlab.example.com:shop/refund.git",
+  "output": ""
+}

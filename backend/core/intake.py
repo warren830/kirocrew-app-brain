@@ -186,7 +186,7 @@ def brain_cmd() -> list[str]:
 def start(repo: Repo, body: dict[str, Any], work_root: str) -> dict[str, Any]:
     """``brain start`` in a new worktree (blocking: call it in a thread)."""
     out = {"ok": False, "key": None, "branch": None, "intent": None, "worktree": None, "output": "", "slot": None,
-           "url": None, "session_error": ""}
+           "url": None, "session_error": "", "problem": None, "me": None}
     b = clean_body(repo, body, start=True)
     if b["docs"] and not b["consent"]:
         raise IntakeError("门 1：确认你是作者，或已取得作者同意")

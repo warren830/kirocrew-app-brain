@@ -50,7 +50,7 @@
       "level": "FAIL",
       "label": "brain-kit",
       "why": "没装（没有 .brain/kit.json）",
-      "todo": "下面可以装到一个新分支上"
+      "todo": "下面就能装：默认直接装在当前分支并提交"
     },
     {
       "id": "lean",
@@ -79,6 +79,13 @@
       "label": "列表",
       "why": "还不在列表里",
       "todo": ""
+    },
+    {
+      "id": "me",
+      "level": "WARN",
+      "label": "你是谁",
+      "why": "brain-kit 还不知道你是谁：认领需求时要用",
+      "todo": "在下面填你的 GitLab 用户名，存进这个仓库的 git config brain.user"
     }
   ],
   "crew": {
@@ -122,6 +129,32 @@
   },
   "branch": "brain/install",
   "pending": null,
+  "install": {
+    "options": [
+      {
+        "mode": "inplace",
+        "title": "直接装在 main",
+        "ok": true,
+        "why": "",
+        "line": "装在你现在的检出里，提交在 main 上，马上能用；只提交 brain install 写的文件，你自己没提交的改动不动；不会自己推送"
+      },
+      {
+        "mode": "branch",
+        "title": "装到新分支，开 MR 给团队看",
+        "ok": true,
+        "why": "",
+        "line": "从 origin/main 建新分支，放在单独的工作目录里，不动你的检出；推送、开 MR 给团队看，合进 main 以后生效"
+      }
+    ],
+    "recommend": "branch",
+    "current": "main",
+    "target": "main",
+    "remote_url": "git@gitlab.example.com:shop/refund.git",
+    "dirty": [
+      "README.md"
+    ],
+    "overlap": []
+  },
   "origin": {
     "url": "git@gitlab.example.com:shop/refund.git",
     "base": "https://gitlab.example.com",
@@ -129,5 +162,16 @@
   },
   "default_branch": "main",
   "current_branch": "main",
+  "me": {
+    "name": null,
+    "source": "none",
+    "gitlab": "https://gitlab.example.com",
+    "text": "",
+    "ask": true,
+    "label": "你的 GitLab 用户名",
+    "why": "这个仓库用 GitLab：认领的分支 ai/<名字>/… 和交接都按这个名字认人，要和你在 GitLab 上的用户名一样",
+    "suggest": "alice",
+    "error": ""
+  },
   "error": ""
 }

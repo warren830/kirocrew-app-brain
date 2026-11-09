@@ -70,7 +70,9 @@ async def install(svc, path, kit=None, branch=None):
     if branch:
         body["branch"] = branch
     job = (await svc.import_install(body))["job"]
-    assert job["state"] == "running" and [s["id"] for s in job["steps"]] == [s for s, _ in installer.INSTALL_STEPS]
+    steps = [s["id"] for s in job["steps"]]      # a new branch (a repo with a remote), else in place
+    assert job["state"] == "running" and steps in ([s for s, _ in installer.INSTALL_STEPS],
+                                                   [s for s, _ in mod("inplace").INSTALL_STEPS])
     return await svc.wait_job(job["id"])
 
 
@@ -161,7 +163,8 @@ def test_a_plain_dirty_repo_each_check_says_why_and_the_form_is_prefilled(tmp_pa
     assert got["origin"] == {"url": "git@gitlab.example.com:grp/pay.git", "base": "https://gitlab.example.com",
                              "project": "grp/pay"}
     assert c["clean"]["level"] == "WARN" and "有 2 个改动没提交" in c["clean"]["why"] and "不会动" in c["clean"]["todo"]
-    assert c["kit"]["level"] == "FAIL" and "没装" in c["kit"]["why"] and "新分支" in c["kit"]["todo"]
+    assert c["kit"]["level"] == "FAIL" and "没装" in c["kit"]["why"] and "直接装在当前分支" in c["kit"]["todo"]
+    assert got["install"]["recommend"] == "branch"            # a remote: the new branch for an MR is recommended
     assert [c[k]["level"] for k in ("lean", "brain", "agents")] == ["FAIL"] * 3
     assert got["form"] == {"req_prefix": "PAY", "tracker": "none", "jira_base": "", "gitlab_base": "https://gitlab.example.com",
                            "gitlab_project": "grp/pay", "default_branch": "main", "team": ""}
@@ -320,7 +323,7 @@ def test_install_goes_on_a_new_branch_in_its_own_worktree_and_never_touches_the_
     assert sh("git", "-C", bare, "branch", "--list", "brain/install").stdout == ""   # nothing pushed
     assert got["next"] == "pending" and got["kit"]["state"] == "branch"
     p = got["pending"]
-    assert p["text"] == "安装在 brain/install 分支上，合并后生效" and p["branch"] == "brain/install" and not p["pushed"]
+    assert p["text"] == "装在 brain/install 分支上，还没推送：合进 main 以后生效" and p["branch"] == "brain/install" and not p["pushed"]
     assert p["remote_url"] == str(bare.resolve()) and p["target"] == "main" and p["gitlab_project"] == "grp/pay"
     assert p["commit"] == c["sha"][:12] and p["worktree"] == str(wt)
     assert checks(got)["kit"]["level"] == "WARN" and "推送并开 MR" in checks(got)["kit"]["todo"]
@@ -435,14 +438,14 @@ def test_add_installed_and_pending_repos_then_merge_and_pull(tmp_path, home):
     assert got["refused"].code == "not_installed" and "还没装 brain-kit" in str(got["refused"])
     assert got["ready"]["status"]["repos"][0]["ok"] is True
     r2 = got["pending"]["status"]["repos"][1]
-    assert got["pending"]["id"] == "r2" and "安装在 brain/install 分支上，合并后生效" in got["pending"]["text"]
+    assert got["pending"]["id"] == "r2" and "装在 brain/install 分支上，还没推送：合进 main 以后生效" in got["pending"]["text"]
     assert r2["path"] == str(repo.resolve()) and r2["ok"] is False and r2["error"] == "" and r2["kit"] is None
-    assert r2["pending"]["state"] == "branch" and r2["pending"]["text"] == "安装在 brain/install 分支上，合并后生效"
+    assert r2["pending"]["state"] == "branch" and r2["pending"]["text"] == "装在 brain/install 分支上，还没推送：合进 main 以后生效"
     assert "推送并开 MR" in r2["pending"]["next"]
     assert got["overview"]["errors"] == []                                      # pending is no error
     assert got["changed"] is True and got["pulled_seen"] is True
     m = got["merged"]["repos"][1]
-    assert m["pending"]["state"] == "merged" and "已经合并到 origin/main" in m["pending"]["text"] and "git pull" in m["pending"]["next"]
+    assert m["pending"]["state"] == "merged" and "已经合进 origin/main" in m["pending"]["text"] and "git pull" in m["pending"]["next"]
     assert got["pulled"]["repos"][1]["ok"] is True and got["pulled"]["repos"][1]["pending"] is None
 
 
@@ -515,7 +518,7 @@ def test_publish_pushes_the_branch_and_opens_the_mr_with_the_persons_token(tmp_p
     shown = json.dumps([no_token, first, again, status], ensure_ascii=False)
     assert tok not in shown and tok not in caplog.text                # ... and never shown or logged
     assert status["repos"][0]["pending"]["mr_url"] == "https://gitlab.example.com/grp/pay/-/merge_requests/7"
-    assert "审核并合并" in status["repos"][0]["pending"]["next"]
+    assert "在 GitLab 上合并 MR" in status["repos"][0]["pending"]["next"] and status["repos"][0]["pending"]["word"] == "MR 等合并"
 
 
 def test_a_push_that_fails_says_why_and_shows_the_commands(tmp_path, home, monkeypatch):

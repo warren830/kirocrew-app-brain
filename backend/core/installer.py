@@ -1,4 +1,7 @@
-"""安装到新分支, and 推送并开 MR: brain-kit into a repo that has none, without touching the person's checkout.
+"""装到新分支, and 推送并开 MR: brain-kit into a repo on a new branch, without touching the person's checkout. The
+default is to install in place (inplace.py, as brain-kit's own CLI does); this route is the one a person picks for a
+team repo (an MR) or when their uncommitted changes touch what brain install writes. landing.py gets such a branch in:
+「合并到 <default>」, 「拉取」 after the MR, and the sweep of records nothing waits for.
 
   install  a NEW branch (default brain/install) from the default branch (origin's: what GitLab has), in its own worktree
            under work_root; ``brain install`` there (brain-kit's CLI from the configured checkout, as a command with a
@@ -195,13 +198,14 @@ def install(top: str, kit: dict[str, str], branch: str, work_root: str, records:
             step: Callable[..., None]) -> dict[str, Any]:
     """brain install on a new branch in its own worktree (blocking: run it in a thread). The person's checkout, its
     branch, index and files are never touched; a failure before the commit takes back the worktree and the branch."""
-    res: dict[str, Any] = {"path": top, "branch": branch, "base": None, "base_sha": None, "worktree": None,
-                           "output": "", "kit": kit, "doctor": {"ran": False, "rows": [], "output": ""}, "files": [],
-                           "commit": {"ok": False, "sha": None, "blocked": False, "text": "", "output": ""}}
+    g = Git(top)
+    res: dict[str, Any] = {"mode": "branch", "path": top, "branch": branch, "base": None, "base_sha": None,
+                           "worktree": None, "output": "", "kit": kit, "doctor": {"ran": False, "rows": [], "output": ""},
+                           "files": [], "commit": {"ok": False, "sha": None, "blocked": False, "text": "", "output": ""},
+                           "remote_url": (origin_of(g) or {}).get("url") or "", "target": kit["default_branch"]}
     step("branch", "running")
     if not bk.ok():
         raise ImportFail("brain-kit 没装载：先在设置里写对它的位置", "no_brainkit", 409, res)
-    g = Git(top)
     if os.path.exists(os.path.join(top, KIT)):
         raise ImportFail("这个仓库已经装了 brain-kit：直接「加入列表」", "installed", 409, res)
     if g.ok("rev-parse", "-q", "--verify", "refs/heads/" + branch):
@@ -339,8 +343,8 @@ def upgrade_text(res: dict[str, Any]) -> str:
     if not c.get("ok"):
         return c.get("text") or "还没提交"
     if res.get("remote_url"):
-        return "提交在新分支 %s 上：推送并开 MR，合进 %s 以后在这个目录里 git pull" % (res["branch"], res["target"])
-    return "提交在本机分支 %s 上（这个仓库没有远端）：在本机把它合进 %s" % (res["branch"], res["target"])
+        return "提交在新分支 %s 上：推送并开 MR，合进 %s 以后点「拉取」" % (res["branch"], res["target"])
+    return "提交在本机分支 %s 上（这个仓库没有远端）：点「合并到 %s」就生效" % (res["branch"], res["target"])
 
 
 def upgrade(top: str, branch: str, work_root: str, records: Records, step: Callable[..., None], *,
@@ -349,8 +353,9 @@ def upgrade(top: str, branch: str, work_root: str, records: Records, step: Calla
     thread). *branch*: the name asked for (a taken one gets -2, -3 …); *records*: the upgrade records (upgrades.json),
     never the install ones. The person's checkout, its branch, index and files are never touched; a failure before
     the commit, or nothing to commit, takes back the worktree and the branch."""
-    res: dict[str, Any] = {"path": top, "branch": branch, "base": None, "base_sha": None, "worktree": None,
-                           "output": "", "kit": kit_form({}), "doctor": {"ran": False, "rows": [], "output": ""},
+    res: dict[str, Any] = {"mode": "branch", "path": top, "branch": branch, "base": None, "base_sha": None,
+                           "worktree": None, "output": "", "kit": kit_form({}),
+                           "doctor": {"ran": False, "rows": [], "output": ""},
                            "files": [], "commit": {"ok": False, "sha": None, "blocked": False, "text": "", "output": ""},
                            "changed": False, "remote_url": "", "target": "", "gitlab_project": "", "can_open_mr": False,
                            "text": ""}
@@ -368,7 +373,7 @@ def upgrade(top: str, branch: str, work_root: str, records: Records, step: Calla
     ref, sha = got
     res.update(base=short_ref(ref), base_sha=sha, target=d)
     if not has_at(g, sha, KIT):
-        raise ImportFail("%s 上还没有 .brain/kit.json：先在「导入仓库」里把 brain-kit 装到新分支上，合进 %s" % (short_ref(ref), d),
+        raise ImportFail("%s 上还没有 .brain/kit.json：先在「导入仓库」里装上 brain-kit" % short_ref(ref),
                          "not_installed", 409, res)
     links = symlinks_on_targets(g, sha)
     if links:
@@ -449,15 +454,30 @@ def upgrade(top: str, branch: str, work_root: str, records: Records, step: Calla
     return res
 
 
-def commit_message(kit: dict[str, str], purpose: str = "install", version: Any = None) -> tuple[str, str]:
+def commit_message(kit: dict[str, str], purpose: str = "install", version: Any = None,
+                   inplace: bool = False) -> tuple[str, str]:
+    where_zh = "在这个检出里" if inplace else "在单独的工作目录里"
+    where_en = "in place, on the checkout's branch" if inplace else "in a worktree of its own"
     if purpose == "upgrade":
         return ("Update brain-kit's kit files (brain install)",
-                "brain-kit%s 的 `brain install` 在单独的工作目录里重装了这个仓库的 kit 文件（AI-DLC Lean、KiroCrew 的 hook "
+                "brain-kit%s 的 `brain install` %s重装了这个仓库的 kit 文件（AI-DLC Lean、KiroCrew 的 hook "
                 "适配、aidlc-docs/lean.json 的 fingerprint_exclude 加上 runs/** 等）；.brain/kit.json 没动。由 Brain app "
-                "的「修复」发起。\n\nkit.json: %s" % (" " + str(version) if version else "", kit_line(kit)))
+                "的「修复」发起。\n\nkit.json: %s" % (" " + str(version) if version else "", where_zh, kit_line(kit)))
     return ("Install brain-kit (brain install)",
             "AI-DLC Lean, the KiroCrew hook adapter, .brain/kit.json, the Brain files and AGENTS.md, made by brain-kit's "
-            "`brain install` in a worktree of its own (the Brain app's 导入仓库).\n\nkit.json: %s" % kit_line(kit))
+            "`brain install` %s (the Brain app's 导入仓库).\n\nkit.json: %s" % (where_en, kit_line(kit)))
+
+
+def commit_failure(p: Any, where: str, purpose: str = "install") -> tuple[bool, str]:
+    """(a hook said no, the plain words) for a `git commit` that did not go through."""
+    low = ((p.stderr or "") + (p.stdout or "")).lower()
+    if "please tell me who you are" in low or "empty ident" in low or "unable to auto-detect email" in low:
+        return False, ("git 不知道你是谁：在终端里设好 git config --global user.name 和 user.email（这里不替你填），"
+                       "再点「再提交一次」")
+    if "nothing to commit" in low or "nothing added to commit" in low or "no changes added to commit" in low:
+        return False, (UP_TO_DATE if purpose == "upgrade" else "没有可提交的改动：brain install 什么也没写？看看 %s" % where)
+    return True, "提交被拦下了（多半是 git hook），它说：\n%s\n\n改动还在 %s 里：处理好以后点「再提交一次」。" % (
+        last_lines(tail(p), 15) or "（什么也没说，退出码 %d）" % p.returncode, where)
 
 
 def commit(top: str, records: Records, step: Callable[..., None] | None = None, *,
@@ -498,17 +518,7 @@ def commit(top: str, records: Records, step: Callable[..., None] | None = None, 
         records.update(top, commit=sha, committed_by=who)
         step("commit", "ok", out["text"])
         return out
-    low = (p.stderr + p.stdout).lower()
-    if "please tell me who you are" in low or "empty ident" in low or "unable to auto-detect email" in low:
-        out["text"] = ("git 不知道你是谁：在终端里设好 git config --global user.name 和 user.email（这里不替你填），"
-                       "再点「再提交一次」")
-    elif "nothing to commit" in low or "nothing added to commit" in low:
-        out["text"] = (UP_TO_DATE if purpose == "upgrade" else
-                       "没有可提交的改动：brain install 什么也没写？看看工作目录 %s" % wt)
-    else:
-        out["blocked"] = True
-        out["text"] = "提交被拦下了（多半是 git hook），它说：\n%s\n\n改动还在 %s 里：处理好以后点「再提交一次」。" % (
-            last_lines(out["output"], 15) or "（什么也没说，退出码 %d）" % p.returncode, wt)
+    out["blocked"], out["text"] = commit_failure(p, "工作目录 %s" % wt, purpose)
     step("commit", "fail", out["text"])
     return out
 
@@ -596,7 +606,7 @@ def publish(top: str, records: Records, confirm: dict[str, Any], *, transport: A
     rec = records.get(top)
     if not rec or not rec.get("branch"):
         raise ImportFail("这个仓库没有 app 更新 kit 文件的分支：先点「修复」" if purpose == "upgrade" else
-                         "这个仓库没有 app 装的分支：先「安装到新分支」", "no_install", 409)
+                         "这个仓库没有 app 装的分支：先装到新分支", "no_install", 409)
     if not rec.get("commit"):
         raise ImportFail("还没提交：先提交，再推送", "not_committed", 409)
     g = Git(top)

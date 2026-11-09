@@ -39,6 +39,7 @@
   "ended_at": 1794146369,
   "error": "",
   "result": {
+    "mode": "branch",
     "path": "/Users/alice/workplace/refund",
     "branch": "brain/install",
     "base": "origin/main",
@@ -220,6 +221,8 @@
       "blocked": false,
       "text": "提交了 eb43199f（作者 Alice Example <alice@example.com>）",
       "output": ""
-    }
+    },
+    "remote_url": "git@gitlab.example.com:shop/refund.git",
+    "target": "main"
   }
 }

@@ -8,12 +8,16 @@
   clone    ``git clone`` of a URL into a parent folder: no shell, no prompt (GIT_TERMINAL_PROMPT=0, askpass that
            answers nothing, ssh in batch mode, a new session so no terminal can be asked), a time limit; the usual
            failures said in plain Chinese.
-  Records  what the app installed where (``imports.json`` in its data dir), so a listed repo whose brain-kit is only on
-           the unmerged install branch shows 「安装在 brain/install 分支上，合并后生效」 instead of an error
-           (``pending_state``).
+  choices  where an install (or a kit update) goes: in place on the checkout's branch (inplace.py; the default) or a
+           new branch for an MR (installer.py; recommended for a repo with a remote), one line each, and why a way
+           cannot be taken (on no branch, in the middle of a merge or rebase, uncommitted changes in what brain install
+           writes).
+  Records  what the app installed on a branch (``imports.json`` in its data dir), so a listed repo whose brain-kit is
+           only on the unmerged install branch says what it waits for (``pending_state``: 「还没合进 main」 without a
+           remote, never 「等合并」 there; 合并到 main and 拉取 are landing.py's) instead of an error.
   Jobs     the long steps (a clone, an install) in a worker thread, their steps and result for the page to poll.
 安装到新分支 and 推送并开 MR (brain install on a new branch in its own worktree, the commit, the push and the MR) are
-installer.py's.
+installer.py's; 直接装 is inplace.py's.
 
 Every path from the page is checked: absolute, no ``..``, a real directory, no symlink on the way that the OS user could
 have made (agents run as that user; root's own aliases such as macOS's /tmp are fine), and from then on its realpath.
@@ -38,7 +42,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
-from . import bk, crewcheck, problems
+from . import bk, crewcheck, identity, problems
 from .constants import GIT_BIN
 from .repo import GIT_ENV, Git
 
@@ -447,7 +451,10 @@ class Records:
     with the same fields (and purpose "upgrade"): they never count as a pending install.
 
       branch, worktree, base (origin/main), base_sha, commit (null until committed), kit (the form's values), files,
-      doctor ({ok, warn, fail} counts), at, pushed, mr_iid, mr_url, brainkit (the version)."""
+      doctor ({ok, warn, fail} counts), at, pushed, mr_iid, mr_url, brainkit (the version).
+    mode "inplace" (inplace.install: in the checkout, on its branch): branch is the checkout's, paths the ones the install
+    wrote; kept only while a hook stops the commit (再提交一次), removed once it is committed. landing.sweep clears the
+    records nothing waits for any more."""
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -478,6 +485,16 @@ class Records:
             self._save(data)
             return rec
 
+    def remove(self, top: str) -> bool:
+        """Forget what was installed at *top* (nothing waits for it any more). False: there was no record."""
+        with self._lock:
+            data = self.all()
+            if top not in data:
+                return False
+            data.pop(top)
+            self._save(data)
+            return True
+
     def _save(self, data: dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=str(self.path.parent), prefix=".imports.")
@@ -493,30 +510,62 @@ class Records:
 
 def pending_state(top: str, rec: dict[str, Any] | None, *, token: bool = False) -> dict[str, Any] | None:
     """A repo whose checkout has no .brain/kit.json yet but will: brain-kit is on the default branch already (merged:
-    the checkout needs a pull), on the install branch the app made (or a local brain/install branch), or installed in
-    that branch's worktree and not committed yet. None: nothing of the sort."""
+    the checkout needs a pull, or to be on that branch), on the install branch the app made (or a local brain/install
+    branch: 「合并到 <default>」 when it can be fast-forwarded), or installed in that branch's worktree and not committed
+    yet. None: nothing of the sort. *word* is the short state the list shows; a repo without a remote never says it
+    waits for a merge: it says what the person can do."""
     g = Git(top)
+    rec = rec if isinstance(rec, dict) and rec.get("mode") != "inplace" else None
     kit = (rec or {}).get("kit") or {}
     d = kit.get("default_branch") or default_branch(g)[0]
     origin = origin_of(g)
     if d:
         for ref in ("refs/remotes/origin/" + d, "refs/heads/" + d):
-            if has_at(g, ref, KIT):
-                return _pending("merged", short_ref(ref), rec, origin, d, token,
-                                "已经合并到 %s：这个目录还没更新" % short_ref(ref),
-                                "在这个目录里切到 %s 并 git pull，就能用了" % d)
+            if not has_at(g, ref, KIT):
+                continue
+            short = short_ref(ref)
+            cur = g.out("symbolic-ref", "-q", "--short", "HEAD")
+            if ref.startswith("refs/remotes/") and not has_at(g, "refs/heads/" + d, KIT):
+                ok, why = pull_check(g, d)
+                p = _pending("merged", short, rec, origin, d, token, "已经合进 %s，这个目录还没更新" % short,
+                             "点「拉取」更新这个目录（git pull --ff-only）" if ok else why)
+                p.update(word="要拉取", pull={"ok": ok, "why": why})
+            elif cur != d:
+                p = _pending("merged", short, rec, origin, d, token, "已经合进 %s，这个目录在 %s 上" % (d, cur or "别的提交"),
+                             "切到 %s 就能用（git switch %s）" % (d, d))
+                p["word"] = "不在 %s 上" % d
+            else:
+                p = _pending("merged", short, rec, origin, d, token, "%s 上有 brain-kit，这个目录里少了 .brain/kit.json" % d,
+                             "在终端里 git checkout -- .brain/kit.json 拿回来")
+                p["word"] = "少了 kit.json"
+            return p
     b = (rec or {}).get("branch") or (DEFAULT_BRANCH if g.ok("rev-parse", "-q", "--verify", "refs/heads/" + DEFAULT_BRANCH)
                                        else None)
     if b and has_at(g, "refs/heads/" + b, KIT):
-        p = _pending("branch", b, rec, origin, d, token, "安装在 %s 分支上，合并后生效" % b, "")
+        ok, why = merge_check(g, b, (rec or {}).get("base_sha"), d or "")
+        p = _pending("branch", b, rec, origin, d, token, "", "")
+        tgt = d or "默认分支"
+        if origin is None:
+            text, word = "装在本机分支 %s 上，还没合进 %s" % (b, tgt), "还没合进 %s" % tgt
+            nxt = "点「合并到 %s」就能用（快进，不多一个提交）" % tgt if ok else why
+        elif p["mr_url"]:
+            text, word = "装在 %s 分支上，MR 开着：合进 %s 以后生效" % (b, tgt), "MR 等合并"
+            nxt = "在 GitLab 上合并 MR（团队的做法），合并以后点「拉取」"
+        elif p["pushed"]:
+            text, word = "装在 %s 分支上，推上去了：合进 %s 以后生效" % (b, tgt), "等开 MR"
+            nxt = "在 GitLab 上开 MR、合并；只有你一个人用的话，也可以在本机合并"
+        else:
+            text, word = "装在 %s 分支上，还没推送：合进 %s 以后生效" % (b, tgt), "还没推送"
+            nxt = "推送并开 MR 给团队看；只有你一个人用的话，也可以在本机合并"
+        p.update(text=text, next=nxt, word=word, merge={"ok": ok, "why": why, "confirm": origin is not None})
         p["commit"] = (g.out("rev-parse", "-q", "--verify", "refs/heads/%s^{commit}" % b) or "")[:12] or None
-        p["next"] = ("在 GitLab 上审核并合并 MR，然后在这个目录里 git pull" if p["mr_url"] else
-                     "推送并开 MR（在「导入仓库」里），合并以后就能用了")
         return p
     wt = (rec or {}).get("worktree")
     if b and wt and os.path.isfile(os.path.join(wt, KIT)) and g.ok("rev-parse", "-q", "--verify", "refs/heads/" + b):
-        return _pending("uncommitted", b, rec, origin, d, token, "装在 %s 分支的工作目录里，还没提交" % b,
-                        "在「导入仓库」里检查这个仓库，再提交一次")
+        p = _pending("uncommitted", b, rec, origin, d, token, "装在 %s 分支的工作目录里，还没提交" % b,
+                     "在「导入仓库」里检查这个仓库，再提交一次")
+        p["word"] = "还没提交"
+        return p
     return None
 
 
@@ -529,8 +578,171 @@ def _pending(state: str, branch: str, rec: dict[str, Any] | None, origin: dict[s
     project = kit.get("gitlab_project") or (origin or {}).get("project") or ""
     return {"state": state, "branch": branch, "worktree": wt if wt and os.path.isdir(wt) else None, "commit": None,
             "pushed": bool(rec.get("pushed")), "mr_url": rec.get("mr_url") if isinstance(rec.get("mr_url"), str) else None,
-            "text": text, "next": nxt, "target": target or "", "remote_url": (origin or {}).get("url") or "",
-            "gitlab_base": base, "gitlab_project": project, "can_open_mr": bool(token and base and project)}
+            "text": text, "next": nxt, "word": "", "target": target or "", "remote_url": (origin or {}).get("url") or "",
+            "gitlab_base": base, "gitlab_project": project, "can_open_mr": bool(token and base and project),
+            "merge": None, "pull": None}
+
+
+# ---- where an install goes: in place, or a new branch ---------------------------------------------------------- #
+
+# what `brain install` writes besides brain-kit's and Lean's kit folders (.kiro/<name>, read from the kit itself)
+WRITES = (".brain", "aidlc-docs/lean.json", "aidlc-docs/audit", "AGENTS.md", ".gitignore")
+OPS = (("MERGE_HEAD", "合并", "git merge --abort"), ("rebase-merge", "变基（rebase）", "git rebase --abort"),
+       ("rebase-apply", "变基（rebase）", "git rebase --abort"), ("CHERRY_PICK_HEAD", "cherry-pick", "git cherry-pick --abort"),
+       ("REVERT_HEAD", "revert", "git revert --abort"), ("BISECT_LOG", "二分查找（bisect）", "git bisect reset"))
+
+
+def status_map(g: Git) -> dict[str, str] | None:
+    """{path: added | modified | deleted | other} of every uncommitted change, staged or not, each untracked file on its
+    own; None when git status did not finish in time. Read only (no optional locks, no fsmonitor)."""
+    p = g.run("-c", "core.fsmonitor=false", "status", "--porcelain=v1", "-z", "--untracked-files=all",
+              timeout=STATUS_TIMEOUT_S)
+    if p.returncode != 0:
+        return None
+    return {r["path"]: r["change"] for r in _status_rows(p.stdout)}
+
+
+def tracked_changes(g: Git) -> list[str] | None:
+    """The paths with uncommitted changes to tracked files (staged or not; untracked files left out); None: unknown."""
+    p = g.run("-c", "core.fsmonitor=false", "status", "--porcelain=v1", "-z", "--untracked-files=no",
+              timeout=STATUS_TIMEOUT_S)
+    return [r["path"] for r in _status_rows(p.stdout)] if p.returncode == 0 else None
+
+
+def in_progress(g: Git) -> tuple[str, str]:
+    """(what, how to stop it) when the checkout is in the middle of a merge, rebase, cherry-pick, revert or bisect, or has
+    conflicts left; ("", "") when it is not."""
+    gd = g.out("rev-parse", "--absolute-git-dir")
+    for name, what, how in OPS if gd else ():
+        if os.path.exists(os.path.join(gd, name)):
+            return what, how
+    if g.out("diff", "--name-only", "--diff-filter=U"):
+        return "解决冲突", "先把冲突解决完"
+    return "", ""
+
+
+def write_targets(cfg: dict[str, Any] | None = None) -> list[str]:
+    """The paths `brain install` writes, as prefixes: the folders under .kiro/ that brain-kit's kit and Lean's kit ship
+    (read from brain-kit's checkout), .brain/, the Brain folder, Lean's lean.json and audit ledger, AGENTS.md, .gitignore."""
+    out = set(WRITES) | {str((cfg or {}).get("brain_dir") or "brain").strip("/") or "brain"}
+    kiro = set()
+    if bk.ok():
+        for kit in (bk.root() / "kit", bk.root() / "vendor" / "aidlc-lean" / "kit"):
+            try:
+                kiro.update(".kiro/" + n for n in os.listdir(str(kit / ".kiro")))
+            except OSError:
+                continue
+    out |= kiro or {".kiro"}
+    return sorted(out)
+
+
+def touches(path: str, targets: list[str]) -> bool:
+    """*path* (a file, or a folder git lists as one) is something `brain install` writes, or holds one."""
+    p = path.rstrip("/")
+    return any(p == t or p.startswith(t + "/") or t.startswith(p + "/") for t in targets)
+
+
+def merge_check(g: Git, branch: str, base_sha: str | None, d: str) -> tuple[bool, str]:
+    """(it can be fast-forwarded here, why not): the checkout on the default branch, no uncommitted tracked change,
+    in the middle of nothing, the default branch still where the install branch started, the branch ahead of it."""
+    if not d:
+        return False, "找不到默认分支：合并不了"
+    cur = g.out("symbolic-ref", "-q", "--short", "HEAD")
+    if cur != d:
+        return False, "你的检出在 %s 上，不在 %s：切到 %s 再合并" % (cur or "一个提交上（不在分支上）", d, d)
+    what, how = in_progress(g)
+    if what:
+        return False, "这个检出正在%s的中间：先做完或放弃（%s），再合并" % (what, how)
+    dirty = tracked_changes(g)
+    if dirty is None:
+        return False, "看不出有没有没提交的改动（git status 没在 %d 秒内结束）" % STATUS_TIMEOUT_S
+    if dirty:
+        return False, "你的检出有没提交的改动（%s）：先提交或收起来（git stash），再合并" % _names(dirty)
+    head = g.out("rev-parse", "-q", "--verify", "HEAD^{commit}")
+    tip = g.out("rev-parse", "-q", "--verify", "refs/heads/%s^{commit}" % branch)
+    if not tip:
+        return False, "分支 %s 不在了" % branch
+    if base_sha and head != base_sha:
+        if g.ok("merge-base", "--is-ancestor", head, base_sha):
+            return False, "本机的 %s 比装的时候用的旧（装时是 %s）：先拉取，再合并" % (d, base_sha[:8])
+        return False, "%s 在装的时候是 %s，后来有了新提交（现在是 %s）：快进不了。可以直接装在 %s 上" % (
+            d, base_sha[:8], head[:8], d)
+    if not g.ok("merge-base", "--is-ancestor", head, tip):
+        return False, "%s 和 %s 分开了：快进不了" % (d, branch)
+    return True, ""
+
+
+def pull_check(g: Git, d: str) -> tuple[bool, str]:
+    """(git pull --ff-only can run here, why not): an origin, the checkout on the default branch, clean, in the middle
+    of nothing."""
+    if origin_of(g) is None:
+        return False, "没有 origin：拉取不了"
+    cur = g.out("symbolic-ref", "-q", "--short", "HEAD")
+    if cur != d:
+        return False, "你的检出在 %s 上，不在 %s：切到 %s 再拉取" % (cur or "一个提交上（不在分支上）", d, d)
+    what, how = in_progress(g)
+    if what:
+        return False, "这个检出正在%s的中间：先做完或放弃（%s），再拉取" % (what, how)
+    dirty = tracked_changes(g)
+    if dirty:
+        return False, "你的检出有没提交的改动（%s）：先提交或收起来（git stash），再拉取" % _names(dirty)
+    return (False, "看不出有没有没提交的改动（git status 没在 %d 秒内结束）" % STATUS_TIMEOUT_S) if dirty is None else (True, "")
+
+
+def _names(paths: list[str], n: int = 3) -> str:
+    return "、".join(paths[:n]) + (" 等 %d 个" % len(paths) if len(paths) > n else "")
+
+
+def choices(top: str, *, purpose: str = "install", cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Where an install (purpose "install") or a kit update ("upgrade") goes, as two options with one plain line each.
+
+    In place (the default, as brain-kit's own CLI does it): in the checkout, on its branch, committed there; not when the
+    checkout is on no branch, is in the middle of a merge or rebase, or has uncommitted changes that touch what brain
+    install writes (then only the install's own paths would be committed, and the person's changes stay as they are).
+    A new branch (and an MR) is offered when the checkout has uncommitted changes or the repo has a remote, and it is
+    the recommended one for a repo with a remote (a team repo: its default branch is usually protected) or when in
+    place cannot be done. Read only."""
+    g = Git(top)
+    cur = g.out("symbolic-ref", "-q", "--short", "HEAD") or None
+    d = str((cfg or {}).get("default_branch") or "") or (default_branch(g)[0] or "")
+    origin = origin_of(g)
+    rows = status_map(g)
+    dirty = sorted(rows or {})
+    targets = write_targets(cfg)
+    overlap = [p for p in dirty if touches(p, targets)]
+    what, how = in_progress(g)
+    if rows is None:
+        why = "看不出有没有没提交的改动（git status 没在 %d 秒内结束）" % STATUS_TIMEOUT_S
+    elif what:
+        why = "检出正在%s的中间：先做完或放弃（%s）" % (what, how)
+    elif not cur:
+        why = "检出现在不在任何分支上（detached HEAD）：先切到一个分支"
+    elif overlap:
+        why = "你没提交的改动碰到了 brain install 要写的文件（%s）：直接装会混在一起" % _names(overlap)
+    else:
+        why = ""
+    upgrade = purpose == "upgrade"
+    verb = "更新" if upgrade else "装"
+    line = "%s在你现在的检出里，提交在 %s 上，%s" % (verb, cur or "当前分支", "马上生效" if upgrade else "马上能用")
+    if cur and d and cur != d:
+        line += "（%s 不是默认分支 %s：合进 %s 以后，app 给需求建的工作目录里才有）" % (cur, d, d)
+    if dirty and not overlap:
+        line += "；只提交 brain install 写的文件，你自己没提交的改动不动"
+    if origin is not None:
+        line += "；不会自己推送"
+    base = "origin/" + d if origin is not None and d else (d or "默认分支")
+    options = [{"mode": "inplace", "title": "直接%s在 %s" % (verb, cur) if cur else "直接%s在当前分支" % verb,
+                "line": line, "ok": not why, "why": why}]
+    if origin is not None or dirty or why:
+        options.append({"mode": "branch",
+                        "title": ("%s新分支，开 MR 给团队看" % ("更新到" if upgrade else "装到")) if origin is not None else
+                        ("%s新分支" % ("更新到" if upgrade else "装到")),
+                        "line": "从 %s 建新分支，放在单独的工作目录里，不动你的检出；%s" % (
+                            base, "推送、开 MR 给团队看，合进 %s 以后生效" % (d or "默认分支") if origin is not None else
+                            "在本机合进 %s 以后生效（「合并到 %s」）" % (d or "默认分支", d or "默认分支")),
+                        "ok": True, "why": ""})
+    return {"options": options, "recommend": "inplace" if not why and origin is None else "branch", "current": cur,
+            "target": d, "remote_url": (origin or {}).get("url") or "", "dirty": dirty[:10], "overlap": overlap[:10]}
 
 
 # ---- 检查 (read only) ----------------------------------------------------------------------------------------------- #
@@ -543,7 +755,7 @@ def blank_inspect(raw: Any) -> dict[str, Any]:
     return {"input": raw if isinstance(raw, str) else "", "path": None, "note": "", "checks": [],
             "crew": {"rows": [], "fix": {"agent": False, "engine": False}}, "next": "fix", "listed": None,
             "kit": {"state": "none", "values": None}, "form": None, "branch": DEFAULT_BRANCH, "pending": None,
-            "origin": None, "default_branch": None, "current_branch": None, "error": ""}
+            "install": None, "origin": None, "default_branch": None, "current_branch": None, "me": None, "error": ""}
 
 
 def kit_view(cfg: dict[str, Any]) -> dict[str, str]:
@@ -687,7 +899,7 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
         checks.append(row("kit", "FAIL", "brain-kit", "没装（没有 .brain/kit.json），app 现在也没装载 brain-kit，装不了",
                           "先在设置里写对 brain-kit 的位置"))
     else:
-        checks.append(row("kit", "FAIL", "brain-kit", "没装（没有 .brain/kit.json）", "下面可以装到一个新分支上"))
+        checks.append(row("kit", "FAIL", "brain-kit", "没装（没有 .brain/kit.json）", "下面就能装：默认直接装在当前分支并提交"))
         got = base_ref(g, d) if d else None
         links = symlinks_on_targets(g, got[1]) if got else []
         if links:
@@ -707,6 +919,13 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
     rid = listed_id(top, listed)
     out["listed"] = rid
     checks.append(row("listed", "OK", "列表", "已经在列表里（%s）" % rid if rid else "还不在列表里"))
+    # who brain-kit will say the person is here (kit.json's GitLab, or the form's guess before an install)
+    base = ((out["kit"]["values"] or {}) if out["kit"]["state"] == "checkout" else form_defaults(top, origin, d)).get(
+        "gitlab_base") or ""
+    me = out["me"] = identity.of(top, base, token=token)
+    checks.append(row("me", "OK", "你是谁", me["text"]) if me["name"] or me["source"] == "token" else
+                  row("me", "WARN", "你是谁", me["error"] or "brain-kit 还不知道你是谁：认领需求时要用",
+                      "在下面填%s，存进这个仓库的 git config brain.user" % me["label"] if me["ask"] else ""))
     def crew_rows() -> dict[str, Any]:
         team = None if team_of is None else ([top] if cfg and team_of(top, cfg) else [])
         return crewcheck.checks([top] if cfg else [], team_paths=team)
@@ -716,14 +935,15 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
     out["crew"] = {"rows": list(crew.get("rows") or []), "fix": dict(crew.get("fix") or {"agent": False, "engine": False})}
     out["form"] = form_defaults(top, origin, d)
     out["pending"] = pend
-    if rid:
+    if out["kit"]["state"] == "none" and bk.ok() and not pend:
+        out["next"] = "install"          # listed or not: it has no brain-kit yet
+        out["install"] = choices(top)
+    elif rid:
         out["next"] = "listed"
     elif out["kit"]["state"] == "checkout":
         out["next"] = "add"
     elif pend:
         out["next"] = "pending"
-    elif out["kit"]["state"] == "none" and bk.ok():
-        out["next"] = "install"
     return out
 
 

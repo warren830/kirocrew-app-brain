@@ -62,10 +62,12 @@ def started(svc, coro_fn):
     return run(go())
 
 
-async def upgrade(svc, path, branch=None):
+async def upgrade(svc, path, branch=None, mode=None):
     body = {"path": str(path)}
     if branch:
         body["branch"] = branch
+    if mode:
+        body["mode"] = mode
     job = (await svc.import_upgrade(body))["job"]
     assert job["kind"] == "upgrade" and job["state"] == "running"
     assert [s["id"] for s in job["steps"]] == [s for s, _ in installer.UPGRADE_STEPS]
@@ -127,7 +129,7 @@ def test_the_kit_fix_reinstalls_on_a_new_branch_and_never_touches_the_checkout(t
     assert r["kit"]["req_prefix"] == "PAY" and r["kit"]["default_branch"] == "main"
     assert (r["remote_url"], r["target"], r["gitlab_project"], r["can_open_mr"]) == (
         str((tmp_path / "pay-origin.git").resolve()), "main", "grp/pay", False)
-    assert r["text"] == "提交在新分支 brain/upgrade-kit 上：推送并开 MR，合进 main 以后在这个目录里 git pull"
+    assert r["text"] == "提交在新分支 brain/upgrade-kit 上：推送并开 MR，合进 main 以后点「拉取」"
     assert r["doctor"]["rows"] and all(set(x) == {"level", "text", "todo", "fix", "repo", "raw"} for x in r["doctor"]["rows"])
     paths = {f["path"] for f in r["files"]}
     assert "aidlc-docs/lean.json" in paths and (ADAPTER in paths) == HAS_VERSION_CHECK
@@ -172,14 +174,15 @@ def test_the_kit_fix_reinstalls_on_a_new_branch_and_never_touches_the_checkout(t
     assert checkout_state(repo) == before
 
 
-def test_without_a_remote_the_commit_is_on_a_local_branch_and_the_text_says_so(tmp_path, home):
+def test_without_a_remote_a_branch_update_is_on_a_local_branch_and_the_text_says_how_it_gets_in(tmp_path, home):
+    """(Without a remote the default is in place, test_inplace.py; a person may still pick the branch.)"""
     repo = older_kit(tmp_path, origin=False)
     before = checkout_state(repo)
     svc = make_service(tmp_path, [repo])
-    done = started(svc, lambda: upgrade(svc, repo))
+    done = started(svc, lambda: upgrade(svc, repo, mode="branch"))
     r = done["result"]
     assert done["state"] == "done" and r["commit"]["ok"] and r["base"] == "main" and r["remote_url"] == ""
-    assert r["text"] == "提交在本机分支 brain/upgrade-kit 上（这个仓库没有远端）：在本机把它合进 main"
+    assert r["mode"] == "branch" and r["text"] == "提交在本机分支 brain/upgrade-kit 上（这个仓库没有远端）：点「合并到 main」就生效"
     assert r["can_open_mr"] is False and "runs/**" in lean_json_at(repo, "brain/upgrade-kit")["fingerprint_exclude"]
     assert checkout_state(repo) == before
 

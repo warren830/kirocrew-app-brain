@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "text": "拉取了 origin/main：brain-kit 到了，这个仓库现在就能用",
+  "output": "From gitlab.example.com:shop/refund\n * branch            main       -> FETCH_HEAD\nUpdating 04174d9..d634228\nFast-forward",
+  "removed": [],
+  "kept": []
+}

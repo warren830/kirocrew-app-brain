@@ -33,6 +33,7 @@
   "ended_at": 1794146504,
   "error": "",
   "result": {
+    "mode": "branch",
     "path": "/Users/alice/workplace/shop-pay",
     "branch": "brain/upgrade-kit",
     "base": "origin/main",
@@ -184,6 +185,6 @@
     "target": "main",
     "gitlab_project": "shop/shop-pay",
     "can_open_mr": true,
-    "text": "提交在新分支 brain/upgrade-kit 上：推送并开 MR，合进 main 以后在这个目录里 git pull"
+    "text": "提交在新分支 brain/upgrade-kit 上：推送并开 MR，合进 main 以后点「拉取」"
   }
 }

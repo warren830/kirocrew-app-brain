@@ -93,13 +93,15 @@ def test_the_backend_answers_with_the_fixtures_keys(tmp_path, home):
 
 def test_the_import_routes_answer_with_the_fixtures_keys(tmp_path, home, monkeypatch):
     """导入仓库's answers (ui/src/test/fixtures/import-*.json): defaults, a 检查 before and after the install (pending),
-    the clone and install jobs as the page polls them, the push and MR (a fake GitLab, a token made at run time), and
-    the kit fix's job (POST /import/upgrade) on a repo whose kit on main is older."""
+    the clone and install jobs as the page polls them (on a new branch, and in place), the push and MR (a fake GitLab, a
+    token made at run time), 「合并到 main」, 「拉取」, 推送, the choices of a kit update, and the kit fix's job (POST
+    /import/upgrade) on a repo whose kit on main is older."""
     import secrets
 
     from test_import import KIT, FakeGitLab, plain_repo
     from test_upgrade import older_kit
     repo, bare = plain_repo(tmp_path, "refund")
+    team, _ = plain_repo(tmp_path, "orders")
     shop = older_kit(tmp_path, name="shop")
     svc = make_service(tmp_path, [], transport=FakeGitLab())
 
@@ -117,6 +119,13 @@ def test_the_import_routes_answer_with_the_fixtures_keys(tmp_path, home, monkeyp
             monkeypatch.setenv("GITLAB_TOKEN", "fake-" + secrets.token_hex(8))
             out["import-publish.json"] = await svc.import_publish({"path": str(repo), "branch": p["branch"],
                                                                    "target": p["target"], "remote_url": p["remote_url"]})
+            out["import-merge.json"] = await svc.import_merge({"path": str(repo), "confirm": True})
+            out["import-push.json"] = await svc.import_push({"path": str(repo), "branch": "main",
+                                                             "remote_url": p["remote_url"]})
+            out["import-pull.json"] = await svc.import_pull({"path": str(repo)})
+            job = (await svc.import_install({"path": str(team), "kit": KIT, "mode": "inplace"}))["job"]
+            out["import-inplace-job.json"] = await svc.wait_job(job["id"])
+            out["import-choices.json"] = await svc.import_choices({"path": str(shop), "purpose": "upgrade"})
             job = (await svc.import_upgrade({"path": str(shop)}))["job"]
             out["import-upgrade-job.json"] = await svc.wait_job(job["id"])
             return out
@@ -126,6 +135,9 @@ def test_the_import_routes_answer_with_the_fixtures_keys(tmp_path, home, monkeyp
     got = run(go())
     assert got["import-job.json"]["state"] == "done" and got["import-publish.json"]["mr"]
     assert got["import-upgrade-job.json"]["state"] == "done" and got["import-upgrade-job.json"]["result"]["changed"]
+    assert got["import-merge.json"]["ok"] and got["import-push.json"]["pushed"] and got["import-pull.json"]["ok"]
+    assert got["import-inplace-job.json"]["result"]["mode"] == "inplace" and got["import-choices.json"]["options"]
+    assert got["import-inspect.json"]["install"] and got["import-inspect-pending.json"]["pending"]["merge"]
     problems = []
     for name, real in got.items():
         problems += ["%s %s" % (name, p) for p in diff_keys(fixture(name), json.loads(json.dumps(real)))]

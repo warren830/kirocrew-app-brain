@@ -1,6 +1,7 @@
 """What brain-kit (and the app's own checks) say, as a person reads it: plain short Chinese, one 做什么 line, the
 one-click fix when the app has one, and brain-kit's own words kept (``raw``: the page shows them folded, for
-debugging). Pure: no I/O, no brain-kit import; the patterns are brain-kit 48b6b97's and d46765f's strings.
+debugging). Pure: no I/O, no brain-kit import; the patterns are brain-kit 48b6b97's and d46765f's strings (and
+91e2fee's words for who the person is).
 
 A CheckRow is ``{"level", "text", "todo", "fix", "repo", "raw"}``:
 
@@ -8,7 +9,9 @@ A CheckRow is ``{"level", "text", "todo", "fix", "repo", "raw"}``:
   text   what is wrong (or right), short; code names (`brain-dev.json`, `lean.json`, `runs/**`) are fine
   todo   做什么, one line ('' for an OK row, or when there is nothing to do)
   fix    'agent' (add Lean's hooks to ~/.kiro/agents/brain-dev.json), 'engine' (kirocrew engine kas), 'kit'
-         (reinstall brain-kit onto a new branch of the repo, POST /import/upgrade), or None
+         (reinstall brain-kit and commit it, POST /import/upgrade: in the checkout on its branch by default, or on a
+         new branch for an MR), 'me' (the name brain-kit goes by in the repo: the page's input, POST /me/name, which
+         sets git config brain.user there), or None
   repo   the repo path the row is about (None: machine-wide)
   raw    the original text ('' when the row is the app's own words and there is nothing more to show)
 
@@ -24,12 +27,14 @@ import re
 from typing import Any, Iterable
 
 LEVELS = ("OK", "WARN", "FAIL")
-FIXES = ("agent", "engine", "kit")
+FIXES = ("agent", "engine", "kit", "me")
+ME_TODO = "在下面填上，存进这个仓库的 git config brain.user"
+ME_GITLAB = "要你在 GitLab 上的用户名：认领的分支 ai/<名字>/… 和交接都按它认人。" + ME_TODO + "（或者设好 GITLAB_TOKEN）"
 AGENT_OK = "brain-dev 带着 Lean 的三个 hook"   # crewcheck.agent_ok accepts the OK row whose text starts with it
 TRIGGER_NAMES = {"agentSpawn": "会话开始", "userPromptSubmit": "发消息", "preToolUse": "调用工具前"}
 EVENT_TRIGGER = {"SessionStart": "agentSpawn", "UserPromptSubmit": "userPromptSubmit", "PreToolUse": "preToolUse"}
 
-REINSTALL = "点「修复」：在新分支上重装 brain-kit 并提交，再经 MR 合进默认分支"
+REINSTALL = "点「修复」：重装 brain-kit 并提交（默认直接在当前分支上，团队仓库可以选新分支开 MR）"
 LOCAL_ONLY = "只有把需求交给运行机时才要紧"
 GENERIC_TEXT = {"FAIL": "brain-kit 报了一个问题", "WARN": "brain-kit 提醒了一件事", "OK": "brain-kit：这项通过"}
 GENERIC_TODO = {"FAIL": "看下面 brain-kit 的原话；看不懂就问维护 brain-kit 的人",
@@ -90,7 +95,7 @@ RULES: list[Rule] = [
     Rule(r"^(?P<path>\S+) is an older adapter \(version (?P<have>\d+), needs (?P<need>\d+)\)",
          "{path} 是旧版（第 {have} 版，要第 {need} 版）",
          "运行机上的 run 停下来问人时写不了 park.json。" + REINSTALL, "kit", runner=True,
-         local=LOCAL_ONLY + "（运行机靠新版停下来问人）。要交的话点「修复」：在新分支上重装 brain-kit"),
+         local=LOCAL_ONLY + "（运行机靠新版停下来问人）。要交的话点「修复」：重装 brain-kit"),
     # cli.runner_kit_problems: Lean / the adapter only on this disk, not in git (worktrees are made from main)
     Rule(r"^(?P<path>\S+) is not committed: AI-DLC Lean;", "AI-DLC Lean 没提交到 git",
          "app 的工作目录从默认分支建，没提交的 Lean 不在里面。" + REINSTALL, "kit"),
@@ -160,6 +165,15 @@ RULES: list[Rule] = [
          lambda g, lv: "KiroCrew 引擎：%s" % ("默认（kas）" if g["be"].startswith("default") else "kas")),
     Rule(r"^KiroCrew engine: (?P<be>\S+)", "KiroCrew 引擎是 {be}，不是 kas",
          "点「修复」设成 kas：Lean 的 hook 只在 kas（v3）上测过", "engine"),
+    # cli._me: brain-kit does not know who the person is (48b6b97's words, and the ones after it)
+    Rule(r"^who are you\? this repo uses GitLab \((?P<base>[^)]*)\)", "brain-kit 不知道你是谁：这个仓库用 GitLab（{base}）",
+         ME_GITLAB, "me"),
+    Rule(r"^who are you\? your login name is not usable", "brain-kit 不知道你是谁：这台机器的登录名不能当名字",
+         "写一个名字（小写字母、数字、. _ -）。" + ME_TODO, "me"),
+    Rule(r"^who are you\?", "brain-kit 不知道你是谁",
+         "填上你的名字（用 GitLab 的仓库填 GitLab 用户名）。" + ME_TODO, "me"),
+    Rule(r"^brain\.user '?(?P<u>.*?)'? is not a GitLab username", "git config brain.user（{u}）不能当名字用",
+         "改成你在 GitLab 上的用户名（小写字母、数字、. _ -）。" + ME_TODO, "me"),
     # brain: BrainError as `brain` prints it for a refused hand-over (cmd_handoff)
     Rule(r"^not handed over: Lean would refuse this run's RELEASE approval later", "没交出去：Lean 把 runs/ 下的记录算成代码",
          "点「修复」：重装会把 runs/** 加进 aidlc-docs/lean.json（由人看过再合并），再交接", "kit"),
@@ -196,10 +210,20 @@ def row(level: Any, raw: Any, *, repo: str | None = None, team: bool | None = No
             elif level_now == "WARN":
                 level_now = "FAIL"
         fix = r.fix if level_now != "OK" else None
-        if fix == "kit" and not repo:
+        if fix in ("kit", "me") and not repo:
             fix = None
         return mk(level_now, text, todo, fix, repo, s)
     return fallback(lv, s, repo=repo)
+
+
+def who_row(output: Any, *, repo: str | None = None) -> dict[str, Any] | None:
+    """The line of brain's *output* that says brain-kit does not know who the person is, as a FAIL row with the 'me'
+    fix; None when there is none."""
+    for line in str(output or "").splitlines():
+        r = row("FAIL", line, repo=repo)
+        if r["fix"] == "me":
+            return r
+    return None
 
 
 def fallback(level: Any, raw: str, *, repo: str | None = None, todo: str = "") -> dict[str, Any]:

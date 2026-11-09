@@ -79,6 +79,13 @@
       "label": "列表",
       "why": "还不在列表里",
       "todo": ""
+    },
+    {
+      "id": "me",
+      "level": "WARN",
+      "label": "你是谁",
+      "why": "brain-kit 还不知道你是谁：认领需求时要用",
+      "todo": "在下面填你的 GitLab 用户名，存进这个仓库的 git config brain.user"
     }
   ],
   "crew": {
@@ -128,14 +135,22 @@
     "commit": "eb43199fe3ac",
     "pushed": false,
     "mr_url": null,
-    "text": "安装在 brain/install 分支上，合并后生效",
-    "next": "推送并开 MR（在「导入仓库」里），合并以后就能用了",
+    "text": "装在 brain/install 分支上，还没推送：合进 main 以后生效",
+    "next": "推送并开 MR 给团队看；只有你一个人用的话，也可以在本机合并",
+    "word": "还没推送",
     "target": "main",
     "remote_url": "git@gitlab.example.com:shop/refund.git",
     "gitlab_base": "https://gitlab.example.com",
     "gitlab_project": "shop/refund",
-    "can_open_mr": true
+    "can_open_mr": true,
+    "merge": {
+      "ok": true,
+      "why": "",
+      "confirm": true
+    },
+    "pull": null
   },
+  "install": null,
   "origin": {
     "url": "git@gitlab.example.com:shop/refund.git",
     "base": "https://gitlab.example.com",
@@ -143,5 +158,16 @@
   },
   "default_branch": "main",
   "current_branch": "main",
+  "me": {
+    "name": null,
+    "source": "none",
+    "gitlab": "https://gitlab.example.com",
+    "text": "",
+    "ask": true,
+    "label": "你的 GitLab 用户名",
+    "why": "这个仓库用 GitLab：认领的分支 ai/<名字>/… 和交接都按这个名字认人，要和你在 GitLab 上的用户名一样",
+    "suggest": "alice",
+    "error": ""
+  },
   "error": ""
 }

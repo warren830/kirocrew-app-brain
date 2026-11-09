@@ -423,7 +423,7 @@
   "errors": [
     {
       "repo": "r2",
-      "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装到一个新分支上"
+      "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用"
     }
   ],
   "cto": {
