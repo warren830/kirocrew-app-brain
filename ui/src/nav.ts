@@ -157,3 +157,9 @@ export function searchOf(v: View): string {
 export function fileOfEntry(id: string): BrainFile | undefined {
   return ({ P: 'PRODUCT', T: 'TECH', I: 'IMPROVEMENT', J: 'PROJECT' } as Record<string, BrainFile>)[id.charAt(0)]
 }
+
+/** Each view's name, the one a crumb and ← 返回 say for the view a page was opened from (UI问题清单 REST-16, 17). */
+export const VIEW_NAME: Record<ViewKind, string> = {
+  overview: '交付总览', item: '需求详情', board: '需求看板', new: '开需求', brain: 'Brain', todo: '待办', team: '运行机',
+  settings: '设置', import: '导入仓库',
+}
