@@ -72,7 +72,7 @@
       "icon": "laptop",
       "status": "awaiting_approval",
       "doing": "会话里有一个工具调用等你批准",
-      "since": 1794146400,
+      "since": 1794146040.0,
       "history": [
         {
           "at": 1794045600.0,
@@ -90,6 +90,16 @@
           "doing": "交给你批准需求"
         },
         {
+          "at": 1794048720,
+          "status": "running",
+          "doing": "批准了，接着做"
+        },
+        {
+          "at": 1794048780,
+          "status": "running",
+          "doing": "做完需求分析"
+        },
+        {
           "at": 1794048900,
           "status": "running",
           "doing": "在做：应用设计"
@@ -98,6 +108,16 @@
           "at": 1794051360,
           "status": "done",
           "doing": "交给你批准设计"
+        },
+        {
+          "at": 1794052860,
+          "status": "running",
+          "doing": "批准了，接着做"
+        },
+        {
+          "at": 1794052920,
+          "status": "running",
+          "doing": "做完应用设计"
         },
         {
           "at": 1794053100,
@@ -115,7 +135,7 @@
           "doing": "交给你批准代码生成计划"
         },
         {
-          "at": 1794146400,
+          "at": 1794146040.0,
           "status": "awaiting_approval",
           "doing": "会话里有一个工具调用等你批准"
         }
@@ -127,18 +147,18 @@
           "kind": "work"
         },
         {
-          "a": 1794048900,
+          "a": 1794048720,
           "b": 1794051360,
           "kind": "work"
         },
         {
-          "a": 1794053100,
+          "a": 1794052860,
           "b": 1794145200.0,
           "kind": "work"
         },
         {
           "a": 1794145200.0,
-          "b": 1794146040,
+          "b": null,
           "kind": "wait"
         }
       ],
@@ -151,7 +171,7 @@
         {
           "at": 1794049800,
           "kind": "blocked",
-          "title": "Lean 拦下了写 src/refund/service.py（inception）"
+          "title": "Lean 拦下了写 src/refund/service.py：需求和设计还没批"
         },
         {
           "at": 1794055440.0,
@@ -170,7 +190,7 @@
         }
       ],
       "facts": [
-        "Lean 做完 8/11 个阶段",
+        "Lean 做完 8 · 下一步：代码生成",
         "提交 3 次",
         "Lean 拦下 1 次",
         "会话 1 个"
@@ -214,7 +234,7 @@
         {
           "at": 1794047460,
           "kind": "request",
-          "title": "请你批准需求（REQUIREMENTS · c68b048b）"
+          "title": "请你批准需求"
         },
         {
           "at": 1794048720,
@@ -236,8 +256,13 @@
       "icon": "design",
       "status": "awaiting_approval",
       "doing": "等你批准代码生成计划",
-      "since": 1794146040,
+      "since": 1794146040.0,
       "history": [
+        {
+          "at": 1794048720,
+          "status": "waiting",
+          "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+        },
         {
           "at": 1794051360,
           "status": "awaiting_approval",
@@ -254,12 +279,12 @@
           "doing": "等你批准代码生成计划"
         },
         {
-          "at": 1794052860,
+          "at": 1794052860.0,
           "status": "merged",
           "doing": "已批准"
         },
         {
-          "at": 1794146040,
+          "at": 1794146040.0,
           "status": "awaiting_approval",
           "doing": "等你批准代码生成计划"
         }
@@ -280,7 +305,7 @@
         {
           "at": 1794051360,
           "kind": "request",
-          "title": "请你批准设计（DESIGN · 7e242934）"
+          "title": "请你批准设计"
         },
         {
           "at": 1794052860,
@@ -290,12 +315,12 @@
         {
           "at": 1794146040,
           "kind": "request",
-          "title": "请你批准代码生成计划（PLAN · 5d1e7a90）"
+          "title": "请你批准代码生成计划"
         }
       ],
       "facts": [
         "请求批准 2 次",
-        "approve 那一行在会话里自己打"
+        "批准的那一行由人在会话里自己打"
       ],
       "credits": null,
       "session": null,
@@ -307,7 +332,7 @@
       "sub": "brain handoff",
       "icon": "handover",
       "status": "waiting",
-      "doing": "等本机做完再 brain handoff",
+      "doing": "等本机做完再交接",
       "since": null,
       "history": [],
       "spans": [],
@@ -362,9 +387,7 @@
       "history": [],
       "spans": [],
       "marks": [],
-      "facts": [
-        "停下问人 0 次"
-      ],
+      "facts": [],
       "credits": null,
       "session": null,
       "line": null
@@ -480,7 +503,7 @@
       "kind": "start",
       "from": "person",
       "to": "local",
-      "text": "开工：brain start，在它自己的工作目录里",
+      "text": "开工：在它自己的工作目录里",
       "detail": false,
       "src": "runs/PAY-3/run.json"
     },
@@ -520,7 +543,7 @@
       "kind": "request",
       "from": "local",
       "to": "req",
-      "text": "请你批准需求（REQUIREMENTS · c68b048b）",
+      "text": "请你批准需求",
       "detail": false,
       "src": null
     },
@@ -570,7 +593,7 @@
       "kind": "blocked",
       "from": "local",
       "to": "local",
-      "text": "Lean 拦下了写 src/refund/service.py（inception）",
+      "text": "Lean 拦下了写 src/refund/service.py：需求和设计还没批",
       "detail": true,
       "src": null
     },
@@ -580,7 +603,7 @@
       "kind": "request",
       "from": "local",
       "to": "design",
-      "text": "请你批准设计（DESIGN · 7e242934）",
+      "text": "请你批准设计",
       "detail": false,
       "src": null
     },
@@ -670,7 +693,7 @@
       "kind": "request",
       "from": "local",
       "to": "design",
-      "text": "请你批准代码生成计划（PLAN · 5d1e7a90）",
+      "text": "请你批准代码生成计划",
       "detail": false,
       "src": null
     }
@@ -713,7 +736,7 @@
         "id": "gate-REQUIREMENTS",
         "group": "gate",
         "label": "需求",
-        "name": "需求审批（REQUIREMENTS）",
+        "name": "需求审批",
         "status": "pass",
         "at": 1794048720,
         "detail": "你批准了",
@@ -723,7 +746,7 @@
         "id": "gate-DESIGN",
         "group": "gate",
         "label": "设计",
-        "name": "设计审批（DESIGN）",
+        "name": "设计审批",
         "status": "pass",
         "at": 1794052860,
         "detail": "你批准了",
@@ -733,17 +756,17 @@
         "id": "gate-PLAN",
         "group": "gate",
         "label": "计划",
-        "name": "代码生成计划（PLAN）",
+        "name": "代码生成计划审批",
         "status": "wait",
         "at": null,
-        "detail": "等你批准：在会话里打 approve PLAN 5d1e7a90",
+        "detail": "等你在会话里打这一行批准：approve PLAN 5d1e7a90",
         "actor": "design"
       },
       {
         "id": "gate-RELEASE",
         "group": "gate",
         "label": "发布",
-        "name": "发布审批（RELEASE）",
+        "name": "发布审批",
         "status": "skip",
         "at": null,
         "detail": "还没到这一步",
@@ -793,9 +816,12 @@
     "passed": 2,
     "failed": 1,
     "total": 4,
+    "todo": [
+      "发布审批",
+      "verify"
+    ],
     "at": 1794052860,
-    "history": [],
-    "todo": []
+    "history": []
   },
   "accept": {
     "state": "not_yet",
@@ -823,7 +849,7 @@
         "count": 1
       }
     ],
-    "checks": "检查 2/4 通过；需求、设计已批准",
+    "checks": "检查 2/4 过 · 没过：引用的 Brain 条目 · 等人：代码生成计划审批 · 还剩 发布审批、verify",
     "done": null
   },
   "brain": {
