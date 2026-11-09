@@ -104,7 +104,8 @@ def test_team_states_from_the_ledger():
              ({"state": "dispatched"}, [{"id": "D-5", "state": "delivered", "kind": "clarify"}], None, "running", "runner"),
              ({"state": "dispatched"}, [], waiting, "parked", "bridge"),
              ({"state": "send_unknown", "slot": "run-pay-1-1"}, [], None, "running", "people"),
-             ({"state": "failed"}, [], None, "rejected", "people"), ({"state": "closed"}, [], None, "merged", "nobody")]
+             ({"state": "failed"}, [], None, "rejected", "people"), ({"state": "closed"}, [], None, "closed", "nobody"),
+             ({"state": "merged"}, [{"id": "D-2", "state": "delivered", "kind": "acceptance"}], None, "merged", "nobody")]
     for run_row, decs, park, want, who in cases:
         r = row()
         deliveries.team_classify(r, run_row, decs, park)
@@ -115,6 +116,9 @@ def test_team_states_from_the_ledger():
     r = row()
     deliveries.team_classify(r, {"state": "dispatched"}, [{"id": "D-5", "state": "refused"}], None)
     assert "签名服务不签" in r["waits"]["text"] and "D-5" in r["waits"]["text"]
+    r = row()
+    deliveries.team_classify(r, {"state": "merged"}, [], None)
+    assert (r["state_label"], r["waits"]["text"]) == ("已合并", "MR 已合并，运行结束")    # not 「运行机在跑」
     r = row()
     deliveries.team_classify(r, {"state": "signing", "run_id": "RUN-PAY-1-1"}, [], None)
     assert "签接手合同" in r["waits"]["text"] and "RUN-PAY-1-1" in r["waits"]["text"]

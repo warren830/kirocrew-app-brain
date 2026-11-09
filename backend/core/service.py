@@ -433,9 +433,6 @@ class Service:
             row["where"] = "runner"
             decs = [d for d in led["decisions"] if d["run_id"] in all_ids[key]]
             deliveries.team_classify(row, r, decs, facts.get("park"))
-            if r.get("state") in ("merged", "closed"):
-                row["state"] = "merged" if r["state"] == "merged" else "closed"
-                row["state_label"] = deliveries.STATE_LABEL[row["state"]]
             row["run_ids"] = all_ids[key]
             row["credits"] = round(sum(snap["credits"].get(x, 0.0) for x in all_ids[key]), 3) or None
             row["sessions"] = sum(len(snap["by"].get(x, [])) for x in all_ids[key])

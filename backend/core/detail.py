@@ -215,7 +215,8 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
     for h in a.get("handovers") or []:
         label = HANDOVER_LABEL.get(str(h.get("kind")), "桥记下了这次交接")
         items.append({"at": h.get("at"), "kind": "handover", "label": label,
-                      "detail": h.get("run_id") or h.get("reason") or h.get("commit"), "who": h.get("by"), "src": h.get("src")})
+                      "detail": h.get("run_id") or h.get("reason") or str(h.get("commit") or "")[:12] or None, "who": h.get("by"),
+                      "src": h.get("src")})
     for q in a.get("questions") or []:
         what = KIND_LABEL.get(str(q.get("kind")), "问题")
         items.append({"at": q.get("at"), "kind": "question",
