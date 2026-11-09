@@ -77,3 +77,14 @@ export function lines(text: string): string[] {
 export function splitPaths(text: string): string[] {
   return text.split(/[\s,，、;；]+/).filter(Boolean)
 }
+
+/** How long something has waited, in one unit: 不到 1 分钟, 25 分钟, 11 小时, 3 天 (「已等 11 小时」). */
+export function fmtWaited(sec: number): string {
+  const s = Math.max(0, Math.round(sec))
+  if (s < 60) return '不到 1 分钟'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m} 分钟`
+  const h = Math.floor(m / 60)
+  if (h < 48) return `${h} 小时`
+  return `${Math.floor(h / 24)} 天`
+}
