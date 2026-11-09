@@ -31,7 +31,9 @@ export const BRAIN_FILES: readonly BrainFile[] = ['PRODUCT', 'TECH', 'IMPROVEMEN
 
 export type OverviewEntry = { repo?: string; state?: ReqState }
 export type ItemEntry = { repo: string; key: string; from?: ItemFrom }
-export type BoardEntry = { repo: string; key: string; replay?: boolean; focus?: BoardFocus; from?: BoardFrom }
+export type BoardEntry = { repo: string; key: string; replay?: boolean; focus?: BoardFocus; from?: BoardFrom
+  /** a moment of it (epoch s): 需求详情's 价值流 and 决定 open the board there (?at=) */
+  at?: number }
 /** 开需求; with key (and title): 开工 of a requirement claimed already, its key fixed (?view=new&repo=&key=&title=) */
 export type NewEntry = { repo?: string; key?: string; title?: string }
 export type BrainEntryRef = { repo?: string; file?: BrainFile; id?: string; reflect?: string }
@@ -84,6 +86,8 @@ export function parseView(search: string): View {
     if (FOCUS.includes(focus)) v.focus = focus as BoardFocus
     const from = q.get('from') ?? ''
     if (BOARD_FROM.includes(from)) v.from = from as BoardFrom
+    const at = Number(q.get('at') ?? '')
+    if (Number.isInteger(at) && at > 1e9 && at < 1e10) v.at = at
     return v
   }
   if (view === 'new') return { kind: 'new', ...repoOf(q) }
@@ -130,6 +134,7 @@ export function searchOf(v: View): string {
       if (v.replay) q.set('replay', '1')
       put('focus', v.focus)
       put('from', v.from)
+      if (v.at) q.set('at', String(v.at))
       break
     case 'new':
       q.set('view', 'new')

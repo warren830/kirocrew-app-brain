@@ -727,7 +727,10 @@ export interface RequirementDetail {
 
 // ---------------------------------------------------------------- POST /requirements/{repo}/{key}/session, /answer
 
-export interface OpenSessionBody { trust?: boolean; kickoff?: boolean }
+export interface OpenSessionBody { trust?: boolean; kickoff?: boolean
+  /** 开审查会话: a NEW brain-dev session in the worktree to review the code (the session that wrote it may not review it,
+   * Lean's next step says so), never the live one; its first message the review line Lean wrote */
+  review?: boolean }
 export interface OpenSessionResult { ok: boolean; slot: string; url: string }
 /**
  * choice: an option id (A–H), or 'approve' / 'reject' for a question without options. id: the question's D-<n> when it

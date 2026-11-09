@@ -1,36 +1,41 @@
 /**
  * 需求详情: one requirement, between 交付总览 (every requirement) and its 需求看板 (how it went), as the sample's 交付详情
- * shows one delivery. It answers what one asks of a requirement — how long it took and where it is, where the time
- * went (AI on this machine, the runner, waiting for a person, done again), what it cost, what the checks say, and what
- * people decided and asked — and keeps everything this app showed before: Lean's 11 stages and its approvals (a pending
- * one's line, shown to be typed in the session by the person), Session notes, the MR's 变更说明 (its first line, the
- * whole text folded, 复制), decisions with their Brain citations (they open the Brain view), questions and answers (the
- * answer form only where the person may answer here), the timeline, the sessions this app opened with their credits,
- * and what the run used of the Brain.
+ * shows one delivery. First what to do now (此刻: who it waits on, since when, and the step right there: 打开会话,
+ * 复制那一行, 开审查会话, 开工, 去 MR 上回答, 回写 Brain), then how long it took, where the time went (AI on this machine,
+ * the runner, waiting for a person, done again), what it cost and what the checks say; the 价值流 on a time axis (图 /
+ * 表格, every part and moment opens the board there); Lean's 11 stages and approvals; the decisions (each opens the
+ * board at its stage); questions and answers (the answer form only where the person may answer here), the MR's 变更说明
+ * (formatted, 复制 copies the Markdown), Lean's notes, the sessions, what the run used of the Brain and the timeline.
+ * A requirement only claimed is one sentence and 开工; one that is not there says so and where to go.
  *
  * Polls GET /requirements/{repo}/{key} every 5 s, and the board's snapshot (GET /board/{repo}/{key}) for the value
- * stream (its actors' spans); without a board the cards that need it say so.
+ * stream (its actors' spans), the checks and the step; without a board the cards that need it say so.
  */
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, usePoll, useAction } from '../api'
-import { RoleGlyph, RoleIcon } from '../board/RoleIcon'
-import { Hit, Mini, Tip, useWidth, type TipState } from '../cto/charts'
+import { RoleIcon } from '../board/RoleIcon'
+import { Hit, Mini } from '../cto/charts'
 import { ago, fmtCredits, fmtIso, fmtSpan, fmtTime, isoDay } from '../format'
-import type { ItemEntry, ItemFrom } from '../nav'
-import type { Decision, OpenSessionBody, OpenSessionResult, ReqBoard, RequirementDetail, SessionRow, Stage, TimelineItem, TimelineKind } from '../types'
-import { APPROVAL_META, Icon, LoadState, MrLink, STAGE_META, StateChip, TypeLine } from '../ui'
+import type { BoardEntry, ItemEntry, ItemFrom } from '../nav'
+import type {
+  CheckCell, Decision, LeanSummary, OpenSessionBody, OpenSessionResult, ReqBoard, RequirementDetail, SessionRow, Stage,
+  TimelineItem, TimelineKind, WaitDo, WaitWho, Waits,
+} from '../types'
+import { APPROVAL_META, Icon, LoadState, MrLink, STAGE_META, StateChip, TYPE_IT_YOURSELF, isOpenQuestion } from '../ui'
+import {
+  ACT, CHECK_GROUP_NAME, DECIDED_BY, DO_NAME, WHERE_NAME, approvalName, leanProgress, missingSourceName, sourceName, stageName, waitsOn,
+} from '../vocab'
+import { Inline } from './Markdown'
 import type { ViewProps } from './props'
-import { EntryChip, MrDescCard, QuestionCard } from './Question'
+import { EntryChip, MrDescCard, QuestionCard, useCopy } from './Question'
+import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
 import { ReqSwitch } from './ReqSwitch'
 
 export { EntryChip, MR_DESC_COPY_HINT, MrDescCard, QuestionCard, mrDescSource } from './Question'
+export { PART_LABEL, PART_VAR, valueStream, type Part, type StreamSeg } from './Stream'
 
 const FROM_LABEL: Record<ItemFrom, string> = { overview: '交付总览', todo: '待办', brain: 'Brain', board: '需求看板' }
-
-const BY_LABEL: Record<NonNullable<Decision['by']>, string> = {
-  person: '人', agent: 'agent', check: '检查', brain: 'Brain', bridge: 'bridge', unclassified: '没归类',
-}
 
 const KIND_META: Record<TimelineKind, { icon: string; label: string }> = {
   stage: { icon: 'design', label: '阶段' },
@@ -48,81 +53,197 @@ const KIND_META: Record<TimelineKind, { icon: string; label: string }> = {
 }
 
 export const DETAIL_CSS = `
+.br-detail { container: br-detail / inline-size; }
+.br-detail .br-detail-head { display: grid; gap: 12px; }
 .br-detail .cto-item-head .kt-run-title { margin: 0; }
+.br-detail .br-now { display: grid; gap: 8px; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--kt-glass); }
+.br-detail .br-now.is-you { border-color: var(--kit-wait); background: color-mix(in srgb, var(--kt-approve) 7%, var(--card)); }
+.br-detail .br-now-head { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; }
+.br-detail .br-now-head .cto-eyebrow { align-self: center; }
+.br-detail .br-now-text { color: var(--text-strong); font-size: 1.08em; font-weight: 700; }
+.br-detail .br-now p { margin: 0; color: var(--text); }
+.br-detail .br-now-say { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; border: 1px dashed color-mix(in srgb, var(--kt-approve) 55%, var(--border)); background: var(--card); }
+.br-detail .br-now-say code { font-weight: 700; color: var(--text-strong); user-select: all; overflow-wrap: anywhere; flex: 1 1 260px; }
+.br-detail .br-now-act { gap: 8px; }
+.br-detail .br-now-act a.kt-btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.br-detail .br-claimed-text { font-size: 1.7em; font-weight: 800; color: var(--text-strong); line-height: 1.25; margin: 4px 0 0; }
 .br-detail .cto-item-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-@media (max-width: 1180px) { .br-detail .cto-item-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.br-detail .cto-item-cards > .cto-card { container-type: inline-size; }
+.br-detail .cto-item-cards .cto-value { white-space: nowrap; font-size: min(2.85em, 14cqi); }
+@container br-detail (max-width: 1180px) { .br-detail .cto-item-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container br-detail (max-width: 600px) { .br-detail .cto-item-cards { grid-template-columns: minmax(0, 1fr); } }
+.br-detail .cto-segs i.is-skip { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 45%, transparent) 0 2px, transparent 2px 5px); box-shadow: none; }
+.br-detail .cto-segs i.is-next, .br-detail .cto-segs i.is-todo { background: transparent; box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+.br-detail .cto-segs i.is-next { box-shadow: inset 0 0 0 2px var(--accent); }
+.br-detail .cto-segs i.is-run { background: var(--kt-run); }
+.br-detail .cto-segs i.is-wait { background: var(--kt-approve); }
+.br-detail .cto-segs i.is-watch { background: color-mix(in srgb, var(--kt-ok) 45%, transparent); }
+.br-detail .cto-chips button.cto-chip { cursor: pointer; padding: 0; font: inherit; }
 .br-detail .br-twocol { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-@media (max-width: 1100px) { .br-detail .br-twocol { grid-template-columns: minmax(0, 1fr); } }
+@container br-detail (max-width: 1100px) { .br-detail .br-twocol { grid-template-columns: minmax(0, 1fr); } }
 .br-detail .br-col { display: grid; gap: 16px; min-width: 0; }
-.br-detail .br-detail-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 5px 22px; margin: 10px 0 0; padding: 10px 14px;
+.br-detail :where(.br-col) > section.cto-card { border-radius: var(--kit-r); border: 1px solid var(--border); background-color: var(--card); padding: var(--kit-pad-block); margin: 0; }
+.br-detail .br-detail-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 5px 22px; margin: 0; padding: 10px 14px;
   border: 1px solid var(--border); border-radius: 12px; background: var(--kt-glass); }
-.br-detail .br-detail-facts > div { display: grid; grid-template-columns: 6em minmax(0, 1fr); gap: 8px; align-items: baseline; min-width: 0; }
+.br-detail .br-detail-facts > div { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 8px; align-items: baseline; min-width: 0; }
+.br-detail .br-detail-facts > details { grid-column: 1 / -1; }
 .br-detail .br-detail-facts dt { font-size: .86em; }
 .br-detail .br-detail-facts dd { overflow-wrap: anywhere; }
-.br-detail .br-stagecells { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; }
-@media (max-width: 1100px) { .br-detail .br-stagecells { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.br-detail :is(.br-path > span, .br-nowrap) { white-space: nowrap; }
+.br-detail .br-rawlist { margin: 6px 0 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; }
+.br-detail .br-rawlist dd { margin: 0; overflow-wrap: anywhere; }
+.br-detail .br-stagecells { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; list-style: none; margin: 0; padding: 0; }
+@container br-detail (max-width: 1100px) { .br-detail .br-stagecells { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@container br-detail (max-width: 600px) { .br-detail .br-stagecells { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .br-detail .br-stagecell { position: relative; display: grid; gap: 2px; align-content: start; padding: 7px 8px 8px; border-radius: 10px; min-height: 64px;
   border: 2px solid color-mix(in srgb, var(--kt-tone) 70%, var(--border)); background: color-mix(in srgb, var(--kt-tone) 12%, var(--card)); }
 .br-detail .br-stagecell.is-done { background: var(--kt-ok-solid); border-color: color-mix(in srgb, var(--kt-ok) 75%, transparent); }
 .br-detail .br-stagecell.is-done :is(.br-stage-n, .br-stage-label) { color: #fff; }
+.br-detail .br-stagecell.is-done .br-stage-units .br-chip { color: #fff; background: rgba(255, 255, 255, .18); border-color: rgba(255, 255, 255, .4); }
 .br-detail .br-stagecell.is-skipped { border-style: dashed; background: transparent; opacity: .7; }
 .br-detail .br-stagecell.is-todo { border-style: dashed; background: transparent; border-color: var(--border-strong); }
+.br-detail .br-stagecell.is-next { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent); }
+.br-detail .br-stagecell.is-next .br-stage-n { color: var(--accent); }
 .br-detail .br-stagecell.is-started { box-shadow: 0 0 0 2px color-mix(in srgb, var(--kt-run) 25%, transparent), 0 0 18px -6px var(--kt-run); }
 .br-detail .br-stage-n { font-size: .74em; font-weight: 800; color: var(--muted); }
 .br-detail .br-stage-label { font-size: .86em; font-weight: 750; color: var(--text-strong); line-height: 1.25; }
 .br-detail .br-stage-units { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
 .br-detail .br-stage-units .br-chip { font-size: .7em; padding: 0 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.br-detail .br-stagecells { list-style: none; margin: 0; padding: 0; }
+.br-detail .br-lean-sub { margin: 14px 0 6px; }
 .br-detail .br-approvals { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .br-detail .br-approval { display: grid; gap: 6px; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--kt-glass); }
 .br-detail .br-approval[data-state="pending"] { border-color: var(--kit-wait); background: color-mix(in srgb, var(--kt-approve) 6%, var(--card)); }
 .br-detail .br-approval[data-state="approved"] { border-color: var(--kit-ok); }
+.br-detail .br-approval .br-raw { margin-left: auto; }
 .br-detail .cto-table td { vertical-align: top; }
-.br-detail .br-vs { position: relative; }
+.br-detail .br-dec td:last-child { white-space: nowrap; text-align: right; }
+@container br-detail (max-width: 1100px) {
+  .br-detail .br-dec thead { display: none; }
+  .br-detail .br-dec, .br-detail .br-dec tbody { display: block; }
+  .br-detail .br-dec tr { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline; padding: 9px 12px; margin-bottom: 8px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--kt-glass); }
+  .br-detail .br-dec td { display: block; border: 0; padding: 0; min-width: 0; }
+  .br-detail .br-dec td.br-key { grid-area: 1 / 1; }
+  .br-detail .br-dec td[data-label="阶段"] { grid-area: 1 / 2; }
+  .br-detail .br-dec td[data-label="谁定的"] { grid-area: 1 / 3; white-space: normal; }
+  .br-detail .br-dec td[data-label="决定"] { grid-area: 2 / 1 / 3 / -1; color: var(--text-strong); }
+  .br-detail .br-dec td[data-label="为什么"] { grid-area: 3 / 1 / 4 / -1; }
+  .br-detail .br-dec td[data-label="引用 Brain"] { grid-area: 4 / 1 / 5 / 4; }
+  .br-detail .br-dec td:last-child { grid-area: 4 / 4; text-align: right; }
+  .br-detail .br-dec td[data-label="引用 Brain"] .br-dim { visibility: hidden; }
+  .br-detail .br-dec td:is([data-label="为什么"], [data-label="谁定的"])::before { content: attr(data-label) '：'; color: var(--muted); font-size: .9em; }
+}
+.br-detail .br-vs { position: relative; margin-top: 10px; }
 .br-detail .br-vs svg { display: block; width: 100%; overflow: visible; }
 .br-detail .br-vs text { font-size: 12px; fill: var(--muted); font-variant-numeric: tabular-nums; }
 .br-detail .br-vs text.is-strong { fill: var(--text-strong); font-weight: 650; font-size: 12.5px; }
+.br-detail .br-vs .br-vs-n circle { fill: var(--text-strong); stroke: var(--card); stroke-width: 1.5; }
+.br-detail .br-vs .br-vs-n text { fill: var(--card); font-size: 10px; font-weight: 800; }
 .br-detail .br-sessions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .br-detail .br-session { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-elevated, var(--card)); }
 .br-detail .br-session .kt-role-icon { color: var(--text-strong); }
 .br-detail .br-tl li { grid-template-columns: 3.4em 22px 1fr; }
 .br-detail .br-tl .kt-role-icon { color: var(--muted); }
-.br-detail .br-tl li[data-kind="merge"] .kt-role-icon, .br-detail .br-tl li[data-kind="approval"] .kt-role-icon { color: var(--kt-ok); }
+.br-detail .br-tl li[data-kind="merge"] .kt-role-icon, .br-detail .br-tl li[data-kind="approval"] .kt-role-icon, .br-detail .br-tl li[data-kind="human"] .kt-role-icon { color: var(--kt-ok); }
 .br-detail .br-tl li[data-kind="blocked"] .kt-role-icon { color: var(--kt-warn); }
 .br-detail .br-tl li[data-kind="handover"] .kt-role-icon { color: var(--kt-handoff); }
 .br-detail .br-tlbox { max-height: 520px; overflow: auto; }
+.br-detail .br-tl details summary { cursor: pointer; color: var(--muted); }
+.br-detail .br-tlmissing { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.br-detail .br-dec td:is(.br-key, [data-label="阶段"], [data-label="谁定的"]) { white-space: nowrap; }
 `
 
-/** Where the time went, from the board's actors: AI on this machine, the runner, waiting for a person, done again. */
-export type Part = 'agent' | 'runner' | 'person' | 'rework'
-export const PART_LABEL: Record<Part, string> = { agent: 'AI 在本机做', runner: '运行机在做', person: '等人', rework: '返工' }
-export const PART_VAR: Record<Part, string> = { agent: 'var(--vs-agent)', runner: 'var(--s1)', person: 'var(--vs-person)', rework: 'var(--vs-rework)' }
-const RANK: Record<Part, number> = { person: 4, rework: 3, runner: 2, agent: 1 }
+// ------------------------------------------------------------------ what the page reads off the records
 
-/** The requirement's time as segments in order, each the most telling part at that time (a wait for a person over work
- * going on meanwhile); quiet stretches with nothing recorded are left out. */
-export function valueStream(b: ReqBoard, now: number): { from: number; to: number; part: Part }[] {
-  const ivs: { a: number; b: number; part: Part }[] = []
-  for (const a of b.actors) {
-    for (const s of a.spans) {
-      const part: Part = s.kind === 'wait' ? 'person' : s.kind === 'fix' ? 'rework' : a.key === 'runner' || a.key === 'bridge' || a.key === 'signer' ? 'runner' : 'agent'
-      const end = s.b ?? (b.ended_at ?? now)
-      if (end > s.a) ivs.push({ a: s.a, b: end, part })
-    }
-  }
-  const pts = [...new Set(ivs.flatMap((x) => [x.a, x.b]))].sort((x, y) => x - y)
-  const out: { from: number; to: number; part: Part }[] = []
-  for (let i = 0; i < pts.length - 1; i++) {
-    const t0 = pts[i], t1 = pts[i + 1]
-    const on = ivs.filter((x) => x.a <= t0 && x.b >= t1)
-    if (!on.length) continue
-    const part = on.sort((x, y) => RANK[y.part] - RANK[x.part])[0].part
-    const last = out[out.length - 1]
-    if (last && last.part === part && Math.abs(last.to - t0) < 1) last.to = t1
-    else out.push({ from: t0, to: t1, part })
-  }
-  return out
+/** The requirement went to the team runner: its questions and approvals are answered on the MR from then on. */
+function handedOver(x: RequirementDetail): boolean {
+  return !!x.run?.handoff || ['handed_over', 'running', 'parked', 'acceptance'].includes(x.row.state)
 }
+
+/** Lean's progress the one way (vocab.leanProgress): the backend's counts, else counted from the stages. */
+function leanOf(x: RequirementDetail): Required<Pick<LeanSummary, 'done_n' | 'skipped_n' | 'next'>> {
+  const l = x.row.lean
+  if (l.done_n !== undefined && l.skipped_n !== undefined && l.next !== undefined) return { done_n: l.done_n, skipped_n: l.skipped_n, next: l.next }
+  const st = x.lean.stages
+  const next = st.find((s) => s.state === 'started' || s.state === 'todo')
+  return { done_n: st.filter((s) => s.state === 'done').length, skipped_n: st.filter((s) => s.state === 'skipped').length, next: next ? { id: next.id, label: next.label, n: next.n } : null }
+}
+
+const isoSec = (iso: string | null | undefined) => (iso && Number.isFinite(Date.parse(iso)) ? Date.parse(iso) / 1000 : null)
+
+/** When the work began: brain start (the board's start event, else the run's own time), never the claim. */
+function startOf(x: RequirementDetail, board: ReqBoard | null): number | null {
+  return board?.events.find((e) => e.kind === 'start')?.at ?? isoSec(x.run?.created_at)
+}
+
+/** The step of an older backend without `waits.do`, from what it did send. */
+function oldDo(x: RequirementDetail): WaitDo {
+  const w = x.row.waits
+  if (w.line) return 'approve'
+  switch (x.row.state) {
+    case 'claimed': return 'start'
+    case 'acceptance': return 'accept'
+    case 'parked': return 'answer'
+    case 'rejected': return 'redo_handoff'
+    case 'local':
+      if (x.sessions.some((s) => s.kind === 'local' && s.awaiting)) return 'tool'
+      return w.who === 'you' ? 'reply' : 'none'
+    default: return 'none'
+  }
+}
+
+interface Now {
+  who: WaitWho
+  do: WaitDo
+  where: Waits['where']
+  text: string
+  line: string | null
+  since: number | null
+  sessionUrl: string | null
+  mrUrl: string | null
+  /** the open MR question (D-n) it waits on, and how it is answered: its options (A / B …), else approve / reject */
+  question: string | null
+  choices: string
+}
+
+/** 此刻: one judgment (the backend's waits) with where to take the step. */
+function nowOf(x: RequirementDetail, board: ReqBoard | null, live: SessionRow | null): Now {
+  const w = x.row.waits
+  const step = w.do ?? oldDo(x)
+  const onMr = handedOver(x)
+  const where = w.where !== undefined ? w.where
+    : step === 'start' || step === 'write_back' ? 'app' : step === 'none' || step === 'watch' ? null : onMr ? 'mr' : 'session'
+  const open = x.questions.find((q) => isOpenQuestion(q) && q.source !== 'park')
+  return {
+    who: w.who, do: step, where, text: w.text, line: w.line,
+    since: w.since ?? (step === 'start' ? isoSec(x.claim?.created_at) : step === 'reply' ? live?.last_activity ?? null : null),
+    sessionUrl: live?.url ?? null,
+    mrUrl: board?.accept.step.mr_url ?? open?.mr_url ?? x.row.mr?.url ?? null,
+    question: open?.id ?? null,
+    choices: open?.options.length ? `选 ${open.options.map((o) => o.id).join(' / ')}` : 'approve / reject',
+  }
+}
+
+/** Lean's next step when it is a review in a new session (the session that wrote the code may not review it), and
+ * the line Lean wrote to say to that session. */
+function reviewOf(next: string[]): { say: string | null } | null {
+  const n = next[0] ?? ''
+  if (!/审查/.test(n) || !/新会话/.test(n)) return null
+  const m = /说[:：]\s*「([^」]+)」/.exec(n)
+  return { say: m ? m[1] : null }
+}
+
+/** The write-back branch brain reflect made for it (brain/<KEY>-reflect-<n>), if it did. */
+function reflectBranch(x: RequirementDetail, board: ReqBoard | null): string | null {
+  const texts = [...(board?.events ?? []).filter((e) => e.kind === 'reflect').map((e) => e.text), ...x.timeline.items.map((i) => `${i.label} ${i.detail ?? ''}`)]
+  for (const t of texts) {
+    const m = /brain\/[A-Za-z0-9._-]+-reflect-\d+/.exec(t)
+    if (m) return m[0]
+  }
+  return null
+}
+
+// ------------------------------------------------------------------ the page
 
 export function DetailView({ entry, onBack, onSwitch, ...props }: {
   entry: ItemEntry
@@ -140,9 +261,11 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
   }
   const x = d.data
   const board = b.data
+  const missing = !x && d.status === 404
+  const repoInfo = props.status?.repos.find((r) => r.id === entry.repo) ?? null
   const live = x ? x.sessions.find((s) => s.kind === 'local' && !s.error) ?? null : null
-  const canOpen = !!x && x.row.state === 'local' && !live
-  const toBoard = (replay = false) => props.go({ kind: 'board', repo: entry.repo, key: entry.key, from: 'item', ...(replay ? { replay: true } : {}) })
+  const toBoard = (more: Partial<BoardEntry> = {}) => props.go({ kind: 'board', repo: entry.repo, key: entry.key, from: 'item', ...more })
+  const toOverview = onBack ?? (() => props.go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) }))
   return (
     <main className="kt-root br-view cto-root cto-item br-detail" data-testid="br-detail">
       <style>{DETAIL_CSS}</style>
@@ -156,138 +279,525 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
         <ReqSwitch repo={entry.repo} reqKey={entry.key} status={props.status} pollMs={props.pollMs}
           onPick={onSwitch ?? ((repo, key) => props.go({ kind: 'item', repo, key }))} />
         <div className="cto-item-act">
-          <button type="button" className="kt-btn is-primary" onClick={() => toBoard()}>需求看板 ↗</button>
-          {x && x.row.state === 'merged' && <button type="button" className="kt-btn" onClick={() => toBoard(true)}>▶ 回放 ↗</button>}
+          {x && <button type="button" className="kt-btn is-primary" onClick={() => toBoard()}>需求看板 ↗</button>}
+          {x && x.row.state === 'merged' && <button type="button" className="kt-btn" onClick={() => toBoard({ replay: true })}>▶ 回放 ↗</button>}
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{from}</button>}
         </div>
       </div>
-      <LoadState loading={d.loading} error={d.error} has={!!x} />
+      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} onOverview={toOverview} /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
       {x && (
-        <>
-          <Header x={x} />
-          <Cards x={x} board={board} onBoard={() => toBoard()} />
-          {(canOpen || opened) && <OpenSession repo={entry.repo} reqKey={entry.key} opened={opened} onOpened={(r) => { setOpened(r); after() }} />}
-          <StreamCard board={board} onBoard={() => toBoard()} />
-          <LeanCard x={x} sessionUrl={live?.url ?? null} />
-          <div className="br-twocol">
-            <div className="br-col">
-              <DecisionsCard decisions={x.decisions} repo={entry.repo} go={props.go} />
-              <section className="cto-card" aria-label="问题和回答">
-                <div className="cto-chart-head"><h3>问题和回答</h3><span className="cto-dim">{x.questions.length} 个 · 能在这里回答的才有回答框</span></div>
-                {x.questions.length === 0 ? <p className="br-empty">没有问过人。</p> : (
-                  <div className="br-stack">
-                    {x.questions.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={entry.repo} reqKey={entry.key} onAnswered={after} />)}
-                  </div>
-                )}
-              </section>
-              <MrDescCard m={x.mr_desc} />
-            </div>
-            <div className="br-col">
-              <NotesCard x={x} />
-              <SessionsCard sessions={x.sessions} total={x.credits.total} note={x.credits.note} />
-              <BrainUseCard b={x.brain} repo={entry.repo} go={props.go} />
-              <TimelineCard t={x.timeline} />
-            </div>
-          </div>
-        </>
+        <Page x={x} board={board} live={live} entry={entry} props={props} opened={opened} localOnly={x.row.local_only ?? repoInfo?.remote === false}
+          onOpened={(r) => { setOpened(r); after() }} after={after} toBoard={toBoard} />
       )}
     </main>
   )
 }
 
-function Header({ x }: { x: RequirementDetail }) {
-  const r = x.row
-  const run = x.run
+function NotFound({ repoName, reqKey, onOverview }: { repoName: string | null; reqKey: string; onOverview: () => void }) {
   return (
-    <section className="br-head br-detail-head" aria-label="需求">
-      <header className="cto-item-head">
-        <h2 className="kt-run-title">{r.title}</h2>
-        <span className="kt-pill tone-info kt-mono">{r.key}</span>
-        <StateChip state={r.state} label={r.state_label} />
-        <span className="cto-org">{r.owner ? `${r.owner} 的需求 · ` : ''}{x.where_label}</span>
-      </header>
-      <div className="cto-item-now br-row" data-testid="detail-waits">
-        <span>此刻：{r.waits.text || '—'}</span>
-        {r.waits.line && <code className="br-mono br-strong">{r.waits.line}</code>}
+    <section className="cto-card" aria-label="没有这个需求" data-testid="detail-missing">
+      <h3>{repoName ? `${repoName} 仓库里没有 ${reqKey}` : `没有找到 ${reqKey}`}</h3>
+      <p className="cto-desc">它可能已经关闭，或者在别的仓库里。</p>
+      <p className="br-hint">做什么：在上面「切换需求」里换一个，或者回交付总览找。</p>
+      <div className="br-row" style={{ marginTop: 10 }}>
+        <button type="button" className="kt-btn is-primary" onClick={onOverview}>回交付总览</button>
       </div>
-      <dl className="br-facts br-detail-facts">
-        <div><dt>分支</dt><dd>{r.branch ? <code>{r.branch}</code> : '—'}</dd></div>
-        <div><dt>工作目录</dt><dd>{r.worktree ? <code>{r.worktree}</code> : '—'}</dd></div>
-        <div><dt>Lean intent</dt><dd>{r.intent ? <code>{r.intent}</code> : '—'}</dd></div>
-        <div><dt>MR</dt><dd><MrLink mr={r.mr} /></dd></div>
-        {x.claim && <div><dt>认领</dt><dd>{x.claim.owner ?? '—'} · {fmtIso(x.claim.created_at)} · 来源 {x.claim.source}{x.claim.closed ? ` · 已关闭：${x.claim.closed}` : ''}</dd></div>}
-        {run && <div><dt>运行</dt><dd>开始于 {fmtIso(run.created_at)}{run.origin ? ` · 来源 ${run.origin}` : ''}{run.brain_commit ? <> · Brain <code>{run.brain_commit}</code></> : ''}</dd></div>}
-        {run?.handoff && <div><dt>交接</dt><dd>{fmtIso(run.handoff.requested_at)}{run.handoff.by ? ` · ${run.handoff.by}` : ''}</dd></div>}
-        {run && run.materials.length > 0 && <div><dt>材料</dt><dd className="br-row">{run.materials.map((m) => <code key={m}>{m}</code>)}</dd></div>}
-        {r.run_ids.length > 0 && <div><dt>运行机</dt><dd className="br-row">{r.run_ids.map((id) => <code key={id}>{id}</code>)}</dd></div>}
-        {r.expected_paths.length > 0 && <div><dt>要改的地方</dt><dd className="br-row">{r.expected_paths.map((p) => <code key={p}>{p}</code>)}</dd></div>}
-        {r.overlap.length > 0 && <div><dt>重叠</dt><dd><span className="br-chip tone-warn">和 {r.overlap.join('、')} 改同一块</span></dd></div>}
-      </dl>
     </section>
   )
 }
 
+function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after, toBoard }: {
+  x: RequirementDetail
+  board: ReqBoard | null
+  live: SessionRow | null
+  entry: ItemEntry
+  props: ViewProps
+  opened: OpenSessionResult | null
+  localOnly: boolean
+  onOpened: (r: OpenSessionResult) => void
+  after: () => void
+  toBoard: (more?: Partial<BoardEntry>) => void
+}) {
+  const at = board?.at ?? Date.now() / 1000
+  const now = nowOf(x, board, live)
+  const started = x.row.state !== 'claimed' && !(x.row.state === 'closed' && !x.run)
+  const onStart = () => props.go({ kind: 'new', repo: entry.repo, key: entry.key, title: x.row.title })
+  if (!started) {
+    return (
+      <section className="br-detail-head" aria-label="需求">
+        <Header x={x} />
+        <Claimed x={x} now={now} at={at} onStart={onStart} />
+        <Facts x={x} start={null} localOnly={localOnly} />
+      </section>
+    )
+  }
+  const canOpen = x.row.state === 'local' && !live
+  const toAt = (t: number | null) => toBoard(t ? { at: Math.round(t) } : {})
+  const scrollTo = (label: string) => document.querySelector(`[data-testid="br-detail"] [aria-label="${label}"]`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  return (
+    <>
+      <section className="br-detail-head" aria-label="需求">
+        <Header x={x} />
+        <NowBar x={x} now={now} at={at} live={live} canOpen={canOpen} repo={entry.repo} reqKey={entry.key}
+          onStart={onStart} onAnswer={() => scrollTo('问题和回答')} onBrain={() => props.go({ kind: 'brain', repo: entry.repo, reflect: entry.key })} />
+        {(canOpen || opened) && <OpenSession repo={entry.repo} reqKey={entry.key} opened={opened} onOpened={onOpened} />}
+        <Facts x={x} start={startOf(x, board)} localOnly={localOnly} />
+      </section>
+      <Cards x={x} board={board} at={at} localOnly={localOnly} replying={now.do === 'reply'} onBoard={toBoard} onSessions={() => scrollTo('会话')} />
+      <StreamCard board={board} at={at} onAt={toAt} />
+      <LeanCard x={x} sessionUrl={now.sessionUrl} mrUrl={now.mrUrl} />
+      <DecisionsCard decisions={x.decisions} stages={x.lean.stages} repo={entry.repo} owner={x.row.owner} me={board?.person.me ?? false} go={props.go} onAt={toAt} />
+      <div className="br-twocol">
+        <div className="br-col">
+          <QuestionsCard x={x} repo={entry.repo} reqKey={entry.key} onAnswered={after} />
+          <MrDescCard m={x.mr_desc} />
+        </div>
+        <div className="br-col">
+          <NotesCard x={x} />
+          <SessionsCard sessions={x.sessions} total={x.credits.total} note={x.credits.note} replying={now.do === 'reply'} at={at} />
+          <BrainUseCard x={x} board={board} repo={entry.repo} reqKey={entry.key} go={props.go} />
+          <TimelineCard x={x} showMissing={handedOver(x) && !localOnly} />
+        </div>
+      </div>
+    </>
+  )
+}
+
+function Header({ x }: { x: RequirementDetail }) {
+  const r = x.row
+  return (
+    <header className="cto-item-head">
+      <h2 className="kt-run-title">{r.title}</h2>
+      <span className="kt-pill tone-info kt-mono">{r.key}</span>
+      <StateChip state={r.state} label={r.state_label} />
+      <span className="cto-org">{r.owner ? `${r.owner} 的需求 · ` : ''}{WHERE_NAME[r.where] ?? x.where_label}</span>
+    </header>
+  )
+}
+
+/** A path that breaks only after a 「/」, never inside a name. */
+function PathText({ path }: { path: string }) {
+  const parts = path.split('/')
+  return (
+    <code className="br-path" title={path}>
+      {parts.map((p, i) => <span key={i}><span>{i ? `/${p}` : p}</span><wbr /></span>)}
+    </code>
+  )
+}
+
+function Facts({ x, start, localOnly }: { x: RequirementDetail; start: number | null; localOnly: boolean }) {
+  const r = x.row
+  const run = x.run
+  const raw = ([
+    ['Lean intent', r.intent],
+    ['Brain 提交', run?.brain_commit],
+    ['材料包', run?.materials.join('、')],
+    ['运行机的运行', r.run_ids.join('、')],
+    ['认领分支', r.where === 'claim' ? `claim/${r.key}` : null],
+    ['来源', x.claim?.source],
+  ] as [string, string | null | undefined][]).filter((kv): kv is [string, string] => !!kv[1])
+  return (
+    <dl className="br-detail-facts" aria-label="基本信息">
+      {r.branch && <div><dt>分支</dt><dd><code>{r.branch}</code></dd></div>}
+      {r.worktree && <div><dt>工作目录</dt><dd><PathText path={r.worktree} /></dd></div>}
+      {r.intent && <div><dt>Lean 记录</dt><dd><PathText path={`aidlc-docs/${r.intent}/`} /></dd></div>}
+      {r.where !== 'claim' && (
+        <div><dt>MR</dt><dd>{r.mr ? <MrLink mr={r.mr} /> : localOnly ? '这个仓库只在本机做，没有 MR' : '还没有：交接时开'}</dd></div>
+      )}
+      {x.claim && (
+        <div>
+          <dt>认领</dt>
+          <dd>
+            {x.claim.owner ?? '—'} · {fmtIso(x.claim.created_at)}{x.claim.source && <> · <span className="br-nowrap">来自{sourceName(x.claim.source)}</span></>}
+            {x.claim.closed ? ` · 已关闭：${x.claim.closed}` : ''}
+          </dd>
+        </div>
+      )}
+      {run && (
+        <div>
+          <dt>开工</dt>
+          <dd>
+            {start ? fmtTime(start) : fmtIso(run.created_at)}
+            {run.origin && <> · <span className="br-nowrap">{run.origin === 'local' ? '在本机开工' : `来自${sourceName(run.origin)}`}</span></>}
+            {run.brain_commit && <> · <span className="br-nowrap">Brain 版本 <code title={run.brain_commit}>{run.brain_commit.slice(0, 8)}</code></span></>}
+          </dd>
+        </div>
+      )}
+      {run?.handoff && <div><dt>交接</dt><dd>{fmtIso(run.handoff.requested_at)}{run.handoff.by ? ` · ${run.handoff.by}` : ''}</dd></div>}
+      {run && run.materials.length > 0 && <div><dt>带进来的文档</dt><dd>{run.materials.length} 份</dd></div>}
+      {r.run_ids.length > 0 && <div><dt>运行机</dt><dd>跑了 {r.run_ids.length} 次</dd></div>}
+      {r.expected_paths.length > 0 && <div><dt>要改的地方</dt><dd className="br-row">{r.expected_paths.map((p) => <code key={p}>{p}</code>)}</dd></div>}
+      {r.overlap.length > 0 && <div><dt>重叠</dt><dd><span className="br-chip tone-warn">和 {r.overlap.join('、')} 改同一块</span></dd></div>}
+      {raw.length > 0 && (
+        <details className="br-raw">
+          <summary>细节</summary>
+          <dl className="br-rawlist">{raw.map(([k, v]) => <div key={k} style={{ display: 'contents' }}><dt>{k}</dt><dd><code>{v}</code></dd></div>)}</dl>
+        </details>
+      )}
+    </dl>
+  )
+}
+
+// ------------------------------------------------------------------ 此刻
+
+/** A requirement only claimed: one sentence, and 开工 for the person whose claim it is. */
+function Claimed({ x, now, at, onStart }: { x: RequirementDetail; now: Now; at: number; onStart: () => void }) {
+  const mine = now.who === 'you'
+  const owner = x.row.owner ?? x.claim?.owner ?? '认领的人'
+  const span = now.since ? fmtSpan(at - now.since) : null
+  if (x.row.state === 'closed') {
+    return (
+      <section className="cto-card br-now" aria-label="此刻" data-testid="detail-waits">
+        <div className="cto-eyebrow">此刻</div>
+        <p className="br-claimed-text">认领已经关了，没有开工</p>
+        {x.claim?.closed && <p className="cto-desc">{x.claim.closed}</p>}
+      </section>
+    )
+  }
+  return (
+    <section className={`cto-card br-now${mine ? ' is-you' : ''}`} aria-label="此刻" data-testid="detail-waits">
+      <div className="cto-eyebrow">此刻</div>
+      <p className="br-claimed-text">{mine ? `认领了${span ? ` ${span}` : ''}，还没开工` : `等 ${owner} 开工`}</p>
+      <p className="cto-desc">
+        {mine
+          ? '开工会在这台机器上建它的工作目录和分支，再开一个 brain-dev 会话。还没开工，所以没有周期、时间、成本、检查和记录。'
+          : `${owner} 认领了${span ? ` ${span}` : ''}，还没开工。开工以后，这里有周期、时间、成本、检查和 Lean 的 11 个阶段。`}
+      </p>
+      {mine && (
+        <div className="br-row br-now-act">
+          <button type="button" className="kt-btn is-primary" onClick={onStart}>{ACT.start}</button>
+          <span className="br-hint">在「开需求」里开工，需求号和标题已经带过去了</span>
+        </div>
+      )}
+    </section>
+  )
+}
+
+/**
+ * 此刻: who it waits on, since when, what to do and where — with the step's button right there. A local run's
+ * approval is a line the person types themselves (复制那一行, 打开会话); once handed over, it is an answer on the MR.
+ */
+function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, onBrain }: {
+  x: RequirementDetail
+  now: Now
+  at: number
+  live: SessionRow | null
+  canOpen: boolean
+  repo: string
+  reqKey: string
+  onStart: () => void
+  onAnswer: () => void
+  onBrain: () => void
+}) {
+  const navigate = useNavigate()
+  const line = useCopy(now.line ?? '')
+  const review = now.do === 'reply' ? reviewOf(x.lean.next) : null
+  const say = useCopy(review?.say ?? '')
+  const mine = now.who === 'you'
+  const person = !['agent', 'runner', 'bridge', 'nobody'].includes(now.who)
+  const waited = person && now.since ? fmtSpan(at - now.since) : null
+  const onMr = now.where === 'mr'
+  const openSession = now.sessionUrl && !canOpen
+    ? <button type="button" className={`kt-btn${review || onMr ? '' : ' is-primary'}`} onClick={() => navigate(now.sessionUrl as string)}><Icon name="MessageSquare" size={13} />{ACT.openSession}</button>
+    : null
+  const mrLink = now.mrUrl && /^https?:\/\//i.test(now.mrUrl)
+    ? (
+      <a className={`kt-btn${mine ? ' is-primary' : ''}`} href={now.mrUrl} target="_blank" rel="noopener noreferrer">
+        {mine ? ACT.answerOnMr : '在 MR 上看'}{now.question ? ` ${now.question}` : ''} <Icon name="ExternalLink" size={12} />
+      </a>
+    )
+    : null
+  let body: ReactNode = null
+  let acts: ReactNode = null
+  switch (now.do) {
+    case 'approve':
+    case 'accept':
+    case 'answer':
+      if (onMr) {
+        body = mine
+          ? <p>{now.do === 'answer' ? '问题已经发到 MR 上了' : '交接以后，批准在 MR 上回答'}{now.question ? `：回答 ${now.question}` : ''}（{now.choices}）。</p>
+          : <p>{waitsOn(now.who)}在 MR 上回答{now.question ? ` ${now.question}` : ''}，你不用做什么；回答以后运行机接着做。</p>
+        acts = mrLink
+      } else if (now.line) {
+        body = (
+          <div className="br-now-say" data-testid="now-line">
+            <code>{now.line}</code>
+            <button type="button" className="kt-btn is-small is-primary" onClick={() => void line.copy()}><Icon name="Copy" size={13} />{ACT.copyLine}</button>
+            {line.copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
+            {line.copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请手动选中这一行</span>}
+          </div>
+        )
+        acts = <>{openSession}<span className="br-hint">{TYPE_IT_YOURSELF}</span></>
+      } else {
+        acts = <><button type="button" className="kt-btn is-primary" onClick={onAnswer}>{DO_NAME.answer} ↓</button>{openSession}</>
+      }
+      break
+    case 'reply':
+      if (review) {
+        body = (
+          <>
+            <p>Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审{review.say ? '，对它说：' : '。'}</p>
+            {review.say && (
+              <div className="br-now-say" data-testid="now-say">
+                <code>{review.say}</code>
+                <button type="button" className="kt-btn is-small" onClick={() => void say.copy()}><Icon name="Copy" size={13} />复制那一句</button>
+                {say.copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
+                {say.copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请手动选中</span>}
+              </div>
+            )}
+          </>
+        )
+        acts = <><ReviewButton repo={repo} reqKey={reqKey} liveSlot={live?.slot ?? null} worktree={x.row.worktree} />{openSession}</>
+      } else {
+        body = x.lean.next[0] ? <p>Lean 记下的下一步：<Inline text={x.lean.next[0]} /></p> : null
+        acts = openSession
+      }
+      break
+    case 'tool':
+    case 'redo_handoff':
+      body = (
+        <div>
+          <p>做什么：{now.do === 'tool' ? '在会话里批准这个工具调用' : `${DO_NAME.redo_handoff}（在会话里改，再交接一次）`}。</p>
+          {x.row.waits.raw && <details className="br-raw"><summary>细节</summary><pre>{x.row.waits.raw}</pre></details>}
+        </div>
+      )
+      acts = openSession
+      break
+    case 'label_handoff':
+      body = <p>做什么：{DO_NAME.label_handoff}（在 MR 上加交接标签）。</p>
+      acts = now.mrUrl ? <a className="kt-btn is-primary" href={now.mrUrl} target="_blank" rel="noopener noreferrer">去 MR 上看 <Icon name="ExternalLink" size={12} /></a> : null
+      break
+    case 'start':
+      acts = mine ? <button type="button" className="kt-btn is-primary" onClick={onStart}>{ACT.start}</button> : null
+      break
+    case 'write_back':
+      acts = <button type="button" className="kt-btn is-primary" onClick={onBrain}>{ACT.writeBack} ↗</button>
+      break
+    default:
+  }
+  return (
+    <section className={`br-now${mine ? ' is-you' : ''}`} aria-label="此刻" data-testid="detail-waits" data-do={now.do}>
+      <div className="br-now-head">
+        <span className="cto-eyebrow">此刻</span>
+        {person && <span className={`br-chip tone-${mine ? 'wait' : 'idle'}`}>{waitsOn(now.who)}</span>}
+        <span className="br-now-text">{now.text || '—'}</span>
+        {waited && <span className="br-dim">已等 {waited}</span>}
+      </div>
+      {body}
+      {acts && <div className="br-row br-now-act">{acts}</div>}
+    </section>
+  )
+}
+
+/** 开审查会话: a new brain-dev session in the worktree that reviews the code (POST …/session {review}). */
+function ReviewButton({ repo, reqKey, liveSlot, worktree }: { repo: string; reqKey: string; liveSlot: string | null; worktree: string | null }) {
+  const api = useAppApi()
+  const navigate = useNavigate()
+  const [same, setSame] = useState(false)
+  const act = useAction((body: OpenSessionBody) => api.post<OpenSessionResult>(paths.session(repo, reqKey), body))
+  const open = async () => {
+    const r = await act.run({ trust: true, kickoff: true, review: true })
+    if (!r) return
+    if (liveSlot && r.slot === liveSlot) setSame(true)
+    else navigate(r.url)
+  }
+  return (
+    <>
+      <button type="button" className="kt-btn is-primary" disabled={act.busy} onClick={() => void open()}>
+        <Icon name="MessageSquare" size={13} />{act.busy ? '正在开…' : ACT.review}
+      </button>
+      {same && (
+        <p className="br-note" role="status">
+          没开成新的审查会话：app 只找到了原来那个会话。在 KiroCrew 里新开一个 brain-dev 会话{worktree ? `（工作目录 ${worktree}）` : ''}，把上面那句贴给它。
+        </p>
+      )}
+      {act.error && <p className="br-error" role="alert">{act.error}</p>}
+    </>
+  )
+}
+
+function OpenSession({ repo, reqKey, opened, onOpened }: { repo: string; reqKey: string; opened: OpenSessionResult | null; onOpened: (r: OpenSessionResult) => void }) {
+  const api = useAppApi()
+  const navigate = useNavigate()
+  const [trust, setTrust] = useState(true)
+  const [kickoff, setKickoff] = useState(true)
+  const act = useAction((body: OpenSessionBody) => api.post<OpenSessionResult>(paths.session(repo, reqKey), body))
+  const open = async () => {
+    const r = await act.run({ trust, kickoff })
+    if (r) onOpened(r)
+  }
+  return (
+    <section className="cto-card is-wait br-opensession" aria-label="开会话">
+      {opened ? (
+        <div className="br-row">
+          <span className="br-ok-text">会话开好了。</span>
+          <button type="button" className="kt-btn is-primary" onClick={() => navigate(opened.url)}>
+            <Icon name="MessageSquare" size={13} />{ACT.openSession}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="cto-chart-head"><h3>还没有会话</h3><span className="cto-dim">在这个需求的工作目录里开一个 brain-dev 会话，接着做。</span></div>
+          <div className="br-row">
+            <label className="br-check">
+              <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} />
+              <span>这个会话的工具调用不用逐个批准</span>
+            </label>
+            <label className="br-check">
+              <input type="checkbox" checked={kickoff} onChange={(e) => setKickoff(e.target.checked)} />
+              <span>开好后先发一句开场，让它接着做</span>
+            </label>
+            <span className="br-grow" />
+            <button type="button" className="kt-btn is-primary" disabled={act.busy} onClick={() => void open()}>{act.busy ? '正在开…' : '开会话'}</button>
+          </div>
+        </>
+      )}
+      {act.error && <p className="br-error" role="alert">{act.error}</p>}
+    </section>
+  )
+}
+
+// ------------------------------------------------------------------ the four numbers
+
+/** The checks not reached yet, by name: the backend's list, else the approvals still ahead. */
+function todoOf(w: ReqBoard['checks']): string[] {
+  return w.todo ?? w.cells.filter((c) => c.status === 'skip' && c.group === 'gate').map((c) => c.name.replace(/（[^）]*）$/, ''))
+}
+
+const cellName = (c: CheckCell) => c.name.replace(/（[^）]*）$/, '')
+
 /** The four numbers of one requirement (the sample's 交付详情 cards): 周期, 时间花在哪, 成本, 检查. */
-function Cards({ x, board, onBoard }: { x: RequirementDetail; board: ReqBoard | null; onBoard: () => void }) {
-  const now = board?.at ?? Date.now() / 1000
-  const start = board?.started_at ?? (x.claim?.created_at ? Date.parse(x.claim.created_at) / 1000 : null)
+function Cards({ x, board, at, localOnly, replying, onBoard, onSessions }: {
+  x: RequirementDetail
+  board: ReqBoard | null
+  at: number
+  localOnly: boolean
+  replying: boolean
+  onBoard: (more?: Partial<BoardEntry>) => void
+  onSessions: () => void
+}) {
+  const start = startOf(x, board)
   const end = board?.ended_at ?? null
-  const lean = x.row.lean
-  const parts = board ? valueStream(board, now) : []
-  const split = (['agent', 'runner', 'person', 'rework'] as Part[]).map((p) => ({ p, s: parts.filter((g) => g.part === p).reduce((a, g) => a + g.to - g.from, 0) }))
+  const lean = leanOf(x)
+  const segs = board ? valueStream(board, at) : []
+  const split = splitOf(segs)
   const busy = split.filter((s) => s.p !== 'person').reduce((a, s) => a + s.s, 0)
+  const waits = segs.filter((s) => s.part === 'person')
   const sent = board ? board.events.filter((e) => e.kind === 'reject' || e.kind === 'rejected').length : 0
   const blocked = board ? board.events.filter((e) => e.kind === 'blocked').length : 0
-  const w = board?.checks
+  const toPart = (p: Part) => (p === 'person' && waits[0] ? onBoard({ at: Math.round(waits[0].from) }) : onBoard({ focus: 'lanes' }))
   return (
     <section className="cto-cards cto-item-cards" aria-label="这个需求的四个数">
       <article className="cto-card" aria-label="周期">
         <div className="cto-eyebrow">周期</div>
-        <div className="cto-value" data-testid="item-cycle">{start ? fmtSpan((end ?? now) - start) : '—'}</div>
-        <div className="cto-desc">{start ? `${fmtTime(start)} 起` : '还没开工'}{end ? ` → ${fmtTime(end)} 合并` : ' → 进行中'}</div>
-        <div className="kt-segs cto-segs" aria-label={`Lean ${lean.done}/${lean.total}`}>
-          {Array.from({ length: lean.total }, (_, i) => <i key={i} className={i < lean.done ? 'is-pass' : lean.stage_state === 'started' && lean.stage_n === i + 1 ? 'is-run' : ''} />)}
+        <div className="cto-value" data-testid="item-cycle">{start ? fmtSpan((end ?? at) - start) : '—'}</div>
+        <div className="cto-desc">{start ? `${fmtTime(start)} 开工` : '开工时间没记下'}{end ? ` → ${fmtTime(end)} 合并` : ' → 进行中'}</div>
+        <div className="kt-segs cto-segs" role="img" aria-label={`Lean：${leanProgress(lean)}`}>
+          {x.lean.stages.map((s) => (
+            <i key={s.id} title={`${s.n} ${s.label} · ${lean.next?.n === s.n && s.state === 'todo' ? '下一步' : STAGE_META[s.state]?.label ?? s.state}`}
+              className={s.state === 'done' ? 'is-pass' : s.state === 'skipped' ? 'is-skip' : s.state === 'started' ? 'is-run' : lean.next?.n === s.n ? 'is-next' : 'is-todo'} />
+          ))}
         </div>
-        <div className="cto-legend"><span>Lean 做完 {lean.done}/{lean.total} 个阶段 · 现在 {x.row.stage ?? '还没开始'}</span></div>
+        <div className="cto-legend"><span data-testid="lean-progress">Lean {leanProgress(lean)}</span></div>
       </article>
       <article className="cto-card" aria-label="时间花在哪">
         <div className="cto-eyebrow">时间花在哪</div>
         <div className="cto-value">{board ? fmtSpan(busy) : '—'}</div>
-        <div className="cto-desc">{board ? `AI 在做 · 等人 ${fmtSpan(split.find((s) => s.p === 'person')!.s)}` : '看板的数据还没来'}</div>
+        <div className="cto-desc">{board ? `AI 在做 · 等人 ${fmtSpan(split.find((s) => s.p === 'person')!.s)}${waits.length ? `（${waits.length} 段）` : ''}` : '看板的数据还没来'}</div>
         {board && <SplitBar split={split} />}
         {board && (
           <div className="cto-legend">
             {split.filter((s) => s.s > 0).map(({ p, s }) => (
-              <button type="button" key={p} onClick={onBoard} title="在需求看板上看"><i className="cto-sw" style={{ background: PART_VAR[p] }} />{PART_LABEL[p]}<b>{fmtSpan(s)}</b></button>
+              <button type="button" key={p} onClick={() => toPart(p)} title={p === 'person' ? '到看板上第一次等人的那一刻' : '在需求看板的泳道上看'}>
+                <i className="cto-sw" style={{ background: PART_VAR[p] }} />{PART_LABEL[p]}<b>{fmtSpan(s)}</b>
+              </button>
             ))}
           </div>
         )}
       </article>
-      <article className="cto-card" aria-label="成本">
-        <div className="cto-eyebrow">成本</div>
-        <div className="cto-value">{fmtCredits(x.credits.total)}<span className="cto-of">credits</span></div>
-        <div className="cto-desc">{x.sessions.length} 个会话 · KiroCrew 只报 credits</div>
-        <div className="cto-chips" aria-label="会话">
-          {x.sessions.map((s) => (
-            <span key={s.slot} className={`cto-chip${s.error ? ' is-back' : s.awaiting ? ' is-wait' : ''}`} title={`${s.title}：${fmtCredits(s.credits)} credits`}>
-              <RoleIcon role={s.kind === 'runner' ? 'runner' : 'laptop'} size={16} />
-            </span>
-          ))}
-          {x.sessions.length === 0 && <span className="cto-chip is-idle"><RoleIcon role="laptop" size={16} /></span>}
-        </div>
-      </article>
-      <article className={`cto-card${w && w.total ? (w.failed ? ' is-bad' : w.passed === w.total ? ' is-ok' : '') : ''}`} aria-label="检查">
-        <div className="cto-eyebrow">检查</div>
-        <div className="cto-value">{w ? <>{w.passed}<span className="cto-of">/{w.total}</span></> : '—'}</div>
-        <div className="cto-desc">Lean 审批 · verify · 交接 · Brain</div>
-        {w && (
-          <button type="button" className="kt-segs cto-segs" aria-label="在需求看板的检查墙上看每一项" onClick={onBoard}>
-            {w.cells.filter((c) => c.status !== 'skip').map((c) => <i key={c.id} className={c.status === 'pass' ? 'is-pass' : c.status === 'fail' ? 'is-fail' : 'is-wait'} title={c.name} />)}
-          </button>
-        )}
-        <div className="cto-legend"><span><RoleIcon role="bounce" size={14} />退回 {sent} 次 · Lean 拦下 {blocked} 次</span></div>
-      </article>
+      <CostCard x={x} replying={replying} onSessions={onSessions} />
+      <ChecksCard board={board} localOnly={localOnly} sent={sent} blocked={blocked} onBoard={onBoard} />
     </section>
+  )
+}
+
+/** a session chip of the cost card by its state's tone: its look, its legend word and swatch */
+const CHIP: Record<string, { cls: string; label: string; sw: string }> = {
+  bad: { cls: ' is-back', label: '出错', sw: 'var(--vs-rework)' },
+  wait: { cls: ' is-wait', label: '等人', sw: 'var(--vs-person)' },
+  run: { cls: '', label: '在做', sw: 'var(--kt-ok-solid)' },
+  idle: { cls: ' is-idle', label: '空着', sw: 'var(--border-strong)' },
+}
+
+function CostCard({ x, replying, onSessions }: { x: RequirementDetail; replying: boolean; onSessions: () => void }) {
+  const ss = x.sessions
+  const tones = [...new Set(ss.map((s) => sessionState(s, replying).tone))]
+  return (
+    <article className="cto-card" aria-label="成本">
+      <div className="cto-eyebrow">成本</div>
+      <div className="cto-value">{x.credits.total !== null ? <>{fmtCredits(x.credits.total)}<span className="cto-of">credits</span></> : <span className="cto-of" style={{ marginLeft: 0 }}>还没有</span>}</div>
+      <div className="cto-desc">{ss.length ? `${ss.length} 个会话` : '还没开过会话'}</div>
+      {ss.length > 0 && (
+        <>
+          <div className="cto-chips" aria-label="会话">
+            {ss.map((s) => {
+              const st = sessionState(s, replying)
+              return (
+                <button type="button" key={s.slot} className={`cto-chip${CHIP[st.tone].cls}`} title={`${s.title} · ${st.label} · ${fmtCredits(s.credits)} credits`} onClick={onSessions}>
+                  <RoleIcon role={s.kind === 'runner' ? 'runner' : 'laptop'} size={16} />
+                </button>
+              )
+            })}
+          </div>
+          <div className="cto-legend">
+            {tones.map((t) => <span key={t}><i className="cto-dot" style={{ background: CHIP[t].sw }} />{CHIP[t].label}</span>)}
+          </div>
+          <div className="cto-foot"><button type="button" className="cto-link" onClick={onSessions}>看每个会话的用量 ↓</button></div>
+        </>
+      )}
+    </article>
+  )
+}
+
+function ChecksCard({ board, localOnly, sent, blocked, onBoard }: {
+  board: ReqBoard | null
+  localOnly: boolean
+  sent: number
+  blocked: number
+  onBoard: (more?: Partial<BoardEntry>) => void
+}) {
+  const raw = board?.checks
+  // the 14 days after the merge are watched, nobody's turn (an older backend says wait)
+  const w = raw && { ...raw, cells: raw.cells.map((c) => (c.group === 'after' && c.status === 'wait' ? { ...c, status: 'watch' as const } : c)) }
+  const todo = w ? todoOf(w) : []
+  const failed = w ? w.cells.filter((c) => c.status === 'fail').map(cellName) : []
+  const waiting = w ? w.cells.filter((c) => c.status === 'wait').map(cellName) : []
+  const watching = w ? w.cells.filter((c) => c.status === 'watch').map(cellName) : []
+  const shown = w ? w.cells.filter((c) => c.status !== 'not_needed' && c.status !== 'skip' && !(localOnly && c.group === 'handover')) : []
+  const ahead = w ? w.cells.filter((c) => c.status === 'skip' && todo.includes(cellName(c))) : []
+  const groups = [...new Set([...shown, ...ahead].map((c) => CHECK_GROUP_NAME[c.group] ?? c.group))]
+  const ok = !!w && w.total > 0 && w.passed === w.total && !todo.length && !waiting.length
+  const say = !w ? '看板的数据还没来'
+    : w.total === 0 && !todo.length ? '还没有检查结果'
+      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed} 项都过`, waiting.length ? `等人：${waiting.join('、')}` : '',
+        watching.length ? `观察中：${watching.join('、')}` : '', todo.length ? `还剩 ${todo.join('、')}` : '']
+        .filter(Boolean).join(' · ')
+  return (
+    <article className={`cto-card${w && w.total ? (w.failed ? ' is-bad' : ok ? ' is-ok' : '') : ''}`} aria-label="检查">
+      <div className="cto-eyebrow">检查</div>
+      <div className="cto-value">{w && w.total ? <>{w.passed}<span className="cto-of">/{w.total}</span></> : w ? <span className="cto-of" style={{ marginLeft: 0 }}>还没有</span> : '—'}</div>
+      <div className="cto-desc" data-testid="checks-say">{say}</div>
+      {w && shown.length + ahead.length > 0 && (
+        <button type="button" className="kt-segs cto-segs" aria-label="在需求看板的检查墙上看每一项" onClick={() => onBoard({ focus: 'checks' })}>
+          {[...shown, ...ahead].map((c) => (
+            <i key={c.id} title={`${cellName(c)}：${c.detail}`}
+              className={c.status === 'pass' ? 'is-pass' : c.status === 'fail' ? 'is-fail' : c.status === 'wait' ? 'is-wait' : c.status === 'watch' ? 'is-watch' : 'is-todo'} />
+          ))}
+        </button>
+      )}
+      {groups.length > 0 && <div className="cto-legend"><span className="cto-dim">查的是：{groups.join(' · ')}</span></div>}
+      <div className="cto-legend"><span><RoleIcon role="bounce" size={14} />退回 {sent} 次 · Lean 拦下 {blocked} 次</span></div>
+    </article>
   )
 }
 
@@ -315,130 +825,50 @@ function SplitBar({ split }: { split: { p: Part; s: number }[] }) {
   )
 }
 
-/** 价值流: the requirement's time on one band — AI on this machine, the runner, waiting for a person, done again — with
- * its moments (approvals, the hand-over, questions, the merge) under it; every part opens the board. */
-function StreamCard({ board, onBoard }: { board: ReqBoard | null; onBoard: () => void }) {
-  const segs = board ? valueStream(board, board.at) : []
-  return board && segs.length ? <StreamChart board={board} segs={segs} onBoard={onBoard} /> : null
-}
+// ------------------------------------------------------------------ Lean
 
-/** The chart itself: mounted with its box, so it is measured at the width it has. */
-function StreamChart({ board, segs, onBoard }: { board: ReqBoard; segs: ReturnType<typeof valueStream>; onBoard: () => void }) {
-  const [ref, W] = useWidth(1100)
-  const [tip, setTip] = useState<TipState>(null)
-  const t0 = segs[0].from, t1 = segs[segs.length - 1].to
-  const total = Math.max(60, t1 - t0)
-  const L = 6, R = 6, pw = Math.max(10, W - L - R)
-  const x = (t: number) => L + ((Math.min(Math.max(t, t0), t1) - t0) / total) * pw
-  const moments = board.events.filter((e) => ['approve', 'reject', 'handover', 'accepted', 'question', 'answer', 'merge', 'reflect'].includes(e.kind))
-  const ICON: Record<string, string> = { approve: 'approved', reject: 'bounce', handover: 'handover', accepted: 'bridge', question: 'question', answer: 'person', merge: 'merge', reflect: 'brain' }
-  const H = 112
-  return (
-    <section className="cto-card" aria-label="价值流" data-testid="item-stream">
-      <div className="cto-chart-head">
-        <h3>价值流</h3>
-        <span className="cto-dim">从开工到{board.ended_at ? '合并' : '此刻'}，记下的 {fmtSpan(segs.reduce((a, s) => a + s.to - s.from, 0))} · 安静的时段没画 · 点任一段到需求看板</span>
-      </div>
-      <div className="cto-legend">
-        {(['agent', 'runner', 'person', 'rework'] as Part[]).map((p) => <span key={p}><i className="cto-sw" style={{ background: PART_VAR[p] }} />{PART_LABEL[p]}</span>)}
-        <span className="cto-dim">· 色块下方是关键时刻</span>
-      </div>
-      <div className="br-vs" ref={ref}>
-        <svg viewBox={`0 0 ${W} ${H}`} height={H} role="img" aria-label={'价值流：' + segs.map((s) => `${PART_LABEL[s.part]} ${fmtSpan(s.to - s.from)}`).join('，')}>
-          {segs.map((s, i) => {
-            const a = x(s.from), bb = x(s.to), w = Math.max(2, bb - a - 2)
-            return (
-              <g key={i} className="cto-vs-seg">
-                <rect x={a} y={18} width={w} height={26} rx={i === 0 || i === segs.length - 1 ? 5 : 2} fill={PART_VAR[s.part]} />
-                {w > 70 && <text x={a + 4} y={60} className="is-strong">{PART_LABEL[s.part]}</text>}
-                {w > 70 && <text x={a + 4} y={74}>{fmtSpan(s.to - s.from)}</text>}
-                <Hit x={a} y={14} w={Math.max(8, w)} h={34} onTip={setTip} onPick={onBoard} label={`${PART_LABEL[s.part]} ${fmtSpan(s.to - s.from)}`}
-                  when={`${fmtTime(s.from)} – ${fmtTime(s.to)}`} rows={[[fmtSpan(s.to - s.from), PART_LABEL[s.part], PART_VAR[s.part]], ['点击', '到需求看板']]} />
-              </g>
-            )
-          })}
-          {moments.map((m) => (
-            <g key={m.seq} className={`cto-vs-moment ${m.kind === 'reject' ? 'is-back' : m.kind === 'question' ? 'is-wait' : 'is-ok'}`} transform={`translate(${x(m.at)},${96})`}>
-              <title>{`${fmtTime(m.at)} · ${m.text}`}</title>
-              <circle r={9} />
-              <RoleGlyph role={ICON[m.kind]} cx={0} cy={0} size={12} />
-            </g>
-          ))}
-        </svg>
-        <Tip tip={tip} width={W} />
-      </div>
-    </section>
-  )
-}
-
-function OpenSession({ repo, reqKey, opened, onOpened }: { repo: string; reqKey: string; opened: OpenSessionResult | null; onOpened: (r: OpenSessionResult) => void }) {
-  const api = useAppApi()
-  const navigate = useNavigate()
-  const [trust, setTrust] = useState(true)
-  const [kickoff, setKickoff] = useState(true)
-  const act = useAction((body: OpenSessionBody) => api.post<OpenSessionResult>(paths.session(repo, reqKey), body))
-  const open = async () => {
-    const r = await act.run({ trust, kickoff })
-    if (r) onOpened(r)
-  }
-  return (
-    <section className="cto-card is-wait br-opensession" aria-label="开会话">
-      {opened ? (
-        <div className="br-row">
-          <span className="br-ok-text">会话开好了。</span>
-          <button type="button" className="kt-btn is-primary" onClick={() => navigate(opened.url)}>
-            <Icon name="MessageSquare" size={13} />打开会话
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="cto-chart-head"><h3>还没有会话</h3><span className="cto-dim">在这个需求的工作目录里开一个 brain-dev 会话，接着做。</span></div>
-          <div className="br-row">
-            <label className="br-check">
-              <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} />
-              <span>这个会话的工具调用不用逐个批准</span>
-            </label>
-            <label className="br-check">
-              <input type="checkbox" checked={kickoff} onChange={(e) => setKickoff(e.target.checked)} />
-              <span>开好后先发一句开场，让它接着做</span>
-            </label>
-            <span className="br-grow" />
-            <button type="button" className="kt-btn is-primary" disabled={act.busy} onClick={() => void open()}>{act.busy ? '正在开…' : '开会话'}</button>
-          </div>
-        </>
-      )}
-      {act.error && <p className="br-error" role="alert">{act.error}</p>}
-    </section>
-  )
-}
-
-function LeanCard({ x, sessionUrl }: { x: RequirementDetail; sessionUrl: string | null }) {
+function LeanCard({ x, sessionUrl, mrUrl }: { x: RequirementDetail; sessionUrl: string | null; mrUrl: string | null }) {
   const { stages, approvals } = x.lean
+  const lean = leanOf(x)
+  const onMr = handedOver(x)
+  const navigate = useNavigate()
   return (
     <section className="cto-card" aria-label="Lean 进度">
       <div className="cto-chart-head">
         <h3>AI-DLC Lean</h3>
-        <span className="cto-dim">做完或跳过 {x.row.lean.done}/{x.row.lean.total} 个阶段 · 审批的那一行由你在会话里自己打，app 不替你发</span>
+        <span className="cto-dim">{leanProgress(lean)} · {onMr ? '交接以后，审批在 MR 上回答' : '审批的那一行由你在会话里自己打，app 不替你发'}</span>
       </div>
       <ol className="br-stagecells" aria-label="11 个阶段">
-        {stages.map((s) => <StageCell key={s.id} s={s} />)}
+        {stages.map((s) => <StageCell key={s.id} s={s} next={lean.next?.n === s.n && s.state === 'todo'} />)}
       </ol>
-      <h3 style={{ marginTop: 4 }}>审批</h3>
+      <h3 className="br-lean-sub">审批</h3>
       {approvals.length === 0 ? <p className="br-empty">还没有审批。</p> : (
         <ul className="br-approvals" aria-label="审批">
           {approvals.map((a, i) => {
             const m = APPROVAL_META[a.state] ?? { label: a.state, tone: 'idle' }
+            const q = x.questions.find((qq) => qq.lean_request?.startsWith(a.kind) && qq.source !== 'park')
+            const url = q?.mr_url ?? mrUrl
+            const unit = /\/([^/]+)-code-generation-plan\.md$/.exec(a.path ?? '')?.[1]
             return (
               <li key={`${a.kind}-${a.sha8 ?? i}`} className="br-approval" data-testid="approval" data-state={a.state}>
                 <div className="br-row">
                   <RoleIcon role={a.kind === 'RELEASE' ? 'release' : a.kind === 'REQUIREMENTS' ? 'req' : 'design'} size={16} />
-                  <b className="br-mono">{a.kind}</b>
-                  <span className={`br-chip tone-${m.tone}`}>{m.label}</span>
-                  {a.sha8 && <code className="br-dim">{a.sha8}</code>}
+                  <b>{approvalName(a.kind)}{unit ? ` · ${unit}` : ''}</b>
+                  <span className={`br-chip tone-${m.tone}`}>{a.state === 'pending' && onMr ? '在 MR 上等回答' : m.label}</span>
                   {a.at !== null && <span className="br-dim br-small">{fmtTime(a.at)}</span>}
-                  {a.path && <code className="br-dim br-small">{a.path}</code>}
+                  <details className="br-raw">
+                    <summary>细节</summary>
+                    <code>{[a.kind, a.sha8, a.path].filter(Boolean).join(' · ')}</code>
+                  </details>
                 </div>
-                {a.state === 'pending' && a.line && <TypeLine line={a.line} sessionUrl={sessionUrl} />}
+                {a.state === 'pending' && (onMr
+                  ? (
+                    <p className="br-note">
+                      在 MR 上回答{q?.id ? ` ${q.id}` : ''}（approve / reject），这里不能回答。
+                      {url && /^https?:\/\//i.test(url) && <> <a className="br-link" href={url} target="_blank" rel="noopener noreferrer">{ACT.answerOnMr} <Icon name="ExternalLink" size={12} /></a></>}
+                    </p>
+                  )
+                  : a.line && <ApprovalLine line={a.line} sessionUrl={sessionUrl} onOpen={(u) => navigate(u)} />)}
               </li>
             )
           })}
@@ -448,12 +878,30 @@ function LeanCard({ x, sessionUrl }: { x: RequirementDetail; sessionUrl: string 
   )
 }
 
-function StageCell({ s }: { s: Stage }) {
-  const m = STAGE_META[s.state] ?? STAGE_META.todo
+/** A pending approval's line, typed by the person themselves in the session: 复制那一行, 打开会话. */
+function ApprovalLine({ line, sessionUrl, onOpen }: { line: string; sessionUrl: string | null; onOpen: (url: string) => void }) {
+  const { copied, copy } = useCopy(line)
   return (
-    <li className={`br-stagecell is-${s.state} tone-${m.tone === 'wait' ? 'approve' : m.tone}`} data-testid="stage" data-state={s.state} title={s.note ?? m.label}>
-      <span className="br-stage-n">{s.n} · {m.label}</span>
-      <span className="br-stage-label">{s.label}<span className="br-sr">（{m.label}）</span></span>
+    <div className="br-line" data-testid="type-line">
+      <code className="br-mono">{line}</code>
+      <div className="br-row">
+        <button type="button" className="br-btn is-small" onClick={() => void copy()}><Icon name="Copy" size={13} />{ACT.copyLine}</button>
+        {sessionUrl && <button type="button" className="br-btn is-small" onClick={() => onOpen(sessionUrl)}><Icon name="MessageSquare" size={13} />{ACT.openSession}</button>}
+        {copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
+        {copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请手动选中这一行</span>}
+      </div>
+      <p>{TYPE_IT_YOURSELF}</p>
+    </div>
+  )
+}
+
+function StageCell({ s, next }: { s: Stage; next: boolean }) {
+  const m = STAGE_META[s.state] ?? STAGE_META.todo
+  const label = next ? '下一步' : m.label
+  return (
+    <li className={`br-stagecell is-${s.state}${next ? ' is-next' : ''} tone-${m.tone === 'wait' ? 'approve' : m.tone}`} data-testid="stage" data-state={s.state} title={s.note ?? label}>
+      <span className="br-stage-n">{s.n} · {label}</span>
+      <span className="br-stage-label">{s.label}<span className="br-sr">（{label}）</span></span>
       {s.units.length > 0 && (
         <span className="br-stage-units">
           {s.units.map((u) => {
@@ -466,130 +914,130 @@ function StageCell({ s }: { s: Stage }) {
   )
 }
 
+// ------------------------------------------------------------------ decisions, questions, notes
+
+/** Who settled a decision, in words: the owner (you, when it is you), a person by their pseudonym, the Brain entries,
+ * the AI itself, a check, the bridge; a Who cell outside brain-kit's vocabulary stays 没归类 (never a guessed name). */
+function decidedBy(d: Decision, owner: string | null, me: boolean): string {
+  if (d.by === 'person') return d.who === 'owner' ? (me ? '你（负责人）' : `负责人${owner ? ` ${owner}` : ''}`) : `人${d.who ? `（化名 ${d.who}）` : ''}`
+  if (d.by === 'brain') return `${DECIDED_BY.brain}${d.who ? ` ${d.who}` : ''}`
+  if (d.by) return DECIDED_BY[d.by] ?? d.by
+  return d.who ?? '—'
+}
+
+function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt }: {
+  decisions: Decision[]
+  stages: Stage[]
+  repo: string
+  owner: string | null
+  me: boolean
+  go: ViewProps['go']
+  onAt: (t: number | null) => void
+}) {
+  const people = decisions.filter((d) => d.by === 'person').length
+  const atOf = (d: Decision) => stages.find((s) => s.id === d.stage)?.at ?? null
+  return (
+    <section className="cto-card" aria-label="决定">
+      <div className="cto-chart-head">
+        <h3>决定</h3>
+        <span className="cto-dim">{decisions.length} 条 · 人定了 {people} 条 · 每一条都能在需求看板上看它那个阶段 · 引用的 Brain 条目点开看</span>
+      </div>
+      {decisions.length === 0 ? <p className="br-empty">还没有记下决定。</p> : (
+        <table className="cto-table br-dec">
+          <thead>
+            <tr><th>编号</th><th>阶段</th><th>决定</th><th>为什么</th><th>谁定的</th><th>引用 Brain</th><th /></tr>
+          </thead>
+          <tbody>
+            {decisions.map((dd) => {
+              const t = atOf(dd)
+              const tip = [
+                dd.by === 'unclassified' ? 'Who 不是规定的写法：没归类，也不猜是谁' : '',
+                dd.by === 'person' && dd.who && dd.who !== 'owner' ? '化名：brain-kit 不写真名' : '',
+                dd.vouchers.length ? `凭证 ${dd.vouchers.join('、')}` : '',
+              ].filter(Boolean).join('；')
+              return (
+                <tr key={dd.id} data-testid="decision">
+                  <td className="br-key" data-label="编号" title={[dd.date, dd.src].filter(Boolean).join(' · ')}>{dd.id}</td>
+                  <td className="br-dim" data-label="阶段">{stageName(dd.stage) || '—'}</td>
+                  <td data-label="决定"><Inline text={dd.text} /></td>
+                  <td className="br-dim" data-label="为什么">{dd.why ? <Inline text={dd.why} /> : '—'}</td>
+                  <td data-label="谁定的" title={tip || undefined}>{decidedBy(dd, owner, me)}</td>
+                  <td data-label="引用 Brain"><span className="br-row" style={{ gap: 4 }}>{dd.cites.length ? dd.cites.map((c) => <EntryChip key={c} id={c} repo={repo} go={go} />) : <span className="br-dim">—</span>}</span></td>
+                  <td><button type="button" className="cto-link" onClick={() => onAt(t)} title={t ? `看板回放到 ${fmtTime(t)}` : '打开需求看板'}>{ACT.onBoard}</button></td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+    </section>
+  )
+}
+
+function QuestionsCard({ x, repo, reqKey, onAnswered }: { x: RequirementDetail; repo: string; reqKey: string; onAnswered: () => void }) {
+  // questions asked straight in the session (「Q1 选 A」 in decisions.md) are not park.json's or the MR's
+  const asked = x.decisions.flatMap((d) => [...d.text.matchAll(/\bQ(\d+)\b/g)].map((m) => ({ q: `Q${m[1]}`, d: d.id })))
+  const qs = [...new Set(asked.map((a) => a.q))]
+  const ds = [...new Set(asked.map((a) => a.d))]
+  return (
+    <section className="cto-card" aria-label="问题和回答">
+      <div className="cto-chart-head"><h3>问题和回答</h3><span className="cto-dim">{x.questions.length} 个 · 能在这里回答的才有回答框</span></div>
+      {x.questions.length === 0 ? (
+        <p className="br-empty">
+          {qs.length
+            ? `问题都是在会话里直接问的（${qs.join('、')}），回答记在决定 ${ds.join('、')} 里。这里只列停下来等回答的和 MR 上的问题。`
+            : '没有停下来问过人。'}
+        </p>
+      ) : (
+        <div className="br-stack">
+          {x.questions.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={repo} reqKey={reqKey} onAnswered={onAnswered} />)}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function NotesCard({ x }: { x: RequirementDetail }) {
   const { status, next, open_questions } = x.lean
   return (
     <section className="cto-card" aria-label="会话记录">
-      <div className="cto-chart-head"><h3>会话记录</h3><span className="cto-dim">aidlc-state.md 的 Session notes</span></div>
-      {status ? <p className="br-pre br-strong" style={{ margin: 0 }}>{status}</p> : <p className="br-empty">还没有写。</p>}
+      <div className="cto-chart-head"><h3>会话记录</h3><span className="cto-dim">Lean 记下的现状和下一步</span></div>
+      {status ? <p className="br-pre br-strong" style={{ margin: 0 }}><Inline text={status} /></p> : <p className="br-empty">还没有写。</p>}
       {next.length > 0 && (
         <div>
           <b className="br-strong">下一步</b>
-          <ul className="br-list">{next.map((n, i) => <li key={i}>{n}</li>)}</ul>
+          <ul className="br-list">{next.map((n, i) => <li key={i}><Inline text={n} /></li>)}</ul>
         </div>
       )}
       {open_questions.length > 0 && (
         <div>
           <b className="br-strong">没解决的问题</b>
-          <ul className="br-list">{open_questions.map((n, i) => <li key={i}>{n}</li>)}</ul>
+          <ul className="br-list">{open_questions.map((n, i) => <li key={i}><Inline text={n} /></li>)}</ul>
         </div>
       )}
     </section>
   )
 }
 
-function DecisionsCard({ decisions, repo, go }: { decisions: Decision[]; repo: string; go: ViewProps['go'] }) {
-  const people = decisions.filter((d) => d.by === 'person').length
-  return (
-    <section className="cto-card" aria-label="决定">
-      <div className="cto-chart-head">
-        <h3>决定</h3>
-        <span className="cto-dim">decisions.md · {decisions.length} 条 · 人定了 {people} 条 · 引用的 Brain 条目点开看</span>
-      </div>
-      {decisions.length === 0 ? <p className="br-empty">还没有记下决定。</p> : (
-        <div className="br-scroll">
-          <table className="cto-table">
-            <thead>
-              <tr><th>ID</th><th>日期</th><th>阶段</th><th>决定</th><th>为什么</th><th>谁定的</th><th>引用 Brain</th><th>凭证</th></tr>
-            </thead>
-            <tbody>
-              {decisions.map((dd) => (
-                <tr key={dd.id}>
-                  <td className="br-key" title={dd.src}>{dd.id}</td>
-                  <td className="br-dim" style={{ whiteSpace: 'nowrap' }}>{dd.date ?? '—'}</td>
-                  <td className="br-dim">{dd.stage ?? '—'}</td>
-                  <td className="br-pre">{dd.text}</td>
-                  <td className="br-pre br-dim">{dd.why ?? '—'}</td>
-                  <td title={dd.by === 'unclassified' ? 'Who 不是规定的写法：没归类，也不猜是谁' : undefined}>
-                    {[dd.who, dd.by ? BY_LABEL[dd.by] : null].filter(Boolean).join(' · ') || '—'}
-                  </td>
-                  <td><span className="br-row" style={{ gap: 4 }}>{dd.cites.length ? dd.cites.map((c) => <EntryChip key={c} id={c} repo={repo} go={go} />) : <span className="br-dim">—</span>}</span></td>
-                  <td>{dd.vouchers.length ? dd.vouchers.map((v) => <code key={v}>{v} </code>) : <span className="br-dim">—</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  )
-}
+// ------------------------------------------------------------------ sessions, the Brain, the timeline
 
-/** The local time of an ISO time (14:05), or "—". */
-function clock(iso: string | null): string {
-  if (!iso) return '—'
-  const t = fmtIso(iso)
-  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(t) ? t.slice(11) : '—'
-}
-
-function TimelineCard({ t }: { t: RequirementDetail['timeline'] }) {
-  const days = new Map<string, TimelineItem[]>()
-  for (const it of t.items) {
-    const day = isoDay(it.at) ?? '没有时间'
-    days.set(day, [...(days.get(day) ?? []), it])
-  }
-  return (
-    <section className="cto-card" aria-label="时间线">
-      <div className="cto-chart-head">
-        <h3>时间线</h3>
-        <span className="cto-dim">{t.source === 'trace' ? '来自 brain-kit trace' : 'app 自己拼的（brain-kit 没有 trace）'}</span>
-      </div>
-      {t.error && <p className="br-error" role="alert">{t.error}</p>}
-      <div className="br-tlbox">
-        {t.items.length === 0 ? <p className="br-empty">还没有记录。</p> : [...days.entries()].map(([day, items]) => (
-          <div key={day}>
-            <p className="br-day">{day}</p>
-            <ol className="br-tl">
-              {items.map((it, i) => {
-                const k = KIND_META[it.kind] ?? { icon: 'commit', label: it.kind }
-                return (
-                  <li key={i} data-testid="tl-item" data-kind={it.kind}>
-                    <time>{clock(it.at)}</time>
-                    <span title={k.label}><RoleIcon role={k.icon} size={16} /><span className="br-sr">{k.label}</span></span>
-                    <span>
-                      <span className="br-strong">{it.label}</span>
-                      {it.detail && <span className="br-dim"> · {it.detail}</span>}
-                      {it.who && <span className="br-dim br-small"> · {it.who}</span>}
-                    </span>
-                  </li>
-                )
-              })}
-            </ol>
-          </div>
-        ))}
-      </div>
-      {t.missing.length > 0 && <p className="br-note br-small">这些来源没读到：{t.missing.join('、')}</p>}
-    </section>
-  )
-}
-
-function sessionState(s: SessionRow): { label: string; tone: string } {
+function sessionState(s: SessionRow, replying: boolean): { label: string; tone: string } {
   if (s.error) return { label: '出错', tone: 'bad' }
   if (s.awaiting) return { label: '等批准', tone: 'wait' }
-  if (s.busy) return { label: '在忙', tone: 'run' }
-  return { label: '空闲', tone: 'idle' }
+  if (s.busy) return { label: '在做', tone: 'run' }
+  if (replying && s.kind === 'local') return { label: '等你回话', tone: 'wait' }
+  return { label: '空着', tone: 'idle' }
 }
 
-function SessionsCard({ sessions, total, note }: { sessions: SessionRow[]; total: number | null; note: string }) {
+function SessionsCard({ sessions, total, note, replying, at }: { sessions: SessionRow[]; total: number | null; note: string; replying: boolean; at: number }) {
   const navigate = useNavigate()
-  const now = Date.now() / 1000
   return (
     <section className="cto-card" aria-label="会话">
-      <div className="cto-chart-head"><h3>会话</h3><span className="cto-dim">这个 app 开的 · 合计 {fmtCredits(total)} credits</span></div>
-      {sessions.length === 0 ? <p className="br-empty">还没有会话。</p> : (
+      <div className="cto-chart-head"><h3>会话</h3><span className="cto-dim" title={note || undefined}>这个 app 开的 · 合计 {fmtCredits(total)} credits</span></div>
+      {sessions.length === 0 ? <p className="br-empty">还没开过会话。</p> : (
         <ul className="br-sessions">
           {sessions.map((s) => {
-            const st = sessionState(s)
+            const st = sessionState(s, replying)
             return (
               <li key={s.slot} className="br-session" data-testid="session">
                 <RoleIcon role={s.kind === 'runner' ? 'runner' : 'laptop'} size={22} />
@@ -603,32 +1051,41 @@ function SessionsCard({ sessions, total, note }: { sessions: SessionRow[]; total
                     <code>{s.agent}</code>
                     <span>credits {fmtCredits(s.credits)}</span>
                     <span>{s.turns} 轮</span>
-                    <span>最近 {ago(s.last_activity, now)}</span>
+                    <span>最近活动：{ago(s.last_activity, at)}</span>
                   </div>
                   {s.error && <p className="br-error br-small">{s.error}</p>}
                 </div>
                 <button type="button" className="kt-btn is-small" onClick={() => navigate(s.url)}>
-                  <Icon name="MessageSquare" size={13} />打开会话
+                  <Icon name="MessageSquare" size={13} />{ACT.openSession}
                 </button>
               </li>
             )
           })}
         </ul>
       )}
-      {note && <p className="br-hint">{note}</p>}
     </section>
   )
 }
 
-function BrainUseCard({ b, repo, go }: { b: RequirementDetail['brain']; repo: string; go: ViewProps['go'] }) {
+function BrainUseCard({ x, board, repo, reqKey, go }: { x: RequirementDetail; board: ReqBoard | null; repo: string; reqKey: string; go: ViewProps['go'] }) {
+  const b = x.brain
+  const branch = b.proposals ? reflectBranch(x, board) : null
+  const toReflect = () => go({ kind: 'brain', ...(repo !== 'runner' ? { repo } : {}), reflect: reqKey })
   return (
     <section className="cto-card" aria-label="用到的 Brain">
       <div className="cto-chart-head"><h3>用到的 Brain</h3><span className="cto-dim">开工时带进来的、决定里引用的</span></div>
       <div className="br-row">
         <span className="kt-pill tone-info">载入 {b.loaded ?? '—'} 条</span>
         <span className="kt-pill tone-ok">引用 {b.cited.length} 条</span>
-        {b.proposals !== null && <span className="kt-pill tone-handoff">提议 {b.proposals} 条新知识</span>}
       </div>
+      {b.proposals !== null && b.proposals > 0 && (
+        <div className="br-row" data-testid="brain-proposals">
+          <span>
+            提议 {b.proposals} 条新知识：{branch ? <>已写到回写分支 <code>{branch}</code>，等合并</> : '还没回写到 Brain'}
+          </span>
+          <button type="button" className="cto-link" onClick={toReflect}>在 Brain 里看 ↗</button>
+        </div>
+      )}
       <div className="br-row" aria-label="引用">
         <span className="br-dim br-small">引用</span>
         {b.cited.length ? b.cited.map((c) => <EntryChip key={c} id={c} repo={repo} go={go} />) : <span className="br-dim">—</span>}
@@ -643,6 +1100,84 @@ function BrainUseCard({ b, repo, go }: { b: RequirementDetail['brain']; repo: st
         <div className="br-row" aria-label="不认识">
           <span className="br-bad-text br-small">Brain 里没有</span>
           {b.unknown.map((c) => <span key={c} className="br-tag br-mono">{c}</span>)}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** The local time of an ISO time (14:05), or "—". */
+function clock(iso: string | null): string {
+  if (!iso) return '—'
+  const t = fmtIso(iso)
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(t) ? t.slice(11) : '—'
+}
+
+const PSEUDONYM = /^[A-Z]-[0-9A-F]{4,}$/
+
+/** An item of the timeline in words: the app's own records said plainly (no slot ids, commands or flags). */
+function itemText(it: TimelineItem): { label: string; detail: string | null; title: string | null } {
+  const reflect = /^brain reflect --apply( --push)?：(.+)$/.exec(it.label)
+  if (reflect) return { label: `回写 Brain${reflect[1] ? '并推送' : ''}：${reflect[2]}`, detail: it.detail ? `分支 ${it.detail}` : null, title: it.label }
+  if (it.label === '开了 brain-dev 会话') return { label: it.label, detail: it.detail?.includes('信任') ? '工具调用不用逐个批准' : null, title: it.detail }
+  if (it.kind === 'commit' && it.detail && /^[0-9a-f]{7,40}$/.test(it.detail)) return { label: it.label, detail: it.detail.slice(0, 8), title: it.detail }
+  if (it.detail && /^claim\/\S+ 推到 origin$/.test(it.detail)) return { label: it.label, detail: '认领推到了远端', title: it.detail }
+  return { label: it.label, detail: it.detail ? it.detail.replace(/^工作区 /, '工作目录 ') : null, title: null }
+}
+
+function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: boolean }) {
+  const t = x.timeline
+  const items = [...t.items].sort((a, b) => (isoSec(b.at) ?? 0) - (isoSec(a.at) ?? 0))
+  const days = new Map<string, TimelineItem[]>()
+  for (const it of items) {
+    const day = isoDay(it.at) ?? '没有时间'
+    days.set(day, [...(days.get(day) ?? []), it])
+  }
+  const missing = [...new Set(t.missing.map(missingSourceName))]
+  return (
+    <section className="cto-card" aria-label="时间线">
+      <div className="cto-chart-head">
+        <h3>时间线</h3>
+        <span className="cto-dim">最新的在上面 · {t.source === 'trace' ? 'brain-kit 记下的' : 'app 从 Lean 记录和提交拼的'}</span>
+      </div>
+      {t.error && (
+        <div className="br-note" role="status">
+          <p style={{ margin: 0 }}>这个需求的记录有一部分读不出来，下面只列读到的。</p>
+          <p className="br-hint">做什么：等一会儿它会自己再读；一直这样的话，把细节里的原话发给维护 app 的人。</p>
+          <details className="br-raw"><summary>细节</summary><pre>{t.error}</pre></details>
+        </div>
+      )}
+      <div className="br-tlbox">
+        {items.length === 0 ? <p className="br-empty">还没有记录。</p> : [...days.entries()].map(([day, list]) => (
+          <div key={day}>
+            <p className="br-day">{day}</p>
+            <ol className="br-tl">
+              {list.map((it, i) => {
+                const k = KIND_META[it.kind] ?? { icon: 'commit', label: it.kind }
+                const s = itemText(it)
+                const long = !!s.detail && s.detail.length > 60
+                const who = it.who && !PSEUDONYM.test(it.who) ? it.who : null
+                return (
+                  <li key={i} data-testid="tl-item" data-kind={it.kind} title={[s.title, it.who && !who ? `化名 ${it.who}` : null].filter(Boolean).join(' · ') || undefined}>
+                    <time>{clock(it.at)}</time>
+                    <span title={k.label}><RoleIcon role={k.icon} size={16} /><span className="br-sr">{k.label}</span></span>
+                    <span>
+                      <span className="br-strong">{s.label}</span>
+                      {s.detail && !long && <span className="br-dim"> · {s.detail}</span>}
+                      {who && <span className="br-dim br-small"> · {who}</span>}
+                      {long && <details><summary className="br-small">看说明</summary><span className="br-dim br-small"><Inline text={s.detail} /></span></details>}
+                    </span>
+                  </li>
+                )
+              })}
+            </ol>
+          </div>
+        ))}
+      </div>
+      {showMissing && missing.length > 0 && (
+        <div className="br-note br-small br-tlmissing">
+          这里读不到：{missing.join('、')}。时间线里没有这些事。
+          <details className="br-raw"><summary>细节</summary><pre>{t.missing.join('\n')}</pre></details>
         </div>
       )}
     </section>

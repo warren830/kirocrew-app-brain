@@ -291,5 +291,19 @@ button.br-tag:hover { border-color: var(--accent); color: var(--text-strong); }
 .br-segs i.is-run { background: var(--kt-run); box-shadow: 0 0 8px color-mix(in srgb, var(--kt-run) 55%, transparent); }
 .br-switch { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .br-switch .kt-select { max-width: 340px; color: var(--text-strong); }
+/* ---------- Markdown shown as text (views/Markdown.tsx: a 变更说明's 看全文) ---------- */
+.br-md { display: grid; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--text); line-height: 1.6; }
+.br-md > * { margin: 0; min-width: 0; }
+.br-md :is(h4, h5) { margin: 6px 0 0; color: var(--text-strong); font-weight: 700; }
+.br-md h4 { font-size: 1.08em; }
+.br-md h5 { font-size: 1em; }
+.br-md :is(ul, ol) { padding-left: 1.4em; display: grid; gap: 2px; }
+.br-md hr { border: 0; border-top: 1px solid var(--border); }
+.br-md pre { padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); white-space: pre-wrap; word-break: break-word; }
+.br-md .cto-table { font-size: 13px; }
+.br-md .cto-table td { color: var(--text); }
+.br-md .cto-table td:first-child { white-space: nowrap; }
+.br-md code, .br-inline code { padding: 0 4px; border-radius: 5px; background: color-mix(in srgb, var(--text) 8%, transparent); overflow-wrap: anywhere; }
+.br-mdfold > summary { font-size: 13px; }
 `
 

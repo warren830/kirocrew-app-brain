@@ -48,6 +48,9 @@ export const ACT = {
   openBoard: '需求看板',
   openDetail: '需求详情',
   me: '你是谁',
+  review: '开审查会话',
+  writeBack: '回写 Brain',
+  onBoard: '在看板上看 ↗',
 } as const
 
 /** where a requirement came from (Requirement.source, brainkit.intents) */
@@ -75,3 +78,25 @@ export const WAIT_NAME: Record<WaitDo, string> = {
   approve: '等批准', reply: '等回话', tool: '等批准工具调用', start: '等开工', answer: '等回答', accept: '等验收',
   redo_handoff: '要重做交接', label_handoff: '要补交接标签', write_back: '要回写 Brain', watch: '观察中', none: '',
 }
+
+/** where a requirement's facts were read (Requirement.where) → where it is, in words (需求详情's head) */
+export const WHERE_NAME: Record<string, string> = {
+  worktree: '在这台机器上做', branch: '在运行分支上（这台机器没检出）', main: '已合并到默认分支', runner: '在运行机上', claim: '只有认领',
+}
+
+/** who settled a decision (Decision.by, decisions.md's Who) → one word; a person's pseudonym and the Brain entries are
+ * added by the view */
+export const DECIDED_BY: Record<string, string> = {
+  agent: 'AI 自己定的', person: '人', check: '检查定的', brain: '照 Brain', bridge: '桥记下的', unclassified: '没归类',
+}
+
+/** what a check of the wall is about (CheckCell.group) */
+export const CHECK_GROUP_NAME: Record<string, string> = {
+  gate: 'Lean 审批', verify: '自动检查', handover: '交接', brain: 'Brain', after: '合并后观察',
+}
+
+/** a source brain-kit's trace could not read (its English words, ReqBoard.missing) → what it is */
+const MISSING_SOURCE: [RegExp, string][] = [
+  [/^bridge ledger/i, '桥的账本'], [/^vouchers/i, '回答凭证'], [/^pushes/i, '推送记录'], [/^CI pipelines/i, 'GitLab 上的 CI'], [/^runnerd/i, '运行机的记录'],
+]
+export const missingSourceName = (raw: string): string => MISSING_SOURCE.find(([re]) => re.test(raw))?.[1] ?? '别的记录'
