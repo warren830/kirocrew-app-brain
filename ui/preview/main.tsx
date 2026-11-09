@@ -18,12 +18,12 @@ import world from './world.json'
 import { API, fixtureRoutes } from '../src/test/routes'
 import { StubApiError, setApiRoutes, setNavigateHook } from '../src/test/stubs/app-sdk'
 import type {
-  CrewFixBody, ImportInspect, ImportJob, IntakeBody, Overview, ReflectApplyBody, ReflectApplyResult, ReqBoard, RepoInfo, RequirementDetail, Settings, StartBody, Status,
+  CrewFixBody, ImportInspect, ImportJob, IntakeBody, Overview, ReflectApplyBody, ReflectApplyResult, ReqBoard, RepoInfo, RequirementDetail, Settings, SplitResult, StartBody, Status,
 } from '../src/types'
 
-const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'norepos', 'light'] as const
+const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'norepos', 'race', 'light'] as const
 type Flag = (typeof FLAGS)[number]
-const FLAG_NAME: Record<Flag, string> = { team: '团队模式', nokit: '找不到 brain-kit', crewfail: 'KiroCrew 有 FAIL', noeval: '没有 evaluate', norepos: '没有仓库', light: '亮色' }
+const FLAG_NAME: Record<Flag, string> = { team: '团队模式', nokit: '找不到 brain-kit', crewfail: 'KiroCrew 有 FAIL', noeval: '没有 evaluate', norepos: '没有仓库', race: '认领晚一步', light: '亮色' }
 const KEY = 'brain-preview-flags'
 
 function readFlags(): Set<Flag> {
@@ -135,7 +135,7 @@ function overview(path: string): Overview {
   }
   o.errors = repos.filter((r) => !r.ok && !r.pending && (repo === 'all' || r.id === repo)).map((r) => ({ repo: r.id, error: r.error }))
   if (flags.has('noeval')) {
-    o.eval = { available: false, error: 'brain-kit 还没有 evaluate 模块', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
+    o.eval = { available: false, error: 'brain-kit 还没有 evaluate 模块', ref: null, metrics: [], queue: [], skipped: [], notes: [], families: [] }
     o.cto = { ...o.cto, available: false, unattended: null, stepped_in: null, runs: [], sentence: o.cto.credits.per_req !== null ? `每个需求平均 ${o.cto.credits.per_req} credits。` : o.cto.sentence }
   }
   return o
@@ -150,6 +150,9 @@ setApiRoutes({
   [`GET ${API}/settings`]: () => clone(settings),
   [`GET ${API}/crew`]: () => ({ ...status().crew }),
   [`GET ${API}/todo`]: () => shift({ ...fx.todo(), team: flags.has('team') }),
+  [`GET ${API}/team`]: () => shift(teamView()),
+  // the next free key of shop-pay comes after the world's big requirement and its small ones
+  [`GET ${API}/intake/next*`]: (_b, path) => (path.includes('repo=r1') ? { ...fx.intakeNext(), key: 'PAY-12' } : fx.intakeNext()),
   [`GET ${API}/overview*`]: (_b, path) => shift(overview(path)),
   [`POST ${API}/settings`]: (body) => {
     settings = { ...settings, ...clone(body as Partial<Settings>) }
@@ -159,6 +162,24 @@ setApiRoutes({
   [`POST ${API}/refresh`]: (body) => ({ ok: true, text: `预览：没有真的跑 git fetch（${(body as { repo: string }).repo}）` }),
   [`POST ${API}/requirements/*`]: (body, path) => {
     if (path.endsWith('/session')) return { ok: true, slot: 'brain-PAY-3-7f3a', url: '/chat?sid=brain-PAY-3-7f3a' }
+    const key = decodeURIComponent(path.split('/').slice(-2)[0])
+    if (path.endsWith('/split')) return splitAnswer(key, !!(body as { apply?: boolean }).apply)
+    if (path.endsWith('/claim')) {
+      const release = !!(body as { release?: boolean }).release
+      if (!release && flags.has('race')) {    // carol's claim reached the server first (brain-kit: first push wins)
+        const text = `晚了一步：carol 先认领了 ${key}`
+        return { ok: false, text, owner: 'carol', output: `brain: ${key} was just claimed by carol: their claim reached the server first`,
+          problem: { level: 'FAIL', text, todo: '换一个待认领的小需求', fix: null, repo: null, raw: `${key} was just claimed by carol: their claim reached the server first` } }
+      }
+      return { ok: true, text: release ? `预览：没有真的放回。放回去了：${key} 又是待认领` : `预览：没有真的认领。认领了 ${key}`, owner: release ? null : 'alice', problem: null, output: '' }
+    }
+    if (path.endsWith('/start')) {
+      const on = (body as { on?: string }).on ?? null
+      return { ok: true, key, branch: `ai/alice/${key}-jobs`, worktree: `/Users/alice/workplace/brain-app/shop-pay/${key.toLowerCase()}-jobs`, on,
+        text: `预览：没有真的开工。开工了：${key}（jobs），分支 ai/alice/${key}-jobs${on ? `，从 ${on} 的分支开始` : ''}`, blocked: [], can_on: null, problem: null,
+        output: '', slot: `brain-${key}-1a2b`, url: `/chat?sid=brain-${key}-1a2b`, session_error: '' }
+    }
+    if (path.endsWith('/sync')) return { ok: true, result: 'merged', text: '预览：没有真的同步。合进来了：ai/alice/PAY-8-big，Lean 自己的文件已经自动解决', conflicts: [], problem: null, output: '' }
     const choice = (body as { choice: string }).choice
     return { ok: true, via: 'session', text: `预览：回答 ${choice} 没有真的送出去` }
   },
@@ -195,6 +216,50 @@ setApiRoutes({
   },
   [`POST ${API}/team/loop`]: () => ({ ok: true, summary: { handoffs: 0, answers: 1, signed: 1 }, error: '' }),
 })
+
+/** 运行机 in the preview: the fixture with what brain-kit 0d52e97's bridge also keeps (the outbox, the notices on a run,
+ * bridge.json and runnerd.json, the runner's hooks). */
+function teamView() {
+  const t = fx.team()
+  t.ledger.outbox = { sent: 14, unknown: 1, dropped: 1 }
+  t.runs = t.runs.map((r) => (r.run_id === 'RUN-PAY-5-1' ? { ...r, notes: [{ kind: 'ci_wait', text: '验收问题等 MR 的流水线通过才发（通过以后桥自动发）', at: FIXTURE_AT - 1800 }] }
+    : r.run_id === 'RUN-PAY-4-1' ? { ...r, notes: [{ kind: 'outbox_unknown', text: 'D-2 的回答不知道送到会话没有（送过 1 次）：桥每轮看一下会话，看到了就算送到；一直这样就要人看一下会话', at: FIXTURE_AT - 600 }] } : r))
+  t.config = [
+    { file: 'bridge.json', key: 'interval', value: '60 秒', default: true, text: '桥每隔这么久跑一轮' },
+    { file: 'bridge.json', key: 'send_give_up_minutes', value: '60 分钟', default: true, text: '接手消息送了 3 次都没进运行机的会话，过了这么久就算这个 run 没能开始（回答和通知一直送，不放弃）' },
+    { file: 'bridge.json', key: 'runnerd_wait_minutes', value: '120 分钟', default: false, text: '运行机这么久没准备好工作区、也没报错，就在 MR 上说一声（桥接着等）' },
+    { file: 'bridge.json', key: 'acceptance_ci_wait_minutes', value: '60 分钟', default: true, text: '验收问题等流水线通过才发：流水线这么久还没跑完，就在 MR 上说一声' },
+    { file: 'bridge.json', key: 'edit_check_rounds', value: '3', default: true, text: '查不到回复有没有被别人改过：连着这么多轮，就在 MR 上说一声（回答先等着，不算也不丢）' },
+    { file: 'bridge.json', key: 'edit_check_wait_minutes', value: '30 分钟', default: true, text: '……或者从第一次查不到起过了这么久' },
+    { file: 'runnerd.json', key: 'kit_dir', value: '/opt/brain-kit', default: false, text: '运行机用哪份 brain-kit 的 kit/：每建一个工作区前查一次，它的 lean-hook.py 要是第 3 版' },
+    { file: 'runnerd.json', key: 'agent_spec', value: '/home/brainbot/.kiro/agents/brain-run.json', default: false, text: 'brain-run 的 agent 文件：查它带着 lean-hook.py --runner 的三个 hook（工具调用前的匹配要是 *）' },
+    { file: 'runnerd.json', key: 'hook_path', value: '/usr/bin:/bin', default: true, text: '运行机上的 hook 找 git 和 ssh-keygen 用的 PATH' },
+  ]
+  t.hooks = [{ level: 'OK', text: '运行机的 Lean hook 没问题：brain-kit 带的 lean-hook.py 是第 3 版，brain-run 的三个 hook 都对', todo: '', fix: null, repo: null, raw: '' }]
+  return t
+}
+
+/** 拆成小需求 in the preview: what `brain split --dry-run --json` would say for a big one's three units (nothing filed). */
+function splitAnswer(key: string, apply: boolean): SplitResult {
+  const units: [string, string, string, string[]][] = [['api', '通过接口提交退款', 'services/api/**', []], ['web', '在订单页看到退款状态', 'web/**', ['api']],
+    ['jobs', '每晚自动对账', 'jobs/**', ['web']]]
+  const fam = W.boards[`r1/${key}`]?.row.family
+  if (fam?.role === 'parent') {        // split already: the same approved units again, nothing changes
+    return { ok: true, dry_run: !apply, parent: key, branch: fam.branch, units_sha: '31369169', design_sha: '4a037c33', warnings: [], problems: [], output: '',
+      actions: fam.children.map((c) => ({ unit: c.unit ?? '', kind: 'same', kind_label: '没变', key: c.key, title: c.title, paths: [], depends_on: c.depends_on, contracts: [], why: [], attention: false })),
+      text: `${apply ? '预览：没有真的拆。拆好了' : '会拆成'} ${fam.children.length} 个小需求（没变 ${fam.children.length} 个）` }
+  }
+  const n = Number(key.split('-')[1] ?? 0)
+  return {
+    ok: true, dry_run: !apply, parent: key, branch: `ai/alice/${key}-big`, units_sha: '31369169', design_sha: '4a037c33',
+    actions: units.map(([unit, title, paths, deps], i) => ({
+      unit, kind: 'new', kind_label: '新登记（待认领）', key: apply ? `PAY-${n + 10 + i}` : null, title: `${unit} · ${title}`, paths: [paths],
+      depends_on: deps.map((d) => (apply ? `PAY-${n + 10 + units.findIndex((u) => u[0] === d)}` : `${d}（新）`)), contracts: [], why: [], attention: false,
+    })),
+    warnings: [], problems: [], output: '',
+    text: apply ? '预览：没有真的拆。拆好了：3 个小需求（新登记 3 个（待认领））' : '会拆成 3 个小需求（新登记 3 个（待认领））',
+  }
+}
 
 /** 导入仓库 in the preview: the fixtures moved to the path asked for; jobs whose steps advance with the clock. */
 function importRoutes() {
