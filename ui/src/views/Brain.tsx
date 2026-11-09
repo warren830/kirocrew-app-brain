@@ -7,8 +7,9 @@
  * picked out and scrolled to. Beside it the Brain's check and what is never cited or keeps coming back; below, every
  * run's use of the Brain (the numbers count the runs merged into the default branch: a run not merged yet is listed on
  * its own, with what 需求详情 says for it), and 回写 as steps: pick a requirement → 预览 → the changes → confirm →
- * written on a new branch (and an MR, linked). An empty Brain says what fills it and leads to 开需求; no repo leads to
- * 导入仓库. Breakpoints follow the view's own width (its root is the `kt-root` container), not the window: inside
+ * written on a new branch (and an MR, linked); the merged requirements first, the usual time to write one back. An empty
+ * Brain says what fills it and leads to 开需求; no repo leads to 导入仓库; a repo asked for that cannot be read says why
+ * (never another repo's Brain in its place). A rate whose base is 0 says 还没有 and when it will have one. Breakpoints follow the view's own width (its root is the `kt-root` container), not the window: inside
  * KiroCrew the dashboard's sidebar takes ~230 px of it.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -67,9 +68,11 @@ const FILL_FLOW: FlowStep[] = [
 export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewProps) {
   const api = useAppApi()
   const reduced = useReducedMotion()
-  const repos = (props.status?.repos ?? []).filter((r) => r.ok)
+  const listed = props.status?.repos ?? []
+  const repos = listed.filter((r) => r.ok)
   const [repoPick, setRepoPick] = useState(entry.repo ?? '')
-  const repo = repoPick && (!props.status || repos.some((r) => r.id === repoPick)) ? repoPick : repos[0]?.id ?? ''
+  const unreadable = repos.length > 0 ? listed.find((r) => r.id === repoPick && !r.ok) : undefined
+  const repo = unreadable ? '' : repoPick && (!props.status || repos.some((r) => r.id === repoPick)) ? repoPick : repos[0]?.id ?? ''
   const brain = usePoll<BrainView>(repo ? paths.brain(repo) : null, props.pollMs ?? 0)
   const data = brain.data
 
@@ -82,7 +85,8 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
   const file: BrainFileView | undefined = data
     ? data.files.find((f) => f.key === filePick) ?? (id ? data.files.find((f) => hasEntry(f, id)) : undefined) ?? data.files[0]
     : undefined
-  const reflectKey = reflectPick && data?.reflect.some((r) => r.key === reflectPick) ? reflectPick : data?.reflect[0]?.key
+  const reflectable = data ? mergedFirst(data.reflect) : []
+  const reflectKey = reflectPick && reflectable.some((r) => r.key === reflectPick) ? reflectPick : reflectable[0]?.key
 
   const write = (patch: Partial<BrainEntryRef>) => {
     const v = { repo: repo || undefined, file: (file?.key as BrainFile | undefined) ?? filePick, id, reflect: reflectPick, ...patch }
@@ -141,7 +145,7 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
       key={repo}
       repo={repo}
       branch={branch}
-      items={data.reflect}
+      items={reflectable}
       pick={reflectKey}
       onPick={(k) => {
         setReflectPick(k)
@@ -170,8 +174,8 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
           <>
             <label className="bv-repo" htmlFor="brain-repo">
               <span className="br-dim">仓库</span>
-              <select id="brain-repo" value={repo} onChange={(e) => pickRepo(e.target.value)}>
-                {repos.map((r) => <option key={r.id} value={r.id}>{repoLabel(r, repos)}</option>)}
+              <select id="brain-repo" value={unreadable?.id ?? repo} onChange={(e) => pickRepo(e.target.value)}>
+                {listed.map((r) => <option key={r.id} value={r.id} disabled={!r.ok}>{repoLabel(r, listed)}{r.ok ? '' : '（现在读不了）'}</option>)}
               </select>
             </label>
             {data?.ref && <span className="bv-ref" title={`Brain 读的是默认分支上的这个版本：${data.ref}`}>读的是 <code>{data.ref.split('@')[0]}</code></span>}
@@ -198,6 +202,15 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
           punch="先导入一个仓库，这里就能看到它的 Brain。">
           <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'import' })}>
             <RoleIcon role="import" size={17} />导入仓库
+          </button>
+        </EmptyHero>
+      )}
+      {unreadable && (
+        <EmptyHero testid="repo-unreadable" title={`${unreadable.name} 的 Brain 现在看不了`}
+          text={[unreadable.pending ? unreadable.pending.text : unreadable.error || '读不了']}
+          punch="按上面的提示修好以后，这里就能看到它的 Brain；要看别的仓库，在右上角换一个。">
+          <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'import', path: unreadable.path })}>
+            <RoleIcon role="import" size={17} />去导入仓库检查
           </button>
         </EmptyHero>
       )}
@@ -321,12 +334,10 @@ function BrainKpis({ data, lint, branch, onEntry }: { data: BrainView; lint: Che
       <Kpi label="条目" value={total} of="条" testid="kpi-entries">
         <FileBar files={data.files} total={total} />
       </Kpi>
-      <Kpi label="知识有用率" value={fmtRate(u.useful).pct} of={fmtRate(u.useful).frac} note={`现有条目里被引用过的 · 只算合并进 ${branch} 的运行`} testid="usage-useful">
-        <RateCells rate={u.useful} hit="pass" label="用上的" />
-      </Kpi>
-      <Kpi label="重复纠正率" value={fmtRate(u.repeat_rate).pct} of={fmtRate(u.repeat_rate).frac} note="同样的纠正又出现的" testid="usage-repeat">
-        <RateCells rate={u.repeat_rate} hit="fail" label="又出现的" />
-      </Kpi>
+      <RateKpi label="知识有用率" rate={u.useful} hit="pass" cells="用上的" testid="usage-useful"
+        note={`现有条目里被引用过的 · 只算合并进 ${branch} 的运行`} none="Brain 里还没有条目：写进条目以后才算得出" />
+      <RateKpi label="重复纠正率" rate={u.repeat_rate} hit="fail" cells="又出现的" testid="usage-repeat"
+        note="同样的纠正又出现的" none="还没有「纠正」类的条目：有了才算得出" />
       <Kpi label="撤回候选" value={candidates.length} of="条" testid="kpi-candidates"
         note={candidates.length ? undefined : `没有 · 已归档 ${u.archived} · 已清除 ${u.purged}`}>
         {candidates.length > 0 && (
@@ -369,9 +380,21 @@ function FileBar({ files, total }: { files: BrainFileView[]; total: number }) {
   )
 }
 
-/** a/b as cells (up to 40), else as a bar; *hit* says how the a are drawn. */
+/** A rate a/b as a counter card: the percentage and a/b with its cells; with a base of 0, 还没有 and when it will have one. */
+function RateKpi({ label, rate, hit, cells, note, none, testid }: {
+  label: string; rate: [number, number]; hit: 'pass' | 'fail'; cells: string; note: string; none: string; testid: string
+}) {
+  if (rate[1] <= 0) return <Kpi label={label} value={<span className="bv-word">还没有</span>} note={none} testid={testid} />
+  const r = fmtRate(rate)
+  return (
+    <Kpi label={label} value={r.pct} of={r.frac} note={note} testid={testid}>
+      <RateCells rate={rate} hit={hit} label={cells} />
+    </Kpi>
+  )
+}
+
+/** a/b (b > 0) as cells (up to 40), else as a bar; *hit* says how the a are drawn. */
 function RateCells({ rate: [a, b], hit, label }: { rate: [number, number]; hit: 'pass' | 'fail'; label: string }) {
-  if (b <= 0) return <div className="kt-kpi-note">还没有数</div>
   if (b <= 40) {
     return <Segs label={`${a}/${b} ${label}`} cells={Array.from({ length: b }, (_, i) => ({ tone: i < a ? hit : 'idle' as const }))} />
   }
@@ -390,6 +413,9 @@ function IdChips({ ids, onEntry, tone = 'idle' }: { ids: string[]; onEntry: (id:
     </span>
   )
 }
+
+/** The requirements to write back, the merged ones first (the usual time to write one back), else in the backend's order. */
+const mergedFirst = (items: BrainView['reflect']) => [...items.filter((r) => r.state === 'merged'), ...items.filter((r) => r.state !== 'merged')]
 
 /** what to do about a withdraw candidate (an entry runs keep loading and never cite) */
 export const CANDIDATE_DO = '看一眼还有没有用：没用了，就在下一个需求里让 AI 提议撤回它，回写以后它就从 Brain 里拿掉；还有用就不用管。'
@@ -473,15 +499,15 @@ function UsageCard({ usage, onEntry }: { usage: BrainView['usage']; onEntry: (id
         <span className="br-dim br-small">已归档 {usage.archived} · 已清除 {usage.purged}</span>
       </header>
       <div className="bv-block">
-        <b className="bv-block-h">又出现的纠正</b>
-        {usage.repeats_any.length === 0 ? <p className="br-empty">没有：同样的纠正没再出现过。</p> : (
+        <b className="bv-block-h">又出现的条目</b>
+        {usage.repeats_any.length === 0 ? <p className="br-empty">没有：还没有哪一条又出现过。</p> : (
           <ul className="bv-repeats" data-testid="usage-repeats">
             {usage.repeats_any.map(([x, n]) => (
               <li key={x}>
                 <button type="button" className={`br-chip tone-${n >= 2 ? 'bad' : 'warn'}`} onClick={() => onEntry(x)}>{x}</button>
                 <span className="bv-rep-n" aria-hidden="true">{Array.from({ length: Math.min(n, 8) }, (_, i) => <i key={i} />)}</span>
                 <span>重复 {n} 次</span>
-                {n >= 2 && <span className="br-chip tone-bad kt-pill" title="同样的纠正出现两次以上：写成一个会失败的确定性检查，别再靠 AI 记住">该写成确定性检查了</span>}
+                {n >= 2 && <span className="br-chip tone-bad kt-pill" title="同样的事出现两次以上：写成一个会失败的确定性检查，别再靠 AI 记住">该写成确定性检查了</span>}
               </li>
             ))}
           </ul>
@@ -760,6 +786,7 @@ const BV_CSS = `
 @container kt-root (max-width: 760px) { .bv-kpis > *, .bv-kpis > :nth-child(n+4) { grid-column: span 3; } .bv-kpis > :last-child:nth-child(odd) { grid-column: span 6; } }
 @container kt-root (max-width: 460px) { .bv-kpis > *, .bv-kpis > :nth-child(n+4), .bv-kpis > :last-child:nth-child(odd) { grid-column: span 6; } }
 .bv-kpis .br-kpi-big { font-size: 2.6em; }
+.bv-kpis .bv-word { font-size: .73em; color: var(--muted); }
 .bv-stack { display: flex; gap: 2px; height: .8em; margin-top: .2em; border-radius: .3em; overflow: hidden; }
 .bv-stack i { flex: 1 1 0; min-width: .4em; background: var(--muted); }
 .bv-stack i.is-none { background: color-mix(in srgb, var(--muted) 22%, transparent); }

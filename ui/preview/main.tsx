@@ -11,12 +11,14 @@
  * Every fixture time is moved so that the fixtures' `at` is now. Opening a session is shown, not done.
  *
  * The stubs answer as the real backend does, so the preview never looks better than the app: 待办 is the backend's own
- * list when the world has it (else the fixture), only of the repos listed, its KiroCrew items made from the FAIL rows as
- * backend/core/todo.py makes them, and /status counts that very list; KiroCrew's rows are those of the listed repos;
- * brain-kit not found says it as backend/core/bk.py does, with no modules; gate 2 refuses confidential material as
- * brain-kit does when the repo's kit does not allow it (it never does here); a repo filter answers with that repo's own
- * numbers when the world has them; the Brain of a repo is its own (shop-pay's is the fixture, the others are empty), a
- * reflect preview is the requirement's own, 运行机's counts come from its own runs table, a round says brain-kit's steps.
+ * list when the world has it (else the fixture), only of the repos listed (in team mode the person's own, then the
+ * runner's), its KiroCrew items made from the FAIL rows as backend/core/todo.py makes them, and /status counts that very
+ * list; KiroCrew's rows are those of the listed repos; brain-kit not found says it as backend/core/bk.py does, with no
+ * modules; without evaluate the module is off and 交付评估 says so as the backend does; gate 2 refuses confidential
+ * material as brain-kit does when the repo's kit does not allow it (it never does here); a repo filter answers with that
+ * repo's own numbers when the world has them; the Brain of a repo is the one brainview.view made for it (a repo the app
+ * cannot read answers 404, as the backend does), a reflect preview is the requirement's own, 运行机's counts come from
+ * its own runs table, a round says brain-kit's steps; 开审查会话 opens a new session, never the live one.
  */
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -27,7 +29,7 @@ import { API, fixtureRoutes } from '../src/test/routes'
 import { StubApiError, setApiRoutes, setNavigateHook } from '../src/test/stubs/app-sdk'
 import { simulated } from './simulate'
 import type {
-  BrainView, CheckRow, CrewFixBody, ImportInspect, ImportJob, IntakeBody, IntakeNext, KitForm, Overview, ReflectApplyBody, ReflectApplyResult, ReflectPreview, RepoInfo, ReqBoard, RequirementDetail, Settings, StartBody, Status, TeamView, Todo, TodoItem,
+  BrainView, CheckRow, CrewFixBody, ImportInspect, ImportJob, IntakeBody, IntakeNext, KitForm, OpenSessionBody, Overview, ReflectApplyBody, ReflectApplyResult, ReflectPreview, RepoInfo, ReqBoard, RequirementDetail, Settings, StartBody, Status, TeamView, Todo,
 } from '../src/types'
 
 const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'norepos', 'light'] as const
@@ -69,8 +71,8 @@ let crewFixed = false
  * without brainkit.evaluate): four repos, nineteen requirements in every state, each with its board. */
 const W = world as unknown as {
   status: Status; overview: Overview; boards: Record<string, ReqBoard>; details: Record<string, RequirementDetail>
-  overviews: Record<'eval' | 'noeval', Record<string, Overview>>; todo: Record<'ok' | 'crewfail', Todo>
-  stages: Record<string, RequirementDetail['lean']['stages']>
+  overviews: Record<'eval' | 'noeval', Record<string, Overview>>; todo: Record<'ok' | 'crewfail' | 'team', Todo>
+  stages: Record<string, RequirementDetail['lean']['stages']>; brains: Record<string, BrainView>
 }
 let repos: RepoInfo[] = flags.has('norepos') ? [] : clone(W.status.repos)
 
@@ -100,6 +102,7 @@ function status(): Status {
     const modules = Object.fromEntries(Object.keys(s.brainkit.modules).map((k) => [k, false])) as Status['brainkit']['modules']
     s.brainkit = { ...s.brainkit, ok: false, version: null, modules, error: `这里没有 brain-kit（找不到 ${settings.brainkit}/brainkit/__init__.py）` }
   }
+  if (flags.has('noeval')) s.brainkit.modules = { ...s.brainkit.modules, evaluate: false }
   s.crew.rows = crewRows()
   if (flags.has('crewfail') && !crewFixed) s.crew.fix = { ...s.crew.fix, agent: true }
   s.counts.todo = todo().items.length
@@ -107,24 +110,15 @@ function status(): Status {
   return shift(s)
 }
 
-/** 待办 as GET /todo answers: the backend's list (the world's when it has one), of the repos listed only; in team mode the
- * kinds a runner has; KiroCrew's items from the FAIL rows, as backend/core/todo.py makes them. */
+/** 待办 as GET /todo answers: the backend's list (backend/core/todo.py made each in the world), of the repos listed only;
+ * in team mode the person's own, then the runner ledger's; KiroCrew's item while brain-dev.json is missing. */
 function todo(): Todo {
   const team = flags.has('team')
-  const world = W.todo?.[flags.has('crewfail') && !crewFixed ? 'crewfail' : 'ok']
-  const base = world ?? fx.todo()
+  const failing = flags.has('crewfail') && !crewFixed
   const listed = new Set(listedRepos().filter((r) => r.ok).map((r) => r.id))
-  const kinds = team ? ['question', 'acceptance', 'handoff_rejected'] : null
-  const rows = new Map(W.overview.rows.map((r) => [`${r.repo}/${r.key}`, r]))
-  // the fixture's items stand in for the backend's until the world has its list: only for requirements the world has,
-  // a refused or unlabelled hand-over saying what its row says (todo.py takes row.waits.text for them)
-  const items = clone(base.items).filter((i) => i.kind !== 'crew' && listed.has(i.repo) && (!kinds || kinds.includes(i.kind))
-    && (!!world || rows.has(`${i.repo}/${i.key}`)))
-    .map((i) => (world || !['handoff_rejected', 'handoff_unlabelled'].includes(i.kind) ? i : { ...i, text: rows.get(`${i.repo}/${i.key}`)?.waits.text ?? i.text }))
-  const crew: TodoItem[] = crewRows().filter((r) => r.level === 'FAIL').map((r) => ({
-    kind: 'crew', repo: '', key: '', title: `KiroCrew 检查${r.repo ? ` · ${r.repo.split('/').pop()}` : ''}`, text: r.todo ? `${r.text}。${r.todo}` : r.text,
-    line: null, approval: null, mr_url: null, question: null, session: null, since: null,
-  }))
+  if (team) listed.add('runner')
+  const items = clone(W.todo[team ? 'team' : 'ok'].items).filter((i) => listed.has(i.repo))
+  const crew = failing ? clone(W.todo.crewfail.items).filter((i) => i.kind === 'crew') : []
   return { items: [...items, ...crew], team }
 }
 
@@ -214,24 +208,21 @@ function overview(path: string): Overview {
   }
   o.errors = listedRepos().filter((r) => !r.ok && !r.pending && (repo === 'all' || r.id === repo)).map((r) => ({ repo: r.id, error: r.error }))
   if (flags.has('noeval') && !own) {
-    o.eval = { available: false, error: 'brain-kit 还没有 evaluate 模块', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
+    o.eval = { available: false, error: '这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     o.cto = { ...o.cto, available: false, unattended: null, stepped_in: null, runs: [], sentence: o.cto.credits.per_req !== null ? `每个需求平均 ${o.cto.credits.per_req} credits。` : o.cto.sentence }
   }
   return o
 }
 
-/** GET /brain?repo=: shop-pay's is the fixture (its 知识有用率 as brain-kit counts it: entries cited at least once over
- * the entries there are); every other repo's Brain is still empty. */
+/** GET /brain?repo=: the Brain brainview.view made for that repo in the world; a repo the app cannot read is not one it
+ * has (backend/core/service.py _repo: 404); one added in the preview has an empty Brain, as a fresh install does. */
 function brain(path: string): BrainView {
   const repo = new URL(path, location.origin).searchParams.get('repo') ?? ''
-  const b = fx.brain()
-  if (repo !== 'r1') {
-    return { ...b, repo, ref: 'main', files: b.files.map((f) => ({ ...f, count: 0, sections: [] })), lint: { errors: [], warnings: [] },
-      usage: { useful: [0, 0], repeat_rate: [0, 0], archived: 0, purged: 0, runs: [], never_cited: [], repeats_any: [], unmerged: [] }, reflect: [] }
-  }
-  const all = b.files.flatMap((f) => f.sections.flatMap((x) => x.entries))
-  b.usage.useful = [all.filter((e) => e.cites > 0).length, all.length]
-  return b
+  if (!listedRepos().some((r) => r.id === repo && r.ok)) throw new StubApiError(404, { error: '没有这个仓库', code: 'no_repo' })
+  if (W.brains[repo]) return clone(W.brains[repo])
+  const b = clone(W.brains.r1)
+  return { ...b, repo, files: b.files.map((f) => ({ ...f, count: 0, sections: [] })), lint: { errors: [], warnings: [] },
+    usage: { useful: [0, 0], repeat_rate: [0, 0], archived: 0, purged: 0, runs: [], never_cited: [], repeats_any: [], unmerged: [] }, reflect: [] }
 }
 
 /** POST /brain/reflect/preview: the requirement's own run. PAY-5 has new knowledge (the fixture, said as the backend says
@@ -294,7 +285,11 @@ setApiRoutes({
   ...importRoutes(),
   [`POST ${API}/refresh`]: (body) => ({ ok: true, text: `预览：没有真的跑 git fetch（${(body as { repo: string }).repo}）` }),
   [`POST ${API}/requirements/*`]: (body, path) => {
-    if (path.endsWith('/session')) return { ok: true, slot: 'brain-PAY-3-7f3a', url: '/chat?sid=brain-PAY-3-7f3a' }
+    if (path.endsWith('/session')) {
+      const { key } = reqOf(path.replace(/\/session$/, ''))
+      const slot = (body as OpenSessionBody | undefined)?.review ? `brain-${key}-review-${Math.random().toString(16).slice(2, 6)}` : `brain-${key}-7f3a`
+      return { ok: true, slot, url: `/chat?sid=${slot}` }
+    }
     const choice = (body as { choice: string }).choice
     return { ok: true, via: 'session', text: `预览：回答 ${choice} 没有真的送出去` }
   },
@@ -470,7 +465,7 @@ function importRoutes() {
       if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) throw new StubApiError(400, { error: '名字只能用小写字母、数字和 . _ -（字母或数字开头，最多 64 个）', code: 'invalid_name' })
       const me = { name, source: 'git' as const, gitlab: '', text: `${name}（git config brain.user）`, ask: false, label: '', why: '', suggest: '', error: '' }
       repos = repos.map((r) => (r.path === b.path && r.me ? { ...r, me: { ...me, gitlab: r.me.gitlab } } : r))
-      return { ok: true, text: `预览：没有真的写。这个仓库的 git config brain.user 设成了 ${name}`, me, status: status() }
+      return { ok: true, text: `你在这个仓库的名字设成了 ${name}`, raw: `git config brain.user ${name}`, me, status: status() }
     },
     [`POST ${API}/repos/remove`]: (body: unknown) => {
       const path = (body as { path: string }).path

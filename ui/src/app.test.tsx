@@ -11,6 +11,9 @@ import { apiCalls, apiError, badges, navigations } from './test/stubs/app-sdk'
 
 const bar = () => within(screen.getByTestId('br-appbar'))
 const FIX = '补上 Lean 的 hook'
+/** the bar's 待办 tab: its count is the number of things on 待办 */
+const TODO_N = fx.todo().items.length
+const TODO_TAB = `待办 ${TODO_N}`
 /** the ledger's row of *key* on 交付总览 */
 const ledgerRow = async (key: string) => {
   const table = await screen.findByTestId('req-table')
@@ -27,11 +30,12 @@ describe('the app: one bar over the views', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Brain')
     expect(bar().getByRole('tab', { name: '交付总览' })).toHaveAttribute('aria-selected', 'true')
-    expect(bar().getAllByRole('tab').map((t) => t.textContent)).toEqual(['交付总览', '需求详情', '需求看板', '开需求', 'Brain', '待办6'])
+    expect(bar().getAllByRole('tab').map((t) => t.textContent)).toEqual(['交付总览', '需求详情', '需求看板', '开需求', 'Brain', `待办${TODO_N}`])
     expect(bar().getByRole('tab', { name: /^需求详情/ })).toBeEnabled() // nothing in hand yet: they still open one
     expect(bar().getByRole('tab', { name: /^需求看板/ })).toBeEnabled()
-    expect(await bar().findByRole('tab', { name: '待办 6' })).toBeInTheDocument()
-    expect(badges).toContain(6) // the sidebar badge
+    expect(fx.status().counts.todo).toBe(TODO_N)
+    expect(await bar().findByRole('tab', { name: TODO_TAB })).toBeInTheDocument()
+    expect(badges).toContain(TODO_N) // the sidebar badge
     expect(bar().getByRole('button', { name: '设置' })).toBeInTheDocument()
   })
 
@@ -98,7 +102,7 @@ describe('the app: one bar over the views', () => {
     await user.click(within(screen.getByTestId('state-filter')).getByRole('button', { name: '等验收 1' }))
     expect(window.location.search).toBe('?view=overview&state=acceptance')
     expect(navigations).toEqual([])
-    await user.click(bar().getByRole('tab', { name: '待办 6' }))
+    await user.click(bar().getByRole('tab', { name: TODO_TAB }))
     expect(navigations).toEqual(['/apps/brain?view=todo'])
     expect(parseView(window.location.search)).toEqual({ kind: 'todo' })
     await user.click(bar().getByRole('button', { name: '设置' }))
@@ -177,7 +181,7 @@ describe('the app: one bar over the views', () => {
     installFixtureRoutes()
     render(<BrainApp pollMs={60_000} />)
     await screen.findByTestId('req-table')
-    await user.click(bar().getByRole('tab', { name: '待办 6' }))
+    await user.click(bar().getByRole('tab', { name: TODO_TAB }))
     expect(await screen.findByTestId('br-todo')).toBeInTheDocument()
     window.history.back()
     expect(await screen.findByTestId('req-table')).toBeInTheDocument()
@@ -226,7 +230,7 @@ describe('the app: one bar over the views', () => {
     expect(screen.queryByTestId('br-crew-fail')).toBeNull()
     expect(within(screen.getByTestId('br-no-brainkit')).getByRole('button', { name: '去填位置' })).toBeInTheDocument()
     // 待办 lists them in its KiroCrew group, once
-    await user.click(bar().getByRole('tab', { name: '待办 6' }))
+    await user.click(bar().getByRole('tab', { name: TODO_TAB }))
     expect(within(await screen.findByRole('region', { name: 'KiroCrew 的问题' })).getByRole('button', { name: FIX })).toBeInTheDocument()
     expect(screen.queryByTestId('br-crew-fail')).toBeNull()
     // every other view has the banner

@@ -175,13 +175,16 @@ describe('待办', () => {
     expect(screen.getAllByRole('form')).toHaveLength(1) // only the clarify question may be answered here
   })
 
-  test('a Lean approval says what the line box says only once, as the backend words it', async () => {
-    const lean: TodoItem = { ...fx.todo().items[0], text: `读完再批：${TYPE_IT_YOURSELF}` }   // todo.build's words
+  test('a Lean approval says once that the person types the line, in the backend’s words (its waits.text)', async () => {
+    const said = '等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行' // deliveries.lean_wait_text
+    const lean: TodoItem = { ...fx.todo().items[0], text: said }
     installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items: [lean] }) })
     renderTodo()
     const card = within(await screen.findByRole('region', { name: 'Lean 审批' })).getByTestId('todo-item')
-    expect(card.textContent!.split(TYPE_IT_YOURSELF)).toHaveLength(2)
-    expect(within(card).getByText('读完再批')).toBeInTheDocument()
+    expect(within(card).getByText(said)).toBeInTheDocument()
+    expect(card.textContent!.match(/自己打/g)).toHaveLength(1)
+    expect(card).not.toHaveTextContent(TYPE_IT_YOURSELF)
+    expect(within(within(card).getByTestId('type-line')).getByText('approve PLAN 5d1e7a90')).toBeInTheDocument()
   })
 
   test('a Lean approval shows its line to type, copies it and opens the session; it is never sent', async () => {
@@ -194,7 +197,6 @@ describe('待办', () => {
     expect(within(lean).queryByText('PLAN')).toBeNull()
     const line = within(lean).getByTestId('type-line')
     expect(within(line).getByText('approve PLAN 5d1e7a90')).toHaveClass('br-mono')
-    expect(line).toHaveTextContent(TYPE_IT_YOURSELF)
     fireEvent.click(within(line).getByRole('button', { name: '复制那一行' }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('approve PLAN 5d1e7a90'))
     fireEvent.click(within(line).getByRole('button', { name: '打开会话' }))

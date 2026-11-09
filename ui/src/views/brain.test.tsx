@@ -30,6 +30,17 @@ function setup(entry: BrainEntryRef = { repo: 'r1' }, routes: Parameters<typeof 
 
 const fileTab = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name} `) })
 
+/** shop-pay's Brain with what the world has none of: a withdraw candidate (six runs loaded P-PAY-2-1, none cited it; it
+ * came in as 只加来源) and an entry one run cited in three places (P-7). */
+function staged() {
+  const b = fx.brain()
+  const [p7, p21] = ['P-7', 'P-PAY-2-1'].map((id) => b.files[0].sections.flatMap((x) => x.entries).find((e) => e.id === id)!)
+  Object.assign(p7, { cites: 3 })
+  Object.assign(p21, { rel: 'same', loaded_by: 6, runs: 0, cites: 0, candidate: true })
+  b.usage.never_cited = ['P-PAY-2-1']
+  return b
+}
+
 describe('Brain', () => {
   test('a tab per file with its count; a tab rewrites the entry; the text and type filters', async () => {
     const { user, props } = setup()
@@ -45,12 +56,12 @@ describe('Brain', () => {
     await user.click(fileTab('技术'))
     expect(props.replace).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', file: 'TECH', id: undefined, reflect: undefined })
     const tech = screen.getByRole('region', { name: '技术知识' })
-    expect(within(tech).getAllByRole('article').map((a) => a.dataset.entryId)).toEqual(['T-PAY-2-1', 'T-12', 'T-PAY-5-1'])
+    expect(within(tech).getAllByRole('article').map((a) => a.dataset.entryId)).toEqual(['T-12', 'T-PAY-2-1', 'T-13'])
     // the text is plain, line breaks kept
     expect(within(tech).getByText(/退款单号是 RF \+ 9 位/).textContent).toBe('退款单号是 RF + 9 位；样例文件里的 7 位是旧格式。\n校验时两种都认，生成只用新格式。')
 
     await user.type(screen.getByLabelText('按文字筛'), '回调')
-    expect(within(tech).getAllByRole('article').map((a) => a.dataset.entryId)).toEqual(['T-PAY-5-1'])
+    expect(within(tech).getAllByRole('article').map((a) => a.dataset.entryId)).toEqual(['T-13'])
     expect(tech).toHaveTextContent('显示 1/3 条')
     await user.clear(screen.getByLabelText('按文字筛'))
     // the type filter: a chip per type the file has, with its count; the same chip again shows all
@@ -74,47 +85,69 @@ describe('Brain', () => {
     expect(scroll.mock.contexts[0]).toBe(el)
     expect(scroll.mock.calls[0][0]).toEqual({ behavior: 'smooth', block: 'center' })
     await user.type(screen.getByLabelText('按文字筛'), '回调')
-    expect(within(screen.getByRole('region', { name: '技术知识' })).getAllByRole('article').map((a) => a.dataset.entryId)).toEqual(['T-12', 'T-PAY-5-1'])
+    expect(within(screen.getByRole('region', { name: '技术知识' })).getAllByRole('article').map((a) => a.dataset.entryId)).toEqual(['T-12', 'T-13'])
     expect(scroll).toHaveBeenCalledTimes(1)
   })
 
   test('a withdraw candidate says so; repeats are counted; how often runs load and use an entry', async () => {
-    setup()
-    const p7 = await screen.findByRole('article', { name: 'P-7' })
-    expect(within(p7).getByText('撤回候选')).toBeInTheDocument()
-    expect(p7).toHaveClass('is-cand')
-    expect(p7).toHaveTextContent('6 次加载 · 0 次用上')
-    expect(p7).not.toHaveTextContent('只加来源') // how it was written is no reader's business
-    const p21 = screen.getByRole('article', { name: 'P-PAY-2-1' })
-    expect(p21).not.toHaveTextContent('撤回候选')
-    expect(p21).toHaveTextContent('5 次加载 · 2 次用上（引用 3 处）')
+    setup({ repo: 'r1' }, { [`GET ${API}/brain*`]: () => staged() })
+    const p21 = await screen.findByRole('article', { name: 'P-PAY-2-1' })
+    expect(within(p21).getByText('撤回候选')).toBeInTheDocument()
+    expect(p21).toHaveClass('is-cand')
+    expect(p21).toHaveTextContent('6 次加载 · 0 次用上')
+    expect(p21).not.toHaveTextContent('只加来源') // how it was written is no reader's business
     expect(within(p21).getByText('RUN-PAY-2-1')).toHaveClass('br-tag')
+    const p7 = screen.getByRole('article', { name: 'P-7' })
+    expect(p7).not.toHaveTextContent('撤回候选')
+    expect(p7).toHaveTextContent('1 次加载 · 1 次用上（引用 3 处）')
+    await userEvent.setup().click(fileTab('技术'))
+    const t21 = screen.getByRole('article', { name: 'T-PAY-2-1' })
+    expect(t21).toHaveTextContent('重复 2 次')
+    expect(t21).toHaveTextContent('合并的运行还没加载过')
+    expect(screen.getByRole('article', { name: 'T-13' })).toHaveTextContent('1 次加载 · 0 次用上')
   })
 
   test('the counter cards: entries per file, the two rates as cells, withdraw candidates (a chip picks one out), lint', async () => {
-    const { user, props } = setup({ repo: 'r1', file: 'TECH' })
+    const { user, props } = setup({ repo: 'r1', file: 'TECH' }, { [`GET ${API}/brain*`]: () => staged() })
     const kpis = await screen.findByRole('group', { name: '指标' })
     const entries = within(kpis).getByTestId('kpi-entries')
     expect(entries).toHaveTextContent('7条')
     expect(within(entries).getByRole('img')).toHaveAccessibleName('产品 2，技术 3，改进 1，项目 1')
     expect(entries).toHaveTextContent('产品 2技术 3改进 1项目 1')
     const useful = within(kpis).getByTestId('usage-useful')
-    expect(within(useful).getByRole('img')).toHaveAccessibleName('5/8 用上的')
+    expect(within(useful).getByRole('img')).toHaveAccessibleName('2/7 用上的')
     // brain-kit's definition, and which runs count
+    expect(useful).toHaveTextContent('29%2/7')
     expect(useful).toHaveTextContent('现有条目里被引用过的 · 只算合并进 main 的运行')
-    expect(useful.querySelectorAll('.kt-segs i.is-pass')).toHaveLength(5)
-    expect(within(kpis).getByTestId('usage-repeat').querySelectorAll('.kt-segs i.is-fail')).toHaveLength(1)
+    expect(useful.querySelectorAll('.kt-segs i')).toHaveLength(7)
+    expect(useful.querySelectorAll('.kt-segs i.is-pass')).toHaveLength(2)
+    // no correction in the Brain: no rate yet, and when there will be one (not 0/0, no empty cells)
+    const repeat = within(kpis).getByTestId('usage-repeat')
+    expect(repeat).toHaveTextContent('重复纠正率还没有还没有「纠正」类的条目：有了才算得出')
+    expect(repeat).not.toHaveTextContent('0/0')
+    expect(repeat.querySelector('.kt-segs')).toBeNull()
     const cand = within(kpis).getByTestId('kpi-candidates')
     expect(cand).toHaveTextContent('1条')
     expect(cand).toHaveTextContent('做什么看一眼还有没有用')
-    await user.click(within(cand).getByRole('button', { name: 'P-7' }))
-    expect(props.replace).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', file: 'PRODUCT', id: 'P-7', reflect: undefined })
-    expect(await screen.findByRole('article', { name: 'P-7' })).toHaveClass('is-hl')
+    await user.click(within(cand).getByRole('button', { name: 'P-PAY-2-1' }))
+    expect(props.replace).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', file: 'PRODUCT', id: 'P-PAY-2-1', reflect: undefined })
+    expect(await screen.findByRole('article', { name: 'P-PAY-2-1' })).toHaveClass('is-hl')
     const lint = within(kpis).getByTestId('kpi-lint')
     expect(lint).toHaveTextContent('Brain 检查')
     expect(lint).toHaveClass('is-bad')
     expect(lint).toHaveTextContent('1个错')
-    expect(lint).toHaveTextContent('2 个提醒')
+    expect(lint).toHaveTextContent('5 个提醒')
+  })
+
+  test('a rate with something to count is a percentage and its cells; no withdraw candidate says so with what was archived', async () => {
+    const b = fx.brain()
+    b.usage.repeat_rate = [1, 4]
+    setup({ repo: 'r1' }, { [`GET ${API}/brain*`]: () => b })
+    const repeat = await screen.findByTestId('usage-repeat')
+    expect(repeat).toHaveTextContent('25%1/4')
+    expect(repeat).toHaveTextContent('同样的纠正又出现的')
+    expect(repeat.querySelectorAll('.kt-segs i.is-fail')).toHaveLength(1)
+    expect(screen.getByTestId('kpi-candidates')).toHaveTextContent('0条没有 · 已归档 0 · 已清除 0')
   })
 
   test('lint as problem rows (FAIL, then WARN) with 做什么 and brain lint’s own words folded; usage rates; 「该写成确定性检查了」 at two repeats; an id chip picks out its entry', async () => {
@@ -122,14 +155,16 @@ describe('Brain', () => {
     const lint = await screen.findByRole('region', { name: '检查' })
     const { errors, warnings } = fx.brain().lint
     const rows = within(lint).getAllByRole('listitem')
-    expect(rows.map((r) => r.dataset.level)).toEqual(['FAIL', 'WARN', 'WARN'])
+    expect(rows.map((r) => r.dataset.level)).toEqual([...errors.map(() => 'FAIL'), ...warnings.map(() => 'WARN')])
     expect(rows[0]).toHaveTextContent(errors[0].text)
     expect(rows[0]).toHaveTextContent(`做什么${errors[0].todo}`)
     expect(within(rows[0]).getByText('brain-kit 的原话').closest('details')).not.toHaveAttribute('open')
     expect(rows[1]).toHaveTextContent(warnings[0].text)
     expect(lint).toHaveClass('is-bad')
-    expect(screen.getByTestId('usage-useful')).toHaveTextContent('63%5/8')
-    expect(screen.getByTestId('usage-repeat')).toHaveTextContent('17%1/6')
+    // what came back is any entry (a 坑, a 流程), not only a correction: the rate of corrections does not count it
+    const usage = screen.getByRole('region', { name: '用处' })
+    expect(usage).toHaveTextContent('又出现的条目')
+    expect(usage).not.toHaveTextContent('又出现的纠正')
     const repeats = within(screen.getByTestId('usage-repeats')).getAllByRole('listitem')
     expect(repeats[0]).toHaveTextContent('T-PAY-2-1重复 2 次该写成确定性检查了')
     expect(repeats[1]).toHaveTextContent('I-PAY-2-1重复 1 次')
@@ -140,15 +175,16 @@ describe('Brain', () => {
     await user.click(within(runs).getAllByRole('button', { name: 'T-12' })[0])
     expect(props.replace).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', file: 'TECH', id: 'T-12', reflect: undefined })
     expect(await screen.findByRole('article', { name: 'T-12' })).toHaveClass('is-hl')
-    await user.click(within(runs).getByRole('button', { name: 'PAY-3' }))
-    expect(props.go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-3', from: 'brain' })
+    await user.click(within(runs).getByRole('button', { name: 'PAY-2' }))
+    expect(props.go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-2', from: 'brain' })
   })
 
   test('a run not merged yet is listed on its own, with the numbers 需求详情 says for it; the merged runs’ numbers leave it out', async () => {
     const { user, props } = setup()
     const own = await screen.findByTestId('usage-unmerged')
     expect(own).toHaveTextContent('还没合并的（合并以后才算进上面的数）')
-    expect(own).toHaveTextContent('PAY-4还在分支上：加载 11 · 引用 2')
+    expect(own).toHaveTextContent('PAY-3还在本机做：加载 7 · 引用 2')
+    expect(own).toHaveTextContent('PAY-4还在分支上：加载 7 · 引用 2')
     expect(within(screen.getByRole('table', { name: '每次运行' })).queryByRole('button', { name: 'PAY-4' })).toBeNull()
     await user.click(within(own).getByRole('button', { name: 'PAY-4' }))
     expect(props.go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-4', from: 'brain' })
@@ -156,9 +192,10 @@ describe('Brain', () => {
 
   test('an entry’s `code` is monospace; a section without a title has no heading of its own', async () => {
     const b = fx.brain()
-    b.files[0].sections = [{ title: '', entries: [{ ...b.files[0].sections[0].entries[0], text: '计算器（`calc.py`）照 Python 抛 `TypeError`。' }] }]
+    const first = b.files[0].sections[0].entries[0]
+    b.files[0].sections = [{ title: '', entries: [{ ...first, text: '计算器（`calc.py`）照 Python 抛 `TypeError`。' }] }]
     setup({ repo: 'r1' }, { [`GET ${API}/brain*`]: () => b })
-    const card = await screen.findByRole('article', { name: 'P-PAY-2-1' })
+    const card = await screen.findByRole('article', { name: first.id })
     expect(within(card).getByText('calc.py').tagName).toBe('CODE')
     expect(within(card).getByText('TypeError')).toHaveClass('bv-code')
     expect(card).not.toHaveTextContent('`')
@@ -227,6 +264,34 @@ describe('Brain', () => {
     await user.selectOptions(within(card).getByLabelText('选一个需求'), 'PAY-2')
     expect(props.replace).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', file: 'PRODUCT', id: undefined, reflect: 'PAY-2' })
     expect(within(card).queryByTestId('reflect-preview')).toBeNull()
+  })
+
+  test('with nothing picked, 回写 starts at a merged requirement, the usual time to write one back, whatever the backend lists first', async () => {
+    const b = fx.brain()
+    b.reflect = [{ key: 'PAY-5', title: '退款回调失败重试', state: 'acceptance' }, { key: 'PAY-2', title: '退款单号校验', state: 'merged' }]
+    setup({ repo: 'r1' }, { [`GET ${API}/brain*`]: () => b })
+    const card = await screen.findByRole('region', { name: '回写' })
+    expect(within(card).getByLabelText('选一个需求')).toHaveValue('PAY-2')
+    expect(within(within(card).getByLabelText('选一个需求')).getAllByRole('option').map((o) => o.textContent)).toEqual(['PAY-2 · 退款单号校验（已合并）', 'PAY-5 · 退款回调失败重试（还没合并）'])
+    expect(card).not.toHaveTextContent('还没合并：一般合并以后再回写')
+  })
+
+  test('a repo asked for that cannot be read says why and the way on, not another repo’s Brain; the picker names it', async () => {
+    const { user, props } = setup({ repo: 'r2' })
+    const hero = screen.getByTestId('repo-unreadable')
+    expect(within(hero).getByRole('heading', { name: 'shop-web 的 Brain 现在看不了' })).toBeInTheDocument()
+    expect(hero).toHaveTextContent(fx.status().repos[1].error)
+    expect(screen.queryByRole('region', { name: '产品知识' })).toBeNull()
+    expect(apiCalls.filter((c) => c.path.startsWith(`${API}/brain`))).toHaveLength(0)
+    const picker = screen.getByLabelText('仓库')
+    expect(picker).toHaveValue('r2')
+    expect(within(picker).getByRole('option', { name: 'shop-web（现在读不了）' })).toBeDisabled()
+    await user.click(within(hero).getByRole('button', { name: '去导入仓库检查' }))
+    expect(props.go).toHaveBeenCalledWith({ kind: 'import', path: '/Users/alice/workplace/shop-web' })
+    await user.selectOptions(picker, 'r1')
+    expect(props.replace).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1' })
+    expect(await screen.findByRole('region', { name: '产品知识' })).toBeInTheDocument()
+    expect(screen.queryByTestId('repo-unreadable')).toBeNull()
   })
 
   test('a preview with problems (or nothing substantive) cannot be written', async () => {

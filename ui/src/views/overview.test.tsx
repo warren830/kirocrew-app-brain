@@ -475,7 +475,7 @@ describe('交付总览', () => {
 
   test('without the evaluate module the eval card says so plainly and what to do, brain-kit’s words folded; another error is said as it is', async () => {
     const ov = fx.overview()
-    ov.eval = { available: false, error: 'brain-kit 还没有 evaluate 模块（No module named brainkit.evaluate）', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
+    ov.eval = { available: false, error: '这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit', raw: "No module named 'brainkit.evaluate'", ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
     const s = fx.status()
     s.brainkit.modules.evaluate = false
@@ -485,16 +485,21 @@ describe('交付总览', () => {
     expect(within(batch).getByRole('button', { name: '去设置 ↗' })).toBeInTheDocument()
     const folded = within(batch).getByText('细节').closest('details') as HTMLDetailsElement
     expect(folded.open).toBe(false)
-    expect(folded).toHaveTextContent('No module named brainkit.evaluate')
+    expect(folded).toHaveTextContent("No module named 'brainkit.evaluate'")
+    expect(batch.textContent!.match(/新一点的 brain-kit/g)).toHaveLength(1) // what to do, once
     expect(screen.queryByTestId('eval-queue')).toBeNull()
     unmount()
     const ov2 = fx.overview()
-    ov2.eval = { available: false, error: '评估读默认分支失败：没有 runs/', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
+    ov2.eval = { available: false, error: '交付评估没算成：brain-kit 的原话在细节里', raw: "KeyError: 'runs'", ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov2 })
     render(<OverviewView entry={{}} {...props()} />)
     const other = await screen.findByTestId('eval-batch')
-    expect(other).toHaveTextContent('评估读默认分支失败：没有 runs/')
+    expect(other).toHaveTextContent('交付评估没算成：brain-kit 的原话在细节里')
     expect(other).not.toHaveTextContent('换一个新一点的 brain-kit') // not the missing module's fix
+    // the 细节 it points to is there, folded, with brain-kit's own words
+    const said = within(other).getByText('细节').closest('details') as HTMLDetailsElement
+    expect(said.open).toBe(false)
+    expect(said).toHaveTextContent("KeyError: 'runs'")
   })
 
   test('the decision funnel: the total, a row per category that has any; the questions only in team mode', async () => {

@@ -25,7 +25,7 @@ import { useNavigate } from '@kirocrew/app-sdk'
 import { paths, usePoll } from '../api'
 import { fmtWaited } from '../format'
 import type { Todo, TodoItem } from '../types'
-import { CheckRows, EmptyHero, ExtLink, Icon, LoadState, RoleIcon, TYPE_IT_YOURSELF, TypeLine, type FlowStep } from '../ui'
+import { CheckRows, EmptyHero, ExtLink, Icon, LoadState, RoleIcon, TypeLine, type FlowStep } from '../ui'
 import { ACT, DO_NAME, approvalName } from '../vocab'
 import { QuestionCard } from './Question'
 import type { ViewProps } from './props'
@@ -162,8 +162,6 @@ function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; 
   const navigate = useNavigate()
   const icon = it.kind === 'lean_approval' ? approvalIcon(it.approval) : group.icon
   const session = it.session?.url ?? null
-  // the line box below says 「在会话里自己打这一行」 itself
-  const text = it.kind === 'lean_approval' && it.line ? it.text.replace(TYPE_IT_YOURSELF, '').replace(/[：:，,。\s]+$/, '') : it.text
   const line = it.kind === 'handoff_rejected' && session ? redoLine(it.text) : it.line
   const asked = it.question && (it.kind === 'question' || it.kind === 'clarify' || it.kind === 'acceptance')
   const mr = it.mr_url ?? it.question?.mr_url ?? null
@@ -182,9 +180,10 @@ function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; 
         {it.approval && <span className="br-chip tone-wait">{approvalName(it.approval)}</span>}
         {it.since !== null && <span className="br-dim br-small" title="从它这样等着你的那一刻算起">已等 {fmtWaited(now - it.since)}</span>}
       </div>
-      {text && <p className="td-text">{text}</p>}
+      {it.text && <p className="td-text">{it.text}</p>}
       {group.key === 'stuck' && <p className="td-do"><b>做什么</b>找这个需求的负责人，在 MR 上决定重开还是关掉它。</p>}
-      {line && (it.kind === 'lean_approval' || it.kind === 'reply' || it.kind === 'handoff_rejected') && <TypeLine line={line} sessionUrl={session} />}
+      {/* a Lean approval's text is its waits.text, which says the person types the line (deliveries.lean_wait_text) */}
+      {line && (it.kind === 'lean_approval' || it.kind === 'reply' || it.kind === 'handoff_rejected') && <TypeLine line={line} sessionUrl={session} said={it.kind === 'lean_approval'} />}
       {asked && <QuestionCard q={it.question!} repo={it.repo} reqKey={it.key} mrUrl={null} onAnswered={onAnswered} />}
       <div className="td-acts">
         {it.kind === 'start' && it.key && (
