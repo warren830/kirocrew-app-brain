@@ -30,7 +30,10 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
+import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -48,6 +51,10 @@ lean_view = importlib.import_module("_brainapp_backend.core.lean_view")
 deliveries = importlib.import_module("_brainapp_backend.core.deliveries")
 identity = importlib.import_module("_brainapp_backend.core.identity")
 service = importlib.import_module("_brainapp_backend.core.service")
+bk = importlib.import_module("_brainapp_backend.core.bk")
+brainview = importlib.import_module("_brainapp_backend.core.brainview")
+repo_mod = importlib.import_module("_brainapp_backend.core.repo")
+BRAINKIT = Path(os.environ.get("BRAIN_TEST_BRAINKIT") or Path.home() / "warren_ws" / "brain-kit")
 
 FIX = ROOT / "ui" / "src" / "test" / "fixtures"
 T0 = 1794146400          # 2026-11-08 14:00 UTC: the fixtures' `at`
@@ -110,18 +117,32 @@ class Req:
             data["note" if state == "done" else "reason"] = note
         self._lean(at, ev, **data)
 
-    def request(self, at: float, kind: str) -> str:
+    def _doc(self, kind: str, unit: str | None) -> dict:
+        """What Lean's approval of *kind* covers: its document (a PLAN is one unit's code-generation plan)."""
+        path = {"REQUIREMENTS": "inception/requirements/requirements.md",
+                "DESIGN": "inception/application-design/application-design.md",
+                "PLAN": "construction/plans/%s-code-generation-plan.md" % unit,
+                "RELEASE": "operations/release.md"}.get(kind, "%s.md" % kind.lower())
+        return dict({"path": "aidlc-docs/%s/%s" % (self.intent, path)}, **({"unit": unit} if unit else {}))
+
+    def request(self, at: float, kind: str, unit: str | None = None, sha8: str | None = None) -> str:
         h = sha(self.key, kind, at)
-        self._lean(at, "APPROVAL_REQUESTED", kind=kind, sha256=h, path="aidlc-docs/%s/%s.md" % (self.intent, kind.lower()))
+        h = sha8 + h[len(sha8):] if sha8 else h
+        self._lean(at, "APPROVAL_REQUESTED", kind=kind, sha256=h, **self._doc(kind, unit))
         return h
 
-    def approve(self, at: float, kind: str, h: str, who: str = "P-1A2B") -> None:
-        self._lean(at, "APPROVED", kind=kind, sha256=h, path="aidlc-docs/%s/%s.md" % (self.intent, kind.lower()))
+    def approve(self, at: float, kind: str, h: str, who: str = "P-1A2B", unit: str | None = None) -> None:
+        self._lean(at, "APPROVED", kind=kind, sha256=h, **self._doc(kind, unit))
         self.humans.append({"at": iso(at), "kind": "approval", "what": kind, "who": who, "judgment_point": True})
 
     def reject(self, at: float, kind: str, h: str) -> None:
-        self._lean(at, "REJECTED", kind=kind, sha256=h, path="aidlc-docs/%s/%s.md" % (self.intent, kind.lower()))
+        self._lean(at, "REJECTED", kind=kind, sha256=h, **self._doc(kind, None))
         self.humans.append({"at": iso(at), "kind": "rejection", "what": kind, "who": "P-1A2B", "judgment_point": True})
+
+    def turn(self, at: float, session: str = "s-1") -> None:
+        """The person typed in the session (Lean's UserPromptSubmit hook): the session's first prompt is its task."""
+        self._lean(at, "HUMAN_TURN", session=session, turn=sum(1 for e in self.events if e["event"] == "HUMAN_TURN") + 1,
+                   chars=40)
 
     def blocked(self, at: float, gate: str, path: str) -> None:
         self._lean(at, "BLOCKED", gate=gate, path=path, tool="fs_write")
@@ -140,7 +161,7 @@ class Req:
 
     def handoff(self, at: float) -> None:
         self.hand_at = at
-        s = self.commit(at, "person", "%s：交接（brain handoff）" % self.key, files=2, after=False, records=True)
+        s = self.commit(at, "person", "%s: hand off to team runner" % self.key, files=2, after=False, records=True)
         self.hands.append({"at": iso(at), "kind": "requested", "by": self.owner, "commit": s})
 
     def accepted(self, at: float, iid: int, run_id: str) -> None:
@@ -168,12 +189,13 @@ class Req:
 
     # what the backend reads it from
     def facts(self, park: dict | None = None) -> dict:
+        self.events.sort(key=lambda e: e["_at"])          # Lean's ledger in time order, as lean_view.events reads it
         approvals = []
         last: dict[str, dict] = {}
         for e in self.events:
             if e["event"] in ("APPROVAL_REQUESTED", "APPROVED", "REJECTED"):
-                last[e["data"]["kind"]] = e
-        for kind, e in last.items():
+                last[(e["data"]["kind"], e["data"].get("unit"))] = e        # a PLAN is asked per unit, as Lean does
+        for (kind, _), e in last.items():
             st = {"APPROVAL_REQUESTED": "pending", "APPROVED": "approved", "REJECTED": "rejected"}[e["event"]]
             h = e["data"]["sha256"]
             approvals.append({"kind": kind, "unit": e["data"].get("unit"), "state": st, "sha8": h[:8], "at": e["_at"],
@@ -205,7 +227,7 @@ class Req:
                 row.update(state=lean_view.STAGE_STATE[e["event"]], at=e["ts"], note=d.get("note") or d.get("reason"), src="aidlc-docs/audit/L-3F2A1C.jsonl")
         stages = sorted(seen.values(), key=lambda r: r["first_at"])
         verify = [{"at": e["ts"], "ok": e["data"]["ok"], "src": "aidlc-docs/audit/L-3F2A1C.jsonl"} for e in self.events if e["event"] == "VERIFY"]
-        return {"stages": stages, "humans": self.humans, "brain": brain,
+        return {"stages": stages, "humans": self.humans, "brain": brain, "missing": TRACE_MISSING,
                 "actions": {"commits": self.commits, "handovers": self.hands, "questions": self.park, "blocked": [
                     {"at": e["ts"], "gate": e["data"]["gate"], "path": e["data"]["path"], "tool": "fs_write", "src": "aidlc-docs/audit/L-3F2A1C.jsonl"}
                     for e in self.events if e["event"] == "BLOCKED"]},
@@ -216,9 +238,149 @@ class Req:
                             "reverted_or_hotfixed_within_14d": self.after14 or {"value": None, "window_closed": None, "window_end": None, "evidence": []}}}
 
 
-def standard(r: Req, t: float, *, design_back: bool = False, plan: bool = False) -> float:
+def changes(r: Req) -> dict[str, list[dict]]:
+    """Each commit's files as board.changes_from_log reads them from git: the hand-over's run.json and MR.md, a
+    records-only commit's Lean records, else the requirement's code and its tests; a path's first commit adds it."""
+    area = r.slug.split("-")[0]
+    seen: set[str] = set()
+    out = {}
+    for c in r.commits:
+        h = int(c["sha"][:8], 16)
+        if c["subject"].endswith("hand off to team runner"):
+            pool = ["runs/%s/run.json" % r.key, "runs/%s/MR.md" % r.key]
+        elif c["records_only"]:
+            pool = ["aidlc-docs/%s/%s" % (r.intent, x) for x in (
+                "aidlc-state.md", "decisions.md", "inception/requirements/requirements.md",
+                "inception/application-design/application-design.md", "audit.md")]
+        else:
+            pool = ["src/%s/%s.py" % (area, x) for x in ("service", "models", "api", "export", "jobs")] + [
+                "tests/test_%s.py" % area, "tests/test_%s_api.py" % area]
+        paths = list(dict.fromkeys(pool[(h + i) % len(pool)] for i in range(max(1, int(c["files"])))))
+        out[c["sha"]] = [{"path": p, "added": 4 + (h >> (2 * i)) % 70, "removed": 0 if p not in seen else (h >> i) % 15,
+                          "status": "M" if p in seen else "A"} for i, p in enumerate(paths)]
+        seen.update(paths)
+    return out
+
+
+# each repo's Brain (file, section, id, header attributes, text): its older entries (sequential ids) and what its
+# merged runs wrote back; T-13 cites a chat (not a reference: brain lint fails it), T-PAY-2-1 came back twice
+BRAIN = {
+    "r1": [("PRODUCT", "退款", "P-7", "type:principle side:product rel:new src:PAY-1", "对商户的金额一律到分，不四舍五入到元。"),
+           ("TECH", "退款", "T-12", "type:guideline side:builder rel:new src:PAY-1", "导出大文件分批写，一批不超过 5000 行。"),
+           ("TECH", "回调", "T-13", "type:decision side:builder rel:new src:见群聊", "退款回调失败后按 1、5、30 分钟重试三次，之后进人工队列。"),
+           ("PROJECT", "约定", "J-3", "type:process side:shared rel:new src:PAY-1", "需求文档一律走开需求的五关，原件不进任何仓库。")],
+    "r3": [("TECH", "订单", "T-3", "type:guideline side:builder rel:new src:ORD-1", "订单金额的计算只在 order-core 里做，页面只展示。"),
+           ("PRODUCT", "订单", "P-2", "type:principle side:product rel:new src:ORD-1", "取消订单不收手续费。")],
+    "r4": [],
+}
+# what a merged run wrote back into the Brain (brain reflect, merged), by key
+WRITTEN_BACK = {
+    "PAY-2": [("PRODUCT", "退款", "P-PAY-2-1", "type:decision side:product rel:new src:D-1,RUN-PAY-2-1",
+               "退款单只给有退款权限的运营看：里面有收款人姓名。"),
+              ("TECH", "退款", "T-PAY-2-1", "type:pitfall side:builder rel:new repeats:2 src:D01#S030,V-1a2b3c4d5e",
+               "退款单号是 RF + 9 位；样例文件里的 7 位是旧格式。\n校验时两种都认，生成只用新格式。"),
+              ("IMPROVEMENT", "流程", "I-PAY-2-1", "type:process side:builder rel:new repeats:1 src:RUN-PAY-2-1",
+               "交接前先 rebase 到最新的 main：桥只收 brain_commit 在 main 上的运行。")],
+}
+for _i, _k in enumerate(("ORD-2", "ORD-4", "ORD-6", "ORD-8")):
+    WRITTEN_BACK[_k] = [("TECH", "订单", "T-%s-1" % _k, "type:pitfall side:builder rel:new src:RUN-%s-1" % _k,
+                         ("地址校验要先去掉全角空格。", "优惠券叠加先算满减再算折扣。", "取消订单的退款走原路返回。",
+                          "运费分摊按商品金额比例，尾差记在最后一件。")[_i])]
+# what each run's Lean records cite (decisions.md), by key: the Brain it used
+CITES = {"PAY-2": ["T-12", "P-7"], "PAY-3": ["T-12", "T-PAY-2-1", "T-PAY-9-1"], "PAY-1": ["P-PAY-2-1"],
+         "PAY-4": ["T-PAY-2-1", "T-12"], "PAY-5": ["T-PAY-2-1"], "ORD-3": ["T-3", "T-ORD-2-1"], "ORD-5": ["P-2"],
+         "ORD-7": ["T-ORD-4-1", "T-ORD-6-1"], "ORD-8": ["T-ORD-6-1"], "ORD-9": ["T-ORD-8-1", "T-3"], "ORD-10": ["T-ORD-8-1"]}
+FREE_TEXT = {"r1": {"PRODUCT": "退款要在 7 天内处理"}}     # a line outside the entries: brain lint warns
+
+
+def brain_views(reqs: dict[str, list[Req]], rows: list[dict]) -> dict[str, dict]:
+    """Each repo's Brain page (GET /brain) as brainview.view makes it with brain-kit, on a scratch git repo that holds
+    what the world says: the Brain on main, each merged run (its run.json at the Brain it loaded, its decisions.md
+    citing what it used) and the write-back that followed it, each run not merged yet on its branch (a local one in
+    its worktree). {} without brain-kit (BRAIN_TEST_BRAINKIT)."""
+    if not (BRAINKIT / "brainkit" / "__init__.py").is_file():
+        print("no brain-kit at %s: the Brain pages are left out" % BRAINKIT)
+        return {}
+    bk.load(str(BRAINKIT))
+    E = bk.m("entries")
+    paths = {"r1": "/Users/alice/workplace/shop-pay", "r3": "/Users/alice/workplace/shop-order",
+             "r4": "/Users/alice/workplace/shop-tools"}
+    prefix = {"r1": "PAY", "r3": "ORD", "r4": "TOOL"}
+    out = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        for rid, path in paths.items():
+            top = Path(tmp) / rid
+            top.mkdir()
+
+            def git(*a: str) -> str:
+                return subprocess.run(["git", "-C", str(top), "-c", "user.name=alice", "-c", "user.email=alice@example.com",
+                                       *a], check=True, capture_output=True, text=True).stdout.strip()
+
+            git("init", "-q", "-b", "main")
+            (top / ".brain").mkdir()
+            (top / ".brain" / "kit.json").write_text(json.dumps({"req_prefix": prefix[rid], "default_branch": "main",
+                                                                  "tracker": "none"}), encoding="utf-8")
+            entries = list(BRAIN[rid])
+
+            def write_brain() -> None:
+                (top / "brain").mkdir(exist_ok=True)
+                for key in E.FILES:
+                    text = (BRAINKIT / "templates" / "brain" / ("%s.md" % key)).read_text(encoding="utf-8").rstrip("\n")
+                    if FREE_TEXT.get(rid, {}).get(key):
+                        text += "\n\n" + FREE_TEXT[rid][key]
+                    for section in dict.fromkeys(x[1] for x in entries if x[0] == key):
+                        text += "\n\n## %s" % section
+                        for file, sec, eid, attrs, body in entries:
+                            if file == key and sec == section:
+                                text += "\n\n<!-- id:%s %s -->\n%s" % (eid, attrs, body)
+                    (top / "brain" / ("%s.md" % key)).write_text(text + "\n", encoding="utf-8")
+
+            def run_files(r: Req, brain_commit: str) -> None:
+                (top / "runs" / r.key).mkdir(parents=True, exist_ok=True)
+                (top / "runs" / r.key / "run.json").write_text(json.dumps(
+                    {"key": r.key, "owner": r.owner, "branch": r.branch, "intent": r.intent, "brain_commit": brain_commit,
+                     "created_at": iso(r.start_at or T0)}), encoding="utf-8")
+                d = top / "aidlc-docs" / r.intent
+                d.mkdir(parents=True, exist_ok=True)
+                cites = "".join("| D-%d | %s | requirements | 按 %s | Brain | agent |\n" % (i, iso(r.start_at or T0)[:10], c)
+                                for i, c in enumerate(CITES.get(r.key, []), 1))
+                (d / "decisions.md").write_text("# Decisions\n\n| ID | Date | Stage | Decision | Why | Who |\n|---|---|---|---|---|---|\n"
+                                                + cites + "```brain-proposal\n```\n" * r.proposals, encoding="utf-8")
+
+            write_brain()
+            git("add", "-A")
+            git("commit", "-qm", "brain-kit and the Brain")
+            mine = sorted((r for r in reqs.get(rid, []) if r.start_at is not None), key=lambda r: r.merged_at or 1e12)
+            for r in [r for r in mine if r.merged_at]:
+                run_files(r, git("rev-parse", "HEAD"))
+                git("add", "-A")
+                git("commit", "-qm", "merge %s" % r.key)
+                if r.key in WRITTEN_BACK:
+                    entries += WRITTEN_BACK[r.key]
+                    write_brain()
+                    git("add", "-A")
+                    git("commit", "-qm", "brain: %s written back" % r.key)
+            main = git("rev-parse", "HEAD")
+            for r in [r for r in mine if not r.merged_at]:
+                git("checkout", "-q", "-b", r.branch, main)
+                run_files(r, main)
+                git("add", "-A")
+                git("commit", "-qm", "%s: start" % r.key)
+                git("checkout", "-q", "main")
+                if r.hand_at is None:      # on this machine: in its worktree
+                    git("worktree", "add", "-q", str(Path(tmp) / ("wt-%s" % r.key)), r.branch)
+            repo = repo_mod.Repo(rid, str(top), bk.m("config").load(str(top)))
+            reflect = [{"key": x["key"], "title": x["title"], "state": x["state"]} for x in rows
+                       if x["repo"] == rid and next((q.proposals for q in reqs[rid] if q.key == x["key"]), 0)]
+            view = brainview.view(repo, reflect)
+            out[rid] = json.loads(json.dumps(view, ensure_ascii=False).replace(repo.path, path))
+    return out
+
+
+def standard(r: Req, t: float, *, design_back: bool = False, units: tuple[str, ...] = ()) -> float:
     """The local half up to the design approval, from *t*: reverse engineering skipped, requirements, user stories
-    skipped, the application design (sent back once when *design_back*), units skipped. Returns where it ended."""
+    skipped, the application design (sent back once when *design_back*), units skipped (or split into *units*).
+    Returns where it ended."""
     r.start_at = t
     r.stage(t + 2 * M, "reverse-engineering", "skipped", note="新功能，代码已经读过")
     r.stage(t + 3 * M, "requirements", "started")
@@ -240,6 +402,10 @@ def standard(r: Req, t: float, *, design_back: bool = False, plan: bool = False)
         r.approve(t + 121 * M, "DESIGN", h)
         end = t + 122 * M
     r.stage(end, "application-design", "done", note="设计过了")
+    if units:
+        r.stage(end + 1 * M, "units", "started")
+        r.stage(end + 10 * M, "units", "done", note="拆成 %d 个单元：%s" % (len(units), "、".join(units)))
+        return end + 12 * M
     r.stage(end + 1 * M, "units", "skipped", note="只有一个单元")
     return end + 2 * M
 
@@ -318,6 +484,7 @@ def snapshot(r: Req, row: dict, *, park: dict | None = None, sessions: list | No
     subjects = {c["sha"]: c["subject"] for c in r.commits}
     sessions = sessions or []
     g = board.build(f, row, t, mr=mr, sessions=sessions, app_events=r.app, team_decisions=[], subjects=subjects,
+                    changes=changes(r),
                     reflect_refs=reflect or [], default_branch="main", local_only=local_only,
                     kit_rows=board.kit_cells(kit_rows or [], "/Users/alice/workplace/%s" % {"r1": "shop-pay", "r3": "shop-order", "r4": "shop-tools"}.get(r.repo, "")),
                     decisions=decisions or [], brain=brain, me=me, now=T0)
@@ -329,8 +496,7 @@ def snapshot(r: Req, row: dict, *, park: dict | None = None, sessions: list | No
             "mr_desc": mr_desc or {"available": True, "text": "", "first": None, "source": None, "path": None, "ref": None,
                                    "error": "还没开工：开工以后才有变更说明"},
             "sessions": sessions, "credits": {"total": credits, "note": detail.NO_TOKENS},
-            "source": "trace" if t else "app", "error": "",
-            "missing": detail.missing_text(TRACE_MISSING, handed_over=r.hand_at is not None, local_only=local_only) if t else []}
+            "source": "trace" if t else "app", "error": "", "missing": g["missing"]}
 
 
 def main() -> None:
@@ -347,6 +513,7 @@ def main() -> None:
     boards: dict[str, dict] = {}
     details: dict[str, dict] = {}
     runs: list[dict] = []
+    reqs: dict[str, list[Req]] = {"r1": [], "r3": [], "r4": []}      # every requirement's records, by repo
 
     def mrdesc(key: str, first: str) -> dict:
         m = copy.deepcopy(det["mr_desc"])
@@ -362,8 +529,9 @@ def main() -> None:
     t = standard(p2, T0 - 6 * D, design_back=True)
     end, h = runner_half(p2, t + 20 * M, iid=37, question=("D-1", "clarify", 41 * M, "A"), verify_fail=True)
     merged(p2, end, h, "D-2")
-    p2.app.append({"at": iso(p2.merged_at + 15 * H), "label": "brain reflect --apply：成功", "detail": "brain/PAY-2-reflect-1"})
+    p2.app.append({"at": iso(p2.merged_at + 15 * H), "label": "回写 Brain：成功", "detail": "brain/PAY-2-reflect-1"})
     p2.proposals = 1
+    reqs["r1"].append(p2)
     p2_sess = dict(det["sessions"][0], slot="brain-PAY-2-1c4e", url="/chat?sid=brain-PAY-2-1c4e", title="PAY-2 退款单号校验",
                    credits=8.3, turns=19, busy=False, awaiting=False, last_activity=p2.hand_at)
     row = classified(p2, rows["PAY-2"], reflected=True, slot=p2_sess)
@@ -376,24 +544,40 @@ def main() -> None:
                                   mr_desc=mrdesc("PAY-2", row.get("summary") or "退款单号加上校验位，重复和非法单号在入口就拒掉"), credits=22.7)
     runs.append({"key": "PAY-2", "repo": "r1", "how": "people", "beyond": ["回答问题"], "at_points": 5, "outside": 0, "credits": 22.7, "merged_at": p2.merged_at})
 
-    # PAY-3: on this machine, waits for its code-generation plan (PLAN) approval; a clarify question waits too
+    # PAY-3: on this machine, two units: refund-export's code written yesterday; the session sat quiet overnight until
+    # alice spoke to it this morning; refund-api's code-generation plan (PLAN) waits for her approval, a clarify
+    # question waits too
     p3 = Req("r1", "PAY-3", "退款单导出 CSV", "alice", "refund-export", "261107-refund-export", project="shop/shop-pay")
     p3.claim_at = T0 - 1 * D - 6 * H
-    t = standard(p3, T0 - 1 * D - 4 * H)
-    p3.stage(t, "functional-design", "skipped", unit="refund-api", note="没有要细化的")
-    p3.stage(t + 1 * M, "code-generation", "started", unit="refund-api")
-    p3.commit(t + 40 * M, "person", "PAY-3：导出接口的骨架", files=4)
-    p3.commit(T0 - 3 * H, "person", "PAY-3：CSV 字段和金额格式", files=3)
+    units = ("refund-export", "refund-api")
+    t = standard(p3, T0 - 1 * D - 4 * H, units=units)
+    p3.turn(p3.start_at + 30)                                   # the app's kickoff: the session's task
+    for u in units:
+        p3.stage(t, "functional-design", "started", unit=u)
+        p3.stage(t + 18 * M, "functional-design", "done", unit=u, note="导出字段和分批规则定了")
+        p3.stage(t + 20 * M, "nfr-design", "skipped", unit=u, note="没有新的指标")
+        p3.stage(t + 21 * M, "infrastructure-design", "skipped", unit=u, note="不动基础设施")
+    p3.stage(t + 23 * M, "code-generation", "started", unit="refund-export")
+    h = p3.request(t + 35 * M, "PLAN", unit="refund-export")
+    p3.approve(t + 52 * M, "PLAN", h, unit="refund-export")
+    p3.commit(t + 70 * M, "person", "PAY-3：导出接口的骨架", files=4)
+    p3.commit(t + 95 * M, "person", "PAY-3：refund-export：分批写 CSV", files=3)
+    p3.stage(t + 110 * M, "code-generation", "done", unit="refund-export", note="refund-export 的代码写完了，单测全过")
+    p3.turn(T0 - 5 * H)                                         # the next morning: alice tells it to go on
+    p3.stage(T0 - 5 * H + 2 * M, "code-generation", "started", unit="refund-api")
+    p3.commit(T0 - 40 * M, "person", "PAY-3：refund-api 的代码计划", files=1, records=True)
     p3.question_park(T0 - 20 * M, "waiting", "clarify")
-    p3.request(T0 - 6 * M, "PLAN")
-    p3.events[-1]["data"]["sha256"] = "5d1e7a90" + p3.events[-1]["data"]["sha256"][8:]
-    p3.events[-1]["data"]["unit"] = "refund-api"
+    p3.request(T0 - 6 * M, "PLAN", unit="refund-api", sha8="5d1e7a90")
+    reqs["r1"].append(p3)
     q3 = det["questions"][0]
     p3_park = {"status": "waiting", "kind": "clarify", "ask": "owner", "question": q3["question"], "options": q3["options"],
                "recommend": q3["recommend"], "refs": q3["refs"]}
     row = classified(p3, rows["PAY-3"], park=p3_park, slot=det["sessions"][0])
     det["row"] = row
-    det["timeline"]["missing"] = detail.missing_text(TRACE_MISSING, handed_over=False, local_only=False)
+    f3 = p3.facts(p3_park)      # 需求详情's Lean card, as service._detail_sync sends it: the same records as the row
+    det["lean"]["stages"] = f3["stages"]
+    det["lean"]["approvals"] = [{k: a[k] for k in ("kind", "state", "sha8", "at", "line", "path")} for a in f3["approvals"]]
+    det["timeline"]["missing"] = board.missing_sources(TRACE_MISSING, local_only=False, handed=False)
     boards["r1/PAY-3"] = snapshot(p3, row, park=p3_park,
                                   sessions=det["sessions"], decisions=det["decisions"], brain=det["brain"], questions=det["questions"],
                                   mr_desc=det["mr_desc"], credits=row.get("credits"))
@@ -402,7 +586,7 @@ def main() -> None:
     # PAY-4: on the runner, parked on D-2 (a design question for the product)
     p4 = Req("r1", "PAY-4", "对账单按商户拆分", "carol", "merchant-split", "261105-merchant-split", project="shop/shop-pay")
     p4.claim_at = T0 - 2 * D
-    t = standard(p4, T0 - 1 * D - 22 * H)
+    t = standard(p4, T0 - 9 * H)
     p4.commit(t + 10 * M, "person", "PAY-4：设计定稿", files=2, records=True)
     p4.handoff(t + 30 * M)
     p4.accepted(t + 32 * M, 41, "RUN-PAY-4-1")
@@ -411,6 +595,7 @@ def main() -> None:
     p4.question_park(T0 - 3 * H - 2 * M, "waiting", "design")
     p4.ask("D-2", "design", T0 - 3 * H)
     p4_park = {"status": "waiting", "kind": "design", "ask": "product"}
+    reqs["r1"].append(p4)
     row = classified(p4, rows["PAY-4"], park=p4_park, mr={"state": "opened", "labels": ["ai-running"], "questions": [
         {"id": "D-2", "kind": "design", "state": "open", "lean_request": None, "at": iso(T0 - 3 * H)}]})
     boards["r1/PAY-4"] = snapshot(p4, row, park=p4_park, decisions=det["decisions"][1:3],
@@ -430,6 +615,8 @@ def main() -> None:
     end, h = runner_half(p5, t + 25 * M, iid=44)
     p5.ask("D-3", "acceptance", T0 - 1 * D - 1 * H)
     p5_park = {"status": "waiting", "kind": "acceptance", "lean_request": "RELEASE 0c9a7e21"}
+    p5.proposals = 1        # new knowledge to write back once it is merged (Brain's 回写 lists it)
+    reqs["r1"].append(p5)
     row = classified(p5, rows["PAY-5"], park=p5_park, mr={"state": "opened", "labels": ["ai-running"], "questions": [
         {"id": "D-3", "kind": "acceptance", "state": "open", "lean_request": "RELEASE 0c9a7e21", "at": iso(T0 - 1 * D - 1 * H)}]})
     boards["r1/PAY-5"] = snapshot(p5, row, park=p5_park,
@@ -451,6 +638,7 @@ def main() -> None:
     p7.verify(t + 80 * M, [("pytest -q", 0), ("npm test", 0)])
     p7.stage(t + 81 * M, "build-and-test", "done", note="verify PASS：2 项")
     p7.handoff(t + 85 * M)
+    reqs["r1"].append(p7)
     why, raw = problems.reasons_text(["label 'ai-handoff' was added by bob, not by the branch owner alice"])
     p7.rejected(T0 - 5 * H - 30 * M, why)
     p7_sess = dict(det["sessions"][0], slot="brain-PAY-7-2b9f", url="/chat?sid=brain-PAY-7-2b9f", title="PAY-7 退款原因下拉框",
@@ -488,6 +676,7 @@ def main() -> None:
     p1.verify(t + 50 * M, [("pytest -q", 0)])
     p1.stage(t + 51 * M, "build-and-test", "done", note="verify PASS：1 项")
     p1_idle = t + 53 * M
+    reqs["r1"].append(p1)
     p1_sess = dict(det["sessions"][0], slot="brain-PAY-1-3d8e", url="/chat?sid=brain-PAY-1-3d8e", title="PAY-1 退款原因统计",
                    credits=9.8, turns=14, busy=False, awaiting=False, last_activity=p1_idle, opened_at=p1.start_at)
     row = copy.deepcopy(rows["PAY-3"])
@@ -529,6 +718,7 @@ def main() -> None:
                    mr={"iid": 10 + i, "url": "%s/shop/shop-order/-/merge_requests/%d" % (GL, 10 + i), "state": "merged"},
                    run_ids=["RUN-%s-1" % key] if how != "local" else [], open_questions=[], overlap=[], expected_paths=[], worktree=None, where="main")
         r.proposals = 1 if key == "ORD-9" else i % 2      # ORD-9: merged 3 days ago, its knowledge not written back yet
+        reqs["r3"].append(r)
         order_rows.append(classified(r, row, reflected=bool(i % 2 and ago_d > 5)))
         boards["r3/%s" % key] = snapshot(r, row, credits=cr, mr_desc=mrdesc(key, "%s：做完了，合并进 main" % title),
                                          brain={"loaded": 8 + i, "cited": ["T-ORD-%d-1" % max(1, i)], "stale": [], "unknown": [], "proposals": r.proposals},
@@ -547,6 +737,7 @@ def main() -> None:
     r.commit(t + 40 * M, "bot", "ORD-10：推送服务的骨架", files=4)
     r.commit(T0 - 25 * M, "bot", "ORD-10：模板消息和重试", files=3)
     r.commit(T0 - 4 * M, "bot", "ORD-10：订单状态变化的订阅", files=2)
+    reqs["r3"].append(r)
     row = copy.deepcopy(tmpl)
     row.update(repo="r3", key="ORD-10", title="订单状态推送到企业微信", owner="erin", branch=r.branch, intent=r.intent, state="running", state_label="运行机在跑",
                credits=7.4, updated_at=T0 - 4 * M, summary=None, waits={"who": "runner", "text": "运行机在跑", "line": None, "raw": ""},
@@ -570,6 +761,7 @@ def main() -> None:
     r.stage(r.start_at + 42 * M, "requirements", "done")
     r.stage(r.start_at + 43 * M, "application-design", "started")
     r.commit(T0 - 50 * M, "person", "TOOL-1：导入格式和校验规则", files=2, records=True)
+    reqs["r4"].append(r)
     row = copy.deepcopy(tmpl)
     row.update(repo="r4", key="TOOL-1", title="价格表批量导入", owner="alice", branch=r.branch, intent=r.intent, state="local", state_label="本地开发中",
                credits=4.9, updated_at=T0 - 1 * M, summary=None, waits={"who": "agent", "text": "agent 在做", "line": None, "raw": ""}, mr=None, run_ids=[],
@@ -639,6 +831,25 @@ def main() -> None:
     crew_fail = {"level": "FAIL", "text": "没有 ~/.kiro/agents/brain-dev.json", "todo": "点「装上 brain-dev」：app 装上 brain-kit 带的那一份",
                  "fix": "agent", "repo": None, "raw": ""}
     world_todo = {"ok": todo.build(entries, team=False, crew_rows=[]), "crewfail": todo.build(entries, team=False, crew_rows=[crew_fail])}
+    # team mode (service._todo_sync): alice's own list, then what the runner's ledger waits for (service._team_rows:
+    # each run's row by deliveries.team_classify): D-2 for a person, D-3's acceptance, an answer the signer refused
+    ledger = [(p4, "RUN-PAY-4-1", 41, [{"id": "D-2", "kind": "design", "state": "open", "created": iso(T0 - 3 * H)}]),
+              (p5, "RUN-PAY-5-1", 44, [{"id": "D-3", "kind": "acceptance", "state": "open", "lean_request": "RELEASE 0c9a7e21",
+                                        "created": iso(T0 - 1 * D - 1 * H)}]),
+              (reqs["r3"][-1], "RUN-ORD-10-1", 19, [{"id": "D-1", "kind": "clarify", "state": "refused", "created": iso(T0 - 2 * H)}])]
+    team_entries = []
+    for q, run_id, iid, decs in ledger:
+        f = {"key": q.key, "claim": None, "where": "runner", "branch": q.branch, "owner": q.owner, "worktree": None,
+             "stages": q.facts()["stages"], "events": [], "approvals": [], "run": q.facts()["run"], "park": None}
+        row_t = deliveries.base_row("runner", f)
+        row_t["where"] = "runner"
+        decs = [dict(d, run_id=run_id) for d in decs]
+        deliveries.team_classify(row_t, {"run_id": run_id, "req": q.key, "state": "dispatched"}, decs, None)
+        url = "%s/%s/-/merge_requests/%d" % (GL, q.project, iid)
+        row_t.update(run_ids=[run_id], mr={"iid": iid, "url": url, "state": None})
+        team_entries.append({"row": row_t, "decisions": decs, "mr_url": url})
+    world_todo["team"] = {"items": world_todo["ok"]["items"] + todo.build(team_entries, team=True, crew_rows=[])["items"],
+                          "team": True}
     world_status = copy.deepcopy(status)
     world_status["repos"] = status["repos"] + [
         {"id": "r3", "path": "/Users/alice/workplace/shop-order", "name": "shop-order", "ok": True, "error": "", "pending": None,
@@ -657,8 +868,10 @@ def main() -> None:
     world_status["counts"]["todo"] = len(world_todo["ok"]["items"])
     for r_ in world_status["repos"]:
         r_["remote"] = r_["id"] not in local and r_["id"] != "r2"
+    brains = brain_views(reqs, all_rows)
     world = {"note": "made by scripts/preview_world.py: do not edit by hand", "at": T0, "status": world_status, "overview": world_ov,
-             "overviews": overviews, "todo": world_todo, "boards": boards, "details": details, "stages": STAGES}
+             "overviews": overviews, "todo": world_todo, "boards": boards, "details": details, "stages": STAGES,
+             "brains": brains}
     (ROOT / "ui" / "preview" / "world.json").write_text(json.dumps(world, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     # the contract fixtures the UI tests read: the overview's numbers for its own rows, one live board and one merged
     ov["cto"] = deliveries.cto_numbers([("r1", parts[0][1])], list(rows.values()), available=True, now=T0, names=names, repos=1)
@@ -677,6 +890,8 @@ def main() -> None:
     (FIX / "status.json").write_text(json.dumps(st, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (FIX / "board.json").write_text(json.dumps(boards["r1/PAY-3"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (FIX / "board-merged.json").write_text(json.dumps(boards["r1/PAY-2"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if brains:
+        (FIX / "brain.json").write_text(json.dumps(brains["r1"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print("world: %d rows, %d boards; fixtures: overview.json, detail.json, todo.json, board.json, board-merged.json" % (
         len(all_rows), len(boards)))
 

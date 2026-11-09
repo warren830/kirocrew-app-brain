@@ -16,9 +16,9 @@
       "stage_label": "代码生成",
       "stage_n": 9,
       "stage_state": "started",
-      "done": 6,
+      "done": 8,
       "total": 11,
-      "done_n": 2,
+      "done_n": 4,
       "skipped_n": 4,
       "next": {
         "id": "code-generation",
@@ -26,7 +26,7 @@
         "n": 9
       }
     },
-    "stage": "做完 2 · 跳过 4 · 下一步：代码生成",
+    "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
     "waits": {
       "who": "you",
       "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -121,7 +121,52 @@
           "doing": "在做：下一个阶段"
         },
         {
-          "at": 1794053100,
+          "at": 1794052980,
+          "status": "running",
+          "doing": "在做：拆分单元"
+        },
+        {
+          "at": 1794053520,
+          "status": "running",
+          "doing": "在做：下一个阶段"
+        },
+        {
+          "at": 1794053640,
+          "status": "running",
+          "doing": "在做：功能设计"
+        },
+        {
+          "at": 1794054720,
+          "status": "running",
+          "doing": "在做：下一个阶段"
+        },
+        {
+          "at": 1794055020,
+          "status": "running",
+          "doing": "在做：代码生成"
+        },
+        {
+          "at": 1794055740,
+          "status": "done",
+          "doing": "交给你批准代码生成计划"
+        },
+        {
+          "at": 1794056760,
+          "status": "running",
+          "doing": "批准了，接着做"
+        },
+        {
+          "at": 1794060240,
+          "status": "running",
+          "doing": "在做：下一个阶段"
+        },
+        {
+          "at": 1794128400,
+          "status": "running",
+          "doing": "按你的话接着做"
+        },
+        {
+          "at": 1794128520,
           "status": "running",
           "doing": "在做：代码生成"
         },
@@ -154,6 +199,21 @@
         },
         {
           "a": 1794052860,
+          "b": 1794055740,
+          "kind": "work"
+        },
+        {
+          "a": 1794056760,
+          "b": 1794060240,
+          "kind": "work"
+        },
+        {
+          "a": 1794060240,
+          "b": 1794128400,
+          "kind": "wait"
+        },
+        {
+          "a": 1794128400,
           "b": 1794145200.0,
           "kind": "work"
         },
@@ -175,14 +235,24 @@
           "title": "Lean 拦下了写 src/refund/service.py：需求和设计还没批"
         },
         {
-          "at": 1794055440.0,
+          "at": 1794057840.0,
           "kind": "commit",
-          "title": "提交 0a9c72df：PAY-3：导出接口的骨架"
+          "title": "提交 93b2dea5：PAY-3：导出接口的骨架"
         },
         {
-          "at": 1794135600.0,
+          "at": 1794059340.0,
           "kind": "commit",
-          "title": "提交 d98cdc55：PAY-3：CSV 字段和金额格式"
+          "title": "提交 193239b7：PAY-3：refund-export：分批写 CSV"
+        },
+        {
+          "at": 1794128400,
+          "kind": "answer",
+          "title": "你在会话里回话了"
+        },
+        {
+          "at": 1794144000.0,
+          "kind": "commit",
+          "title": "提交 61ddbc30：PAY-3：refund-api 的代码计划"
         },
         {
           "at": 1794145200.0,
@@ -191,7 +261,7 @@
         }
       ],
       "facts": [
-        "提交 3 次",
+        "提交 4 次",
         "Lean 拦下 1 次",
         "会话 1 个"
       ],
@@ -206,7 +276,7 @@
     {
       "key": "req",
       "title": "需求审批",
-      "sub": "REQUIREMENTS",
+      "sub": "Lean 请人批需求",
       "icon": "req",
       "status": "merged",
       "doing": "你批准了 · 需求",
@@ -252,7 +322,7 @@
     {
       "key": "design",
       "title": "设计审批",
-      "sub": "DESIGN · PLAN",
+      "sub": "设计 · 代码生成计划",
       "icon": "design",
       "status": "awaiting_approval",
       "doing": "等你批准代码生成计划",
@@ -272,6 +342,16 @@
           "at": 1794052860,
           "status": "merged",
           "doing": "你批准了 · 设计"
+        },
+        {
+          "at": 1794055740,
+          "status": "awaiting_approval",
+          "doing": "等你批准代码生成计划"
+        },
+        {
+          "at": 1794056760,
+          "status": "merged",
+          "doing": "你批准了 · 代码生成计划"
         },
         {
           "at": 1794146040,
@@ -296,6 +376,11 @@
           "kind": "wait"
         },
         {
+          "a": 1794055740,
+          "b": 1794056760,
+          "kind": "wait"
+        },
+        {
           "a": 1794146040,
           "b": null,
           "kind": "wait"
@@ -313,13 +398,23 @@
           "title": "你批准了设计"
         },
         {
+          "at": 1794055740,
+          "kind": "request",
+          "title": "请你批准代码生成计划"
+        },
+        {
+          "at": 1794056760,
+          "kind": "approved",
+          "title": "你批准了代码生成计划"
+        },
+        {
           "at": 1794146040,
           "kind": "request",
           "title": "请你批准代码生成计划"
         }
       ],
       "facts": [
-        "请求批准 2 次",
+        "请求批准 3 次",
         "批准的那一行由人在会话里自己打"
       ],
       "credits": null,
@@ -329,7 +424,7 @@
     {
       "key": "handover",
       "title": "交接",
-      "sub": "brain handoff",
+      "sub": "本机做完交给运行机",
       "icon": "handover",
       "status": "waiting",
       "doing": "等本机做完再交接",
@@ -395,7 +490,7 @@
     {
       "key": "ci",
       "title": "CI 检查",
-      "sub": "lean verify",
+      "sub": "构建和测试的自动检查",
       "icon": "ci",
       "status": "waiting",
       "doing": "等提交以后跑 verify",
@@ -411,7 +506,7 @@
     {
       "key": "release",
       "title": "发布验收",
-      "sub": "RELEASE · 验收",
+      "sub": "发布审批 · 验收",
       "icon": "release",
       "status": "waiting",
       "doing": "等 Lean 走到发布审批",
@@ -427,7 +522,7 @@
     {
       "key": "reflect",
       "title": "回写 Brain",
-      "sub": "brain reflect",
+      "sub": "合并后写回新知识",
       "icon": "brain",
       "status": "waiting",
       "doing": "等合并以后写回 Brain",
@@ -633,23 +728,173 @@
       "kind": "stage",
       "from": "local",
       "to": "local",
-      "text": "跳过「拆分单元」：只有一个单元",
+      "text": "开始「拆分单元」",
       "detail": true,
       "src": null
     },
     {
       "seq": 16,
-      "at": 1794053040,
+      "at": 1794053520,
       "kind": "stage",
       "from": "local",
       "to": "local",
-      "text": "跳过「功能设计（refund-api）」：没有要细化的",
+      "text": "做完「拆分单元」",
       "detail": true,
       "src": null
     },
     {
       "seq": 17,
-      "at": 1794053100,
+      "at": 1794053640,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "开始「功能设计（refund-export）」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 18,
+      "at": 1794053640,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "开始「功能设计（refund-api）」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 19,
+      "at": 1794054720,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "做完「功能设计（refund-export）」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 20,
+      "at": 1794054720,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "做完「功能设计（refund-api）」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 21,
+      "at": 1794054840,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "跳过「非功能设计（refund-export）」：没有新的指标",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 22,
+      "at": 1794054840,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "跳过「非功能设计（refund-api）」：没有新的指标",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 23,
+      "at": 1794054900,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "跳过「基础设施设计（refund-export）」：不动基础设施",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 24,
+      "at": 1794054900,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "跳过「基础设施设计（refund-api）」：不动基础设施",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 25,
+      "at": 1794055020,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "开始「代码生成（refund-export）」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 26,
+      "at": 1794055740,
+      "kind": "request",
+      "from": "local",
+      "to": "design",
+      "text": "请你批准代码生成计划",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 27,
+      "at": 1794056760,
+      "kind": "approve",
+      "from": "person",
+      "to": "design",
+      "text": "你批准了代码生成计划",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 28,
+      "at": 1794057840.0,
+      "kind": "commit",
+      "from": "local",
+      "to": "branch",
+      "text": "提交 93b2dea5：PAY-3：导出接口的骨架",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 29,
+      "at": 1794059340.0,
+      "kind": "commit",
+      "from": "local",
+      "to": "branch",
+      "text": "提交 193239b7：PAY-3：refund-export：分批写 CSV",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 30,
+      "at": 1794060240,
+      "kind": "stage",
+      "from": "local",
+      "to": "local",
+      "text": "做完「代码生成（refund-export）」",
+      "detail": true,
+      "src": null
+    },
+    {
+      "seq": 31,
+      "at": 1794128400,
+      "kind": "answer",
+      "from": "person",
+      "to": "local",
+      "text": "你在会话里回话了",
+      "detail": false,
+      "src": null
+    },
+    {
+      "seq": 32,
+      "at": 1794128520,
       "kind": "stage",
       "from": "local",
       "to": "local",
@@ -658,27 +903,17 @@
       "src": null
     },
     {
-      "seq": 18,
-      "at": 1794055440.0,
+      "seq": 33,
+      "at": 1794144000.0,
       "kind": "commit",
       "from": "local",
       "to": "branch",
-      "text": "提交 0a9c72df：PAY-3：导出接口的骨架",
+      "text": "提交 61ddbc30：PAY-3：refund-api 的代码计划",
       "detail": false,
       "src": null
     },
     {
-      "seq": 19,
-      "at": 1794135600.0,
-      "kind": "commit",
-      "from": "local",
-      "to": "branch",
-      "text": "提交 d98cdc55：PAY-3：CSV 字段和金额格式",
-      "detail": false,
-      "src": null
-    },
-    {
-      "seq": 20,
+      "seq": 34,
       "at": 1794145200.0,
       "kind": "question",
       "from": "local",
@@ -688,7 +923,7 @@
       "src": null
     },
     {
-      "seq": 21,
+      "seq": 35,
       "at": 1794146040,
       "kind": "request",
       "from": "local",
@@ -708,29 +943,104 @@
       "files": 2,
       "records_only": true,
       "actor": "local",
-      "changes": []
+      "changes": [
+        {
+          "path": "aidlc-docs/261107-refund-export/inception/application-design/application-design.md",
+          "added": 72,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "aidlc-docs/261107-refund-export/audit.md",
+          "added": 56,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "commit",
-      "at": 1794055440.0,
-      "sha": "0a9c72df5485",
+      "at": 1794057840.0,
+      "sha": "93b2dea57790",
       "by": "person",
       "text": "PAY-3：导出接口的骨架",
       "files": 4,
       "records_only": false,
       "actor": "local",
-      "changes": []
+      "changes": [
+        {
+          "path": "src/refund/api.py",
+          "added": 41,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "src/refund/export.py",
+          "added": 13,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "src/refund/jobs.py",
+          "added": 6,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "tests/test_refund.py",
+          "added": 4,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "commit",
-      "at": 1794135600.0,
-      "sha": "d98cdc559f24",
+      "at": 1794059340.0,
+      "sha": "193239b77a5f",
       "by": "person",
-      "text": "PAY-3：CSV 字段和金额格式",
+      "text": "PAY-3：refund-export：分批写 CSV",
       "files": 3,
       "records_only": false,
       "actor": "local",
-      "changes": []
+      "changes": [
+        {
+          "path": "src/refund/jobs.py",
+          "added": 29,
+          "removed": 0,
+          "status": "M"
+        },
+        {
+          "path": "tests/test_refund.py",
+          "added": 27,
+          "removed": 7,
+          "status": "M"
+        },
+        {
+          "path": "tests/test_refund_api.py",
+          "added": 27,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
+    },
+    {
+      "kind": "commit",
+      "at": 1794144000.0,
+      "sha": "61ddbc3019ed",
+      "by": "person",
+      "text": "PAY-3：refund-api 的代码计划",
+      "files": 1,
+      "records_only": true,
+      "actor": "local",
+      "changes": [
+        {
+          "path": "aidlc-docs/261107-refund-export/audit.md",
+          "added": 48,
+          "removed": 14,
+          "status": "M"
+        }
+      ]
     }
   ],
   "checks": {
@@ -779,7 +1089,7 @@
         "id": "verify",
         "group": "verify",
         "label": "verify",
-        "name": "lean verify",
+        "name": "自动检查",
         "status": "skip",
         "at": null,
         "detail": "还没跑过 verify（构建和测试阶段跑）",
@@ -1041,6 +1351,6 @@
   "source": "trace",
   "error": "",
   "missing": [
-    "CI 流水线（在 GitLab 上，这里读不到）"
+    "CI 流水线：在 GitLab 上，这里读不到"
   ]
 }

@@ -17,9 +17,9 @@
         "stage_label": "代码生成",
         "stage_n": 9,
         "stage_state": "started",
-        "done": 6,
+        "done": 8,
         "total": 11,
-        "done_n": 2,
+        "done_n": 4,
         "skipped_n": 4,
         "next": {
           "id": "code-generation",
@@ -27,7 +27,7 @@
           "n": 9
         }
       },
-      "stage": "做完 2 · 跳过 4 · 下一步：代码生成",
+      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
       "waits": {
         "who": "you",
         "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
