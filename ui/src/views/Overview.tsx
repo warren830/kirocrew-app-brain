@@ -146,6 +146,8 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
   const ledgerRef = useRef<HTMLElement>(null)
   const repos = status?.repos ?? []
   const noRepos = !!status && repos.length === 0
+  // without brain-kit no repo can be read: the app's banner says why and where to fix it, once
+  const noKit = status?.brainkit.ok === false
   const ov = usePoll<Overview>(noRepos ? null : paths.overview(repo), pollMs ?? POLL_MS)
   const data = ov.data
   const runsBy = useMemo(() => new Map((data?.cto.runs ?? []).map((r) => [idOf(r), r])), [data])
@@ -230,7 +232,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
         <PendingRepo key={r.id} repo={r} banner onOpen={() => go({ kind: 'import', path: r.path })} onDone={reloadStatus} />
       ))}
       <LoadState loading={ov.loading} error={ov.error} has={!!data} />
-      {data?.errors.map((e) => {
+      {!noKit && data?.errors.map((e) => {
         const r = repos.find((x) => x.id === e.repo)
         return (
           <div key={e.repo} className="br-banner" role="status" data-testid="repo-error">
@@ -273,7 +275,10 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
         </nav>
       )}
 
-      {empty && (
+      {empty && noKit && (
+        <section className="cto-card" data-testid="ov-nokit"><p className="cto-was">brain-kit 读不到，这里的需求和数字要等它能读了才有：照最上面那条提示修。</p></section>
+      )}
+      {empty && !noKit && (
         <EmptyHero title="还没有需求" text={[`${where}还没有需求。认领一个需求，交它的文档过五关，开工：它会在这里一路走到合并——在哪一步、等谁、花了多少。`]}
           punch="人只在判断点上出手：批准、回答、验收。"
           flow={localOnly

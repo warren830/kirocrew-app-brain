@@ -387,7 +387,7 @@ function Facts({ x, start, localOnly }: { x: RequirementDetail; start: number | 
   const r = x.row
   const run = x.run
   const raw = ([
-    ['Lean intent', r.intent],
+    ['Lean 记录的名字', r.intent],
     ['Brain 提交', run?.brain_commit],
     ['材料包', run?.materials.join('、')],
     ['运行机的运行', r.run_ids.join('、')],
