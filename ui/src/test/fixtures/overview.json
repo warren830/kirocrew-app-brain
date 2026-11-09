@@ -18,14 +18,24 @@
         "stage_n": 9,
         "stage_state": "started",
         "done": 8,
-        "total": 11
+        "total": 11,
+        "done_n": 8,
+        "skipped_n": 0,
+        "next": {
+          "id": "code-generation",
+          "label": "代码生成",
+          "n": 9
+        }
       },
       "stage": "9/11 代码生成",
       "waits": {
         "who": "you",
         "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
         "line": "approve PLAN 5d1e7a90",
-        "raw": ""
+        "raw": "",
+        "do": "approve",
+        "since": null,
+        "where": "session"
       },
       "summary": "退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。",
       "credits": 12.4,
@@ -41,7 +51,8 @@
       "expected_paths": [
         "src/refund/",
         "src/export/csv.py"
-      ]
+      ],
+      "local_only": false
     },
     {
       "repo": "r1",
@@ -60,14 +71,24 @@
         "stage_n": 4,
         "stage_state": "started",
         "done": 3,
-        "total": 11
+        "total": 11,
+        "done_n": 3,
+        "skipped_n": 0,
+        "next": {
+          "id": "application-design",
+          "label": "应用设计",
+          "n": 4
+        }
       },
       "stage": "4/11 应用设计",
       "waits": {
         "who": "product",
         "text": "停在 D-2：等产品在 MR 上回答",
         "line": null,
-        "raw": ""
+        "raw": "",
+        "do": "answer",
+        "since": null,
+        "where": "mr"
       },
       "summary": "退款到账后给商户发通知（规模 S）。现在：Lean 在「代码生成」进行中，已交给团队运行机，等人在 MR 上回答澄清问题。",
       "credits": null,
@@ -91,7 +112,8 @@
       "expected_paths": [
         "src/refund/ledger.py",
         "src/statement/"
-      ]
+      ],
+      "local_only": false
     },
     {
       "repo": "r1",
@@ -110,14 +132,24 @@
         "stage_n": 11,
         "stage_state": "started",
         "done": 10,
-        "total": 11
+        "total": 11,
+        "done_n": 10,
+        "skipped_n": 0,
+        "next": {
+          "id": "release",
+          "label": "发布",
+          "n": 11
+        }
       },
       "stage": "11/11 发布",
       "waits": {
         "who": "you",
         "text": "等你验收：在 MR 上回答 D-3",
         "line": null,
-        "raw": ""
+        "raw": "",
+        "do": "accept",
+        "since": null,
+        "where": "mr"
       },
       "summary": "周报加上退款金额一栏（规模 S）。现在：Lean 在「发布」进行中，已交给团队运行机，等人在 MR 上回答验收问题。",
       "credits": 31.0,
@@ -138,7 +170,8 @@
       ],
       "expected_paths": [
         "src/callback/"
-      ]
+      ],
+      "local_only": false
     },
     {
       "repo": "r1",
@@ -157,14 +190,24 @@
         "stage_n": 10,
         "stage_state": "todo",
         "done": 9,
-        "total": 11
+        "total": 11,
+        "done_n": 9,
+        "skipped_n": 0,
+        "next": {
+          "id": "build-and-test",
+          "label": "构建和测试",
+          "n": 10
+        }
       },
       "stage": "10/11 构建和测试（下一步）",
       "waits": {
         "who": "you",
         "text": "接手被拒：标签是 bob 打的，不是负责人 alice；run.json 里没有交接记录",
         "line": null,
-        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice; run.json has no hand-over (run `brain handoff`)"
+        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice; run.json has no hand-over (run `brain handoff`)",
+        "do": "redo_handoff",
+        "since": null,
+        "where": "session"
       },
       "summary": "退款超过一万要两人复核（规模 M）。现在：Lean 在「构建测试」做完，已交给团队运行机。",
       "credits": 18.2,
@@ -181,7 +224,8 @@
       "open_questions": [],
       "expected_paths": [
         "web/refund/"
-      ]
+      ],
+      "local_only": false
     },
     {
       "repo": "r1",
@@ -200,14 +244,24 @@
         "stage_n": null,
         "stage_state": null,
         "done": 0,
-        "total": 11
+        "total": 11,
+        "done_n": 0,
+        "skipped_n": 0,
+        "next": {
+          "id": "",
+          "label": "",
+          "n": 0
+        }
       },
       "stage": null,
       "waits": {
         "who": "people",
         "text": "已认领，还没开工",
         "line": null,
-        "raw": ""
+        "raw": "",
+        "do": "start",
+        "since": null,
+        "where": "app"
       },
       "summary": null,
       "credits": null,
@@ -218,7 +272,8 @@
       "sessions": 0,
       "overlap": [],
       "open_questions": [],
-      "expected_paths": []
+      "expected_paths": [],
+      "local_only": false
     },
     {
       "repo": "r1",
@@ -237,14 +292,20 @@
         "stage_n": 11,
         "stage_state": "done",
         "done": 11,
-        "total": 11
+        "total": 11,
+        "done_n": 11,
+        "skipped_n": 0,
+        "next": null
       },
       "stage": "11/11 发布（做完）",
       "waits": {
         "who": "nobody",
         "text": "已合并",
         "line": null,
-        "raw": ""
+        "raw": "",
+        "do": "none",
+        "since": null,
+        "where": null
       },
       "summary": "对账单按自然日切分（规模 S）。现在：Lean 在「发布」做完，已交给团队运行机，RELEASE 已批。",
       "credits": 22.7,
@@ -263,7 +324,8 @@
       "open_questions": [],
       "expected_paths": [
         "src/refund/id.py"
-      ]
+      ],
+      "local_only": false
     }
   ],
   "overlaps": [

@@ -17,14 +17,20 @@
       "stage_n": 11,
       "stage_state": "done",
       "done": 11,
-      "total": 11
+      "total": 11,
+      "done_n": 11,
+      "skipped_n": 0,
+      "next": null
     },
     "stage": "11/11 发布（做完）",
     "waits": {
       "who": "nobody",
       "text": "已合并",
       "line": null,
-      "raw": ""
+      "raw": "",
+      "do": "none",
+      "since": null,
+      "where": null
     },
     "summary": "对账单按自然日切分（规模 S）。现在：Lean 在「发布」做完，已交给团队运行机，RELEASE 已批。",
     "credits": 22.7,
@@ -43,7 +49,8 @@
     "open_questions": [],
     "expected_paths": [
       "src/refund/id.py"
-    ]
+    ],
+    "local_only": false
   },
   "branch": "ai/alice/PAY-2-refund-id",
   "base": "main",
@@ -1558,7 +1565,8 @@
         "passed": 3,
         "failed": 0
       }
-    ]
+    ],
+    "todo": []
   },
   "accept": {
     "state": "merged",

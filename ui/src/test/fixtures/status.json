@@ -42,7 +42,8 @@
         "why": "",
         "suggest": "",
         "error": ""
-      }
+      },
+      "remote": true
     },
     {
       "id": "r2",
@@ -52,7 +53,8 @@
       "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用",
       "kit": null,
       "pending": null,
-      "me": null
+      "me": null,
+      "remote": true
     }
   ],
   "crew": {

@@ -17,14 +17,24 @@
       "stage_n": 9,
       "stage_state": "started",
       "done": 8,
-      "total": 11
+      "total": 11,
+      "done_n": 8,
+      "skipped_n": 0,
+      "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+      }
     },
     "stage": "9/11 代码生成",
     "waits": {
       "who": "you",
       "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
       "line": "approve PLAN 5d1e7a90",
-      "raw": ""
+      "raw": "",
+      "do": "approve",
+      "since": null,
+      "where": "session"
     },
     "summary": "退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。",
     "credits": 12.4,
@@ -40,7 +50,8 @@
     "expected_paths": [
       "src/refund/",
       "src/export/csv.py"
-    ]
+    ],
+    "local_only": false
   },
   "branch": "ai/alice/PAY-3-refund-export",
   "base": "main",
@@ -783,7 +794,8 @@
     "failed": 1,
     "total": 4,
     "at": 1794052860,
-    "history": []
+    "history": [],
+    "todo": []
   },
   "accept": {
     "state": "not_yet",

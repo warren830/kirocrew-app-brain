@@ -32,7 +32,8 @@ export const BRAIN_FILES: readonly BrainFile[] = ['PRODUCT', 'TECH', 'IMPROVEMEN
 export type OverviewEntry = { repo?: string; state?: ReqState }
 export type ItemEntry = { repo: string; key: string; from?: ItemFrom }
 export type BoardEntry = { repo: string; key: string; replay?: boolean; focus?: BoardFocus; from?: BoardFrom }
-export type NewEntry = { repo?: string }
+/** 开需求; with key (and title): 开工 of a requirement claimed already, its key fixed (?view=new&repo=&key=&title=) */
+export type NewEntry = { repo?: string; key?: string; title?: string }
 export type BrainEntryRef = { repo?: string; file?: BrainFile; id?: string; reflect?: string }
 export type ImportEntry = { path?: string }
 

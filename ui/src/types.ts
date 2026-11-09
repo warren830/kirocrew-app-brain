@@ -66,6 +66,17 @@ export const STATE_LABEL: Record<ReqState, string> = {
 /** Who the requirement waits on right now. */
 export type WaitWho = 'you' | 'agent' | 'runner' | 'bridge' | 'product' | 'builder' | 'people' | 'nobody'
 
+/**
+ * The step whoever `who` is takes now (UI问题清单 #1: one judgment, every view reads it: 待办, the badges, 交付总览's
+ * lanes, the board): approve (a Lean approval line, in the session), reply (the local session is idle: your turn to
+ * talk), tool (a tool call in the session waits for approval), start (claimed, no run yet: 开工), answer (a question:
+ * in the session for a local run, on the MR for a handed-over one), accept (acceptance), redo_handoff (the hand-over
+ * was refused), label_handoff (pushed without its label), write_back (merged with new knowledge to write back into
+ * the Brain), watch (merged, in its 14 days: nobody's turn), none (nothing to do: AI or the runner at work, or done).
+ */
+export type WaitDo = 'approve' | 'reply' | 'tool' | 'start' | 'answer' | 'accept' | 'redo_handoff' | 'label_handoff'
+  | 'write_back' | 'watch' | 'none'
+
 export interface Waits {
   who: WaitWho
   /** one short Chinese sentence, e.g. 「等你批准需求（在会话里自己打一行）」 */
@@ -75,6 +86,13 @@ export interface Waits {
   /** what text was made from, verbatim, for debugging (shown folded): a refused hand-over's reasons as the bridge wrote
    * them on the MR (text has them in short Chinese, backend/core/problems.py); '' otherwise. The backend always sends it */
   raw?: string
+  /** the step (see WaitDo). The backend always sends it; optional only so older literals compile */
+  do?: WaitDo
+  /** since when it waits like this (epoch s): the moment the session went idle, the approval was asked, the claim was
+   * made, the question was asked; null when unknown. The backend always sends it */
+  since?: number | null
+  /** where the step is taken: the local session, the MR, this app (开需求 / 待办), nowhere. The backend always sends it */
+  where?: 'session' | 'mr' | 'app' | null
 }
 
 export interface LeanSummary {
@@ -91,6 +109,11 @@ export interface LeanSummary {
   /** stages done or skipped / 11 */
   done: number
   total: number
+  /** UI问题清单 #8, the one way to say the progress (vocab.leanProgress): stages done, stages skipped, and the next one
+   * to do (null: every stage done or skipped). The backend always sends them */
+  done_n?: number
+  skipped_n?: number
+  next?: { id: string; label: string; n: number } | null
 }
 
 export interface MrRef { iid: number; url: string | null; state: string | null }
@@ -134,6 +157,9 @@ export interface Requirement {
   open_questions: string[]
   /** expected paths from run.json (overlap warnings come from these) */
   expected_paths: string[]
+  /** its repo has no remote: it is done only on this machine, never handed over (no runner, no MR). The backend
+   * always sends it */
+  local_only?: boolean
 }
 
 // ---------------------------------------------------------------- GET /status
@@ -153,6 +179,8 @@ export interface RepoInfo {
   pending: PendingInstall | null
   /** who brain-kit says the person is there (a loaded repo; null otherwise) */
   me: RepoMe | null
+  /** it has an origin: requirements may be handed over, 从远端取最新 works. The backend always sends it */
+  remote?: boolean
 }
 
 /**
@@ -1047,8 +1075,10 @@ export interface CheckCell {
   label: string
   /** in the inspector line: 需求审批（REQUIREMENTS） */
   name: string
-  /** pass, fail, wait (waits for a person), skip (not run, not needed yet) */
-  status: 'pass' | 'fail' | 'wait' | 'skip'
+  /** pass, fail, wait (waits for a person), skip (not run, not needed yet), watch (the 14 days after the merge, still
+   * running: nobody's turn), not_needed (not on this requirement's way: a stage Lean skipped, the runner of a repo done
+   * only here) */
+  status: 'pass' | 'fail' | 'wait' | 'skip' | 'watch' | 'not_needed'
   /** when it was decided (null: not yet) */
   at: number | null
   /** one plain line */
@@ -1060,6 +1090,8 @@ export interface CheckWall {
   passed: number
   failed: number
   total: number
+  /** the checks not reached yet, by name (「发布审批」): 「目前 3 项都过 · 还剩 发布」. The backend always sends it */
+  todo?: string[]
   at: number | null
   /** verify rounds: passed / failed checks over time (the sparkline) */
   history: { at: number; passed: number; failed: number }[]
