@@ -350,7 +350,7 @@ function Signer({ signer }: { signer: TeamView['signer'] }) {
             <ul className="tm-sigs">
               {signer.refused.map((p) => (
                 <li key={p.req_id} className="tm-sig is-bad">
-                  <span className="br-row"><b>{signKind(p.kind)}</b><span className="br-grow" /><span className="br-mono br-dim br-small">{p.req_id}</span></span>
+                  <span className="br-row" title={p.req_id}><b>{signKind(p.kind)}</b></span>
                   <ul className="br-list br-bad-text">{p.reasons.map((x, i) => <li key={i}>{x}</li>)}</ul>
                   {p.raw.some(Boolean) && <details className="br-raw"><summary>细节</summary><pre>{p.raw.join('\n')}</pre></details>}
                 </li>

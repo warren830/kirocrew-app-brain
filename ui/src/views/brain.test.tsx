@@ -314,6 +314,18 @@ describe('Brain', () => {
     expect(Array.from(within(card).getByRole('list', { name: '回写的步骤' }).children).map((li) => (li as HTMLElement).dataset.state)).toEqual([undefined, undefined, undefined, undefined])
   })
 
+  test('repos listed but none readable: it says why for each, not 「还没有仓库」', () => {
+    const status = fx.status()
+    status.repos = status.repos.map((r) => ({ ...r, ok: false, error: 'brain-kit 没装载' }))
+    installFixtureRoutes()
+    render(<BrainPage entry={{}} status={status} go={vi.fn()} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} />)
+    const hero = screen.getByTestId('repos-unusable')
+    expect(hero).toHaveTextContent('列表里的仓库现在都读不了')
+    expect(hero).toHaveTextContent('shop-pay：brain-kit 没装载')
+    expect(screen.queryByTestId('import-cta')).toBeNull()
+    expect(apiCalls.filter((c) => c.path.startsWith(`${API}/brain`))).toHaveLength(0)
+  })
+
   test('no repo the app can use: the way in is 导入仓库', async () => {
     const status = fx.status()
     status.repos = []

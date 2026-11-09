@@ -187,7 +187,16 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
           </>
         )}
       </header>
-      {props.status && repos.length === 0 && (
+      {props.status && repos.length === 0 && props.status.repos.length > 0 && (
+        <EmptyHero testid="repos-unusable" title="列表里的仓库现在都读不了"
+          text={props.status.repos.map((r) => `${r.name}：${r.pending ? r.pending.text : r.error || '读不了'}`)}
+          punch="按上面的提示修好以后，这里就能看到它的 Brain。">
+          <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'import' })}>
+            <RoleIcon role="import" size={17} />去导入仓库检查
+          </button>
+        </EmptyHero>
+      )}
+      {props.status && props.status.repos.length === 0 && (
         <EmptyHero testid="import-cta" label="导入仓库" title="还没有能用的仓库"
           text={['Brain 是一个仓库里大家共用的知识：做需求时定下的原则、决定和踩过的坑。每次运行会加载它，用上了就引用。']}
           punch="先导入一个仓库，这里就能看到它的 Brain。">
@@ -303,9 +312,14 @@ function BrainKpis({ data, lint, branch, onEntry }: { data: BrainView; lint: Che
         <RateCells rate={u.repeat_rate} hit="fail" label="又出现的" />
       </Kpi>
       <Kpi label="撤回候选" value={candidates.length} of="条" testid="kpi-candidates"
-        note={candidates.length ? '加载够多次，从没被引用' : `没有 · 已归档 ${u.archived} · 已清除 ${u.purged}`}>
-        {candidates.length > 0 && <IdChips ids={candidates.map((e) => e.id)} onEntry={onEntry} tone="warn" />}
-        {candidates.length > 0 && <p className="bv-do"><b>做什么</b>{CANDIDATE_DO}</p>}
+        note={candidates.length ? undefined : `没有 · 已归档 ${u.archived} · 已清除 ${u.purged}`}>
+        {candidates.length > 0 && (
+          <>
+            <IdChips ids={candidates.map((e) => e.id)} onEntry={onEntry} tone="warn" />
+            <div className="br-kpi-note">加载够多次，从没被引用</div>
+            <p className="bv-do"><b>做什么</b>{CANDIDATE_DO}</p>
+          </>
+        )}
       </Kpi>
       <Kpi label="Brain 检查" value={errors} of="个错" tone={errors ? 'bad' : warns ? undefined : 'ok'} testid="kpi-lint"
         note={errors || warns ? `${warns} 个提醒` : '全过'}>
@@ -422,8 +436,8 @@ function LintCard({ rows }: { rows: CheckRow[] }) {
     <section className={`br-card${errors ? ' is-bad' : rows.length ? '' : ' is-ok'}`} aria-label="检查" data-testid="lint">
       <header>
         <RoleIcon role="lint" size={18} />
-        <h3>检查</h3>
-        <span className="br-dim br-small">Brain 检查 · 默认分支</span>
+        <h3>Brain 检查</h3>
+        <span className="br-dim br-small">默认分支上的条目写得对不对</span>
         <span className="br-grow" />
         {errors > 0 && <span className="br-chip tone-bad">{errors} 个错</span>}
         {warns > 0 && <span className="br-chip tone-warn">{warns} 个提醒</span>}
@@ -831,4 +845,6 @@ const BV_CSS = `
   border: 1px dashed color-mix(in srgb, var(--kt-warn) 55%, var(--border)); background: color-mix(in srgb, var(--kt-warn) 6%, transparent); }
 .bv-gaps b { color: var(--text-strong); }
 .bv-applied p { margin: 0; }
+.bv-applied a.br-btn { text-decoration: none; }
+.bv-applied a.br-btn.is-primary { color: var(--accent-fg, #fff); }
 `
