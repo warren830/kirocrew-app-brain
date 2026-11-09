@@ -2,7 +2,7 @@
 
 import json
 
-from appkit import BRAINKIT
+from appkit import BRAINKIT, ROOT, mod
 from brainfix import make_project, make_service, needs_brainkit, run
 
 pytestmark = needs_brainkit
@@ -51,3 +51,23 @@ def test_a_wrong_brainkit_path_turns_the_app_off_politely(tmp_path, home):
     st, crew = run(go())
     assert st["brainkit"]["ok"] is False and "brain-kit" in st["brainkit"]["error"]
     assert st["repos"][0]["ok"] is False and crew["rows"][0]["level"] == "FAIL"
+
+
+def test_the_default_brainkit_is_brainkit_home_then_the_one_bundled_in_the_app_then_a_usual_place(tmp_path,
+                                                                                                    monkeypatch):
+    bk = mod("bk")
+    assert bk.BUNDLED == ROOT / "vendor" / "brain-kit"           # what scripts/release.sh puts in the app
+    bundled = tmp_path / "app" / "vendor" / "brain-kit"
+    (bundled / "brainkit").mkdir(parents=True)
+    (bundled / "brainkit" / "__init__.py").write_text("", encoding="utf-8")
+    usual = tmp_path / "home" / "brain-kit"
+    (usual / "brainkit").mkdir(parents=True)
+    (usual / "brainkit" / "__init__.py").write_text("", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(bk, "BUNDLED", bundled)
+    monkeypatch.setenv("BRAINKIT_HOME", str(tmp_path / "mine"))
+    assert bk.default_path() == str(tmp_path / "mine")
+    monkeypatch.delenv("BRAINKIT_HOME")
+    assert bk.default_path() == str(bundled)
+    monkeypatch.setattr(bk, "BUNDLED", tmp_path / "app" / "vendor" / "none")   # a dev checkout: nothing bundled
+    assert bk.default_path() == str(usual)

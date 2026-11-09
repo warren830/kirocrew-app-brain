@@ -195,7 +195,8 @@ def test_an_edited_question_is_refused(flow):
     assert flow.decision()["state"] == "void" and any(b.startswith("D-1 作废（") for b in flow.gl.bodies())
     d, r = signer_ask(flow.w, answer_voucher(sha, flow.park_raw(sha), "D-1", "A", "alice", q["id"]))
     assert d == "refused" and "edited" in reasons(r), r
-    assert flow.kc.sent == []
+    # nothing of the answer reaches the run: at most brain-kit's own notice (91e2fee) that D-1 is void, to ask again
+    assert len(flow.kc.sent) <= 1 and all(m["message"].startswith("问题作废：D-1 ") for m in flow.kc.sent), flow.kc.sent
 
 
 # ---------------------------------------------------------------- answers: brain-kit 72b278e's edit signal
@@ -345,15 +346,16 @@ def test_graphql_down_signs_nothing_and_records_nothing(flow):
 
 
 def test_graphql_down_for_everyone_fails_closed(flow):
-    """GraphQL answers nobody: brain-kit's bridge does not count alice's touched reply and tells the MR once; the
-    signer does not sign it either. alice's new reply (untouched) needs no GraphQL: the bridge delivers it, and the
-    signer signs it once GraphQL answers again (it still has her first reply to judge)."""
+    """GraphQL answers nobody: brain-kit's bridge does not count alice's touched reply and tells the MR once (91e2fee:
+    after edit_check_rounds rounds, 3 by default); the signer does not sign it either. alice's new reply (untouched)
+    needs no GraphQL: the bridge delivers it, and the signer signs it once GraphQL answers again (it still has her
+    first reply to judge)."""
     flow.hand_over()
     sha, q = flow.ask()
     first = flow.gl.note("alice", "answer D-1 B")
     flow.gl.award(first)
     flow.gl.graphql_down.add("*")
-    assert flow.bridge.collect() == 0 and flow.bridge.collect() == 0
+    assert [flow.bridge.collect() for _ in range(3)] == [0, 0, 0]
     told = [b for b in flow.gl.bodies() if b.startswith("D-1：") and "查不到" in b]
     assert len(told) == 1, flow.gl.bodies()
     d, r = signer_ask(flow.w, answer_voucher(sha, flow.park_raw(sha), "D-1", "B", "alice", q["id"]))

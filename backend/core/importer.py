@@ -259,8 +259,8 @@ def git_failure(p: subprocess.CompletedProcess, what: str, url: str = "") -> tup
                 if https:
                     return kind, ("https 登录没过：git 没有能用的凭据（这里不会弹窗问密码）。改用 SSH 地址，或者先在终端里 "
                                   "git clone 一次让 git 记住凭据，再试。")
-                return kind, ("SSH 登录没过（密钥或证书不对，或者过期了）：刷新你的 SSH 凭据（比如重新跑 mwinit，或者 "
-                              "ssh-add 加上密钥），再试一次。")
+                return kind, ("SSH 登录没过（密钥或证书不对，或者过期了）：刷新你的 SSH 凭据（ssh-add 加上密钥，或者重新登录"
+                              "你们的 SSH 证书），再试一次。")
             host = _host_of(url)
             return kind, "连不上%s：检查地址、网络或 VPN，再试一次。" % (" " + host if host else "这个地址")
     return "other", "%s没成功：%s" % (what, last_lines(hide_credentials(text)) or "（git 什么也没说，退出码 %d）" % p.returncode)

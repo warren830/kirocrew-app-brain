@@ -34,6 +34,8 @@ REQUIRED = ("common", "config", "claims", "runrec", "lean", "entries", "brainlin
             "rest", "intake.package", "bridge.handoff", "bridge.decisions", "bridge.runnerd", "bridge.ledger")
 OPTIONAL = ("trace", "evaluate", "golden", "intents", "mrdesc")
 CANDIDATES = ("~/brain-kit", "~/warren_ws/brain-kit", "~/workplace/brain-kit", "/opt/brain-kit")
+# The brain-kit a release ships inside the app (scripts/release.sh puts it there; a dev checkout has none).
+BUNDLED = Path(__file__).resolve().parents[2] / "vendor" / "brain-kit"
 NEEDS = (("sign", "SpoolSigner"), ("sign", "SignerRefused"), ("sign", "signer_from_config"),
          ("bridge.decisions", "check_answer"), ("bridge.decisions", "Q_HEAD_RE"),
          ("bridge.decisions", "VOUCHER_TIME_FIELDS"), ("bridge.decisions", "DecisionLoop.sign_voucher"),
@@ -49,11 +51,12 @@ _state: dict[str, Any] = {"path": None, "mods": {}, "errors": {}, "error": "", "
 
 
 def default_path() -> str:
-    """$BRAINKIT_HOME, else the first usual place that holds a brain-kit checkout, else ~/brain-kit."""
+    """$BRAINKIT_HOME, else the brain-kit bundled in the app, else the first usual place that holds a brain-kit
+    checkout, else ~/brain-kit."""
     env = os.environ.get("BRAINKIT_HOME", "").strip()
     if env:
         return os.path.expanduser(env)
-    for c in CANDIDATES:
+    for c in (str(BUNDLED),) + CANDIDATES:
         p = os.path.expanduser(c)
         if os.path.isfile(os.path.join(p, "brainkit", "__init__.py")):
             return p

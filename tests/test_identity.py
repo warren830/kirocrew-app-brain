@@ -1,7 +1,8 @@
 """你是谁: the name brain-kit goes by in a repo, shown where the app shows who you are (status, 开需求, 检查), and
 「你的 GitLab 用户名」 / 「你的名字」 when brain-kit would not know: git config brain.user in that repo (brain-kit's
-USER_RE, no shell, no token). Both brain-kits: the clean clone (48b6b97: no name, no start) and a copy of it with
-brain-kit 91e2fee's rule applied (a repo without GitLab uses the login name). Throwaway repos only."""
+USER_RE, no shell, no token). Both brain-kits, made from the checkout whichever it is: one without the login-name
+rule (before 91e2fee, e.g. 48b6b97: no name, no start) and one with brain-kit 91e2fee's rule (a repo without GitLab
+uses the login name). Throwaway repos only."""
 
 import json
 import shutil
@@ -46,9 +47,37 @@ def _login_name() -> str:
 def _store('''
 
 
+def has_login_rule(kit) -> bool:
+    """The checkout already has brain-kit 91e2fee's rule (a release bundles 91e2fee or newer)."""
+    return "\ndef _login_name(" in (kit / "brainkit" / "cli.py").read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def old_kit(tmp_path_factory):
+    """brain-kit without the login-name rule: the checkout when it is that old, else a copy of it with 91e2fee's
+    rule taken out again (OLD_ME back in cli._me, no _login_name)."""
+    if not has_login_rule(BRAINKIT):
+        return BRAINKIT
+    dst = tmp_path_factory.mktemp("bk-old") / "brain-kit"
+    shutil.copytree(BRAINKIT, dst, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+    cli = dst / "brainkit" / "cli.py"
+    src = cli.read_text(encoding="utf-8")
+    start = src.index('    if not who and not cfg["gitlab"]["base"]:\n')
+    end = src.index("    if not USER_RE.match(who.lower()):", start)
+    src = src[:start] + OLD_ME + src[end:]
+    fn = src.index("\n\ndef _login_name(")
+    src = src[:fn] + src[src.index("\n\ndef ", fn + 2):]
+    assert "_login_name" not in src
+    cli.write_text(src, encoding="utf-8")
+    return dst
+
+
 @pytest.fixture(scope="module")
 def fallback_kit(tmp_path_factory):
-    """The clean clone with brain-kit 91e2fee's identity rule (cli._me falls back to the login name without GitLab)."""
+    """brain-kit 91e2fee's identity rule (cli._me falls back to the login name without GitLab): the checkout when it
+    has it, else a copy of it with the rule applied."""
+    if has_login_rule(BRAINKIT):
+        return BRAINKIT
     dst = tmp_path_factory.mktemp("bk") / "brain-kit"
     shutil.copytree(BRAINKIT, dst, ignore=shutil.ignore_patterns(".git", "__pycache__"))
     cli = dst / "brainkit" / "cli.py"
@@ -85,20 +114,25 @@ def start_body(**kw):
     return dict({"repo": "r1", "slug": "refund", "title": "退款", "docs": [], "open_session": False}, **kw)
 
 
-def test_without_gitlab_the_old_brainkit_asks_for_a_name_and_the_start_says_why(tmp_path, home, login):
+def test_without_gitlab_the_old_brainkit_asks_for_a_name_and_the_start_says_why(tmp_path, home, login, old_kit,
+                                                                                 monkeypatch):
+    monkeypatch.setattr(brainfix, "BRAINKIT", old_kit)
     repo = project(tmp_path)
     svc = make_service(tmp_path, [repo])
     routes = mod("handlers").build_routes(svc, AppRoute, web=FakeWeb(), is_owner=lambda _r: True)
 
     async def go():
-        assert not identity.falls_back()                              # the clean clone: no login-name rule
+        assert not identity.falls_back()                              # before 91e2fee: no login-name rule
         st = await svc.status()
         first = await svc.intake_start(start_body())
         saved = await call(routes, "POST", "/me/name", json_body={"path": str(repo), "name": first["me"]["suggest"]})
         again = await svc.intake_start(start_body())
         return st, first, saved, again
 
-    st, first, saved, again = started(svc, go)
+    try:
+        st, first, saved, again = started(svc, go)
+    finally:
+        bk.unload()
     me = st["repos"][0]["me"]
     assert me["ask"] and me["name"] is None and me["label"] == "你的名字" and me["suggest"] == login
     assert me["why"] == identity.WHY_OLD and me["gitlab"] == ""
@@ -140,11 +174,10 @@ def test_without_gitlab_the_new_brainkit_uses_the_login_name_and_no_input(tmp_pa
         bk.unload()
 
 
-@pytest.mark.parametrize("kit_path", ["clean", "fallback"])
-def test_with_gitlab_and_no_token_both_brainkits_ask_for_the_gitlab_username(tmp_path, home, login, fallback_kit,
-                                                                             monkeypatch, kit_path):
-    if kit_path == "fallback":
-        monkeypatch.setattr(brainfix, "BRAINKIT", fallback_kit)
+@pytest.mark.parametrize("kit_path", ["old", "fallback"])
+def test_with_gitlab_and_no_token_both_brainkits_ask_for_the_gitlab_username(tmp_path, home, login, old_kit,
+                                                                             fallback_kit, monkeypatch, kit_path):
+    monkeypatch.setattr(brainfix, "BRAINKIT", fallback_kit if kit_path == "fallback" else old_kit)
     repo = project(tmp_path, kit=GITLAB)
     svc = make_service(tmp_path, [repo])
 
