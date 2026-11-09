@@ -17,27 +17,27 @@
         "stage_label": "代码生成",
         "stage_n": 9,
         "stage_state": "started",
-        "done": 8,
+        "done": 6,
         "total": 11,
-        "done_n": 8,
-        "skipped_n": 0,
+        "done_n": 2,
+        "skipped_n": 4,
         "next": {
           "id": "code-generation",
           "label": "代码生成",
           "n": 9
         }
       },
-      "stage": "9/11 代码生成",
+      "stage": "做完 2 · 跳过 4 · 下一步：代码生成",
       "waits": {
         "who": "you",
-        "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
+        "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
         "line": "approve PLAN 5d1e7a90",
         "raw": "",
         "do": "approve",
-        "since": null,
+        "since": 1794146040.0,
         "where": "session"
       },
-      "summary": "退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。",
+      "summary": "退款单可以导出成 CSV，给财务对账用（规模中）。",
       "credits": 12.4,
       "updated_at": 1794146040,
       "mr": null,
@@ -66,31 +66,31 @@
       "branch": "ai/carol/PAY-4-merchant-split",
       "intent": "261105-merchant-split",
       "lean": {
-        "stage": "application-design",
-        "stage_label": "应用设计",
-        "stage_n": 4,
+        "stage": "functional-design",
+        "stage_label": "功能设计",
+        "stage_n": 6,
         "stage_state": "started",
-        "done": 3,
+        "done": 5,
         "total": 11,
-        "done_n": 3,
-        "skipped_n": 0,
+        "done_n": 2,
+        "skipped_n": 3,
         "next": {
-          "id": "application-design",
-          "label": "应用设计",
-          "n": 4
+          "id": "functional-design",
+          "label": "功能设计",
+          "n": 6
         }
       },
-      "stage": "4/11 应用设计",
+      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
       "waits": {
         "who": "product",
-        "text": "停在 D-2：等产品在 MR 上回答",
+        "text": "等产品在 MR 上回答 D-2（设计）",
         "line": null,
         "raw": "",
         "do": "answer",
-        "since": null,
+        "since": 1794135600.0,
         "where": "mr"
       },
-      "summary": "退款到账后给商户发通知（规模 S）。现在：Lean 在「代码生成」进行中，已交给团队运行机，等人在 MR 上回答澄清问题。",
+      "summary": "退款到账后给商户发通知（规模小）。",
       "credits": null,
       "updated_at": 1794135600,
       "mr": {
@@ -131,27 +131,27 @@
         "stage_label": "发布",
         "stage_n": 11,
         "stage_state": "started",
-        "done": 10,
+        "done": 7,
         "total": 11,
-        "done_n": 10,
-        "skipped_n": 0,
+        "done_n": 4,
+        "skipped_n": 3,
         "next": {
           "id": "release",
           "label": "发布",
           "n": 11
         }
       },
-      "stage": "11/11 发布",
+      "stage": "做完 4 · 跳过 3 · 下一步：发布",
       "waits": {
-        "who": "you",
-        "text": "等你验收：在 MR 上回答 D-3",
+        "who": "product",
+        "text": "等产品在 MR 上验收 D-3（approve / reject）",
         "line": null,
         "raw": "",
         "do": "accept",
-        "since": null,
+        "since": 1794056400.0,
         "where": "mr"
       },
-      "summary": "周报加上退款金额一栏（规模 S）。现在：Lean 在「发布」进行中，已交给团队运行机，等人在 MR 上回答验收问题。",
+      "summary": "周报加上退款金额一栏（规模小）。",
       "credits": 31.0,
       "updated_at": 1794052800,
       "mr": {
@@ -185,31 +185,31 @@
       "branch": "ai/alice/PAY-7-refund-reason",
       "intent": "261106-refund-reason",
       "lean": {
-        "stage": "build-and-test",
-        "stage_label": "构建和测试",
-        "stage_n": 10,
+        "stage": "release",
+        "stage_label": "发布",
+        "stage_n": 11,
         "stage_state": "todo",
-        "done": 9,
+        "done": 7,
         "total": 11,
-        "done_n": 9,
-        "skipped_n": 0,
+        "done_n": 4,
+        "skipped_n": 3,
         "next": {
-          "id": "build-and-test",
-          "label": "构建和测试",
-          "n": 10
+          "id": "release",
+          "label": "发布",
+          "n": 11
         }
       },
-      "stage": "10/11 构建和测试（下一步）",
+      "stage": "做完 4 · 跳过 3 · 下一步：发布",
       "waits": {
         "who": "you",
-        "text": "接手被拒：标签是 bob 打的，不是负责人 alice；run.json 里没有交接记录",
+        "text": "接手被拒：标签是 bob 打的，不是负责人 alice",
         "line": null,
-        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice; run.json has no hand-over (run `brain handoff`)",
+        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
         "do": "redo_handoff",
         "since": null,
         "where": "session"
       },
-      "summary": "退款超过一万要两人复核（规模 M）。现在：Lean 在「构建测试」做完，已交给团队运行机。",
+      "summary": "退款超过一万要两人复核（规模中）。",
       "credits": 18.2,
       "updated_at": 1794128400,
       "mr": {
@@ -248,19 +248,19 @@
         "done_n": 0,
         "skipped_n": 0,
         "next": {
-          "id": "",
-          "label": "",
-          "n": 0
+          "id": "reverse-engineering",
+          "label": "逆向工程",
+          "n": 1
         }
       },
       "stage": null,
       "waits": {
         "who": "people",
-        "text": "已认领，还没开工",
+        "text": "等 carol 开工",
         "line": null,
         "raw": "",
         "do": "start",
-        "since": null,
+        "since": 1793973600.0,
         "where": "app"
       },
       "summary": null,
@@ -291,23 +291,23 @@
         "stage_label": "发布",
         "stage_n": 11,
         "stage_state": "done",
-        "done": 11,
+        "done": 8,
         "total": 11,
-        "done_n": 11,
-        "skipped_n": 0,
+        "done_n": 5,
+        "skipped_n": 3,
         "next": null
       },
-      "stage": "11/11 发布（做完）",
+      "stage": "做完 5 · 跳过 3 · 全部做完",
       "waits": {
         "who": "nobody",
-        "text": "已合并",
+        "text": "已合并，在观察合并后的 14 天（到 11-17）",
         "line": null,
         "raw": "",
-        "do": "none",
-        "since": null,
+        "do": "watch",
+        "since": 1793661540.0,
         "where": null
       },
-      "summary": "对账单按自然日切分（规模 S）。现在：Lean 在「发布」做完，已交给团队运行机，RELEASE 已批。",
+      "summary": "对账单按自然日切分（规模小）。",
       "credits": 22.7,
       "updated_at": 1793663640,
       "mr": {
@@ -390,7 +390,7 @@
   "eval": {
     "available": true,
     "error": "",
-    "ref": "main",
+    "ref": "远端的 main 分支",
     "metrics": [
       {
         "id": "autonomy",
@@ -490,8 +490,8 @@
   ],
   "cto": {
     "available": true,
-    "sentence": "交给运行机的 1 个需求里，0 个交接以后没人插手就做完了；人介入 5 次，5 次落在判断点上；每个需求平均 21.1 credits。",
-    "ref": "origin/main",
+    "sentence": "交给运行机的 1 个需求里，0 个交接以后没人插手就做完了。人介入了 5 次（本机做的也算），5 次落在判断点上。有 credits 的 4 个需求，平均每个 21.1 credits。",
+    "ref": "远端的 main 分支",
     "unattended": [
       0,
       1

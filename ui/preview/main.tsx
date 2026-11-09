@@ -19,6 +19,7 @@ import { API, fixtureRoutes } from '../src/test/routes'
 import { StubApiError, setApiRoutes, setNavigateHook } from '../src/test/stubs/app-sdk'
 import type {
   CrewFixBody, ImportInspect, ImportJob, IntakeBody, Overview, ReflectApplyBody, ReflectApplyResult, ReqBoard, RepoInfo, RequirementDetail, Settings, StartBody, Status,
+  Todo,
 } from '../src/types'
 
 const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'norepos', 'light'] as const
@@ -55,9 +56,14 @@ function shift<T>(x: T): T {
 
 let settings: Settings = fx.settings()
 let crewFixed = false
-/** The world the preview shows (scripts/preview_world.py made it with the backend's own board.py and cto_numbers):
- * four repos, seventeen requirements in every state, each with its board. */
-const W = world as unknown as { status: Status; overview: Overview; boards: Record<string, ReqBoard>; details: Record<string, RequirementDetail> }
+/** The world the preview shows (scripts/preview_world.py made it with the backend's own code: the rows' states and
+ * waits by deliveries.classify, the boards by board.py, 待办 by todo.build, 交付总览 for 全部 and each repo, with and
+ * without brainkit.evaluate): four repos, nineteen requirements in every state, each with its board. */
+const W = world as unknown as {
+  status: Status; overview: Overview; boards: Record<string, ReqBoard>; details: Record<string, RequirementDetail>
+  overviews: Record<'eval' | 'noeval', Record<string, Overview>>; todo: Record<'ok' | 'crewfail', Todo>
+  stages: Record<string, RequirementDetail['lean']['stages']>
+}
 let repos: RepoInfo[] = flags.has('norepos') ? [] : clone(W.status.repos)
 
 function status(): Status {
@@ -72,7 +78,7 @@ function status(): Status {
   }
   if (flags.has('crewfail') && !crewFixed) s.crew.rows = [{ level: 'FAIL', text: '没有 ~/.kiro/agents/brain-dev.json', todo: '点「装上 brain-dev」：app 装上 brain-kit 带的那一份', fix: 'agent', repo: null, raw: '' }, ...s.crew.rows]
   if (crewFixed) s.crew.rows = s.crew.rows.map((r) => (r.fix === 'agent' || r.fix === 'engine' ? { ...r, level: 'OK' as const, todo: '', fix: null } : r))
-  s.counts.todo = fx.todo().items.length
+  s.counts.todo = todo().items.length
   s.team.enabled = s.team.enabled || settings.team.enabled
   return shift(s)
 }
@@ -100,7 +106,7 @@ function detailFor(path: string): RequirementDetail {
     handoff: b.belt.some((x) => x.kind === 'handover') ? { requested_at: new Date(b.belt.find((x) => x.kind === 'handover')!.at * 1000).toISOString(), by: row.owner } : null } : null
   // the construction stages run per unit: this requirement's one unit (its slug), on the stages it has reached
   const unit = (row.branch ?? '').split('/').pop()?.replace(/^[A-Z]+-\d+-/, '') || row.key.toLowerCase()
-  d.lean.stages = d.lean.stages.map((s) => ({ ...s, state: finished || s.n <= row.lean.done ? 'done' : s.n === n ? (row.lean.stage_state === 'todo' ? 'todo' : 'started') : 'todo',
+  d.lean.stages = W.stages[id] ?? d.lean.stages.map((s) => ({ ...s, state: finished || s.n <= row.lean.done ? 'done' : s.n === n ? (row.lean.stage_state === 'todo' ? 'todo' : 'started') : 'todo',
     units: s.units.length && (finished || s.n <= n) ? [{ unit, state: (finished || s.n < n ? 'done' : 'started') as 'done' | 'started' }] : [] }))
   d.lean.approvals = b.actors.filter((a) => ['req', 'design', 'release'].includes(a.key) && a.status !== 'waiting' && a.status !== 'skipped').map((a) => ({
     kind: a.key === 'req' ? 'REQUIREMENTS' : a.key === 'design' ? 'DESIGN' : 'RELEASE', state: a.status === 'merged' ? 'approved' as const : a.status === 'fixing' ? 'rejected' as const : 'pending' as const,
@@ -125,21 +131,17 @@ function boardFor(path: string): ReqBoard {
   return clone(b)
 }
 
+/** 交付总览 as the backend made it for that repo (or 全部), with or without brainkit.evaluate. */
 function overview(path: string): Overview {
-  const o = clone(W.overview)
   const repo = new URL(path, location.origin).searchParams.get('repo') ?? 'all'
-  if (repo !== 'all') {
-    o.rows = o.rows.filter((r) => r.repo === repo)
-    o.cto.runs = o.cto.runs.filter((r) => r.repo === repo)
-    o.overlaps = o.overlaps.filter((x) => o.rows.some((r) => r.key === x.keys[0]))
-  }
+  const byRepo = W.overviews[flags.has('noeval') ? 'noeval' : 'eval']
+  const o = clone(byRepo[repo] ?? byRepo.all)
   o.errors = repos.filter((r) => !r.ok && !r.pending && (repo === 'all' || r.id === repo)).map((r) => ({ repo: r.id, error: r.error }))
-  if (flags.has('noeval')) {
-    o.eval = { available: false, error: 'brain-kit 还没有 evaluate 模块', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
-    o.cto = { ...o.cto, available: false, unattended: null, stepped_in: null, runs: [], sentence: o.cto.credits.per_req !== null ? `每个需求平均 ${o.cto.credits.per_req} credits。` : o.cto.sentence }
-  }
   return o
 }
+
+/** 待办 as the backend made it from the world's rows (with the KiroCrew FAIL when that switch is on). */
+const todo = (): Todo => clone(W.todo[flags.has('crewfail') && !crewFixed ? 'crewfail' : 'ok'])
 
 const routes = fixtureRoutes()
 setApiRoutes({
@@ -149,7 +151,7 @@ setApiRoutes({
   [`GET ${API}/board/*`]: (_b, path) => shift(boardFor(path)),
   [`GET ${API}/settings`]: () => clone(settings),
   [`GET ${API}/crew`]: () => ({ ...status().crew }),
-  [`GET ${API}/todo`]: () => shift({ ...fx.todo(), team: flags.has('team') }),
+  [`GET ${API}/todo`]: () => shift({ ...todo(), team: flags.has('team') }),
   [`GET ${API}/overview*`]: (_b, path) => shift(overview(path)),
   [`POST ${API}/settings`]: (body) => {
     settings = { ...settings, ...clone(body as Partial<Settings>) }
