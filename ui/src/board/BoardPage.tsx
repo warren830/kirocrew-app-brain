@@ -2,8 +2,9 @@
  * 需求看板: one requirement as the sample's 团队看板 shows a run (its main.tsx TeamPage, for a requirement's way).
  *
  * Polls GET /board/{repo}/{key} every 2 s (useBoard.ts) and renders only that contract (types.ts ReqBoard): the
- * header with the live counters, the graph of the way (the hero, with the particle layer), the commit conveyor, one lane
- * per actor on a shared time axis, the check wall, the events, and 验收 with the one step a person takes. Each poll's
+ * header, 你要做的一步 (a narrow strip: what the person does now, and where), the live counters, the graph of the way
+ * (the hero, with the particle layer), the commit conveyor, one lane per actor on a shared time axis, the check wall,
+ * the events, and 验收 (on top once it is time to accept, else under the lanes). Each poll's
  * snapshot is diffed against the previous one (diff.ts): new events become particles and node flashes, changed check
  * cells flip, changed lanes and new commits get a one-time highlight. The first snapshot is history and never animates.
  *
@@ -14,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import type { BoardEntry } from '../nav'
-import type { ReqBoard } from '../types'
+import type { ReqBoard, WaitDo } from '../types'
 import { LoadState } from '../ui'
 import { QuestionCard } from '../views/Question'
 import type { ViewProps } from '../views/props'
@@ -28,10 +29,12 @@ import type { Item } from './engine'
 import { EventFeed } from './EventFeed'
 import { BOARD_EXTRA_CSS } from './extra'
 import { WORKING } from './format'
+import { NextStep } from './NextStep'
+import { openHere } from './next'
 import { Intro, Kpis, TopBar } from './Header'
 import { ClockContext, useReducedMotion, type SnapshotClock } from './hooks'
 import { Lanes } from './Lanes'
-import { edgesOf, layoutGraph } from './layout'
+import { SLOTS, edgesOf, foldedPhases, layoutGraph } from './layout'
 import { ReplayBar, useReplay } from './Replay'
 import { RoleIcon } from './RoleIcon'
 import { useBoard } from './useBoard'
@@ -66,7 +69,15 @@ export function mostActive(b: ReqBoard): string | null {
   return live[0]?.key ?? null
 }
 
-const structureKey = (b: ReqBoard) => `${b.actors.map((a) => a.key).join(',')}|${b.direct ? 1 : 0}|${rosterRows(b)}`
+const structureKey = (b: ReqBoard) => `${b.actors.map((a) => a.key).join(',')}|${b.direct ? 1 : 0}|${rosterRows(b)}|${foldedPhases(b.actors).join(',')}`
+
+/** An error the board came with, said so a person can act on it (brain-kit's own words folded under 细节). A claimed
+ * requirement has no run yet: nothing to read is no error. */
+export function boardProblem(b: ReqBoard): { text: string; todo: string; raw: string } | null {
+  if (!b.error || b.row.state === 'claimed') return null
+  if (!/[A-Za-z]{4,}/.test(b.error.replace(/brain-kit|Lean|KiroCrew/g, ''))) return { text: b.error, todo: '', raw: '' }
+  return { text: '这个需求的运行记录没读全：图上只画了 Lean 的记录和仓库里看得到的', todo: '到需求详情看细节；一直这样的话，到设置里看 brain-kit 能不能用', raw: b.error }
+}
 
 export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs }: {
   entry: BoardEntry
@@ -113,11 +124,14 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
     if (where) setTimeout(() => rootRef.current?.querySelector(where)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 80)
   }, [live.board]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const structure = board ? structureKey(board) : ''
+  // the live board's shape: a replay moves through the same picture
+  const shape = live.board
+  const structure = shape ? structureKey(shape) : ''
   const lay = useMemo(() => {
-    if (!board) return null
-    const keys = board.actors.map((a) => a.key)
-    return layoutGraph(keys, edgesOf(new Set(keys), board.direct), rosterRows(board))
+    if (!shape) return null
+    const fold = foldedPhases(shape.actors)
+    const keys = shape.actors.map((a) => a.key).filter((k) => !fold.includes(SLOTS[k]?.phase ?? ''))
+    return layoutGraph(keys, edgesOf(new Set(keys), shape.direct), rosterRows(shape), fold)
   }, [structure]) // eslint-disable-line react-hooks/exhaustive-deps
   const liveClock: SnapshotClock = useMemo(() => ({ at: live.board?.at ?? Date.now() / 1000, receivedAt: live.receivedAt || Date.now() }), [live.board?.at, live.receivedAt])
   const clock = rp.clock ?? liveClock
@@ -134,19 +148,24 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const toDetail = () => go({ kind: 'item', repo: entry.repo, key: entry.key, from: 'board' })
-  const toStart = () => go({ kind: 'new', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) })
-  // a node that waits for the person: its line is in its lane; a tool call to approve in its session; a question or
-  // 验收 in the 验收 card
-  const onAct = useCallback((key: string) => {
+  const toBrain = () => go({ kind: 'brain', repo: entry.repo, reflect: entry.key })
+  // 开工 the requirement claimed already: 开需求 with its key (fixed there) and title; only its owner starts it
+  const me = status?.repos.find((r) => r.id === entry.repo)?.me?.name ?? null
+  const startable = !!board && entry.repo !== 'runner' && (board.person.me || !board.person.owner || !me)
+  const toStart = () => go({ kind: 'new', repo: entry.repo, key: entry.key, ...(board?.row.title ? { title: board.row.title } : {}) })
+  // a node that waits for the person: the session for what is said or approved there, the step strip for the rest
+  const onAct = useCallback((key: string, d: WaitDo) => {
     const a = board?.actors.find((x) => x.key === key)
-    if (a && !a.line && a.doing.includes('工具调用') && a.session?.url) return navigate(a.session.url)
-    const sel = a?.line ? `[data-testid="kt-lane"][data-role="${key}"]` : '#br-accept'
-    rootRef.current?.querySelector(sel)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+    const url = a?.session?.url ?? board?.actors.find((x) => x.key === 'local')?.session?.url
+    if ((d === 'reply' || d === 'tool') && url) return navigate(url)
+    if (d === 'write_back') return toBrain()
+    rootRef.current?.querySelector(d === 'accept' && !rootRef.current?.querySelector('#br-next') ? '#br-accept' : '#br-next')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
     setFocus(key)
-  }, [board, navigate])
+  }, [board, navigate]) // eslint-disable-line react-hooks/exhaustive-deps
   const quiet = rp.on
-  const open = board ? board.questions.filter((q) => q.state === 'waiting' || q.state === 'open') : []
-  const acceptTop = !!board && (board.accept.step.text !== '' || board.accept.state !== 'not_yet')
+  const side = board ? board.questions.filter((q) => (q.state === 'waiting' || q.state === 'open') && !(board.row.waits.who === 'you' && openHere(q))) : []
+  const acceptTop = !!board && board.accept.state !== 'not_yet'
+  const problem = board ? boardProblem(board) : null
 
   return (
     <main ref={rootRef} className={`kt-root br-view br-board${board?.live && !quiet ? ' is-live' : ''}`} data-testid="br-board" data-motion={reducedMotion ? 'reduce' : undefined}>
@@ -169,15 +188,22 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
         {board && lay && (
           <>
             <TopBar board={board} replaying={rp.on} follow={follow} onReplay={rp.start} onFollow={() => setFollow((v) => !v)} onDetail={toDetail}
-              onSession={(url) => navigate(url)} onStart={entry.repo !== 'runner' ? toStart : undefined} />
+              onSession={(url) => navigate(url)} onStart={startable ? toStart : undefined} />
             <ReplayBar rp={rp} />
-            {board.error && <div className="kt-banner" role="status">{board.error}</div>}
+            {problem && (
+              <div className="kt-banner br-problem" role="status" data-testid="br-board-problem">
+                <b>{problem.text}</b>
+                {problem.todo && <span>做什么：{problem.todo}</span>}
+                {problem.raw && <details className="br-raw"><summary>细节</summary><pre>{problem.raw}</pre></details>}
+              </div>
+            )}
             {board.row.state === 'claimed' && !rp.on ? (
-              <Intro board={board} onStart={entry.repo !== 'runner' ? toStart : undefined} />
+              <Intro board={board} onStart={startable ? toStart : undefined} />
             ) : (
               <>
-                <Kpis key={`${rp.on ? 'replay' : 'live'}`} board={board} reducedMotion={reducedMotion} onActor={onActor} />
-                {acceptTop && <Accept board={board} onDetail={toDetail} onBrain={() => go({ kind: 'brain', repo: entry.repo, reflect: entry.key })} quiet={quiet} />}
+                {!quiet && <NextStep board={board} repo={entry.repo} reqKey={entry.key} onAnswered={live.reload} onBrain={toBrain} onDetail={toDetail} />}
+                <Kpis key={`${rp.on ? 'replay' : 'live'}`} board={board} reducedMotion={reducedMotion} onActor={onActor} replaying={rp.on} />
+                {acceptTop && <Accept board={board} onDetail={toDetail} quiet={quiet} />}
                 <div className="kt-body">
                   <div className="kt-col">
                     <ActorGraph key={`${entry.repo}/${entry.key}${rp.on ? ':replay' : ''}`} board={board} lay={lay} focus={focus} onActor={onActor} flashes={fx.flashes}
@@ -185,14 +211,14 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
                     {focus && <FocusBar board={board} focus={focus} onClear={() => setFocus(null)} />}
                     <Conveyor board={board} fresh={fx.belt} focus={focus} onActor={onActor} />
                     <Lanes board={board} focus={focus} bumps={fx.bumps} onActor={onActor} quiet={quiet} />
-                    {!acceptTop && <Accept board={board} onDetail={toDetail} onBrain={() => go({ kind: 'brain', repo: entry.repo, reflect: entry.key })} quiet={quiet} />}
+                    {!acceptTop && <Accept board={board} onDetail={toDetail} quiet={quiet} />}
                   </div>
                   <aside className="kt-side" aria-label="检查、问题和事件">
-                    <CheckWall board={board} focus={focus} onActor={onActor} flips={fx.flips} />
-                    {!quiet && open.length > 0 && (
+                    <CheckWall board={board} focus={focus} onActor={onActor} flips={fx.flips} onSettings={() => go({ kind: 'settings' })} />
+                    {!quiet && side.length > 0 && (
                       <section className="kt-card br-board-qs" aria-label="等回答的问题" data-testid="br-board-questions">
-                        <header className="kt-card-head"><h2>等回答的问题</h2><span className="kt-badge tone-approve">{open.length}</span></header>
-                        {open.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={entry.repo} reqKey={entry.key} onAnswered={live.reload} />)}
+                        <header className="kt-card-head"><h2>等回答的问题</h2><span className={`kt-badge tone-${board.row.waits.who === 'you' ? 'approve' : 'info'}`}>{side.length}</span></header>
+                        {side.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={entry.repo} reqKey={entry.key} onAnswered={live.reload} />)}
                       </section>
                     )}
                     <EventFeed board={board} focus={focus} onActor={onActor} fresh={fx.fresh} />

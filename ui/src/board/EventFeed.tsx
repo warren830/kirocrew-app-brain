@@ -19,7 +19,7 @@ export function EventFeed({ board, focus, onActor, fresh }: { board: ReqBoard; f
     <section className="kt-card kt-feed" data-testid="kt-feed" aria-label="事件">
       <header className="kt-card-head">
         <h2>事件</h2>
-        <span className="kt-dim">{board.source === 'trace' ? '来自 brain-kit trace' : '来自 Lean 的记录'}</span>
+        <span className="kt-dim">{board.source === 'trace' ? '来自 brain-kit 的记录' : '来自 Lean 的记录'}</span>
         {focused && (
           <button type="button" className="kt-filter" onClick={() => onActor(focused.key)} aria-label={`不再只看${focused.title}`}>
             只看 <RoleIcon role={focused.icon} size={14} /> {focused.title} ✕
