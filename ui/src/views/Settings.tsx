@@ -345,7 +345,9 @@ function RepoRow({ r, onImport, onRemoved, onChanged }: {
       {r.error && (
         <div className="st-repo-why">
           <span className={tone === 'bad' ? 'br-bad-text' : 'br-dim'}>{r.error}</span>
-          <button type="button" className="br-btn is-small" onClick={() => onImport(r.path)}>{tone === 'idle' && !/没装载/.test(r.error) ? '去装' : '去检查'}</button>
+          {/没装载/.test(r.error)
+            ? <span className="br-dim">：先在最上面写对 brain-kit 的位置，这个仓库就能读了</span>
+            : <button type="button" className="br-btn is-small" onClick={() => onImport(r.path)}>{tone === 'idle' ? '去装' : '去检查'}</button>}
         </div>
       )}
       {r.pending && <PendingRepo repo={r} onOpen={() => onImport(r.path)} onDone={onChanged} />}

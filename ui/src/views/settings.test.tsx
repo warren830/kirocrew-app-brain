@@ -291,6 +291,7 @@ describe('设置', () => {
   test('no brain-kit: its place is asked first, at the top, focused, with why (by the reason) and where to get one', async () => {
     const missing = fx.status()
     missing.brainkit = { ...missing.brainkit, ok: false, version: null, error: '这里没有 brain-kit（找不到 /Users/alice/src/brain-kit/brainkit/__init__.py）' }
+    missing.repos[0] = { ...missing.repos[0], ok: false, error: 'brain-kit 没装载', me: null }
     installFixtureRoutes({})
     const { unmount } = render(<SettingsView {...props({ status: missing })} />)
     const card = screen.getByTestId('settings-no-brainkit')
@@ -301,12 +302,17 @@ describe('设置', () => {
     await waitFor(() => expect(input).toHaveFocus())
     expect(screen.getAllByLabelText('brain-kit 在哪')).toHaveLength(1)                  // not a second time in the form below
     expect(card.compareDocumentPosition(screen.getByRole('region', { name: '仓库' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // a repo that waits for brain-kit points at that card, not at 导入仓库
+    const waiting = screen.getByRole('region', { name: '仓库' }).querySelector<HTMLElement>('li[data-repo="r1"]') as HTMLElement
+    expect(waiting).toHaveTextContent('等 brain-kit')
+    expect(waiting).toHaveTextContent('brain-kit 没装载：先在最上面写对 brain-kit 的位置，这个仓库就能读了')
+    expect(within(waiting).queryByRole('button', { name: /去检查|去装/ })).toBeNull()
     unmount()
     const old = fx.status()
     old.brainkit = { ...old.brainkit, ok: false, error: 'brain-kit 太旧（没有 sign.SpoolSigner）：要 72b278e 或更新的版本' }
     const { unmount: u2 } = render(<SettingsView {...props({ status: old })} />)
     expect(screen.getByTestId('settings-no-brainkit')).toHaveTextContent('brain-kit 太旧了（位置是对的）')
-    expect(screen.getByTestId('settings-no-brainkit')).toHaveTextContent('做什么在它的目录里拉取最新的代码（下面这行），再到设置里点「保存」重新读它')
+    expect(screen.getByTestId('settings-no-brainkit')).toHaveTextContent('做什么在它的目录里拉取最新的代码（点「复制」拿命令），再到设置里点「保存」重新读它')
     expect(within(screen.getByTestId('settings-no-brainkit')).getByTestId('cmd-line')).toHaveTextContent(`git -C ${old.brainkit.path} pull --ff-only`)
     expect(screen.getByTestId('settings-no-brainkit')).not.toHaveTextContent('git clone')
     u2()

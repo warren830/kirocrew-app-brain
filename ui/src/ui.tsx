@@ -846,17 +846,17 @@ const shellWord = (p: string) => (/^[\w@%+=:,./~-]+$/.test(p) ? p : `'${p.replac
 export function brainkitProblem(error: string, path = ''): { kind: 'missing' | 'old' | 'broken'; text: string; todo: string; cmd: string; raw: string } {
   const pull = path ? `git -C ${shellWord(path)} pull --ff-only` : ''
   if (/太旧/.test(error)) {
-    return { kind: 'old', text: 'brain-kit 太旧了（位置是对的）', todo: `在它的目录里拉取最新的代码${pull ? '（下面这行）' : ''}，再到设置里点「保存」重新读它`, cmd: pull, raw: error }
+    return { kind: 'old', text: 'brain-kit 太旧了（位置是对的）', todo: `在它的目录里拉取最新的代码${pull ? '（点「复制」拿命令）' : ''}，再到设置里点「保存」重新读它`, cmd: pull, raw: error }
   }
   if (/导入失败/.test(error)) {
     return {
       kind: 'broken', text: 'brain-kit 读不进来（位置是对的）',
-      todo: `那个目录里的 brain-kit 不完整：拉取一遍${pull ? '（下面这行）' : ''}，还不行就重新克隆一份；再到设置里点「保存」重新读它`, cmd: pull, raw: error,
+      todo: `那个目录里的 brain-kit 不完整：拉取一遍${pull ? '（点「复制」拿命令）' : ''}，还不行就重新克隆一份；再到设置里点「保存」重新读它`, cmd: pull, raw: error,
     }
   }
   return {
     kind: 'missing', text: '找不到 brain-kit',
-    todo: '在设置的「brain-kit 在哪」写上它的目录，点「保存」；这台机器上还没有的话，先克隆一份（下面这行），再写它的位置', cmd: BRAINKIT_CLONE, raw: error,
+    todo: '在设置的「brain-kit 在哪」写上它的目录，点「保存」；这台机器上还没有的话，先在终端里克隆一份（点「复制」拿命令），再写它的位置', cmd: BRAINKIT_CLONE, raw: error,
   }
 }
 
