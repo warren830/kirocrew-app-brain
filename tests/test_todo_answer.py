@@ -167,3 +167,61 @@ def test_a_runner_question_of_my_own_run_is_answered_as_my_mr_comment(tmp_path, 
     assert q["id"] == "D-3" and q["answerable_here"] and q["answer_via"] == "mr" and q["question"] == "退款要不要人工审核？"
     assert res["via"] == "mr" and gl.posted == ["answer D-3 B 小额不审"]
     assert "t0ken" not in json.dumps([view, d, res])
+
+
+class LabelledGitLab(FakeGitLab):
+    """The same MR, with the labels and head a test sets."""
+
+    def __init__(self, branch, sha, labels):
+        super().__init__(branch)
+        self.sha, self.labels = sha, labels
+
+    def __call__(self, method, url, headers, body):
+        from urllib.parse import unquote, urlsplit
+        if method == "GET" and unquote(urlsplit(url).path).endswith("/merge_requests"):
+            return 200, json.dumps([{"iid": 7, "web_url": "https://gl.example/grp/pay/-/merge_requests/7",
+                                     "state": "opened", "labels": list(self.labels), "sha": self.sha}]).encode()
+        return super().__call__(method, url, headers, body)
+
+
+def test_a_pushed_hand_over_without_its_label_is_nothing_handed_over(tmp_path, home):
+    """brain-kit 72b278e: `brain handoff` exits 1 when it pushed but could not label (someone pushed after it, or
+    GitLab did not record the push in time): nothing was handed over. The MR at the hand-over commit has no label: the
+    row says so and 待办 lists it; with the label the bridge has it."""
+    repo = make_project(tmp_path, kit={"gitlab": {"base": "https://gl.example", "project": "grp/pay"},
+                                       "bridge_user": "brain-bridge"})
+    wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "refund", "refund", "退款")
+    intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
+    st = wt / "aidlc-docs" / intent / "aidlc-state.md"
+    st.write_text(st.read_text().replace("Status: Inception: starting", "Status: Construction"))
+    sh("git", "-C", wt, "commit", "-qam", "notes")
+    brain(wt, "handoff", "--no-push")
+    tok = home / ".brain" / "gitlab-token"
+    tok.parent.mkdir(parents=True, exist_ok=True)
+    tok.write_text("t0ken-for-tests")
+    tok.chmod(0o600)
+    head = sh("git", "-C", wt, "rev-parse", "HEAD").stdout.strip()
+    gl = LabelledGitLab("ai/alice/PAY-1-refund", head, [])
+    svc = make_service(tmp_path, [repo], transport=gl)
+
+    async def go():
+        await svc.start()
+        try:
+            await svc.overview("r1")
+            await svc.refresh_mrs()
+            out = [await svc.overview("r1"), await svc.todo()]
+            gl.labels = ["ai-handoff"]
+            svc.mr._rows.clear()
+            await svc.refresh_mrs()
+            return out + [await svc.overview("r1"), await svc.todo()]
+        finally:
+            await svc.stop()
+
+    v1, t1, v2, t2 = run(go())
+    row = v1["rows"][0]
+    assert (row["state"], row["waits"]["who"]) == ("handed_over", "you"), row
+    assert "没有交接标签 ai-handoff" in row["waits"]["text"] and "什么也没交出去" in row["waits"]["text"]
+    item = [i for i in t1["items"] if i["key"] == "PAY-1"]
+    assert [i["kind"] for i in item] == ["handoff_unlabelled"] and item[0]["mr_url"].endswith("/merge_requests/7")
+    assert (v2["rows"][0]["state"], v2["rows"][0]["waits"]["who"]) == ("handed_over", "bridge")
+    assert not [i for i in t2["items"] if i["kind"] == "handoff_unlabelled"]

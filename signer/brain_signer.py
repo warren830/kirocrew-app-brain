@@ -12,20 +12,31 @@ answers in ``<spool>/signed/<req>.json`` ({req_id, voucher, sig}) or ``<spool>/r
 A check it cannot make (GitLab down, more notes than brain-kit reads) gets no answer: the SpoolSigner gives up after its
 timeout and the bridge asks again next round. Nothing in a request is trusted.
 
-The rules are brain-kit's own (commit 9935b11 or newer), run with this signer's identities, ledger, GitLab token and
+The rules are brain-kit's own (commit 72b278e or newer), run with this signer's identities, ledger, GitLab token and
 Jira, and the kit config read from the default branch (never anything from the app):
 hand-over  ``Bridge.verify`` for the MR as GitLab shows it now: branch, the label added by the owner after GitLab
-           recorded the head as pushed (MR versions), the head is the hand-over commit itself (one parent, and it
-           changes run.json: what ``brain handoff`` commits; a commit pushed on top of it was not handed over), claim,
-           run.json, the Lean note, the Brain commit, materials, no other open run.
+           recorded the head as pushed (MR versions), the head is the hand-over commit itself (one parent, it changes
+           run.json: what ``brain handoff`` commits; a commit pushed on top of it was not handed over; 72b278e: a head
+           a bot authored or committed, kit bot_emails / bot_users, never is), claim, run.json, the Lean note, the
+           Brain commit, materials, no other open run.
 answer     ``decisions.check_answer`` on the MR, bound to the question note the voucher names (``question_note``: the
            note id brain-kit's ledger recorded when the bridge posted it; a voucher without one is refused). That note
-           is on the MR (deleted: the decision is void), by kit.json ``bridge_user``, the unedited text the bridge
-           posts for park.json at that commit, posted after GitLab recorded the push, its D-n bound to nothing else;
-           the first valid reply after it (or after the bridge's last conflict note) is by a person allowed for that
-           kind (decision_roles from main, this signer's roles; never a bot or the bridge account) and was never
-           edited (updated_at after created_at); no other allowed person answered differently; the MR head has not
+           is on the MR (deleted: the decision is void), by kit.json ``bridge_user``, the text the bridge posts for
+           park.json at that commit (ticking its review checklist is fine), posted after GitLab recorded the push, its
+           D-n bound to nothing else; the first valid reply after it (or after the bridge's last conflict note) is by
+           a person allowed for that kind (decision_roles from main, this signer's roles; never a bot or the bridge
+           account) and says what its author wrote; no other allowed person answered differently; the MR head has not
            moved. A question without options is answered approve / reject; a batch review's item list is whole.
+           "What its author wrote" is check_answer's ``edits``, made the way brain-kit's own ``collect`` makes them:
+           ``DecisionLoop.reply_states`` on this signer's ledger (its ``replies`` table) with this signer's GitLab
+           token. Each reply is recorded the first time this signer reads it, with its text's hash; a reply GitLab
+           shows as touched after it was posted (updated_at) is looked up on GitLab GraphQL (``GitLab.note_edits``,
+           lastEditedBy: an award emoji leaves it empty, a text edit names the editor). Edited by someone else: it never
+           counts, and an allowed person's such reply holds the round (a conflict: nothing is signed); edited by its
+           author before this signer first read it: it counts as it reads now; its text changed after that: it never
+           counts. When GraphQL cannot be read, this signer answers nothing (a check it cannot make: the bridge asks
+           again) and records nothing for that reply, where brain-kit's own bridge records it as "cannot tell" for
+           good and tells the person to reply again; either way nothing is signed for it.
 What this signer adds, because brain-kit cannot know it or does not offer it:
 - the voucher is rebuilt from what those checks found and must be the one asked for, byte for byte (canonical JSON).
   brain-kit has no public voucher builder, so ``handoff_voucher`` / ``answer_voucher`` below copy the layout of
@@ -59,8 +70,9 @@ config (signer.json):
    "identities": "/srv/brain-authz/identities.json", "intake_dir": "/srv/brain-intake",
    "vouchers_dir": "/srv/brain-intake/vouchers", "publish_vouchers": true, "ledger": "/var/lib/brain-signer/ledger.sqlite",
    "contract_ttl_hours": 72, "pseudonym_salt": "<same as the app's bridge.json>", "bridge_users": ["brain-bridge"],
-   "max_clock_skew_s": 600, "interval": 2, "keep_days": 14}
+   "max_clock_skew_s": 600, "interval": 2, "keep_days": 14, "publish_timeout": 60}
   bridge_users is optional: when set, kit.json's bridge_user must be one of them (a pin against a changed main).
+  publish_timeout (brain-kit 72b278e, seconds): each git push / pull of the vouchers repo ends after it.
 """
 from __future__ import annotations
 
@@ -88,12 +100,16 @@ CREATE TABLE IF NOT EXISTS bound_decisions (
 """
 ADDED_COLUMNS = (("signed_answers", "answer", "TEXT"), ("bound_decisions", "question_note", "INTEGER"))
 VERDICT = {"none": "MR 上没有可以回答 %s 的人的有效回答", "conflict": "%s 收到不同的回答，不签",
+           "held": "%s 有能回答的人的回复被改过（或查不到是谁改的），看不出原来写的是什么，算一个不同的回答，不签",
            "stale": "%s 作废：问题发出后分支又有了新推送", "void": "%s 作废：问题没有绑在这次推送和 park.json 上"}
 # what a brain-kit checkout must offer (9935b11: the hand-over commit rule, run reservations, answers bound to their
-# question note)
+# question note; 72b278e: the edit signal, check_answer's edits from DecisionLoop.reply_states and GitLab GraphQL)
 NEEDS = (("bridge.decisions", "check_answer"), ("bridge.decisions", "VOUCHER_TIME_FIELDS"), ("sign", "SpoolSigner"),
          ("bridge.ledger", "RESERVED"), ("bridge.ledger", "Ledger.is_reservation_for"),
-         ("bridge.handoff", "Bridge.handoff_commit_problems"), ("rest", "GitLab.commit"))
+         ("bridge.handoff", "Bridge.handoff_commit_problems"), ("rest", "GitLab.commit"),
+         ("bridge.decisions", "SCHEMA"), ("bridge.decisions", "DecisionLoop.reply_states"),
+         ("bridge.decisions", "edit_state"), ("rest", "GitLab.note_edits"))
+BRAINKIT_NEEDED = "72b278e"
 
 
 def is_int(x):
@@ -134,6 +150,7 @@ def load_brainkit(path):
     sys.path.insert(0, path)
     import importlib
     import brainkit  # noqa: F401
+    import inspect
     lacking = []
     for mod, attr in NEEDS:
         obj = importlib.import_module("brainkit." + mod)
@@ -141,9 +158,12 @@ def load_brainkit(path):
             obj = getattr(obj, part, None)
         if obj is None:
             lacking.append("%s.%s" % (mod, attr))
+    check = getattr(importlib.import_module("brainkit.bridge.decisions"), "check_answer", None)
+    if check is not None and "edits" not in inspect.signature(check).parameters:
+        lacking.append("bridge.decisions.check_answer(edits=)")
     if lacking:
-        raise SystemExit("brain-signer: brain-kit at %s is too old (needs %s: commit 9935b11 or newer)"
-                         % (path, ", ".join(lacking)))
+        raise SystemExit("brain-signer: brain-kit at %s is too old (needs %s: commit %s or newer)"
+                         % (path, ", ".join(lacking), BRAINKIT_NEEDED))
 
 
 def _nid(note):
@@ -161,6 +181,33 @@ class Refuse(Exception):
     def __init__(self, *reasons):
         self.reasons = [" ".join(str(r).split())[:300] for r in reasons] or ["没写原因"]
         super().__init__("; ".join(self.reasons))
+
+
+class CannotCheck(Exception):
+    """A check this signer cannot make right now (GitLab GraphQL did not answer): no answer is written, the bridge
+    asks again. Deliberately not a BrainError: brain-kit's DecisionLoop catches those."""
+
+
+class EditsOrNothing:
+    """The signer's GitLab as the brain-kit Bridge inside this signer sees it: the same client, with one difference.
+    brain-kit's DecisionLoop.reply_states, when GitLab GraphQL fails (rest.GitLab.note_edits raises BrainError), records
+    the reply as "unknown" for good: its bridge then tells the person to reply again. Here that failure is a check the
+    signer cannot make: note_edits raises CannotCheck, which goes through reply_states before anything is recorded for
+    that reply, so the request gets no answer and is checked again when the bridge asks again. Everything else goes
+    to the client as it is."""
+
+    def __init__(self, gl, brain_error):
+        self._gl, self._brain_error = gl, brain_error
+
+    def __getattr__(self, name):
+        return getattr(self._gl, name)
+
+    def note_edits(self, project, iid, *args, **kw):
+        try:
+            return self._gl.note_edits(project, iid, *args, **kw)
+        except self._brain_error as e:
+            raise CannotCheck("GitLab GraphQL did not say who edited the replies on %s!%s (nothing signed, nothing "
+                              "recorded): %s" % (project, iid, str(e).split("\n", 1)[0][:200]))
 
 
 def handoff_voucher(v, mr, facts, principal):
@@ -201,11 +248,15 @@ class Signer:
         self.key = sign.KeySigner(cfg["signing_key"])
         bcfg = merged(BRIDGE_DEFAULTS, {k: cfg[k] for k in (
             "projects", "identities", "ledger", "vouchers_dir", "intake_dir", "publish_vouchers", "pseudonym_salt",
-            "contract_ttl_hours", "signing_key") if k in cfg})
+            "contract_ttl_hours", "signing_key", "publish_timeout") if k in cfg})
         bcfg["spool_dir"] = cfg["spool"]
-        self.br = Bridge(bcfg, gitlab, jira, None, out, signer=self.key)
+        # brain-kit's Bridge with this signer's GitLab client; GraphQL failures stop the check instead of being
+        # recorded (EditsOrNothing)
+        self.br = Bridge(bcfg, EditsOrNothing(gitlab, common.BrainError), jira, None, out, signer=self.key)
         self.ledger = self.br.ledger            # brain-kit's Ledger: any thread may use it; .lock for several steps
         with self.ledger.lock:
+            # brain-kit's decision tables, for its replies table: each reply as this signer first read it
+            self.ledger.db.executescript(decisions.SCHEMA)
             self.ledger.db.executescript(SIGNED_SCHEMA)
             for table, col, kind in ADDED_COLUMNS:
                 if col not in {r[1] for r in self.ledger.db.execute("PRAGMA table_info(%s)" % table)}:
@@ -462,6 +513,14 @@ class Signer:
                 return nid
         return None
 
+    def reply_edits(self, did, qn, project, iid, notes):
+        """check_answer's ``edits`` for the replies to `did` after its question note `qn`, as brain-kit's own
+        ``collect`` makes them: ``DecisionLoop.reply_states`` (each reply recorded at this signer's first sight with its
+        text's hash in this signer's ledger; a touched one looked up on GitLab GraphQL with this signer's token). The
+        round starts at the question here (this signer knows no rounds but the bridge's conflict notes, which
+        check_answer reads off the MR); CannotCheck when GraphQL does not answer (EditsOrNothing)."""
+        return self.br.reply_states({"id": did, "note_id": qn, "told_id": 0, "project": project, "iid": iid}, notes)
+
     def answer(self, v):
         for k in ("decision", "park_hash", "decision_kind", "choice", "answerer"):
             if not is_str(v.get(k), 100):
@@ -490,14 +549,16 @@ class Signer:
         raw = self.gl.file_raw(project, "%s/%s/park.json" % (kit["runs_dir"], run["req"]), v["sha"])
         pushed = self.rest.head_pushed_at(self.gl.mr_versions(project, iid), v["sha"])
         notes = self.gl.mr_notes(project, iid)               # all of them, or an error (a flood is not decided)
+        edits = self.reply_edits(did, qn, project, iid, notes)
         # bound to the question note the voucher names (an answer voucher's question_note, as brain-kit's ledger
         # recorded it): only that note counts, and when it is gone the decision is void
         got = self.decisions.check_answer(
             {"id": did, "run_id": v["run_id"], "sha": v["sha"], "park_hash": v["park_hash"],
              "kind": v["decision_kind"], "lean_request": v.get("lean_request"), "question_note": qn},
-            raw, notes, kit, self.br.roles, run["owner"], mr["sha"], pushed)
+            raw, notes, kit, self.br.roles, run["owner"], mr["sha"], pushed, edits=edits)
         if not got.ok:
-            raise Refuse(VERDICT.get(got.status, "%s 不签") % did + ("（%s）" % got.reason if got.reason else ""))
+            status = "held" if got.status == "conflict" and got.held else got.status
+            raise Refuse(VERDICT.get(status, "%s 不签") % did + ("（%s）" % got.reason if got.reason else ""))
         self.same(v, answer_voucher(v, run, got, self.br.pseudonym(got.author), self.sign.PRINCIPAL))
         answer = json.dumps({"decision": did, "choice": got.choice, "rejected": list(got.items),
                              "answerer": v["answerer"]}, sort_keys=True)

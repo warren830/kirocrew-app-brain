@@ -202,6 +202,7 @@ class Repo:
         self._lock = threading.Lock()
         self._facts: dict[str, tuple[tuple, dict[str, Any]]] = {}
         self._scan: tuple[float, tuple, list[dict[str, Any]]] | None = None
+        self._main_sha: tuple[float, str | None] | None = None
 
     # ---- where things are ---------------------------------------------------------------------------- #
 
@@ -211,6 +212,17 @@ class Repo:
             if self.git.ok("rev-parse", "-q", "--verify", r + "^{commit}"):
                 return r
         return None
+
+    def main_sha(self, ttl: float = 4.0) -> str | None:
+        """The default branch's commit (origin's, else the local one), reused for *ttl* seconds."""
+        now = time.monotonic()
+        got = self._main_sha
+        if got is not None and now - got[0] < ttl:
+            return got[1]
+        ref = self.main_ref()
+        sha = self.git.out("rev-parse", "-q", "--verify", ref + "^{commit}") if ref else ""
+        self._main_sha = (now, sha or None)
+        return sha or None
 
     def _places(self) -> dict[str, Any]:
         pre = self.cfg["branch_prefix"]
@@ -330,6 +342,15 @@ class Repo:
             return Source(self.git, ref=facts["ref"])
         return None
 
+    def is_handover_tip(self, facts: dict[str, Any]) -> bool:
+        """The requirement's branch tip is the hand-over commit `brain handoff` made: one commit on top of run.json's
+        handoff.local_head."""
+        lh = ((facts.get("run") or {}).get("handoff") or {}).get("local_head")
+        tip = facts.get("tip")
+        if not isinstance(lh, str) or not isinstance(tip, str) or not re.match(r"^[0-9a-f]{40}$", lh):
+            return False
+        return self.git.out("rev-parse", "-q", "--verify", tip + "^") == lh
+
     def bot_commits_since(self, base: str | None, tip: str | None) -> int:
         """Commits on the run branch after the hand-over that the team runner's bot made (kit bot_emails)."""
         if not base or not tip or base == tip:
@@ -344,6 +365,7 @@ class Repo:
         p = self.git.run("fetch", "--prune", "-q", "origin", timeout=120)
         with self._lock:
             self._scan = None
+            self._main_sha = None
         if p.returncode != 0:
             return False, (p.stderr or p.stdout).strip()[:300] or "git fetch 失败"
         return True, "已从 origin 取到最新"
@@ -351,6 +373,7 @@ class Repo:
     def invalidate(self) -> None:
         with self._lock:
             self._scan = None
+            self._main_sha = None
 
 
 def _key_order(key: str) -> tuple:

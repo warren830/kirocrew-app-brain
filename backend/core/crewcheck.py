@@ -14,6 +14,12 @@
   ``kirocrew config set agent.acp_backend kas``.
 - every repo has Lean and the hook adapter committed in git (``runner_kit_problems``): the app's worktrees are made
   from main, so a file that is only on this disk is not there. There is no fix from here (commit it through an MR).
+- every repo's aidlc-docs/lean.json leaves runs/** out of Lean's code fingerprint (``mrdesc.write_problem``, brain-kit
+  72b278e; 48b6b97's `brain doctor` FAILs and `brain handoff` refuses without it: a park.json or MR.md written after
+  `lean release` would void the RELEASE approval). The file is the person's (the agent cannot edit it): no fix from
+  here; `brain install <repo>` adds it, then it is reviewed and committed.
+- brain-kit 72b278e: a spec that sets its own model, tools, resources or prompt keeps them (`brain crew-agent
+  --force` only adds what is missing; `--reset` takes brain-kit's): said in an OK row, nothing to fix.
 
 The kirocrew CLI lives in ~/.local/bin, which is not on the gateway's PATH: constants.kirocrew_bin finds it.
 """
@@ -125,6 +131,10 @@ def checks(repo_paths: list[str]) -> dict[str, Any]:
                              if cli.CREW_HOOK not in c)
                 rows.append({"level": "OK", "text": AGENT_OK + ("（另有 %d 个别的 hook，留着不动）" % others
                                                                  if others else "")})
+                custom = _custom_fields(cli, spec)
+                if custom:
+                    rows.append({"level": "OK", "text": "brain-dev 用的是你自己的 %s（`brain crew-agent --reset` 换回 "
+                                                        "brain-kit 的；--force 只补缺的）" % "、".join(custom)})
     for rp in repo_paths:
         name = os.path.basename(os.path.normpath(rp))
         try:
@@ -133,6 +143,9 @@ def checks(repo_paths: list[str]) -> dict[str, Any]:
             probs = ["查不了它的 git：%s" % str(exc)[:200]]
         for p in probs:
             rows.append({"level": "FAIL", "text": "仓库 %s：%s" % (name, p)})
+        why = _records_counted(rp)
+        if why:
+            rows.append({"level": "FAIL", "text": "仓库 %s：%s" % (name, why)})
     be, why = _engine()
     if be is None:
         rows.append({"level": "WARN", "text": why})
@@ -142,6 +155,32 @@ def checks(repo_paths: list[str]) -> dict[str, Any]:
         rows.append({"level": "WARN", "text": "KiroCrew 引擎是 %s：Lean 的 hook 只在 kas（v3）上测过" % be})
         fix["engine"] = True
     return {"rows": rows, "fix": fix, "checked_at": time.time()}
+
+
+def _custom_fields(cli: Any, spec: dict[str, Any]) -> list[str]:
+    """brain-kit's fields the spec sets to values of its own (cli.crew_agent_custom, 72b278e); [] when unknown."""
+    fn = getattr(cli, "crew_agent_custom", None)
+    if fn is None:
+        return []
+    try:
+        return [str(k) for k in fn(spec, bk.m("common").load_json(cli.CREW_AGENT_SRC))]
+    except Exception:  # noqa: BLE001 - informational only
+        return []
+
+
+def _records_counted(repo_path: str) -> str:
+    """Why Lean counts the repo's runs/ records as code (mrdesc.write_problem), with brain-kit's fix; "" when it does
+    not, or when brain-kit cannot tell."""
+    if not bk.has("mrdesc") or not hasattr(bk.m("mrdesc"), "write_problem"):
+        return ""
+    M = bk.m("mrdesc")
+    try:
+        cfg = bk.m("config").load(repo_path)
+        why = M.write_problem(repo_path, cfg)
+        fix = M.exclude_fix(cfg) if why and hasattr(M, "exclude_fix") else ""
+    except Exception:  # noqa: BLE001 - one unreadable repo must not hide the other checks
+        return ""
+    return ("%s。%s" % (str(why).rstrip("。"), fix) if fix else str(why)) if why else ""
 
 
 def agent_ok(rows: list[dict[str, str]]) -> bool:

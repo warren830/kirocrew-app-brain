@@ -4,6 +4,8 @@
   the start (brain-kit pushes claim/<KEY>; two people racing get two keys).
 - ``check``: brain-kit's dry run in this process (intake.package.build, dry_run=True): every finding, every gate
   that would stop it, verbatim; nothing is written (the intake store folder is created if missing, as brain does).
+  brain-kit 72b278e's "review" findings (请你确认: may be a name or a password, may as well be a word: neither masked
+  nor refused) are also listed on their own, per file, for the person to check before the start.
 - ``start``: ``brain start`` itself, run as a command in a fresh worktree of the repo (one folder per requirement
   under work_root, so several requirements can be open at once and each session has its own directory); its output
   verbatim. Materials go to the person's intake store, never into a repo.
@@ -22,6 +24,9 @@ from .constants import KEY_RE, PYTHON_BIN, SLUG_RE
 from .repo import Repo, parse_branch
 
 CLASSES = ("public", "internal", "confidential", "secret", "unsure")
+# brain-kit's review part of a file's finding line (intake.package.build, 72b278e): 请你确认 N 处（…）：「…」、「…」
+REVIEW_RE = re.compile(r"请你确认 [0-9]+ 处（[^）]*）：「.*?」(?:、「.*?」)*(?=；|$)")
+FILE_RE = re.compile(r"^- \*\*(.+?)\*\*：")
 MAX_DOCS = 50
 START_TIMEOUT_S = 900
 MAX_OUT = 20000
@@ -120,7 +125,7 @@ def clean_body(repo: Repo, body: dict[str, Any], *, start: bool) -> dict[str, An
 def check(repo: Repo, body: dict[str, Any], me: str | None) -> dict[str, Any]:
     """brain-kit's dry run of the five gates (blocking: call it in a thread)."""
     out = {"ok": False, "key": None, "package": None, "classification": None, "segments": 0, "sources": 0,
-           "findings": [], "blocking": [], "refused": [], "error": ""}
+           "findings": [], "review": [], "blocking": [], "refused": [], "error": ""}
     try:
         b = clean_body(repo, body, start=False)
     except IntakeError as exc:
@@ -149,6 +154,19 @@ def check(repo: Repo, body: dict[str, Any], me: str | None) -> dict[str, Any]:
                findings=[str(x) for x in rep.get("findings") or []], blocking=[str(x) for x in rep.get("blocking") or []],
                refused=[{"id": str(r.get("id")), "name": str(r.get("name")), "reason": str(r.get("reason"))}
                         for r in rep.get("refused") or []])
+    out["review"] = review_items(out["findings"])
+    return out
+
+
+def review_items(findings: list[str]) -> list[str]:
+    """brain-kit's 请你确认 parts of the finding lines, one per file, with the file they are in: what may be a name or a
+    password but may as well be a word (not masked; if it is one, the person changes the document and checks again)."""
+    out = []
+    for line in findings:
+        m = REVIEW_RE.search(line)
+        if m:
+            f = FILE_RE.match(line)
+            out.append(("%s：" % f.group(1) if f else "") + m.group(0))
     return out
 
 

@@ -1,5 +1,5 @@
 {
-  "_help": "brain-signer config (signer/brain_signer.py), the other end of brain-kit's sign.SpoolSigner (the app's bridge.json \"signer\": {\"type\": \"spool\", \"spool_dir\": <spool>, \"allowed_signers\": ...}). Runs as its own OS user (brainbridge); this file, the signing key, its GitLab token and its identities copy are readable by that user only. pseudonym_salt must equal the app's bridge.json pseudonym_salt. Answers are signed only when the project's .brain/kit.json on the default branch names bridge_user (the GitLab account of the app's bridge token). bridge_users is optional: a pin, kit.json's bridge_user must be one of them. Needs brain-kit 9935b11 or newer (the hand-over commit rule, run reservations, answers bound to their question note); after updating brain-kit, update the app and this signer together.",
+  "_help": "brain-signer config (signer/brain_signer.py), the other end of brain-kit's sign.SpoolSigner (the app's bridge.json \"signer\": {\"type\": \"spool\", \"spool_dir\": <spool>, \"allowed_signers\": ...}). Runs as its own OS user (brainbridge); this file, the signing key, its GitLab token and its identities copy are readable by that user only. pseudonym_salt must equal the app's bridge.json pseudonym_salt. Answers are signed only when the project's .brain/kit.json on the default branch names bridge_user (the GitLab account of the app's bridge token). bridge_users is optional: a pin, kit.json's bridge_user must be one of them. Needs brain-kit 72b278e or newer (the hand-over commit rule, run reservations, answers bound to their question note; 72b278e: the edit signal, which this signer reads on GitLab GraphQL with its own token, so that token needs a scope GraphQL takes: read_api or api); after updating brain-kit, update the app and this signer together. publish_timeout: seconds for each git push / pull of the vouchers repo.",
   "brainkit": "/opt/brain-kit",
   "spool": "/srv/brain-signer",
   "signing_key": "/etc/brain-kit/bridge_ed25519",
@@ -27,5 +27,6 @@
   ],
   "max_clock_skew_s": 600,
   "interval": 2,
-  "keep_days": 14
+  "keep_days": 14,
+  "publish_timeout": 60
 }

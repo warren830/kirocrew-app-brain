@@ -27,6 +27,11 @@ CAT_LABEL = {"person": "人", "check": "确定性检查", "brain": "Brain 条目
 CAT_ORDER = ("person", "check", "brain", "agent", "unknown", "unclassified")
 # brain-kit's ledger states of a decision that leave the run waiting for good: nobody can answer it any more (the
 # signer refused the answer, the question is void, or it could not be asked) until the run pushes again
+# a pushed hand-over the MR carries no label for (`brain handoff` exits 1 then): nothing was handed over
+NOT_LABELLED = "推上去了，但 MR 上没有交接标签 %s：什么也没交出去。看一眼 MR，再在分支上跑一次 brain handoff"
+# brain-kit's ledger states of a question the bridge has not put on the MR yet: posting (to be posted), asking (one
+# bridge process is posting it right now, 72b278e)
+NOT_POSTED = ("posting", "asking")
 STUCK_DECISION = {"refused": "%s 的回答签名服务不签：看运行机页的拒签原因",
                   "void": "%s 作废（问题没绑上这次推送和 park.json）：run 要重新推送才会重新提问",
                   "invalid": "%s 发不出去（park.json 不对）：run 要改好重新推送"}
@@ -54,6 +59,7 @@ def base_row(repo_id: str, f: dict[str, Any]) -> dict[str, Any]:
         "source": str(claim.get("source") or "product"), "state": "claimed", "state_label": STATE_LABEL["claimed"],
         "where": f.get("where") or "claim", "branch": f.get("branch"), "intent": run.get("intent"),
         "lean": lean, "stage": lean_view.stage_text(lean), "waits": {"who": "nobody", "text": "", "line": None},
+        "summary": None,     # the first line of its 变更说明 (mrdesc_view), filled in by the service
         "credits": None,
         "updated_at": None, "mr": None, "worktree": f.get("worktree"), "run_ids": [], "sessions": 0,
         "overlap": [], "open_questions": [],
@@ -62,8 +68,9 @@ def base_row(repo_id: str, f: dict[str, Any]) -> dict[str, Any]:
 
 
 def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | None, slot: dict[str, Any] | None,
-             cfg: dict[str, Any], bot_commits: int = 0) -> None:
-    """Fill in state, state_label and waits (person mode)."""
+             cfg: dict[str, Any], bot_commits: int = 0, at_handover: bool = False) -> None:
+    """Fill in state, state_label and waits (person mode). *at_handover*: the branch tip is the hand-over commit
+    `brain handoff` made (its parent is run.json's handoff.local_head)."""
     run, park, claim = f.get("run"), f.get("park"), f.get("claim") or {}
     pending = [a for a in f.get("approvals") or [] if a["state"] == "pending" and a.get("line")]
 
@@ -110,7 +117,24 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
         return put("parked", who, "等回答%s（%s）" % (" " + did if did else "", KIND_LABEL.get(kind, kind)))
     if cfg.get("running_label") in labels or bot_commits:
         return put("running", "runner", "运行机在跑")
+    if at_handover and not_labelled(f, mr, cfg):
+        return put("handed_over", "you", NOT_LABELLED % cfg.get("handoff_label"))
     return put("handed_over", "bridge", "等桥核对交接")
+
+
+def not_labelled(f: dict[str, Any], mr: dict[str, Any] | None, cfg: dict[str, Any]) -> bool:
+    """A hand-over that was pushed but is not labelled: the MR (open, its head the branch tip this machine sees) has
+    no hand-over label, and neither the running nor the rejected one. Then the bridge takes nothing (brain-kit 72b278e:
+    `brain handoff` exits 1 when it could not label; the bridge's process() says "unlabelled" while the newest label
+    event takes the label off). Unknown MR: not said. The caller makes sure the tip is the hand-over commit (so a
+    run whose labels were tidied away after the runner's work is not taken for one)."""
+    if not mr or mr.get("state") != "opened" or not cfg.get("handoff_label"):
+        return False
+    labels = set(mr.get("labels") or [])
+    if labels & {cfg.get("handoff_label"), cfg.get("running_label"), cfg.get("rejected_label")}:
+        return False
+    tip = f.get("tip")
+    return not tip or not mr.get("sha") or mr.get("sha") == tip
 
 
 def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[dict[str, Any]],
@@ -120,7 +144,7 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
     void, or that could not be asked leaves the run waiting until a person looks."""
     st = run_row.get("state")
     open_d = [d for d in decisions if d.get("state") == "open"]
-    posting = [d for d in decisions if d.get("state") == "posting"]     # brain-kit: not on the MR yet
+    posting = [d for d in decisions if d.get("state") in NOT_POSTED]    # brain-kit: not on the MR yet
     mine = [d for d in decisions if not run_row.get("run_id") or d.get("run_id") in (None, run_row.get("run_id"))]
 
     def put(state: str, who: str, text: str) -> None:
@@ -276,6 +300,13 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
     wrong_open = [str(k) for k in d.get("wrong_open") or []]
     if wrong_open:
         notes.append("已知有问题、14 天还没满（满了再算进交付正确率）：%s" % "、".join(wrong_open[:20]))
+    # brain-kit 72b278e: a run whose acceptance was rejected waits for its merge and 14 days like a merged one
+    # (autonomy.runs[].correct "wrong_open"); the merged ones are in the line above already
+    a = data.get("autonomy") if isinstance(data.get("autonomy"), dict) else {}
+    unmerged = sorted({str(r["key"]) for r in a.get("runs") or [] if isinstance(r, dict) and r.get("key")
+                       and r.get("correct") == "wrong_open"} - set(wrong_open))
+    if unmerged:
+        notes.append("已知有问题、还没合并（验收被驳回过；合并满 14 天才算进自主度）：%s" % "、".join(unmerged[:20]))
     view.update(available=True, queue=queue, ref=data.get("ref") or ref, skipped=skipped, notes=notes)
     f = data.get("funnel") if isinstance(data.get("funnel"), dict) else None
     funnel = None

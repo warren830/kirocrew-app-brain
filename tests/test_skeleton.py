@@ -5,6 +5,8 @@ import asyncio
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from http_fakes import FakeRequest, FakeWeb
 
 import backend.routes as routes
@@ -78,23 +80,31 @@ def test_settings_are_checked_before_they_are_saved(tmp_path, home):
     assert not (tmp_path / "data" / "settings.json").exists()
 
 
-def test_a_brainkit_older_than_9935b11_is_refused(tmp_path):
-    """The app (and its signer) need brain-kit 9935b11's interfaces: a checkout without one of them is refused with a
-    message naming what it lacks, not half used. (A copy of the checkout with run reservations taken out.)"""
+OLDER = [
+    # 9935b11: the hand-over commit rule (a method: nothing else imports it, so the copy still imports)
+    ("bridge/handoff.py", lambda t: t.replace("def handoff_commit_problems(", "def _handoff_commit_problems_gone("),
+     "bridge.handoff.Bridge.handoff_commit_problems"),
+    # 72b278e: the edit signal (GitLab GraphQL's lastEditedBy, through rest.GitLab.note_edits)
+    ("rest.py", lambda t: t.replace("def note_edits(", "def _note_edits_gone("), "rest.GitLab.note_edits"),
+]
+
+
+@pytest.mark.parametrize("path,cut,lacks", OLDER, ids=["9935b11", "72b278e"])
+def test_an_older_brainkit_is_refused(tmp_path, path, cut, lacks):
+    """The app (and its signer) need brain-kit 72b278e's interfaces: a checkout without one of them is refused with a
+    message naming what it lacks and the commit needed, not half used. (A copy of the checkout with one taken out.)"""
     import shutil
     from appkit import BRAINKIT, mod
-    import pytest
     if not (BRAINKIT / "brainkit" / "__init__.py").is_file():
         pytest.skip("brain-kit checkout not found")
     old = tmp_path / "old-brain-kit"
     shutil.copytree(BRAINKIT / "brainkit", old / "brainkit", ignore=shutil.ignore_patterns("__pycache__"))
-    led = old / "brainkit" / "bridge" / "ledger.py"
-    led.write_text(led.read_text(encoding="utf-8").replace('RESERVED = "signing"', 'SIGNING = "signing"')
-                   .replace("RESERVED", "SIGNING"), encoding="utf-8")
+    f = old / "brainkit" / path
+    f.write_text(cut(f.read_text(encoding="utf-8")), encoding="utf-8")
     bk = mod("bk")
     try:
         got = bk.load(str(old))
-        assert got["ok"] is False and "bridge.ledger.RESERVED" in got["error"] and "9935b11" in got["error"], got
+        assert got["ok"] is False and lacks in got["error"] and "72b278e" in got["error"], got
         assert bk.load(str(BRAINKIT))["ok"] is True
     finally:
         bk.unload()
@@ -104,6 +114,6 @@ def test_a_brainkit_older_than_9935b11_is_refused(tmp_path):
     probe = "import sys; sys.path.insert(0, %r); import brain_signer; brain_signer.load_brainkit(sys.argv[1])" % str(
         ROOT / "signer")
     p = subprocess.run([sys.executable, "-I", "-c", probe, str(old)], capture_output=True, text=True)
-    assert p.returncode != 0 and "bridge.ledger.RESERVED" in p.stderr and "9935b11" in p.stderr, p.stderr
+    assert p.returncode != 0 and lacks in p.stderr and "72b278e" in p.stderr, p.stderr
     p = subprocess.run([sys.executable, "-I", "-c", probe, str(BRAINKIT)], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr

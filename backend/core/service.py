@@ -16,12 +16,13 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from . import bk, brainview, crewcheck, deliveries, detail, intake, lean_view, mrinfo, settings as settings_mod
+from . import bk, brainview, crewcheck, deliveries, detail, intake, lean_view, mrdesc_view, mrinfo
+from . import settings as settings_mod
 from . import todo as todo_mod
 from .constants import APP_NAME, APP_ROOT, KEY_RE, LOCAL_AGENT, LOCAL_FOLDER, REPO_ID_RE, TICK_S, VERSION
 from .gateway import Gateway
 from .httpkit import AppError
-from .repo import Repo, Source, read_facts
+from .repo import Git, Repo, Source, read_facts
 from .sessions import SessionManager
 from .store import Store
 
@@ -43,7 +44,8 @@ def scope_of(rid: str, key: str) -> str:
 
 
 SCRUB_KEYS = ("text", "why", "question", "label", "detail", "status", "next", "open_questions", "output", "reasons",
-              "findings", "blocking", "error", "session_error", "notes", "warnings", "problems")
+              "findings", "review", "blocking", "error", "session_error", "notes", "warnings", "problems", "summary",
+              "first")
 
 
 def scrub_tree(obj: Any, scrub: Callable[[str], str], key: str = "") -> Any:
@@ -85,6 +87,7 @@ class Service:
         self._eval: dict[str, tuple] = {}
         self._eval_running: set[str] = set()
         self._trace: dict[tuple, tuple] = {}
+        self.desc = mrdesc_view.DescCache()     # each requirement's 变更说明, by the commits it is made from
         self._me: str | None = None
 
     # ---- lifecycle ------------------------------------------------------------------------------------ #
@@ -276,16 +279,52 @@ class Service:
         bot = 0
         if run.get("handoff") and not mr:
             bot = repo.bot_commits_since((run.get("handoff") or {}).get("local_head"), f.get("origin_sha"))
-        deliveries.classify(row, f, mr=mr, slot=live, cfg=repo.cfg, bot_commits=bot)
+        deliveries.classify(row, f, mr=mr, slot=live, cfg=repo.cfg, bot_commits=bot,
+                            at_handover=bool(mr) and repo.is_handover_tip(f))
         row["credits"] = snap["credits"].get(scope)
         row["sessions"] = len(sess)
         row["updated_at"] = deliveries.updated_at(f, live)
+        job = self._desc_job(repo, f, row["credits"])
+        row["summary"] = self.desc.first(*job) if job else None
         if mr:
             row["mr"] = {"iid": mr["iid"], "url": mr.get("url") or mrinfo.mr_url(base, project, mr["iid"]),
                          "state": mr.get("state")}
             row["open_questions"] = [q["id"] for q in mr.get("questions") or [] if q.get("state") == "open"]
             row["run_ids"] = sorted({q["run_id"] for q in mr.get("questions") or [] if q.get("run_id")})
         return row
+
+    # ---- 变更说明 (brain mr-desc) ------------------------------------------------------------------------- #
+
+    @staticmethod
+    def _desc_credits(credits: Any) -> float | None:
+        return round(float(credits), 2) if isinstance(credits, (int, float)) and not isinstance(credits, bool) else None
+
+    def _desc_job(self, repo: Repo, f: dict[str, Any], credits: Any) -> tuple[tuple, Callable[[], dict]] | None:
+        """(signature, maker) of a requirement's 变更说明 on this machine: from the commit its facts are read at (the
+        worktree's or branch's tip, the default branch once merged); None before it has a run."""
+        if not f.get("run") or not f.get("key"):
+            return None
+        main = repo.main_sha()
+        sha = f.get("tip") if f.get("where") in ("worktree", "branch") else (main if f.get("where") == "main" else None)
+        if not sha:
+            return None
+        c = self._desc_credits(credits)
+        key, cfg, path = f["key"], repo.cfg, repo.path
+        cr = {"runs": {key: {"credits": c}}} if c is not None else None
+        return (path, sha, main, key, c), (lambda: mrdesc_view.describe(path, cfg, key, sha, cr))
+
+    def _desc_runner_job(self, path: str, cfg: dict[str, Any], key: str, credits: Any,
+                         run_ids: list[str]) -> tuple[tuple, Callable[[], dict]] | None:
+        """The same for a run on the team runner: its workspace's HEAD (the branch as the runner has it)."""
+        git = Git(path)
+        sha = mrdesc_view.target(git, "HEAD")
+        if not sha:
+            return None
+        d = cfg.get("default_branch") or "main"
+        main = mrdesc_view.target(git, "refs/remotes/origin/" + d) or mrdesc_view.target(git, "refs/heads/" + d)
+        c = self._desc_credits(credits)
+        cr = {"runs": {x: {"credits": c} for x in run_ids[-1:]}} if c is not None and run_ids else None
+        return (path, sha, main, key, c), (lambda: mrdesc_view.describe(path, cfg, key, sha, cr))
 
     def _team_rows(self, snap: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]]:
         """(row, facts, decisions) per requirement the team runner has (its latest run)."""
@@ -303,7 +342,6 @@ class Service:
                      "worktree": None, "stages": [], "events": [], "approvals": [], "run": None, "park": None}
             path = r.get("path")
             if path and os.path.isdir(path):
-                from .repo import Git
                 got = read_facts(Source(Git(path), path=path), key, "runs")
                 facts.update(got, worktree=path, stages=lean_view.stages(got["events"]))
                 facts["branch"] = (got["run"] or {}).get("branch")
@@ -319,8 +357,20 @@ class Service:
             row["sessions"] = sum(len(snap["by"].get(x, [])) for x in all_ids[key])
             row["mr"] = {"iid": int(r["iid"]), "url": self.team.mr_url(r["project"], r["iid"]), "state": None}
             row["updated_at"] = lean_view.epoch(r.get("updated"))
+            job = self._runner_desc(facts, key, row) if facts.get("run") else None
+            row["summary"] = self.desc.first(*job) if job else None
             out.append((row, facts, decs))
         return out
+
+    def _runner_desc(self, facts: dict[str, Any], key: str, row: dict[str, Any]):
+        path = facts.get("worktree")
+        if not path:
+            return None
+        try:
+            cfg = bk.m("config").load(path)
+        except Exception:  # noqa: BLE001
+            cfg = dict(bk.m("config").DEFAULTS)
+        return self._desc_runner_job(path, cfg, key, row.get("credits"), row.get("run_ids") or [])
 
     def _overview_sync(self, which: str, snap: dict[str, Any]) -> dict[str, Any]:
         rows, errors, all_decisions, q_counts = [], [], [], {"asked": 0, "answered": 0, "delivered": 0}
@@ -346,7 +396,7 @@ class Service:
             for row, _, decs in self._team_rows(snap):
                 rows.append(row)
                 for d in decs:
-                    if d.get("state") in ("invalid", "posting"):     # never on the MR (yet)
+                    if d.get("state") == "invalid" or d.get("state") in deliveries.NOT_POSTED:   # not on the MR (yet)
                         continue
                     q_counts["asked"] += 1
                     q_counts["answered"] += d.get("state") in ("answered", "delivered", "delivery_unknown", "refused")
@@ -485,7 +535,14 @@ class Service:
                          for s in snap["by"].get(scope, [])],
             "credits": {"total": snap["credits"].get(scope), "note": detail.NO_TOKENS},
             "brain": detail.brain_block(tl.get("brain"), None, f.get("decisions_text")),
+            "mr_desc": self._desc_now(self._desc_job(repo, f, snap["credits"].get(scope))),
         }
+
+    def _desc_now(self, job: tuple[tuple, Callable[[], dict]] | None) -> dict[str, Any]:
+        """The 变更说明 for the detail page: from the cache, or made now (blocking: called in a thread)."""
+        if job is None:
+            return mrdesc_view.empty("还没有 run（只有认领）：开工以后才有变更说明")
+        return self.desc.get_or_make(*job)
 
     def _timeline(self, repo: Repo, f: dict[str, Any], snap: dict[str, Any], scope: str) -> dict[str, Any]:
         sig = (scope, f.get("tip"), f.get("worktree"), len(f.get("events") or []), f.get("park_sha"))
@@ -546,6 +603,7 @@ class Service:
                                              "last_activity", "opened_at", "project", "url", "error")} for s in sess],
             "credits": {"total": row["credits"], "note": detail.NO_TOKENS},
             "brain": detail.brain_block(tl.get("brain"), None, f.get("decisions_text")),
+            "mr_desc": self._desc_now(self._runner_desc(f, key, row) if run else None),
         }
 
     @staticmethod
@@ -827,7 +885,7 @@ class Service:
     async def team_view(self) -> dict[str, Any]:
         if self.team is None:
             return {"status": self._team_status(), "ledger": {"runs": {}, "decisions": {}, "handoffs": {}}, "runs": [],
-                    "signer": {"pending": [], "refused": [], "waiting": []}}
+                    "handovers": [], "signer": {"pending": [], "refused": [], "waiting": []}}
         led = await asyncio.to_thread(self.team.ledger)
         signer = await asyncio.to_thread(self.team.signer_view)
         signer["waiting"] = await asyncio.to_thread(self.team.pending)
@@ -835,6 +893,8 @@ class Service:
                 "runs": [{"run_id": r["run_id"], "req": r["req"], "project": r["project"], "iid": int(r["iid"]),
                           "state": r["state"], "slot": r.get("slot"), "mr_url": self.team.mr_url(r["project"], r["iid"]),
                           "updated": r.get("updated")} for r in led["runs"]],
+                "handovers": [{k: h[k] for k in ("project", "iid", "sha", "result", "error", "at", "mr_url")}
+                              for h in self.team.handovers()],
                 "signer": signer}
 
     async def team_loop(self) -> dict[str, Any]:

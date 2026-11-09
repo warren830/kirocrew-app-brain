@@ -4,7 +4,10 @@ own identities and ledger) and the bridge.json the app hosts, with brain-kit's s
 
 GitLab's notes, labels and MR versions are in memory; commits come from the bare repo (id and parent_ids, as GitLab's
 commits API shows them); authors come from the token (the bridge's, the signer's, a person's). A note can be edited
-(GitLab keeps its id and moves updated_at) or deleted, as whoever holds the account's token can on GitLab.
+(GitLab keeps its id and moves updated_at) or deleted, as whoever holds the account's token can on GitLab. GitLab
+GraphQL answers brain-kit's note_edits query (72b278e) as measured on gitlab.aws.dev on 2026-11-09: lastEditedAt follows
+updated_at (an untouched note: its creation time; an award emoji moves it too), lastEditedBy names the last editor of
+the text only (an award emoji leaves it empty).
 """
 
 from __future__ import annotations
@@ -42,6 +45,8 @@ class GitLab:
                         "created_at": self.tick()}]  # ... and then the owner added the label
         self.who = {"bridge-tok": "brain-bridge", "signer-tok": "brain-signer"}
         self.next_note = 1000
+        self.graphql_down = set()   # tokens GraphQL answers 502 for ("*": every token)
+        self.graphql_calls = []     # the token of each GraphQL request
 
     def tick(self):
         self.t += 1
@@ -71,10 +76,31 @@ class GitLab:
         self.notes.append(n)
         return n
 
-    def edit(self, n, body):
-        """The note's author (or a Maintainer) edits it: same id, new body, updated_at moves."""
+    def edit(self, n, body, by):
+        """*by* edits the note's text (its author; a Maintainer may edit someone else's): same id, new body,
+        updated_at moves, GraphQL's lastEditedBy is *by*."""
         n["body"] = body
         n["updated_at"] = self.tick()
+        n["last_edited_by"] = by
+
+    def award(self, n):
+        """Someone puts an award emoji on the note: updated_at (and GraphQL's lastEditedAt) move, nobody edited it."""
+        n["updated_at"] = self.tick()
+
+    def graphql(self, token, data):
+        """POST /api/graphql: brain-kit's NOTE_EDITS_QUERY for MR !5 (one page)."""
+        self.graphql_calls.append(token)
+        if token in self.graphql_down or "*" in self.graphql_down:
+            return 502, b"Bad Gateway"
+        v = (data or {}).get("variables") or {}
+        if "notes(" not in str((data or {}).get("query")) or v.get("path") != P or str(v.get("iid")) != "5":
+            return 200, json.dumps({"errors": [{"message": "unexpected query"}]}).encode()
+        nodes = [{"id": "gid://gitlab/Note/%d" % n["id"], "author": {"username": n["author"]["username"]},
+                  "lastEditedAt": n.get("updated_at") or n["created_at"],
+                  "lastEditedBy": {"username": n["last_edited_by"]} if n.get("last_edited_by") else None}
+                 for n in self.notes]
+        return 200, json.dumps({"data": {"project": {"mergeRequest": {"notes": {
+            "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": nodes}}}}}).encode()
 
     def delete(self, n):
         self.notes.remove(n)
@@ -103,6 +129,8 @@ class GitLab:
         ok = lambda o, s=200: (s, json.dumps(o).encode())  # noqa: E731
         if path == "/api/v4/user":
             return ok({"username": self.who.get(headers.get("PRIVATE-TOKEN"), "someone")})
+        if path == "/api/graphql" and method == "POST":
+            return self.graphql(headers.get("PRIVATE-TOKEN"), data)
         if path == pre:
             return ok({"default_branch": "main"})
         if path == pre + "/merge_requests" and method == "GET":
@@ -126,6 +154,16 @@ class GitLab:
             return ok(self.page(self.notes, q))
         if path == pre + "/merge_requests/5/notes" and method == "POST":
             return ok(self.note(self.who.get(headers.get("PRIVATE-TOKEN"), "someone"), data["body"]), 201)
+        m = re.match(re.escape(pre) + r"/merge_requests/5/notes/([0-9]+)$", path)
+        if m and method == "PUT":   # GitLab lets an account edit its own notes (brain-kit 48b6b97: the 变更说明 comment)
+            who = self.who.get(headers.get("PRIVATE-TOKEN"), "someone")
+            n = next((x for x in self.notes if x["id"] == int(m.group(1))), None)
+            if n is None:
+                return ok({"message": "404 Note Not Found"}, 404)
+            if n["author"]["username"] != who:
+                return ok({"message": "403 Forbidden"}, 403)
+            self.edit(n, data["body"], by=who)
+            return ok(n)
         m = re.match(re.escape(pre) + r"/repository/files/(.+)/raw$", path)
         if m:
             p = subprocess.run(["git", "-C", self.bare, "show", "%s:%s" % (q.get("ref"), m.group(1))], capture_output=True)
@@ -217,14 +255,19 @@ def world(tmp_path, home, monkeypatch):
     return make_world(tmp_path, home, monkeypatch)
 
 
+BOT_ENV = {"GIT_AUTHOR_NAME": "brain-bot", "GIT_AUTHOR_EMAIL": "brain-bot@noreply.invalid",
+           "GIT_COMMITTER_NAME": "brain-bot", "GIT_COMMITTER_EMAIL": "brain-bot@noreply.invalid"}
+
+
 def commit_push(path, files, msg="c", bot=True):
+    """Commit *files* and force-push the branch: authored and committed by the runner's bot account (kit bot_emails)
+    unless bot=False (then the test's person, t@example.com)."""
     for rel, text in files.items():
         p = path / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(text if isinstance(text, str) else json.dumps(text, ensure_ascii=False))
     sh("git", "-C", path, "add", "-A")
-    who = ["-c", "user.email=brain-bot@noreply.invalid", "-c", "user.name=bot"] if bot else []
-    sh("git", "-C", path, *who, "commit", "-qm", msg)
+    sh("git", "-C", path, "commit", "-qm", msg, env=BOT_ENV if bot else None)
     sh("git", "-C", path, "push", "-q", "-f", "origin", "HEAD:" + BRANCH)
     return sh("git", "-C", path, "rev-parse", "HEAD").stdout.strip()
 

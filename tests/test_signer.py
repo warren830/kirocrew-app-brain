@@ -2,10 +2,14 @@
 (no app here): it signs exactly the vouchers brain-kit builds (9935b11: an answer names its question note), decides
 with brain-kit's Bridge.verify and decisions.check_answer, and refuses the attacks an agent with the app's OS user (and
 so the bridge account's token) can try: a replayed answer, an edited or made-up question, a question older than its
-push, a push after the owner's label, a head that is not the hand-over commit, a D-n bound again after its question
-was deleted, a question deleted and posted again, an edited reply, a second answer to one question, look-alikes, the
-bridge account answering, requests that are not brain-kit's, and odd files in the spool. A late signature is used, not
-signed again; a hand-over's run id is a reservation (brain-kit's `signing`) while it is checked.
+push, a push after the owner's label, a head that is not the hand-over commit, a bot's commit as the head, a D-n bound
+again after its question was deleted, a question deleted and posted again, a reply edited by someone else (also before
+the first poll, and holding the round against another answer), a reply changed after the signer read it, a second
+answer to one question, look-alikes, the bridge account answering, requests that are not brain-kit's, and odd files in
+the spool. The edit signal (brain-kit 72b278e): check_answer's `edits` from brain-kit's DecisionLoop.reply_states on the
+signer's own ledger and GitLab GraphQL with the signer's own token; an award emoji does not make a reply edited; when
+GraphQL does not answer, nothing is signed or recorded. A late signature is used, not signed again; a hand-over's run
+id is a reservation (brain-kit's `signing`) while it is checked.
 """
 
 import hashlib
@@ -185,7 +189,7 @@ def test_an_edited_question_is_refused(flow):
     """Whoever holds the bridge account's token edits D-1 after it was asked: no reply to it counts."""
     flow.hand_over()
     sha, q = flow.ask()
-    flow.gl.edit(q, q["body"].replace("A. 要", "A. 要（人工审核全部免掉）"))
+    flow.gl.edit(q, q["body"].replace("A. 要", "A. 要（人工审核全部免掉）"), by="brain-bridge")
     flow.gl.note("alice", "answer D-1 A")
     assert flow.bridge.collect() == 0
     assert flow.decision()["state"] == "void" and any(b.startswith("D-1 作废（") for b in flow.gl.bodies())
@@ -194,23 +198,171 @@ def test_an_edited_question_is_refused(flow):
     assert flow.kc.sent == []
 
 
-def test_an_edited_reply_does_not_count(flow):
-    """brain-kit 9935b11: a reply edited after it was posted (GitLab moved its updated_at) never counts, whoever
-    edited it. The bridge says so on the MR and delivers nothing; the signer signs nothing for it; a new reply counts."""
+# ---------------------------------------------------------------- answers: brain-kit 72b278e's edit signal
+
+def replies(flow):
+    """The signer's own record of each reply (brain-kit's replies table in the signer's ledger): note id -> state."""
+    return {r["note_id"]: r["state"] for r in flow.signer.ledger.db.execute("SELECT note_id, state FROM replies")}
+
+
+def signer_graphql(flow):
+    return flow.gl.graphql_calls.count("signer-tok")
+
+
+def test_a_reply_edited_by_someone_else_never_counts(flow):
+    """The attack: someone with edit rights (a Maintainer, not the bridge's Reporter account) rewrites alice's reply.
+    GitLab GraphQL names the editor: the bridge tells the MR once and delivers nothing; the signer, asking GraphQL with
+    its own token, signs neither the new text nor the old; alice's new reply counts."""
     flow.hand_over()
     sha, q = flow.ask()
     reply = flow.gl.note("alice", "answer D-1 A")
-    flow.gl.edit(reply, "answer D-1 B 改主意了")
-    assert flow.bridge.collect() == 0
-    assert flow.decision()["state"] == "open" and any(b.startswith("D-1") and "编辑" in b for b in flow.gl.bodies())
+    flow.gl.edit(reply, "answer D-1 B 改主意了", by="mo")
+    assert flow.bridge.collect() == 0 and flow.bridge.collect() == 0
+    told = [b for b in flow.gl.bodies() if b.startswith("D-1：") and "编辑过" in b]
+    assert flow.decision()["state"] == "open" and len(told) == 1, flow.gl.bodies()
+    raw = flow.park_raw(sha)
     for choice in ("A", "B"):
-        d, r = signer_ask(flow.w, answer_voucher(sha, flow.park_raw(sha), "D-1", choice, "alice", q["id"]))
+        d, r = signer_ask(flow.w, answer_voucher(sha, raw, "D-1", choice, "alice", q["id"]))
         assert d == "refused" and "有效回答" in reasons(r), r
+    assert replies(flow) == {reply["id"]: "edited"} and signer_graphql(flow) >= 1
     time.sleep(1.1)   # the bridge's voucher for B gets another issued_at: another request than the refused one
     flow.gl.note("alice", "answer D-1 B")
     assert flow.bridge.collect() == 1
     ans = [x["voucher"] for x in flow.vouchers() if x["voucher"]["kind"] == "answer"]
     assert [(a["choice"], a["question_note"]) for a in ans] == [("B", q["id"])]
+
+
+def test_an_award_emoji_on_a_reply_still_counts(flow):
+    """bob puts a :thumbsup: on alice's reply: GitLab moves its updated_at, GraphQL names no editor. The bridge and the
+    signer (each asking GraphQL) take it as alice wrote it."""
+    flow.hand_over()
+    sha, q = flow.ask()
+    reply = flow.gl.note("alice", "answer D-1 B 小额不审")
+    flow.gl.award(reply)
+    assert reply["updated_at"] != reply["created_at"]
+    assert flow.bridge.collect() == 1 and flow.decision()["state"] == "delivered"
+    assert "：B。" in flow.kc.sent[-1]["message"]
+    ans = [x["voucher"] for x in flow.vouchers() if x["voucher"]["kind"] == "answer"]
+    assert [(a["choice"], a["question_note"]) for a in ans] == [("B", q["id"])]
+    assert replies(flow) == {reply["id"]: "original"} and signer_graphql(flow) == 1
+    assert flow.gl.graphql_calls.count("bridge-tok") == 1
+
+
+def test_a_reply_edited_by_someone_else_holds_the_round(flow):
+    """alice answers A; carol's reply (B) is rewritten to A by a Maintainer before anyone read it. What carol wrote
+    is not known, so it counts as a different answer: nothing is signed for alice's A, the bridge ends the round with
+    a conflict note. In the new round alice's A counts, and the signer agrees (its round starts at that note)."""
+    flow.hand_over()
+    sha, q = flow.ask()
+    flow.gl.note("alice", "answer D-1 A")
+    carol = flow.gl.note("carol", "answer D-1 B")
+    flow.gl.edit(carol, "answer D-1 A", by="mo")
+    raw = flow.park_raw(sha)
+    d, r = signer_ask(flow.w, answer_voucher(sha, raw, "D-1", "A", "alice", q["id"]))
+    assert d == "refused" and "被改过" in reasons(r) and "不同的回答" in reasons(r), r
+    assert replies(flow)[carol["id"]] == "edited"
+    assert flow.bridge.collect() == 0 and flow.decision()["state"] == "open"
+    conflict = [b for b in flow.gl.bodies() if b.startswith("D-1 收到不同的回答")]
+    assert conflict and "@carol=A（这条回复被改过，不算）" in conflict[0] and "@alice=A" in conflict[0], conflict
+    assert not [x for x in flow.vouchers() if x["voucher"]["kind"] == "answer"]
+    time.sleep(1.1)   # the bridge's voucher gets another issued_at than the one refused above: another request
+    flow.gl.note("alice", "answer D-1 A")                                  # the new round
+    assert flow.bridge.collect() == 1
+    ans = [x["voucher"] for x in flow.vouchers() if x["voucher"]["kind"] == "answer"]
+    assert [(a["choice"], a["answerer"]) for a in ans] == [("A", flow.bridge.pseudonym("alice"))]
+
+
+def test_edited_by_its_author_before_first_sight_counts(flow):
+    """Before anyone read it, alice fixed her own reply: it counts as it reads now (GraphQL: alice edited it), for the
+    bridge and the signer alike."""
+    flow.hand_over()
+    sha, q = flow.ask()
+    reply = flow.gl.note("alice", "answer D-1 A")
+    flow.gl.edit(reply, "answer D-1 B 小额不审", by="alice")
+    assert flow.bridge.collect() == 1 and flow.decision()["answer"] == "B"
+    ans = [x["voucher"] for x in flow.vouchers() if x["voucher"]["kind"] == "answer"]
+    assert [(a["choice"], a["answerer"]) for a in ans] == [("B", flow.bridge.pseudonym("alice"))]
+    assert replies(flow) == {reply["id"]: "original"}
+
+
+def test_made_an_answer_by_someone_else_before_first_sight(flow):
+    """carol's harmless note is made into an answer by a Maintainer before the bridge's first poll: the bridge tells the
+    MR once and delivers nothing, the signer will not sign it; carol's own new reply counts (hers stands for her)."""
+    flow.hand_over()
+    sha, q = flow.ask()
+    note = flow.gl.note("carol", "我明天看一下")
+    flow.gl.edit(note, "answer D-1 A", by="mo")
+    assert flow.bridge.collect() == 0 and flow.bridge.collect() == 0
+    told = [b for b in flow.gl.bodies() if b.startswith("D-1：") and "新的回复" in b]
+    assert len(told) == 1, flow.gl.bodies()
+    d, r = signer_ask(flow.w, answer_voucher(sha, flow.park_raw(sha), "D-1", "A", "carol", q["id"]))
+    assert d == "refused" and "有效回答" in reasons(r), r
+    assert replies(flow) == {note["id"]: "edited"}
+    time.sleep(1.1)
+    flow.gl.note("carol", "answer D-1 A")
+    assert flow.bridge.collect() == 1
+    ans = [x["voucher"] for x in flow.vouchers() if x["voucher"]["kind"] == "answer"]
+    assert [(a["choice"], a["answerer"]) for a in ans] == [("A", flow.bridge.pseudonym("carol"))]
+
+
+def test_a_reply_changed_after_the_signer_read_it(flow):
+    """The signer keeps each reply's text hash from its first sight (brain-kit's replies table): alice's reply, read
+    when it said B, says A later. Edited by alice herself (GraphQL shows nothing wrong), it still does not count."""
+    flow.hand_over()
+    sha, q = flow.ask()
+    reply = flow.gl.note("alice", "answer D-1 B")
+    raw = flow.park_raw(sha)
+    d, r = signer_ask(flow.w, answer_voucher(sha, raw, "D-1", "A", "alice", q["id"]))   # not what alice said
+    assert d == "refused" and "凭证和签名服务按 GitLab 重建的不一样" in reasons(r) and replies(flow) == {reply["id"]: "original"}
+    flow.gl.edit(reply, "answer D-1 A", by="alice")
+    time.sleep(1.1)
+    d, r = signer_ask(flow.w, answer_voucher(sha, raw, "D-1", "A", "alice", q["id"]))
+    assert d == "refused" and "有效回答" in reasons(r), r
+    assert not [x for x in flow.vouchers() if x["voucher"]["kind"] == "answer"]
+
+
+def test_graphql_down_signs_nothing_and_records_nothing(flow):
+    """GitLab GraphQL does not answer the signer (its own token) while alice's reply has an award emoji: the signer
+    signs nothing and records nothing for that reply (no answer: the bridge asks again), instead of brain-kit's
+    "cannot tell" for good. Once GraphQL answers, the same voucher is signed."""
+    flow.hand_over()
+    sha, q = flow.ask()
+    reply = flow.gl.note("alice", "answer D-1 B")
+    flow.gl.award(reply)
+    flow.gl.graphql_down.add("signer-tok")
+    flow.client.timeout = 0.5
+    assert flow.bridge.collect() == 0 and flow.decision()["state"] == "open"   # SignerUnavailable: open again
+    late = flow.bridge.ledger.pending_voucher("answer D-1")
+    assert late is not None and late["choice"] == "B"
+    assert replies(flow) == {} and signer_graphql(flow) >= 1
+    assert not [x for x in flow.vouchers() if x["voucher"]["kind"] == "answer"]
+    assert signer_ask(flow.w, late) == (None, None)                          # straight into the spool: no answer either
+    flow.gl.graphql_down.clear()
+    flow.signer._failed.clear()           # (the signer looks at a request it could not check again after RETRY_S)
+    flow.client.timeout = 5
+    assert flow.bridge.collect() == 1 and flow.decision()["voucher_id"] == late["voucher_id"]
+    assert replies(flow) == {reply["id"]: "original"}
+
+
+def test_graphql_down_for_everyone_fails_closed(flow):
+    """GraphQL answers nobody: brain-kit's bridge does not count alice's touched reply and tells the MR once; the
+    signer does not sign it either. alice's new reply (untouched) needs no GraphQL: the bridge delivers it, and the
+    signer signs it once GraphQL answers again (it still has her first reply to judge)."""
+    flow.hand_over()
+    sha, q = flow.ask()
+    first = flow.gl.note("alice", "answer D-1 B")
+    flow.gl.award(first)
+    flow.gl.graphql_down.add("*")
+    assert flow.bridge.collect() == 0 and flow.bridge.collect() == 0
+    told = [b for b in flow.gl.bodies() if b.startswith("D-1：") and "查不到" in b]
+    assert len(told) == 1, flow.gl.bodies()
+    d, r = signer_ask(flow.w, answer_voucher(sha, flow.park_raw(sha), "D-1", "B", "alice", q["id"]))
+    assert (d, r) == (None, None) and first["id"] not in replies(flow)
+    flow.gl.note("alice", "answer D-1 B")
+    flow.gl.graphql_down.clear()
+    flow.signer._failed.clear()           # (the bridge's voucher may be the very request the signer could not check)
+    assert flow.bridge.collect() == 1 and flow.decision()["state"] == "delivered"
+    assert replies(flow)[first["id"]] == "original"
 
 
 def test_a_made_up_question_is_refused(flow):
@@ -498,6 +650,22 @@ def test_only_the_hand_over_commit_is_handed_over(flow):
     assert probs and all("is a merge" in p for p in probs), probs
     d, r = signer_ask(flow.w, v)
     assert d == "refused" and "is a merge" in reasons(r), r
+
+
+def test_a_bots_commit_is_never_handed_over(flow):
+    """brain-kit 72b278e: a head a bot authored or committed (kit bot_emails / bot_users) is never the hand-over, even
+    one that changes run.json the way `brain handoff` does (the runner writes park.json and its work; pre-receive keeps
+    it off run.json). brain-kit's bridge rejects it and the signer refuses it, whatever the label times."""
+    rec = json.loads((flow.w["wt"] / "runs" / "PAY-1" / "run.json").read_text())
+    rec["handoff"] = dict(rec["handoff"], requested_at="2026-11-09T03:00:00Z")
+    commit_push(flow.w["wt"], {"runs/PAY-1/run.json": rec}, "bot: hand over again", bot=True)
+    relabel(flow)
+    v, probs = handoff_request(flow)
+    assert probs and any("made by a bot account" in p for p in probs), probs
+    d, r = signer_ask(flow.w, v)
+    assert d == "refused" and "made by a bot account" in reasons(r), r
+    assert flow.bridge.process(P, flow.bridge.kit(P), flow.gl.mr()) == "rejected"
+    assert flow.signer.ledger.run("RUN-PAY-1-1") is None and flow.signer.ledger.runs_in("signing") == []
 
 
 def test_a_contract_asked_for_again_is_signed_again(flow):

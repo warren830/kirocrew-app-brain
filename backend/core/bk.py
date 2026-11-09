@@ -6,12 +6,13 @@ imports its siblings relatively, so the package works under any name.
 
 Required modules (the app does nothing without them): common, config, claims, runrec, lean, entries, brainlint, usage,
 reflect, sign, cli, intake.package, bridge.handoff, bridge.decisions, bridge.runnerd, rest.
-Optional ones, added while this app was written, are guarded: trace, evaluate, golden, intents. A missing or broken
-optional module turns its feature off (``has()``), with the import error kept for the page.
-The public interfaces of brain-kit 9935b11 are required too (NEEDS: the spool signer, the answer verifier bound to
+Optional ones, added while this app was written, are guarded: trace, evaluate, golden, intents, mrdesc. A missing or
+broken optional module turns its feature off (``has()``), with the import error kept for the page.
+The public interfaces of brain-kit 72b278e are required too (NEEDS: the spool signer, the answer verifier bound to
 the recorded question note, the question's first line, the hand-over commit rule, run reservations (``signing``) and
-pending vouchers, the agent-spec hook functions, GitLab's MR versions and commits): an older checkout is refused with a
-clear error instead of half working.
+pending vouchers, the agent-spec hook functions, GitLab's MR versions and commits; 72b278e: the edit signal, i.e.
+GitLab GraphQL's note_edits, decisions.edit_state and DecisionLoop.reply_states, which the hosted bridge and the
+signer both go by): an older checkout is refused with a clear error instead of half working.
 
 The checkout must not be writable by the agents' OS user in production: whatever is in it runs inside the gateway.
 """
@@ -31,15 +32,17 @@ from typing import Any
 PKG = "_brainapp_brainkit"
 REQUIRED = ("common", "config", "claims", "runrec", "lean", "entries", "brainlint", "usage", "reflect", "sign", "cli",
             "rest", "intake.package", "bridge.handoff", "bridge.decisions", "bridge.runnerd", "bridge.ledger")
-OPTIONAL = ("trace", "evaluate", "golden", "intents")
+OPTIONAL = ("trace", "evaluate", "golden", "intents", "mrdesc")
 CANDIDATES = ("~/brain-kit", "~/warren_ws/brain-kit", "~/workplace/brain-kit", "/opt/brain-kit")
 NEEDS = (("sign", "SpoolSigner"), ("sign", "SignerRefused"), ("sign", "signer_from_config"),
          ("bridge.decisions", "check_answer"), ("bridge.decisions", "Q_HEAD_RE"),
          ("bridge.decisions", "VOUCHER_TIME_FIELDS"), ("bridge.decisions", "DecisionLoop.sign_voucher"),
          ("bridge.ledger", "Ledger"), ("bridge.ledger", "RESERVED"), ("bridge.ledger", "Ledger.pending_voucher"),
          ("bridge.handoff", "Bridge.handoff_commit_problems"), ("cli", "missing_lean_hooks"), ("cli", "add_lean_hooks"),
-         ("cli", "runner_kit_problems"), ("rest", "head_pushed_at"), ("rest", "GitLab.commit"))
-VERSION_NEEDED = "9935b11"
+         ("cli", "runner_kit_problems"), ("rest", "head_pushed_at"), ("rest", "GitLab.commit"),
+         ("bridge.decisions", "edit_state"), ("bridge.decisions", "DecisionLoop.reply_states"),
+         ("rest", "GitLab.note_edits"))
+VERSION_NEEDED = "72b278e"
 
 _lock = threading.RLock()
 _state: dict[str, Any] = {"path": None, "mods": {}, "errors": {}, "error": "", "version": None}

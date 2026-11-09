@@ -185,3 +185,28 @@ def test_form_errors(tmp_path, home):
     for d in ("x", "y", "z"):
         (tmp_path / d).mkdir()
     run(go())
+
+
+def test_what_may_be_a_name_is_listed_under_review(tmp_path, home):
+    """brain-kit 72b278e: a value that looks like a name (or a password) but may as well be a word is neither masked
+    nor refused: findings.md lists it for the submitter (请你确认). The check lists it per file on its own as well, and
+    it stops nothing."""
+    repo = make_project(tmp_path)
+    d = tmp_path / "需求"
+    d.mkdir()
+    (d / "退款需求.md").write_text("# 退款\n\n对接人：张三李四\n\n- AC-1 能退款\n", encoding="utf-8")
+    svc = make_service(tmp_path, [repo])
+
+    async def go():
+        await svc.start()
+        try:
+            return await svc.intake_check(dict(body(tmp_path / "x"), docs=[str(d)]))
+        finally:
+            await svc.stop()
+
+    (tmp_path / "x").mkdir()
+    got = run(go())
+    assert got["ok"] is True and got["blocking"] == [], got
+    assert len(got["review"]) == 1 and got["review"][0].startswith("D01 需求/退款需求.md：请你确认 1 处（"), got["review"]
+    assert "「对接人：张三李四」" in got["review"][0] and got["review"][0] in got["findings"][0].replace("**：", "：")
+    assert "请你确认" in got["findings"][0]                                  # brain-kit's line, verbatim

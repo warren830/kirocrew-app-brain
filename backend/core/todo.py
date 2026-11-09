@@ -6,7 +6,8 @@
   identified (the team dashboard takes no answers); a run left waiting for good (the signer refused its answer, the
   question is void or could not be asked) is listed for a person to look at;
 - the person's own runs: a clarify question may be answered here (into the local session, or as their own MR
-  comment); acceptance waits for the product on the MR; a refused hand-over says why.
+  comment); acceptance waits for the product on the MR; a refused hand-over says why; a hand-over that was pushed
+  but carries no label on its MR (nothing was handed over: `brain handoff` exits 1 then) says so.
 """
 
 from __future__ import annotations
@@ -64,6 +65,8 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
             if row["state"] == "acceptance" and not any(i["key"] == row["key"] and i["kind"] == "acceptance"
                                                         for i in items):
                 items.append({**base, "kind": "acceptance", "text": "等产品在 MR 上验收"})
+            if row["state"] == "handed_over" and (row.get("waits") or {}).get("who") == "you":
+                items.append({**base, "kind": "handoff_unlabelled", "text": row["waits"]["text"]})
         elif row["state"] == "rejected":
             items.append({**base, "kind": "handoff_rejected", "text": row["waits"]["text"]})
     for r in crew_rows:

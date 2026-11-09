@@ -12,7 +12,12 @@ patched or subclassed. What the app changes:
 - vouchers: brain-kit writes the app's copy to bridge.json ``vouchers_dir``; ``publish_vouchers`` is forced off
   (brain-intake gets its copy from the signer, its only writer);
 - bridge.json must not name a ``signing_key``; ``kirocrew.base/app/secret_file`` are not used (the app talks to its
-  own gateway).
+  own gateway);
+- poll: the app runs ``Bridge.poll``'s loop itself (every project, every MR with the hand-over label,
+  ``Bridge.process``) to keep what process() said for each MR for the page: accepted, rejected, seen (that head and
+  label event were checked before), and brain-kit 72b278e's unlabelled (the newest event on the label takes it off:
+  `brain handoff` re-adding it right now) and waiting (this very hand-over is being signed elsewhere: looked at again
+  next round). brain-kit's poll returns nothing (BRAINKIT_REQUESTS 27).
 
 The ledger is brain-kit's ``Ledger``: one sqlite connection any thread may use, ``ledger.lock`` around several
 statements. Rounds run one at a time on the runtime's own worker thread (a round may wait on GitLab, KiroCrew and the
@@ -79,6 +84,7 @@ class TeamRuntime:
         self.loop_error = ""
         self.last_loop_at: float | None = None
         self.last_summary: dict[str, int] = {}
+        self.last_handovers: list[dict[str, Any]] = []   # what Bridge.process said for each labelled MR, last round
         self.lines: deque = deque(maxlen=200)
         self.same_user = False
         self._lock = threading.Lock()
@@ -183,6 +189,9 @@ class TeamRuntime:
                         if self.runnerd_cfg:
                             summary["prepared"] = int(bk.m("bridge.runnerd").once(self.runnerd_cfg, out=self._out) or 0)
                         continue
+                    if step == "poll":
+                        summary["poll"] = self._poll(host)
+                        continue
                     n = getattr(host, step)()
                     if isinstance(n, int):
                         summary[step] = n
@@ -193,6 +202,35 @@ class TeamRuntime:
             self.loop_error = "；".join(errors)
             self.last_summary = summary
         return summary
+
+    def _poll(self, host: Any) -> int:
+        """brain-kit's Bridge.poll, MR by MR, keeping each MR's result (Bridge.process) for the page. One MR that fails
+        does not stop the others, as in brain-kit (its error is logged the same way). -> how many MRs were looked at."""
+        common = bk.m("common")
+        seen: list[dict[str, Any]] = []
+        try:
+            for proj in host.cfg["projects"]:
+                project = proj["project"] if isinstance(proj, dict) else proj
+                kit = host.kit(project)
+                for mr in host.gl.mrs_with_label(project, kit["handoff_label"]):
+                    row = {"project": str(project), "iid": int(mr.get("iid") or 0), "sha": str(mr.get("sha") or "")[:40],
+                           "result": "error", "error": "", "at": time.time()}
+                    try:
+                        row["result"] = str(host.process(project, kit, mr) or "")
+                    except common.BrainError as e:  # retried next round, as brain-kit's poll does
+                        host.out("error on %s!%s: %s" % (project, mr.get("iid"), e))
+                        row["error"] = self.scrub(str(e).split("\n", 1)[0][:300])
+                    seen.append(row)
+        finally:
+            self.last_handovers = seen
+        return len(seen)
+
+    def handovers(self) -> list[dict[str, Any]]:
+        """The labelled MRs of the last round and what brain-kit's bridge said about each (see _poll)."""
+        out = []
+        for r in list(self.last_handovers):
+            out.append(dict(r, mr_url=self.mr_url(r["project"], r["iid"])))
+        return out
 
     # ---- what the page reads -------------------------------------------------------------------------- #
 

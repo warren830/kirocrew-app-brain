@@ -8,6 +8,7 @@ tampered answerer list in the app does not get an answer signed. The app never h
 signer only.
 """
 
+import asyncio
 import json
 import os
 import re
@@ -63,12 +64,22 @@ def test_hand_over_dispatch_question_and_answer_through_the_separate_signer(worl
             view = await svc.team_view()
             overview = await svc.overview("runner")
             todo = await svc.todo()
+            seen["detail"] = await svc.requirement("runner", "PAY-1")
+            for _ in range(150):           # the row's first line of its 变更说明 is made in the background
+                if (await svc.overview("runner"))["rows"][0]["summary"]:
+                    break
+                await asyncio.sleep(0.2)
+            seen["summary"] = (await svc.overview("runner"))["rows"][0]["summary"]
             return first, second, third, view, overview, todo
         finally:
             await svc.stop()
 
     first, second, third, view, overview, todo = run(go())
-    assert first["ok"], first
+    assert first["ok"] and first["summary"]["poll"] == 1, first        # one labelled MR looked at
+    # the run's 变更说明 on the runner: runs/PAY-1/MR.md of the hand-over commit (brain-kit 48b6b97), else its records
+    m = seen["detail"]["mr_desc"]
+    assert m["source"] in ("file", "records") and m["text"].startswith("## PAY-1 · ") and m["first"], m
+    assert seen["summary"] == m["first"]
     # while the contract was being signed: the run id reserved (brain-kit's `signing`), the voucher waiting
     rows, waiting = during[0]
     (row, _, _), = rows
@@ -108,6 +119,35 @@ def test_hand_over_dispatch_question_and_answer_through_the_separate_signer(worl
     # stop closed brain-kit's ledger
     with pytest.raises(Exception):
         seen["host"].ledger.db.execute("SELECT 1")
+
+
+def test_the_page_says_what_the_bridge_made_of_each_labelled_mr(world, tmp_path):
+    """brain-kit 72b278e's Bridge.process results, MR by MR, last round. The newest event on the hand-over label takes
+    it off (as `brain handoff` does while it labels again): unlabelled, nothing done, no rejection on the MR. Labelled
+    again: accepted."""
+    svc = service(world, tmp_path)
+    gl = world["gl"]
+    gl.label("alice", action="remove")
+
+    async def go():
+        await svc.start()
+        try:
+            out = [await svc.team_loop()]
+            await svc.team_loop()       # the round the app starts with (queued at start) has run by now as well
+            out.append(await svc.team_view())
+            gl.label("alice")
+            return out + [await svc.team_loop(), await svc.team_view()]
+        finally:
+            await svc.stop()
+
+    a, va, b, vb = run(go())
+    assert a["ok"] and a["summary"]["poll"] == 1, a
+    assert [(h["iid"], h["result"]) for h in va["handovers"]] == [(5, "unlabelled")] and va["runs"] == []
+    assert not any(x.startswith("AI 接手被拒") for x in gl.bodies())
+    (ho,) = vb["handovers"]
+    assert (ho["project"], ho["iid"], ho["result"], ho["error"]) == ("grp/repo", 5, "accepted", "")
+    assert ho["mr_url"] == "https://gl.example/grp/repo/-/merge_requests/5" and len(ho["sha"]) == 40
+    assert [r["run_id"] for r in vb["runs"]] == ["RUN-PAY-1-1"]
 
 
 def test_the_signer_refuses_what_the_app_was_tricked_into(world, tmp_path):

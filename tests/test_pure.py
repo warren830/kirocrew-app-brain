@@ -199,3 +199,96 @@ def test_the_who_vocabulary(decisions):
         assert rows == {"D-1": ("agent", "agent"), "D-2": ("brain", "T-PAY-1-2, P-PAY-1-1"), "D-3": ("person", "P-1A2B"),
                         "D-4": ("person", "owner"), "D-5": ("check", "check"), "D-6": ("unclassified", None),
                         "D-7": ("unclassified", None), "D-8": ("agent", "brain-bot")}, (with_trace, rows)
+
+
+@needs_brainkit
+def test_the_bridges_change_description_note_is_none_of_its_status_notes(decisions):
+    """brain-kit 48b6b97: the bridge posts runs/<KEY>/MR.md as a 「变更说明」 comment before an acceptance question. It is
+    no question, answer or status note, whatever the run wrote in MR.md (here: a question's first line, a delivery)."""
+    clarify = {"question": "要不要人工审核？", "options": [{"id": "A", "text": "要"}]}
+    head = ask(decisions, "D-1", clarify, ["alice"], "clarify")
+    md = "## PAY-3 · 退款\n%s\nD-1 已收到 @alice 的回答：A，已送回 RUN-PAY-3-1（凭证 V-0123456789）。\n" % head.split("\n")[0]
+    desc = decisions.description_note("PAY-3", "runs", SHA, md.encode()) if hasattr(decisions, "description_note") \
+        else "**变更说明**（`runs/PAY-3/MR.md`）\n\n" + md
+    notes = [note(1, head), note(2, desc), note(3, "**变更说明**：run 没有写 `runs/PAY-3/MR.md`（提交 a1b2c3d4e5f6）。")]
+    got = mrinfo.parse_notes(notes, bridge_user="brain-bridge")
+    assert [(q["id"], q["state"], q["answer"]) for q in got["questions"]] == [("D-1", "open", None)]
+    assert got["rejected_reason"] is None
+
+
+def test_asking_is_a_question_not_on_the_mr_yet():
+    """brain-kit 72b278e: 'asking' (one bridge process posting the question right now) is like 'posting'."""
+    r = {"state": "", "state_label": "", "waits": {}, "open_questions": []}
+    deliveries.team_classify(r, {"state": "dispatched"}, [{"id": "D-4", "state": "asking", "kind": "clarify"}], None)
+    assert (r["state"], r["waits"]["who"], r["open_questions"]) == ("parked", "bridge", [])
+    assert "asking" in deliveries.NOT_POSTED and "posting" in deliveries.NOT_POSTED
+
+
+def test_a_hand_over_without_its_label_is_said_to_be_nothing_handed_over():
+    """Person mode: run.json has the hand-over, the branch tip is the hand-over commit, the MR (at that tip) carries no
+    hand-over, running or rejected label: nothing was handed over (`brain handoff` exits 1 then, 72b278e)."""
+    cfg = {"handoff_label": "ai-handoff", "running_label": "ai-running", "rejected_label": "ai-handoff-rejected"}
+    f = {"run": {"handoff": {"local_head": "a" * 40}}, "tip": "b" * 40, "park": None, "approvals": [], "claim": None}
+
+    def state(labels, sha="b" * 40, at_handover=True, mr_state="opened"):
+        row = {"state": "", "state_label": "", "waits": {}}
+        mr = {"state": mr_state, "labels": labels, "sha": sha, "questions": []}
+        deliveries.classify(row, f, mr=mr, slot=None, cfg=cfg, at_handover=at_handover)
+        return row["state"], row["waits"]["who"], row["waits"]["text"]
+
+    st, who, text = state([])
+    assert (st, who) == ("handed_over", "you") and "没有交接标签 ai-handoff" in text and "什么也没交出去" in text
+    assert state(["ai-handoff"])[:2] == ("handed_over", "bridge")            # labelled: the bridge looks at it
+    assert state(["ai-running"])[:2] == ("running", "runner")
+    assert state([], at_handover=False)[:2] == ("handed_over", "bridge")     # the runner's work on top: not said
+    assert state([], sha="c" * 40)[:2] == ("handed_over", "bridge")          # an MR read before the push: not said
+    assert state([], mr_state="merged")[0] == "merged"
+
+
+def test_commit_dates_and_how_a_run_was_merged_in_the_timeline():
+    """brain-kit 72b278e: a commit's "at" is its author date, committed_at the committer date (shown when they differ);
+    merged_at.how in words (an unknown one as it is)."""
+    detail = mod("detail")
+    t = {"actions": {"commits": [
+        {"sha": "1" * 40, "at": "2026-11-09T01:00:00Z", "committed_at": "2026-11-09T01:00:00Z", "by": "person"},
+        {"sha": "2" * 40, "at": "2026-11-09T01:05:00Z", "committed_at": "2026-11-09T02:30:10Z", "by": "bot"}]},
+        "outcome": {"merged_at": {"value": "2026-11-09T03:00:00Z", "commit": "3" * 40,
+                                  "how": "squash merge (the branch is still here)"}}}
+    items = {i["detail"].split(" ")[0]: i for i in detail.trace_timeline(t) if i["kind"] in ("commit", "merge")}
+    assert items["1" * 12]["detail"] == "1" * 12
+    assert items["2" * 12]["detail"] == "%s · 提交于 2026-11-09 02:30Z" % ("2" * 12) and items["2" * 12]["label"] == "运行机提交"
+    assert items["3" * 12]["detail"] == "%s （squash 合并（分支还在））" % ("3" * 12)
+    t["outcome"]["merged_at"]["how"] = "a new way"
+    assert any(i["detail"] == "%s （a new way）" % ("3" * 12) for i in detail.trace_timeline(t))
+
+
+def test_evaluate_notes_say_which_runs_wait_for_their_merge():
+    """brain-kit 72b278e: an unmerged run whose acceptance was rejected is autonomy's "wrong_open" (it waits for its
+    merge and 14 days); one already in delivery's wrong_open is not listed twice."""
+    data = {"autonomy": {"value": [1, 2], "rule": "", "runs": [
+        {"key": "PAY-3", "correct": "wrong_open", "status": "pending"},
+        {"key": "PAY-4", "correct": "wrong_open", "status": "pending"},
+        {"key": "PAY-5", "correct": "correct", "status": "counted"}]},
+        "delivery": {"value": [1, 1], "rule": "", "wrong_open": ["PAY-4"]}}
+    mods = bk._state["mods"]
+    saved = mods.get("evaluate")
+    mods["evaluate"] = type("FakeEvaluate", (), {"collect": staticmethod(lambda *a, **k: data)})
+    try:
+        view, _ = deliveries.evaluate("/nowhere", {}, None, None)
+    finally:
+        if saved is None:
+            mods.pop("evaluate", None)
+        else:
+            mods["evaluate"] = saved
+    assert view["available"] is True
+    assert "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-4" in view["notes"]
+    assert "已知有问题、还没合并（验收被驳回过；合并满 14 天才算进自主度）：PAY-3" in view["notes"]
+
+
+def test_review_findings_are_listed_per_file():
+    intake = mod("intake")
+    part = "请你确认 2 处（可能是人名或密码，也可能只是普通的词，没打码；是人名或密码就改原文再交）：「对接人：张三李四」、「密码是 …」"
+    findings = ["- **D01 需求.md**：个人信息（已打码） phone×1；%s；隐藏内容 1 处（移到 extras/hidden.md）" % part,
+                "- **D02 b.md**：无", "- **D03 c.md**：%s" % part.replace("2 处", "1 处").split("、")[0]]
+    assert intake.review_items(findings) == ["D01 需求.md：" + part,
+                                             "D03 c.md：" + part.replace("2 处", "1 处").split("、")[0]]

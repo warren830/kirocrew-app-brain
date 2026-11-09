@@ -6,7 +6,9 @@ reads: ``**D-5 · 澄清 · RUN-PAY-3-1** · 提交 <sha12> · park <hash12> · 
 without commit and park counts for nothing and is asked again), their answers, stale (a new push), void (not bound to
 its push or park.json, or its question note deleted), refused (the signer would not sign the answer), answered (the
 bridge has the answer but could not sign it this round: it sends it later, nobody answers again) and invalid ones, and
-the hand-over refusal.
+the hand-over refusal. The bridge's 「变更说明」 comment (brain-kit 48b6b97: runs/<KEY>/MR.md posted before an acceptance
+question, first line ``decisions.DESC_TITLE``) is none of these and is skipped whole: the MR.md text in it is the
+run's, whatever it looks like.
 Only the notes of the bridge's account count when kit.json names it (``bridge_user``): a look-alike posted by a person
 is not a question. The token never leaves brain-kit's GitLab client: it is not logged, stored or returned. Refreshed
 in the background (``refresh``), at most every TTL_S per MR; the overview only reads the cache.
@@ -40,6 +42,7 @@ def parse_notes(notes: list[dict[str, Any]], bridge_user: str | None = None) -> 
     (only its notes count); unknown: every note is read."""
     dec = bk.m("bridge.decisions")
     head_re = dec.Q_HEAD_RE
+    desc_title = str(getattr(dec, "DESC_TITLE", "") or "**变更说明**")
     delivered_re = re.compile(DELIVERED_FMT % getattr(dec, "USER", r"[a-z0-9][a-z0-9._-]*"))
     qs: dict[str, dict[str, Any]] = {}
     rejected = None
@@ -50,6 +53,8 @@ def parse_notes(notes: list[dict[str, Any]], bridge_user: str | None = None) -> 
         first = body.split("\n", 1)[0].rstrip("\r")
         author = ((n.get("author") or {}).get("username") or "").lower()
         if bridge_user and author != bridge_user.lower():
+            continue
+        if first.startswith(desc_title):          # the bridge's 变更说明 comment: not a question, answer or status
             continue
         m = head_re.match(first)
         if m:

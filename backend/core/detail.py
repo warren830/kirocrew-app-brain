@@ -23,6 +23,16 @@ WHO_BRAIN_RE = re.compile(r"^(?i:brain)\s+(%s(?:\s*[,，、;；]\s*%s)*)" % (_EN
 WHO_PERSON_RE = re.compile(r"^(P-[0-9A-F]{4})\s+V-[0-9a-f]{10}" + _NOTE + r"$")
 WHO_OWNER_RE = re.compile(r"^(?i:owner)" + _NOTE + r"$")
 NO_TOKENS = "KiroCrew 只报 credits，input / output / cache token 都是 0"
+# brainkit.trace's outcome.merged_at.how (72b278e: docs/eval.md section 2, rules M1-M6), in words; another value as is
+MERGE_HOW = {
+    "merge commit": "合并提交",
+    "squash and merge commit (the branch is still here)": "squash 加合并提交（分支还在）",
+    "fast-forward": "快进",
+    "rebase merge (the branch is still here)": "rebase 合并（分支还在）",
+    "squash merge (the branch is still here)": "squash 合并（分支还在）",
+    "squash merge (the branch is gone): the commit that brought run.json": "squash 合并（分支已删）：带来 run.json 的提交",
+    "fast-forward or rebase merge (the branch is gone): the last run commit": "快进或 rebase 合并（分支已删）：run 的最后一个提交",
+}
 
 
 # ---------------------------------------------------------------- decisions
@@ -182,9 +192,13 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                       "who": h.get("who"), "src": ", ".join(h.get("src") or [])[:200] or None})
     a = t.get("actions") or {}
     for c in a.get("commits") or []:
+        # brain-kit 72b278e: "at" is the author date; committed_at the committer date (later: rebased or amended)
+        detail = str(c.get("sha") or "")[:12]
+        if c.get("committed_at") and c.get("committed_at") != c.get("at"):
+            detail += " · 提交于 %s" % _iso_minute(c["committed_at"])
         items.append({"at": c.get("at"), "kind": "commit",
                       "label": ("运行机提交" if c.get("by") == "bot" else "提交") + ("（只改记录）" if c.get("records_only") else ""),
-                      "detail": str(c.get("sha") or "")[:12], "who": c.get("who"), "src": c.get("src")})
+                      "detail": detail, "who": c.get("who"), "src": c.get("src")})
     for b in a.get("blocked") or []:
         items.append({"at": b.get("at"), "kind": "blocked", "label": "Lean 拦下（%s）" % (b.get("gate") or "?"),
                       "detail": b.get("path") or b.get("tool"), "who": None, "src": b.get("src")})
@@ -206,7 +220,8 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                       "detail": None, "who": None, "src": r.get("src")})
     m = ((t.get("outcome") or {}).get("merged_at") or {})
     if m.get("value"):
-        detail = " ".join(x for x in (str(m.get("commit") or "")[:12], "（%s）" % m["how"] if m.get("how") else "",
+        how = MERGE_HOW.get(str(m.get("how") or ""), str(m.get("how") or ""))
+        detail = " ".join(x for x in (str(m.get("commit") or "")[:12], "（%s）" % how if how else "",
                                       str(m.get("note") or "")[:300]) if x)
         items.append({"at": m.get("value"), "kind": "merge", "label": "合并进默认分支", "detail": detail or None,
                       "who": None, "src": m.get("src")})
@@ -216,6 +231,12 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                       "detail": str(m["note"])[:300], "who": None, "src": m.get("src")})
     items.sort(key=lambda x: (x["at"] or "", x["kind"]))
     return items
+
+
+def _iso_minute(ts: Any) -> str:
+    """2026-11-09T02:05:33Z -> 2026-11-09 02:05Z (UTC, as brain-kit writes it)."""
+    m = re.match(r"^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2})", str(ts or ""))
+    return "%s %sZ" % (m.group(1), m.group(2)) if m else str(ts)[:40]
 
 
 def timeline(repo_path: str, cfg: dict[str, Any], key: str, *, ref: str | None, events: list[dict[str, Any]],

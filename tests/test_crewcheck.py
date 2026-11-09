@@ -108,6 +108,9 @@ def test_a_different_brain_dev_with_leans_hooks_is_left_alone(tmp_path, home):
     got = cc.checks([str(repo)])
     assert levels(got["rows"])[0] == ("OK", "brain-dev 带着 Lean 的三个 hook")
     assert not [r for r in got["rows"] if r["level"] != "OK"]  # no drift warning: only Lean's hooks matter
+    # brain-kit 72b278e: the person's own fields stay (`brain crew-agent --force` only adds what is missing): said
+    assert ("OK", "brain-dev 用的是你自己的 description、prompt（`brain crew-agent --reset` 换回 brain-kit 的；--force 只补缺的）") \
+        in levels(got["rows"])
     assert got["fix"]["agent"] is False and cc.agent_ok(got["rows"])
     assert "什么都没改" in cc.fix_agent()
     assert p.read_bytes() == before and not backups(home)
@@ -219,3 +222,23 @@ def test_agent_ok_needs_the_checks_to_have_found_leans_hooks():
     assert not cc.agent_ok([{"level": "WARN", "text": "brain-dev 带着 Lean 的三个 hook"}])
     assert cc.agent_ok([{"level": "OK", "text": "brain-dev 带着 Lean 的三个 hook"},
                         {"level": "FAIL", "text": "仓库 pay：.kiro/brain/lean-hook.py is not committed"}])
+
+
+def test_a_repo_whose_lean_counts_the_run_records_as_code_fails(tmp_path, home):
+    """brain-kit 72b278e / 48b6b97: Lean must leave runs/** out of its code fingerprint (aidlc-docs/lean.json
+    fingerprint_exclude), or a park.json or MR.md written after `lean release` voids the RELEASE approval; `brain
+    handoff` refuses then. The check says so per repo with brain-kit's fix (the file is the person's: no fix here)."""
+    repo = make_project(tmp_path)
+    install_brain_dev(home)
+    cc = loaded(tmp_path)
+    lj = repo / "aidlc-docs" / "lean.json"
+    cfg = json.loads(lj.read_text(encoding="utf-8"))
+    if "runs/**" not in (cfg.get("fingerprint_exclude") or []):
+        pytest.skip("this brain-kit's install does not add runs/** (older than 48b6b97)")
+    assert not [r for r in cc.checks([str(repo)])["rows"] if "fingerprint" in r["text"] or "指纹" in r["text"]]
+    cfg["fingerprint_exclude"] = [p for p in cfg["fingerprint_exclude"] if p != "runs/**"]
+    lj.write_text(json.dumps(cfg), encoding="utf-8")
+    got = cc.checks([str(repo)])
+    row = [r for r in got["rows"] if r["text"].startswith("仓库 pay：") and "指纹" in r["text"]]
+    assert len(row) == 1 and row[0]["level"] == "FAIL" and "runs/**" in row[0]["text"], got["rows"]
+    assert got["fix"] == {"agent": False, "engine": False} and cc.agent_ok(got["rows"])
