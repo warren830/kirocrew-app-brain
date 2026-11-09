@@ -5,7 +5,11 @@
  *   /apps/brain                                   交付总览 (the default)
  *     ?view=overview&repo=<id>&state=<ReqState>   …filtered to one repo / one state
  *   ?view=item&repo=<id>&key=<KEY>                需求详情
- *     &from=overview|todo|brain                   …opened from that view: the crumb says the way back
+ *     &from=overview|todo|brain|board             …opened from that view: the crumb says the way back
+ *   ?view=board&repo=<id>&key=<KEY>               需求看板 (the requirement's team-board view, polled every 2 s)
+ *     &replay=1                                   …its 回放 starts (a finished requirement)
+ *     &focus=accept|checks|lanes|feed             …scrolled to 验收, the check wall, the lanes or the events
+ *     &from=overview|item|todo                    …opened from that view: the crumb says the way back
  *   ?view=new&repo=<id>                           开需求
  *   ?view=brain&repo=<id>&file=<FILE>&id=<entry>&reflect=<KEY>   Brain: that file, that entry picked out, that
  *                                                 requirement picked in the reflect card
@@ -18,13 +22,16 @@
  */
 import { STATE_LABEL, type ReqState } from './types'
 
-export type ViewKind = 'overview' | 'item' | 'new' | 'brain' | 'todo' | 'team' | 'settings' | 'import'
-export type ItemFrom = 'overview' | 'todo' | 'brain'
+export type ViewKind = 'overview' | 'item' | 'board' | 'new' | 'brain' | 'todo' | 'team' | 'settings' | 'import'
+export type ItemFrom = 'overview' | 'todo' | 'brain' | 'board'
+export type BoardFrom = 'overview' | 'item' | 'todo'
+export type BoardFocus = 'accept' | 'checks' | 'lanes' | 'feed'
 export type BrainFile = 'PRODUCT' | 'TECH' | 'IMPROVEMENT' | 'PROJECT'
 export const BRAIN_FILES: readonly BrainFile[] = ['PRODUCT', 'TECH', 'IMPROVEMENT', 'PROJECT']
 
 export type OverviewEntry = { repo?: string; state?: ReqState }
 export type ItemEntry = { repo: string; key: string; from?: ItemFrom }
+export type BoardEntry = { repo: string; key: string; replay?: boolean; focus?: BoardFocus; from?: BoardFrom }
 export type NewEntry = { repo?: string }
 export type BrainEntryRef = { repo?: string; file?: BrainFile; id?: string; reflect?: string }
 export type ImportEntry = { path?: string }
@@ -32,6 +39,7 @@ export type ImportEntry = { path?: string }
 export type View =
   | ({ kind: 'overview' } & OverviewEntry)
   | ({ kind: 'item' } & ItemEntry)
+  | ({ kind: 'board' } & BoardEntry)
   | ({ kind: 'new' } & NewEntry)
   | ({ kind: 'brain' } & BrainEntryRef)
   | { kind: 'todo' }
@@ -46,7 +54,9 @@ export const ENTRY_RE = /^[A-Z]-(?:[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]
 /** an absolute path (or ~/…) without control characters: what 导入仓库 may be opened with */
 export const PATH_RE = /^(?:\/|~\/)[^\u0000-\u001f\u007f]{0,1023}$/
 const STATES = Object.keys(STATE_LABEL) as ReqState[]
-const FROM: readonly string[] = ['overview', 'todo', 'brain']
+const FROM: readonly string[] = ['overview', 'todo', 'brain', 'board']
+const BOARD_FROM: readonly string[] = ['overview', 'item', 'todo']
+const FOCUS: readonly string[] = ['accept', 'checks', 'lanes', 'feed']
 
 const repoOf = (q: URLSearchParams) => {
   const r = q.get('repo') ?? ''
@@ -62,6 +72,18 @@ export function parseView(search: string): View {
     if (!REPO_RE.test(repo) || !KEY_RE.test(key)) return { kind: 'overview' }
     const from = q.get('from') ?? ''
     return { kind: 'item', repo, key, ...(FROM.includes(from) ? { from: from as ItemFrom } : {}) }
+  }
+  if (view === 'board') {
+    const repo = q.get('repo') ?? ''
+    const key = q.get('key') ?? ''
+    if (!REPO_RE.test(repo) || !KEY_RE.test(key)) return { kind: 'overview' }
+    const v: View = { kind: 'board', repo, key }
+    if (q.get('replay') === '1') v.replay = true
+    const focus = q.get('focus') ?? ''
+    if (FOCUS.includes(focus)) v.focus = focus as BoardFocus
+    const from = q.get('from') ?? ''
+    if (BOARD_FROM.includes(from)) v.from = from as BoardFrom
+    return v
   }
   if (view === 'new') return { kind: 'new', ...repoOf(q) }
   if (view === 'brain') {
@@ -98,6 +120,14 @@ export function searchOf(v: View): string {
       q.set('view', 'item')
       put('repo', v.repo)
       put('key', v.key)
+      put('from', v.from)
+      break
+    case 'board':
+      q.set('view', 'board')
+      put('repo', v.repo)
+      put('key', v.key)
+      if (v.replay) q.set('replay', '1')
+      put('focus', v.focus)
       put('from', v.from)
       break
     case 'new':

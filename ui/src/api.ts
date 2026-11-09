@@ -16,6 +16,8 @@ export const paths = {
   refresh: () => `${BASE}/refresh`,
   overview: (repo: string) => `${BASE}/overview?repo=${enc(repo || 'all')}`,
   requirement: (repo: string, key: string) => `${BASE}/requirements/${enc(repo)}/${enc(key)}`,
+  /** 需求看板: the requirement's board snapshot (actors, lanes, belt, checks, events), polled every 2 s */
+  board: (repo: string, key: string) => `${BASE}/board/${enc(repo)}/${enc(key)}`,
   session: (repo: string, key: string) => `${BASE}/requirements/${enc(repo)}/${enc(key)}/session`,
   answer: (repo: string, key: string) => `${BASE}/requirements/${enc(repo)}/${enc(key)}/answer`,
   intakeNext: (repo: string) => `${BASE}/intake/next?repo=${enc(repo)}`,
@@ -35,6 +37,8 @@ export const paths = {
   importInstall: () => `${BASE}/import/install`,
   importJob: (id: string) => `${BASE}/import/jobs/${enc(id)}`,
   importCommit: () => `${BASE}/import/commit`,
+  /** the kit fix: brain install again on a new branch (the old adapter, runs/** in lean.json) */
+  importUpgrade: () => `${BASE}/import/upgrade`,
   importPublish: () => `${BASE}/import/publish`,
   importAdd: () => `${BASE}/import/add`,
   repoRemove: () => `${BASE}/repos/remove`,

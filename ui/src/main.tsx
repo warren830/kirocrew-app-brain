@@ -1,20 +1,27 @@
 /**
- * The Brain app: one bar (AppBar.tsx) over the views, as the URL says (nav.ts). A move to another view is a history
- * entry made through the host's router (useNavigate), so Kiro Crew's ← → like the browser's back and forward step
- * between views, and every entry can be linked to; a change inside a view (a filter) rewrites the current entry.
+ * The Brain app: one bar (AppBar.tsx) over the views, as the URL says (nav.ts), in the sample team board's visual
+ * language (board/styles.ts, cto/styles.ts, kit.ts: one set of styles for every view). A move to another view is a
+ * history entry made through the host's router (useNavigate), so Kiro Crew's ← → like the browser's back and forward
+ * step between views, and every entry can be linked to; a change inside a view (a filter) rewrites the current entry.
  *
  * The app reads GET /status for what every view shares: the repos, KiroCrew's checks, team mode, the 待办 count (the
  * tab's count and the sidebar badge). Above every view: a banner when brain-kit is not found, and KiroCrew's failing
- * checks with their fix buttons.
+ * checks (FAIL only: a ! reminder stays in 设置 and on the page it is about) with their fix buttons, except on 开需求 and
+ * 设置, which list those rows themselves.
  *
- * Views: 交付总览 (views/Overview.tsx, the default), 需求详情 (Detail), 开需求 (NewReq), Brain (Brain), 待办 (Todo),
- * 运行机 (Team, team mode only), 设置 (Settings), 导入仓库 (Import: the bar's button, and every place that has no repo).
+ * Views: 交付总览 (views/Overview.tsx, the default: the sample's CTO 视图), 需求详情 (Detail: its 交付详情), 需求看板
+ * (board/BoardPage.tsx: its 团队看板, for one requirement), 开需求 (NewReq), Brain (Brain), 待办 (Todo), 运行机 (Team,
+ * team mode only), 设置 (Settings), 导入仓库 (Import: the bar's button, and every place that has no repo).
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavBadge, useNavigate } from '@kirocrew/app-sdk'
 import { paths, usePoll } from './api'
 import { AppBar } from './AppBar'
-import { parseView, searchOf, type ItemEntry, type View, type ViewKind } from './nav'
+import { BoardPage } from './board/BoardPage'
+import { BOARD_CSS } from './board/styles'
+import { CTO_CSS } from './cto/styles'
+import { KIT_CSS } from './kit'
+import { parseView, searchOf, type View, type ViewKind } from './nav'
 import { APP_CSS } from './styles'
 import type { Status } from './types'
 import { CheckRows } from './ui'
@@ -99,17 +106,18 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
 
   const onTab = useCallback((k: ViewKind) => {
     if (k === 'overview') return go(overviewFilters.current)
-    if (k === 'item') return held ? go({ kind: 'item', ...held }) : undefined
+    if (k === 'item' || k === 'board') return held ? go({ kind: k, ...held }) : undefined
     const repo = repoOfView(current.current)
     if (k === 'new') return go({ kind: 'new', ...(repo ? { repo } : {}) })
     if (k === 'brain') return go({ kind: 'brain', ...(repo ? { repo } : {}) })
     go({ kind: k })
   }, [go, held])
 
-  // 需求详情 says which view it was opened from (its crumb and ← 返回)
+  // 需求详情 and 需求看板 say which view they were opened from (their crumb and ← 返回)
   const goView = useCallback((v: View) => {
     const from = current.current.kind
-    if (v.kind === 'item' && !v.from && (from === 'overview' || from === 'todo' || from === 'brain')) return go({ ...v, from })
+    if (v.kind === 'item' && !v.from && (from === 'overview' || from === 'todo' || from === 'brain' || from === 'board')) return go({ ...v, from })
+    if (v.kind === 'board' && !v.from && (from === 'overview' || from === 'item' || from === 'todo')) return go({ ...v, from })
     go(v)
   }, [go])
 
@@ -118,8 +126,13 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
   let body
   if (v.kind === 'item') {
     const { kind: _k, ...entry } = v
-    const fallback: View = entry.from === 'todo' ? { kind: 'todo' } : entry.from === 'brain' ? { kind: 'brain', repo: entry.repo } : overviewFilters.current
+    const fallback: View = entry.from === 'todo' ? { kind: 'todo' } : entry.from === 'brain' ? { kind: 'brain', repo: entry.repo }
+      : entry.from === 'board' ? { kind: 'board', repo: entry.repo, key: entry.key } : overviewFilters.current
     body = <DetailView key={n} entry={entry} onBack={() => back(fallback)} {...props} />
+  } else if (v.kind === 'board') {
+    const { kind: _k, ...entry } = v
+    const fallback: View = entry.from === 'todo' ? { kind: 'todo' } : entry.from === 'item' ? { kind: 'item', repo: entry.repo, key: entry.key } : overviewFilters.current
+    body = <BoardPage key={n} entry={entry} onBack={entry.from ? () => back(fallback) : undefined} {...props} />
   } else if (v.kind === 'new') {
     const { kind: _k, ...entry } = v
     body = <NewView key={n} entry={entry} {...props} />
@@ -140,10 +153,14 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
     body = <OverviewView key={n} entry={entry} {...props} />
   }
   const s = status.data
-  const failing = s ? s.crew.rows.filter((r) => r.level === 'FAIL') : []
+  // 开需求 and 设置 show KiroCrew's rows themselves, with the same fix buttons: no banner over them there.
+  const failing = s && v.kind !== 'new' && v.kind !== 'settings' ? s.crew.rows.filter((r) => r.level === 'FAIL') : []
   return (
     <div ref={rootRef} className="br-app" data-testid="br-app">
+      <style>{BOARD_CSS}</style>
+      <style>{CTO_CSS}</style>
       <style>{APP_CSS}</style>
+      <style>{KIT_CSS}</style>
       <AppBar view={v.kind} onView={onTab} item={held?.key} todo={todoCount} team={!!s?.app.team} />
       <div className="br-banners" data-testid="br-banners">
         {status.error && (
@@ -154,14 +171,15 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
         {s && !s.brainkit.ok && (
           <div className="br-banner is-error" role="alert" data-testid="br-no-brainkit">
             <div className="br-row">
-              <span>找不到 brain-kit{s.brainkit.error ? `（${s.brainkit.error}）` : ''}：</span>
+              <b className="br-strong">找不到 brain-kit</b>
+              <span>{s.brainkit.error ? `（${s.brainkit.error}）` : ''}在设置里写对它的位置。</span>
               {v.kind !== 'settings' && <button type="button" className="br-btn is-small" onClick={() => go({ kind: 'settings' })}>去设置</button>}
             </div>
           </div>
         )}
         {failing.length > 0 && (
           <div className="br-banner is-error" data-testid="br-crew-fail">
-            <b>KiroCrew 这边有问题</b>
+            <b className="br-strong">KiroCrew 这边有 {failing.length} 件要先处理</b>
             <CheckRows rows={failing} fix={s?.crew.fix} onFixed={() => status.reload()} />
           </div>
         )}
@@ -171,11 +189,10 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
   )
 }
 
-/** The requirement in hand after a move to *v*: the 需求详情 it is; else the one before. */
+/** The requirement in hand after a move to *v*: the 需求详情 or 需求看板 it is; else the one before. */
 function heldOf(v: View, before: Held): Held {
-  if (v.kind !== 'item') return before
-  const e: ItemEntry = v
-  return before && before.repo === e.repo && before.key === e.key ? before : { repo: e.repo, key: e.key }
+  if (v.kind !== 'item' && v.kind !== 'board') return before
+  return before && before.repo === v.repo && before.key === v.key ? before : { repo: v.repo, key: v.key }
 }
 
 function repoOfView(v: View): string | undefined {
