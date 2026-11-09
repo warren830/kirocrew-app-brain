@@ -289,5 +289,7 @@ button.br-tag:hover { border-color: var(--accent); color: var(--text-strong); }
 .br-jobsteps li.is-fail i { background: var(--kt-bad-solid); color: #fff; }
 .br-jobsteps li.is-todo { opacity: .6; border-style: dashed; }
 .br-segs i.is-run { background: var(--kt-run); box-shadow: 0 0 8px color-mix(in srgb, var(--kt-run) 55%, transparent); }
+.br-switch { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.br-switch .kt-select { max-width: 340px; color: var(--text-strong); }
 `
 

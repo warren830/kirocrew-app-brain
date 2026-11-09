@@ -22,6 +22,7 @@ import type { Decision, OpenSessionBody, OpenSessionResult, ReqBoard, Requiremen
 import { APPROVAL_META, Icon, LoadState, MrLink, STAGE_META, StateChip, TypeLine } from '../ui'
 import type { ViewProps } from './props'
 import { EntryChip, MrDescCard, QuestionCard } from './Question'
+import { ReqSwitch } from './ReqSwitch'
 
 export { EntryChip, MR_DESC_COPY_HINT, MrDescCard, QuestionCard, mrDescSource } from './Question'
 
@@ -123,7 +124,12 @@ export function valueStream(b: ReqBoard, now: number): { from: number; to: numbe
   return out
 }
 
-export function DetailView({ entry, onBack, ...props }: { entry: ItemEntry; onBack?: () => void } & ViewProps) {
+export function DetailView({ entry, onBack, onSwitch, ...props }: {
+  entry: ItemEntry
+  onBack?: () => void
+  /** 切换需求: open another requirement here (default: a move to its 需求详情) */
+  onSwitch?: (repo: string, key: string) => void
+} & ViewProps) {
   const d = usePoll<RequirementDetail>(paths.requirement(entry.repo, entry.key), props.pollMs ?? POLL_MS)
   const b = usePoll<ReqBoard>(d.data ? paths.board(entry.repo, entry.key) : null, props.pollMs ?? POLL_MS)
   const [opened, setOpened] = useState<OpenSessionResult | null>(null)
@@ -147,6 +153,8 @@ export function DetailView({ entry, onBack, ...props }: { entry: ItemEntry; onBa
           <b>{entry.key}</b>
         </nav>
         <span className="cto-grow" />
+        <ReqSwitch repo={entry.repo} reqKey={entry.key} status={props.status} pollMs={props.pollMs}
+          onPick={onSwitch ?? ((repo, key) => props.go({ kind: 'item', repo, key }))} />
         <div className="cto-item-act">
           <button type="button" className="kt-btn is-primary" onClick={() => toBoard()}>需求看板 ↗</button>
           {x && x.row.state === 'merged' && <button type="button" className="kt-btn" onClick={() => toBoard(true)}>▶ 回放 ↗</button>}

@@ -108,6 +108,12 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
   useEffect(() => {  // the view that just opened starts at its top (the host page scrolls, not this app)
     if (view.n) rootRef.current?.scrollIntoView?.({ block: 'start' })
   }, [view.n])
+  // 切换需求 on 需求详情 / 需求看板: the same view of another requirement in the place of this one (no new history entry,
+  // so ← 返回 still goes where the view was opened from)
+  const swap = useCallback((v: View) => {
+    replace(v)
+    setView((cur) => ({ ...v, n: cur.n + 1 }))
+  }, [replace])
   // ← 返回: the entry before when this app made it, else the view it came from
   const back = useCallback((fallback: View) => (depth() > 0 ? window.history.back() : go(fallback)), [go])
 
@@ -144,11 +150,12 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
     const { kind: _k, ...entry } = v
     const fallback: View = entry.from === 'todo' ? { kind: 'todo' } : entry.from === 'brain' ? { kind: 'brain', repo: entry.repo }
       : entry.from === 'board' ? { kind: 'board', repo: entry.repo, key: entry.key } : overviewFilters.current
-    body = <DetailView key={n} entry={entry} onBack={() => back(fallback)} {...props} />
+    body = <DetailView key={n} entry={entry} onBack={() => back(fallback)} onSwitch={(repo, key) => swap({ kind: 'item', ...entry, repo, key })} {...props} />
   } else if (v.kind === 'board') {
     const { kind: _k, ...entry } = v
     const fallback: View = entry.from === 'todo' ? { kind: 'todo' } : entry.from === 'item' ? { kind: 'item', repo: entry.repo, key: entry.key } : overviewFilters.current
-    body = <BoardPage key={n} entry={entry} onBack={entry.from ? () => back(fallback) : undefined} {...props} />
+    body = <BoardPage key={n} entry={entry} onBack={entry.from ? () => back(fallback) : undefined} {...props}
+      onSwitch={(repo, key) => swap({ kind: 'board', repo, key, ...(entry.from ? { from: entry.from } : {}) })} />
   } else if (v.kind === 'new') {
     const { kind: _k, ...entry } = v
     body = <NewView key={n} entry={entry} {...props} />

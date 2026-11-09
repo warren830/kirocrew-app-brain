@@ -138,6 +138,29 @@ describe('the app: one bar over the views', () => {
     expect(parseView(window.location.search)).toEqual({ kind: 'item', repo: 'r1', key: 'PAY-5' })
   })
 
+  test('切换需求 on 需求详情 and 需求看板 opens another requirement in the same view; ← 返回 still goes where it came from', async () => {
+    const user = userEvent.setup()
+    installFixtureRoutes()
+    render(<BrainApp pollMs={60_000} />)
+    await user.click(within(await ledgerRow('PAY-3')).getByRole('button', { name: '详情' }))
+    const pick = await screen.findByRole('combobox', { name: '切换需求' })
+    expect(pick).toHaveValue(`r1\u0001PAY-3`)
+    const keys = within(pick).getAllByRole('option').map((o) => o.textContent?.split(' ')[0])
+    expect(keys).toEqual(expect.arrayContaining(fx.overview().rows.map((r) => r.key)))
+    await user.selectOptions(pick, `r1\u0001PAY-5`)
+    expect(parseView(window.location.search)).toEqual({ kind: 'item', repo: 'r1', key: 'PAY-5', from: 'overview' })
+    await waitFor(() => expect(apiCalls.some((c) => c.path === `${API}/requirements/r1/PAY-5`)).toBe(true))
+    expect(bar().getByRole('tab', { name: /^需求详情/ })).toHaveTextContent('PAY-5')
+    // its board, then another one there
+    await user.click(screen.getByRole('button', { name: '需求看板 ↗' }))
+    expect(parseView(window.location.search)).toMatchObject({ kind: 'board', repo: 'r1', key: 'PAY-5' })
+    const onBoard = await within(await screen.findByTestId('br-board')).findByRole('combobox', { name: '切换需求' })
+    await user.selectOptions(onBoard, `r1\u0001PAY-3`)
+    expect(parseView(window.location.search)).toEqual({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item' })
+    await waitFor(() => expect(apiCalls.some((c) => c.path === `${API}/board/r1/PAY-3`)).toBe(true))
+    expect(bar().getByRole('tab', { name: '需求详情' })).toHaveAttribute('title', expect.stringContaining('PAY-3'))
+  })
+
   test('back and forward show the view the entry says', async () => {
     const user = userEvent.setup()
     installFixtureRoutes()

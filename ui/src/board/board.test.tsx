@@ -45,7 +45,7 @@ describe('需求看板', () => {
     expect(screen.getByRole('navigation', { name: '位置' })).toHaveTextContent(/需求看板$/)
     expect(screen.getByRole('button', { name: '跟随' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByText('此刻有人在做')).toBeNull() // live is false
-    expect(apiCalls[0]).toMatchObject({ method: 'GET', path: `${API}/board/r1/PAY-3` })
+    expect(apiCalls.find((c) => !c.path.startsWith(`${API}/overview`))).toMatchObject({ method: 'GET', path: `${API}/board/r1/PAY-3` })
   })
 
   test('the KPIs: checks passed, Lean’s stages and the approvals, a person’s acts, the steps of the way, credits', async () => {
@@ -314,7 +314,7 @@ describe('需求看板', () => {
     renderBoard(PAY3, { pollMs: 30 })
     await loaded()
     await waitFor(() => expect(boardCalls().length).toBeGreaterThanOrEqual(3))
-    expect(apiCalls.every((c) => c.method === 'GET' && c.path === paths.board('r1', 'PAY-3'))).toBe(true)
+    expect(apiCalls.every((c) => c.method === 'GET' && (c.path === paths.board('r1', 'PAY-3') || c.path === paths.overview('all')))).toBe(true)
     await waitFor(() => expect(screen.getByTestId('kt-graph').querySelector('g.kt-node[data-role="design"]')).toHaveAttribute('data-status', 'merged'))
     expect(screen.getAllByTestId('kt-lane').find((l) => l.dataset.role === 'design')).toHaveAttribute('data-status', 'merged')
   })
@@ -346,7 +346,7 @@ describe('需求看板', () => {
     expect(p.go).toHaveBeenCalledTimes(3)
     fireEvent.click(crumb().getByRole('button', { name: '交付总览' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'overview' })
-    fireEvent.click(crumb().getByRole('button', { name: '← 返回需求详情' }))
+    fireEvent.click(screen.getByRole('button', { name: '← 返回需求详情' }))
     expect(onBack).toHaveBeenCalledTimes(1)
     expect(p.replace).not.toHaveBeenCalled()
   })

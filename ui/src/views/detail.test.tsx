@@ -48,7 +48,7 @@ describe('需求详情', () => {
     expect(tl).toHaveTextContent('来自 brain-kit trace')
     expect(tl).toHaveTextContent('这些来源没读到：runnerd')
     expect(screen.getByRole('region', { name: '会话记录' })).toHaveTextContent('refund-api 的代码计划写好了，等批准。')
-    expect(apiCalls[0]).toMatchObject({ method: 'GET', path: `${API}/requirements/r1/PAY-3` })
+    expect(apiCalls.find((c) => !c.path.startsWith(`${API}/overview`))).toMatchObject({ method: 'GET', path: `${API}/requirements/r1/PAY-3` })
   })
 
   test('a pending approval shows its line: 复制 copies it, 打开会话 opens the session; nothing sends it', async () => {
@@ -257,13 +257,13 @@ describe('需求详情', () => {
     renderDetail({ repo: 'r1', key: 'PAY-99' })
     expect(await screen.findByRole('alert')).toHaveTextContent('没有这个需求（404）')
     expect(screen.queryByRole('region', { name: '需求' })).toBeNull()
-    expect(apiCalls[0].path).toBe(`${API}/requirements/r1/PAY-99`)
+    expect(apiCalls.find((c) => !c.path.startsWith(`${API}/overview`))?.path).toBe(`${API}/requirements/r1/PAY-99`)
   })
 
   test('价值流: the board’s time as parts in order (quiet stretches left out), its moments under it; a part opens the board', async () => {
     const { go } = renderDetail()
     const card = await screen.findByRole('region', { name: '价值流' })
-    expect(apiCalls.map((c) => c.path)).toEqual([`${API}/requirements/r1/PAY-3`, `${API}/board/r1/PAY-3`])
+    expect(apiCalls.map((c) => c.path).filter((p) => !p.startsWith(`${API}/overview`))).toEqual([`${API}/requirements/r1/PAY-3`, `${API}/board/r1/PAY-3`])
     // board.json: the local session works with three waits for a person between (REQUIREMENTS, DESIGN, then the
     // question running into the pending PLAN, one part); the gaps after each approval have nothing recorded
     const parts = ['AI 在本机做 31 分钟', '等人 21 分钟', 'AI 在本机做 41 分钟', '等人 25 分钟', 'AI 在本机做 25 小时 35 分', '等人 20 分钟']

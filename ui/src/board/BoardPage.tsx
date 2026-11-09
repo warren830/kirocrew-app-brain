@@ -18,6 +18,7 @@ import type { ReqBoard } from '../types'
 import { LoadState } from '../ui'
 import { QuestionCard } from '../views/Question'
 import type { ViewProps } from '../views/props'
+import { ReqSwitch } from '../views/ReqSwitch'
 import { Accept } from './Accept'
 import { ActorGraph, rosterRows, type FlashMap } from './ActorGraph'
 import { CheckWall } from './CheckWall'
@@ -67,7 +68,12 @@ export function mostActive(b: ReqBoard): string | null {
 
 const structureKey = (b: ReqBoard) => `${b.actors.map((a) => a.key).join(',')}|${b.direct ? 1 : 0}|${rosterRows(b)}`
 
-export function BoardPage({ entry, onBack, go, replace, pollMs }: { entry: BoardEntry; onBack?: () => void } & ViewProps) {
+export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs }: {
+  entry: BoardEntry
+  onBack?: () => void
+  /** 切换需求: open another requirement's board here (default: a move to it) */
+  onSwitch?: (repo: string, key: string) => void
+} & ViewProps) {
   const api = useAppApi()
   const navigate = useNavigate()
   const reducedMotion = useReducedMotion()
@@ -146,15 +152,19 @@ export function BoardPage({ entry, onBack, go, replace, pollMs }: { entry: Board
     <main ref={rootRef} className={`kt-root br-view br-board${board?.live && !quiet ? ' is-live' : ''}`} data-testid="br-board" data-motion={reducedMotion ? 'reduce' : undefined}>
       <style>{BOARD_EXTRA_CSS}</style>
       <ClockContext.Provider value={clock}>
-        <nav className="kit-crumb kt-where" aria-label="位置" data-testid="kt-where">
-          <button type="button" onClick={() => go({ kind: 'overview' })}>交付总览</button>
-          <span aria-hidden="true">›</span>
-          <button type="button" onClick={toDetail} title="需求详情">{entry.key}</button>
-          <span aria-hidden="true">›</span>
-          <b>需求看板{focus && board ? ` · ${board.actors.find((a) => a.key === focus)?.title ?? ''}` : ''}{rp.on ? ' · 回放' : ''}</b>
-          <span className="kt-grow" />
+        <div className="cto-top br-where-row">
+          <nav className="kit-crumb kt-where" aria-label="位置" data-testid="kt-where">
+            <button type="button" onClick={() => go({ kind: 'overview' })}>交付总览</button>
+            <span aria-hidden="true">›</span>
+            <button type="button" onClick={toDetail} title="需求详情">{entry.key}</button>
+            <span aria-hidden="true">›</span>
+            <b>需求看板{focus && board ? ` · ${board.actors.find((a) => a.key === focus)?.title ?? ''}` : ''}{rp.on ? ' · 回放' : ''}</b>
+          </nav>
+          <span className="cto-grow" />
+          {!rp.on && <ReqSwitch repo={entry.repo} reqKey={entry.key} status={status} pollMs={pollMs}
+            onPick={onSwitch ?? ((repo, key) => go({ kind: 'board', repo, key }))} />}
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{entry.from === 'item' ? '需求详情' : entry.from === 'todo' ? '待办' : '交付总览'}</button>}
-        </nav>
+        </div>
         <LoadState loading={live.loading} error={live.missing ? `没有这个需求（${entry.repo} · ${entry.key}）：它可能已经不在这个仓库里` : live.error} has={!!board} />
         {board && lay && (
           <>
