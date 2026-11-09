@@ -1,38 +1,73 @@
 /**
  * 运行机 (team mode only), in the sample board's look: the bridge loop's status as a card with 「现在跑一轮」 (POST
  * /team/loop); the ledger's counts as counter cards (runs by brain-kit's run states, questions by their states,
- * hand-overs, the signer's pending and refused) with a segment bar each; what the bridge said about each labelled MR in
- * the last round as a conveyor (accepted, rejected, seen, unlabelled, waiting, error); the runs as a ledger table with
- * their MRs and sessions; the signer's pending and refused requests and the vouchers it has not answered yet (asked for
- * again next round) as cards.
+ * hand-overs, the messages into the runs' sessions by outbox state, the signer's pending and refused) with a segment bar
+ * each; what the bridge said about each labelled MR in the last round as a conveyor (accepted, rejected, seen,
+ * unlabelled, waiting, error); the runs as a ledger table with their MRs, sessions and what the bridge holds about each
+ * (its notes, a line under the run); the runner's Lean hooks as brain-runnerd checks them; the signer's pending and
+ * refused requests and the vouchers it has not answered yet (asked for again next round) as cards; the bridge.json and
+ * runnerd.json settings brain-kit reads, by file.
  */
+import { Fragment } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
 import { ago, fmtIso } from '../format'
-import type { HandoverResult, RunState, TeamHandover, TeamLoopResult, TeamStatus, TeamView } from '../types'
-import { EmptyHero, ExtLink, Icon, LoadState, RoleIcon, questionMeta, type FlowStep } from '../ui'
+import type { CheckRow, HandoverResult, RunState, TeamConfigRow, TeamHandover, TeamLoopResult, TeamNote, TeamStatus, TeamView } from '../types'
+import { CheckRows, EmptyHero, ExtLink, Icon, LEVEL_LABEL, LoadState, RoleIcon, questionMeta, type FlowStep } from '../ui'
 import type { Tone } from '../styles'
 import type { ViewProps } from './props'
 
 export const TEAM_POLL_MS = 10_000
 export const SIGNER_SAME_USER = '签名服务和 app 是同一个系统用户：它签不签都由 app 说了算，只适合本机试用'
 
-/** brain-kit's run states (the bridge ledger's), in words. */
-export const RUN_STATE: Record<RunState, { label: string; tone: Tone }> = {
+/** brain-kit's run states (the bridge ledger's), in words; hint: what a state can mean, under its chip. */
+export const RUN_STATE: Record<RunState, { label: string; tone: Tone; hint?: string }> = {
   signing: { label: '签名中', tone: 'hand' },
   spooled: { label: '排队等工作区', tone: 'idle' },
   ready: { label: '工作区好了', tone: 'info' },
   dispatched: { label: '已派给会话', tone: 'run' },
-  send_unknown: { label: '送没送到不清楚', tone: 'warn' },
-  failed: { label: '工作区没建成', tone: 'bad' },
+  send_unknown: { label: '送没送到不清楚', tone: 'warn', hint: '桥每轮看会话，看到了就接着做；一直这样要人看一下' },
+  failed: { label: '没能开始', tone: 'bad', hint: '工作区没建成，或接手消息一直送不进会话' },
   merged: { label: '已合并', tone: 'ok' },
   closed: { label: '已关闭', tone: 'idle' },
 }
-export const runStateMeta = (state: string) => RUN_STATE[state as RunState] ?? { label: state, tone: 'idle' as Tone }
+export const runStateMeta = (state: string): { label: string; tone: Tone; hint?: string } =>
+  RUN_STATE[state as RunState] ?? { label: state, tone: 'idle' }
 
 const HANDOFF_STATE: Record<string, { label: string; tone: Tone }> = {
   checking: { label: '在检查', tone: 'run' }, accepted: { label: '已接手', tone: 'ok' }, rejected: { label: '拒绝接手', tone: 'bad' },
 }
+
+/** The messages into the runs' sessions (brain-kit's outbox: hand-overs, answers, notices) by state, in words. */
+export const OUTBOX_STATE: Record<string, { label: string; tone: Tone }> = {
+  sending: { label: '正在送', tone: 'run' },
+  interrupted: { label: '送的时候桥停了', tone: 'warn' },
+  sent: { label: '送到了', tone: 'ok' },
+  unknown: { label: '不知道送到没有', tone: 'warn' },
+  dropped: { label: '不送了', tone: 'bad' },
+}
+export const outboxMeta = (state: string) => OUTBOX_STATE[state] ?? { label: state, tone: 'idle' as Tone }
+
+/**
+ * A run's note (what the bridge holds about it) by kind: the pipeline holding the acceptance question (ci_*), runnerd
+ * silent or retrying (runnerd_*), sends that keep failing (gaveup), messages not known to have landed (outbox_*),
+ * queued. Another ci_ / runnerd_ kind is a warning; any other kind is quiet.
+ */
+export const NOTE_TONE: Record<string, Tone> = {
+  ci_wait: 'warn', ci_person: 'warn', ci_red: 'bad',
+  runnerd_retry: 'warn', runnerd_silent: 'bad',
+  gaveup: 'bad', setup: 'warn', send_unknown: 'warn', held: 'warn', failed: 'bad', nobody: 'bad',
+  outbox_unknown: 'warn', outbox_interrupted: 'warn', outbox_dropped: 'bad',
+  queued: 'idle',
+}
+export const noteTone = (kind: string): Tone => NOTE_TONE[kind] ?? (/^(ci|runnerd)_/.test(kind) ? 'warn' : 'idle')
+const NOTE_GLYPH: Partial<Record<Tone, string>> = { bad: '✕', warn: '!' }
+
+/** The config files brain-kit reads on a team runner, in this order, and what each is for. */
+const CONFIG_FILES: { file: string; what: string }[] = [
+  { file: 'bridge.json', what: '桥' },
+  { file: 'runnerd.json', what: '运行机（brain-runnerd）' },
+]
 
 /** What brain-kit's bridge said about a labelled MR in the last round (Bridge.process), in words. */
 export const HANDOVER_RESULT: Record<HandoverResult, { label: string; tone: Tone; hint: string }> = {
@@ -48,9 +83,10 @@ export const handoverMeta = (result: string) => HANDOVER_RESULT[result as Handov
 const CHIP_CLASS: Record<string, string> = { rejected: 'is-conflict', waiting: 'is-pending', unlabelled: 'is-pending', error: 'is-pending', seen: 'is-seen' }
 
 type LedgerKey = keyof TeamView['ledger']
-/** A ledger count's state in words: runs by run state, decisions by question state, hand-overs by their own. */
+/** A ledger count's state in words: runs by run state, decisions by question state, hand-overs and messages by their own. */
 const ledgerMeta = (k: LedgerKey, state: string): { label: string; tone: Tone } =>
-  k === 'runs' ? runStateMeta(state) : k === 'decisions' ? questionMeta(state) : HANDOFF_STATE[state] ?? { label: state, tone: 'idle' }
+  k === 'runs' ? runStateMeta(state) : k === 'decisions' ? questionMeta(state) : k === 'outbox' ? outboxMeta(state)
+    : HANDOFF_STATE[state] ?? { label: state, tone: 'idle' }
 
 /** How a team runner works, for a machine that is not one. */
 const RUNNER_FLOW: FlowStep[] = [
@@ -148,6 +184,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
             <LedgerKpi k="runs" label="运行" unit="个" counts={data.ledger.runs} />
             <LedgerKpi k="decisions" label="问题" unit="个" counts={data.ledger.decisions} />
             <LedgerKpi k="handoffs" label="交接" unit="次" counts={data.ledger.handoffs} big="accepted" />
+            <OutboxKpi counts={data.ledger.outbox ?? {}} />
             <SignerKpi signer={data.signer} />
           </section>
           <Handovers rows={data.handovers} at={st?.last_loop_at ?? null} />
@@ -162,44 +199,75 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
                 <table className="cto-table tm-runs">
                   <thead><tr><th>运行</th><th>需求</th><th>项目</th><th>状态</th><th>MR</th><th>更新</th><th>会话</th></tr></thead>
                   <tbody>
-                    {data.runs.map((r) => (
-                      <tr key={r.run_id} data-state={r.state}>
-                        <td className="br-mono">{r.run_id}</td>
-                        <td>
-                          <button type="button" className="br-link br-key" onClick={() => go({ kind: 'item', repo: 'runner', key: r.req })}>{r.req}</button>
-                        </td>
-                        <td className="br-dim">{r.project}</td>
-                        <td><RunChip state={r.state} /></td>
-                        <td><ExtLink href={r.mr_url}>!{r.iid}</ExtLink></td>
-                        <td className="br-dim">{fmtIso(r.updated)}</td>
-                        <td>
-                          {r.slot ? (
-                            <button type="button" className="br-btn is-small" onClick={() => navigate(`/chat?sid=${encodeURIComponent(r.slot as string)}`)}>
-                              <Icon name="MessageSquare" size={13} />打开会话
-                            </button>
-                          ) : <span className="br-dim">—</span>}
-                        </td>
-                      </tr>
-                    ))}
+                    {data.runs.map((r) => {
+                      const notes = r.notes ?? []
+                      const hint = runStateMeta(r.state).hint
+                      return (
+                        <Fragment key={r.run_id}>
+                          <tr data-state={r.state} className={notes.length ? 'has-notes' : undefined}>
+                            <td className="br-mono">{r.run_id}</td>
+                            <td>
+                              <button type="button" className="br-link br-key" onClick={() => go({ kind: 'item', repo: 'runner', key: r.req })}>{r.req}</button>
+                            </td>
+                            <td className="br-dim">{r.project}</td>
+                            <td>
+                              <span className="tm-state">
+                                <RunChip state={r.state} />
+                                {hint && <span className="tm-state-hint">{hint}</span>}
+                              </span>
+                            </td>
+                            <td><ExtLink href={r.mr_url}>!{r.iid}</ExtLink></td>
+                            <td className="br-dim">{fmtIso(r.updated)}</td>
+                            <td>
+                              {r.slot ? (
+                                <button type="button" className="br-btn is-small" onClick={() => navigate(`/chat?sid=${encodeURIComponent(r.slot as string)}`)}>
+                                  <Icon name="MessageSquare" size={13} />打开会话
+                                </button>
+                              ) : <span className="br-dim">—</span>}
+                            </td>
+                          </tr>
+                          {notes.length > 0 && (
+                            <tr className="tm-notes-row" data-notes={r.run_id}>
+                              <td colSpan={7}><RunNotes runId={r.run_id} notes={notes} /></td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
           </section>
+          <Hooks rows={data.hooks ?? []} />
           <Signer signer={data.signer} />
+          <Config rows={data.config ?? []} />
         </>
       )}
     </main>
   )
 }
 
-/** A ledger count as a counter card: the total (or one state's count), a segment bar by state, the states in words. */
-function LedgerKpi({ k, label, unit, counts, big }: { k: LedgerKey; label: string; unit: string; counts: Record<string, number>; big?: string }) {
-  const rows = Object.entries(counts).filter(([, n]) => n > 0)
+/**
+ * A ledger count as a counter card: the total (or one state's count), a segment bar by state, the states in words.
+ * order: the states in this order (others after, as they come); mark: a border for a state that needs a look.
+ */
+function LedgerKpi({ k, label, unit, counts, big, order, mark, note }: {
+  k: LedgerKey
+  label: string
+  unit: string
+  counts: Record<string, number>
+  big?: string
+  order?: string[]
+  mark?: 'bad' | 'warn'
+  note?: string
+}) {
+  const at = (s: string) => (order && order.includes(s) ? order.indexOf(s) : order?.length ?? 0)
+  const rows = Object.entries(counts).filter(([, n]) => n > 0).sort((a, b) => at(a[0]) - at(b[0]))
   const total = rows.reduce((a, [, n]) => a + n, 0)
   const value = big ? counts[big] ?? 0 : total
   return (
-    <div className="br-kpi tm-kpi" data-ledger={k}>
+    <div className={`br-kpi tm-kpi${mark ? ` has-${mark}` : ''}`} data-ledger={k}>
       <div className="br-kpi-label">{label}</div>
       <div><span className="br-kpi-big">{value}</span><span className="br-kpi-of">{big ? `/${total}` : unit}</span></div>
       {total > 0 ? (
@@ -212,7 +280,22 @@ function LedgerKpi({ k, label, unit, counts, big }: { k: LedgerKey; label: strin
           <span key={s} className="tm-leg" title={s}><i className={`tone-${ledgerMeta(k, s).tone}`} aria-hidden="true" />{ledgerMeta(k, s).label} <b>{n}</b></span>
         ))}
       </div>
+      {note && <div className="br-kpi-note">{note}</div>}
     </div>
+  )
+}
+
+/** The messages into the runs' sessions: sent of all; a red border when one is not sent any more, amber while one is not
+ * known to have landed (the bridge looks at the session each round and sends it again). */
+function OutboxKpi({ counts }: { counts: Record<string, number> }) {
+  const n = (s: string) => counts[s] ?? 0
+  const unsure = n('unknown') + n('interrupted')
+  return (
+    <LedgerKpi
+      k="outbox" label="送进会话的消息" unit="条" counts={counts} big="sent" order={Object.keys(OUTBOX_STATE)}
+      mark={n('dropped') ? 'bad' : unsure ? 'warn' : undefined}
+      note={unsure ? '桥每轮看会话：看到了就算送到，一直这样要人看一下' : undefined}
+    />
   )
 }
 
@@ -336,7 +419,90 @@ function Signer({ signer }: { signer: TeamView['signer'] }) {
 function RunChip({ state }: { state: string }) {
   const m = runStateMeta(state)
   const live = state === 'dispatched' || state === 'signing'
-  return <span className={`br-chip kt-pill tone-${m.tone}${live ? ' is-live' : ''}`} data-state={state}>{m.label}</span>
+  return <span className={`br-chip kt-pill tone-${m.tone}${live ? ' is-live' : ''}`} data-state={state} title={m.hint}>{m.label}</span>
+}
+
+/** What the bridge holds about a run, a line each, toned by kind, with when it was last said. */
+function RunNotes({ runId, notes }: { runId: string; notes: TeamNote[] }) {
+  return (
+    <ul className="tm-notes" aria-label={`${runId} 桥记着的事`}>
+      {notes.map((n, i) => {
+        const tone = noteTone(n.kind)
+        return (
+          <li key={`${n.kind}-${i}`} className={`tm-note tone-${tone}`} data-kind={n.kind} title={n.kind}>
+            <span className="tm-note-glyph" aria-hidden="true">{NOTE_GLYPH[tone] ?? '·'}</span>
+            <span className="tm-note-text">{n.text}</span>
+            {n.at !== null && <span className="tm-note-at">{ago(n.at)}</span>}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/** The runner's Lean hooks as brain-runnerd checks them before each workspace; nothing with an older brain-kit. */
+function Hooks({ rows }: { rows: CheckRow[] }) {
+  if (rows.length === 0) return null
+  const level = rows.some((r) => r.level === 'FAIL') ? 'FAIL' : rows.some((r) => r.level === 'WARN') ? 'WARN' : 'OK'
+  const tone = level === 'FAIL' ? 'bad' : level === 'WARN' ? 'warn' : 'ok'
+  return (
+    <section className={`br-card tm-hooks is-${tone}`} aria-label="运行机的 Lean hook" data-testid="runner-hooks">
+      <header>
+        <RoleIcon role="lint" size={18} />
+        <h3>运行机的 Lean hook</h3>
+        <span className={`br-chip kt-pill tone-${tone}`}>{LEVEL_LABEL[level]}</span>
+        <span className="br-dim br-small">brain-runnerd 每建一个工作区前查一次：hook 适配器第 3 版，brain-run 的三个 hook</span>
+      </header>
+      <CheckRows rows={rows} />
+    </section>
+  )
+}
+
+/** The bridge.json and runnerd.json settings brain-kit reads, by file: the key, its value (a quiet 默认 when it is the
+ * default), one line. A file the page has no rows of is said so; nothing read yet, one line. */
+function Config({ rows }: { rows: TeamConfigRow[] }) {
+  const files = [...CONFIG_FILES, ...[...new Set(rows.map((r) => r.file as string))]
+    .filter((f) => !CONFIG_FILES.some((c) => c.file === f)).map((file) => ({ file, what: '' }))]
+  const changed = rows.filter((r) => !r.default).length
+  return (
+    <section className="br-card tm-cfg-card" aria-label="配置">
+      <header>
+        <RoleIcon role="settings" size={18} />
+        <h3>配置</h3>
+        <span className="br-dim br-small">
+          {rows.length ? `brain-kit 读的设置：改过 ${changed} 项，其余用默认` : 'brain-kit 读的 bridge.json 和 runnerd.json'}
+        </span>
+      </header>
+      {rows.length === 0 ? <p className="br-empty">还没读到设置：桥开起来以后，这里列出 bridge.json 和 runnerd.json 里 brain-kit 读的每一项。</p> : (
+        <div className="br-scroll">
+          <table className="cto-table tm-cfg">
+            <thead><tr><th>设置</th><th>值</th><th>说明</th></tr></thead>
+            {files.map(({ file, what }) => {
+              const mine = rows.filter((r) => r.file === file)
+              return (
+                <tbody key={file} aria-label={file} data-file={file}>
+                  <tr className="tm-cfg-file">
+                    <th colSpan={3} scope="rowgroup">
+                      <span className="br-row"><RoleIcon role="file" size={14} /><code>{file}</code>{what && <span className="br-dim">{what}</span>}</span>
+                    </th>
+                  </tr>
+                  {mine.length === 0 ? (
+                    <tr><td colSpan={3} className="br-dim">没配 {file}</td></tr>
+                  ) : mine.map((r) => (
+                    <tr key={r.key} data-key={r.key} className={r.default ? 'is-default' : undefined}>
+                      <td className="tm-cfg-key"><code>{r.key}</code></td>
+                      <td className="tm-cfg-val"><span>{r.value}</span>{r.default && <span className="tm-def">默认</span>}</td>
+                      <td className="tm-cfg-text">{r.text}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              )
+            })}
+          </table>
+        </div>
+      )}
+    </section>
+  )
 }
 
 const TM_CSS = `
@@ -360,8 +526,11 @@ const TM_CSS = `
 .tm-loop.is-ok > b { color: var(--kt-ok); }
 .tm-loop.is-bad { background: color-mix(in srgb, var(--kt-bad) 9%, transparent); border: 1px solid var(--kit-bad); }
 .tm-loop.is-bad > b { color: var(--kt-bad); }
-.tm-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-@media (max-width: 1100px) { .tm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tm-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1280px) { .tm-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .tm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tm-kpi.has-bad { border-color: var(--kit-bad); }
+.tm-kpi.has-warn { border-color: color-mix(in srgb, var(--kt-warn) 55%, var(--border)); }
 .tm-stack { display: flex; gap: 2px; height: .75em; margin-top: .2em; border-radius: .3em; overflow: hidden; }
 .tm-stack i { flex: 1 1 0; min-width: .4em; background: var(--kt-tone); }
 .tm-stack.is-empty i { background: color-mix(in srgb, var(--muted) 22%, transparent); }
@@ -382,6 +551,33 @@ const TM_CSS = `
 .tm-mr:hover { text-decoration: underline; }
 .tm-hint { font-size: .8em; color: var(--text); white-space: normal; line-height: 1.4; }
 .tm-runs td { vertical-align: middle; }
+.tm-state { display: inline-grid; gap: .25em; justify-items: start; }
+.tm-state-hint { font-size: .8em; color: var(--muted); max-width: 22em; white-space: normal; line-height: 1.4; }
+.tm-runs tr.has-notes > td { border-bottom: 0; padding-bottom: .35em; }
+.tm-runs tr.tm-notes-row > td { padding-top: 0; padding-bottom: .8em; }
+.tm-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: .3em; }
+.tm-note { display: flex; align-items: baseline; gap: .55em; padding: .32em .75em; border-radius: var(--kit-r-cell, 10px); font-size: .88em; color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--kt-tone) 40%, var(--border)); background: color-mix(in srgb, var(--kt-tone) 7%, transparent); }
+.tm-note.tone-idle { border-color: var(--border); background: var(--kt-glass); }
+.tm-note-glyph { flex: none; display: inline-grid; place-items: center; width: 1.35em; height: 1.35em; border-radius: .4em; align-self: center;
+  font-weight: 900; font-size: .86em; color: var(--kt-tone); border: 1.5px solid var(--kt-tone); background: color-mix(in srgb, var(--kt-tone) 14%, transparent); }
+.tm-note.tone-idle .tm-note-glyph { border-color: color-mix(in srgb, var(--muted) 50%, transparent); color: var(--muted); background: transparent; }
+.tm-note-text { flex: 1; min-width: 0; color: var(--text-strong); white-space: normal; overflow-wrap: anywhere; }
+.tm-note.tone-idle .tm-note-text { color: var(--text); }
+.tm-note-at { flex: none; color: var(--muted); font-size: .92em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tm-cfg th, .tm-cfg td { vertical-align: baseline; }
+.tm-cfg tr.tm-cfg-file > th { padding-top: 1.1em; padding-bottom: .45em; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--text-strong); }
+.tm-cfg tbody:first-of-type tr.tm-cfg-file > th { padding-top: .7em; }
+.tm-cfg tr.tm-cfg-file code { font-size: .95em; color: var(--text-strong); }
+.tm-cfg tr.tm-cfg-file .kt-role-icon { color: var(--muted); }
+.tm-cfg tbody tr:last-child td { border-bottom: 0; }
+.tm-cfg-key code { white-space: nowrap; font-weight: 650; color: var(--text-strong); }
+.tm-cfg-val { min-width: 8em; max-width: 22em; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.tm-cfg-val > span:first-child { font-weight: 650; }
+.tm-cfg tr.is-default .tm-cfg-val > span:first-child { font-weight: 500; color: var(--text); }
+.tm-def { display: inline-flex; margin-left: .55em; padding: 0 .55em; border-radius: 999px; font-size: .78em; font-weight: 650; vertical-align: 1px; white-space: nowrap;
+  color: var(--muted); background: color-mix(in srgb, var(--text) 7%, transparent); }
+.tm-cfg-text { color: var(--text); font-size: .93em; min-width: 18em; }
 .tm-signer { display: grid; grid-template-columns: repeat(auto-fit, minmax(20em, 1fr)); gap: var(--kit-gap-row, 12px); align-items: start; }
 .tm-sig-col { display: grid; gap: .5em; }
 .tm-sig-col h4 { margin: 0; display: flex; align-items: center; gap: .5em; font-size: .93em; color: var(--text-strong); }
