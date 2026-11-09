@@ -162,7 +162,7 @@ function StreamChart({ board, segs, days, onAt }: { board: ReqBoard; segs: Strea
   const L = 6, R = 6, pw = Math.max(10, W - L - R)
   const x = (t: number) => L + ((Math.min(Math.max(t, t0), t0 + total) - t0) / total) * pw
   const BAND = 36, BH = 24, AXIS = 112, MOM = 148
-  const edge = days ? 90 : 56
+  const edge = days ? 112 : 60   // the start and end labels: 11-04 08:34 is about 75 px, a tick's label half of 36
   const ticks = ticksOf(t0, t1).filter((t) => x(t) - x(t0) > edge && x(t1) - x(t) > edge)
   // the moments, those at the same spot as one icon with a count, in rows: one that would sit on top of the one before
   // it goes a row down
