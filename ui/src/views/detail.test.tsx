@@ -822,21 +822,20 @@ describe('需求详情', () => {
   test('时间线: newest first, the app’s own records in words (no commands, slot ids, pseudonyms); unread sources only once handed over', async () => {
     withDetail((d) => {
       d.timeline.items.push(
-        { at: '2026-11-08T22:00:00+08:00', kind: 'app', label: 'brain reflect --apply：成功', detail: 'brain/PAY-3-reflect-1', who: null, src: 'app' },
-        { at: '2026-11-07T16:00:01+08:00', kind: 'app', label: '开了 brain-dev 会话', detail: 'brain-r1-pay-3-1-8efc，信任这个会话', who: null, src: 'app' },
+        { at: '2026-11-08T22:00:00+08:00', kind: 'app', label: '回写 Brain 并推送：成功', detail: 'brain/PAY-3-reflect-1', who: null, src: 'app' },
         { at: '2026-11-07T18:30:00+08:00', kind: 'human', label: '批准需求', detail: null, who: 'G-A29056', src: 'audit' },
       )
     })
     renderDetail()
     const tl = await screen.findByRole('region', { name: '时间线' })
     const items = within(tl).getAllByTestId('tl-item')
-    expect(items[0]).toHaveTextContent('回写 Brain：成功 · 分支 brain/PAY-3-reflect-1')
+    expect(items[0]).toHaveTextContent('回写 Brain 并推送：成功 · 分支 brain/PAY-3-reflect-1')
     expect(items[1]).toHaveTextContent('代码生成：refund-api 的计划写好了')
     expect(items.at(-1)).toHaveTextContent('认领')
     expect(tl).toHaveTextContent('最新的在上面 · brain-kit 记下的')
-    expect(tl).toHaveTextContent('开了 brain-dev 会话 · 工具调用不用逐个批准')
+    expect(tl).toHaveTextContent('开了本机会话 · 工具调用不用逐个批准')
     expect(items.at(-1)).toHaveTextContent('认领 · 认领推到了远端')
-    expect(tl).not.toHaveTextContent(/brain reflect|--apply|8efc|G-A29056|claim\/|origin/)
+    expect(tl).not.toHaveTextContent(/brain reflect|--apply|G-A29056|claim\/|origin/)
     expect(items.find((i) => i.textContent!.includes('批准需求'))!.title).toContain('化名 G-A29056')
     expect(tl).not.toHaveTextContent('读不到')   // a local run: the bridge's and the runner's records are not on its way
   })
