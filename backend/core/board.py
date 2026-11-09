@@ -22,15 +22,15 @@ from .deliveries import CAT_LABEL, CAT_ORDER, KIND_LABEL, category, park_waiting
 # (key, title, sub, icon): the actors in the order of the way
 ACTORS = (
     ("local", "本机会话", "brain-dev · AI-DLC Lean", "laptop"),
-    ("req", "需求审批", "REQUIREMENTS", "req"),
-    ("design", "设计审批", "DESIGN · PLAN", "design"),
-    ("handover", "交接", "brain handoff", "handover"),
+    ("req", "需求审批", "Lean 请人批需求", "req"),
+    ("design", "设计审批", "设计 · 代码生成计划", "design"),
+    ("handover", "交接", "本机做完交给运行机", "handover"),
     ("bridge", "桥", "核对交接 · 转问题", "bridge"),
     ("signer", "签名", "接手合同 · 回答凭证", "signer"),
     ("runner", "运行机", "brain-run · 无人值守", "runner"),
-    ("ci", "CI 检查", "lean verify", "ci"),
-    ("release", "发布验收", "RELEASE · 验收", "release"),
-    ("reflect", "回写 Brain", "brain reflect", "brain"),
+    ("ci", "CI 检查", "构建和测试的自动检查", "ci"),
+    ("release", "发布验收", "发布审批 · 验收", "release"),
+    ("reflect", "回写 Brain", "合并后写回新知识", "brain"),
 )
 RUNNER_SIDE = ("handover", "bridge", "signer", "runner")
 DESIGN_STAGES = ("user-stories", "application-design", "units", "functional-design", "nfr-design", "infrastructure-design")
@@ -746,9 +746,9 @@ def _belt(evs: list[dict[str, Any]], changes: dict[str, list[dict[str, Any]]]) -
                         "text": _clip(e.get("subject") or ("运行机的提交" if e.get("by") == "bot" else "提交"), 80),
                         "files": int(e.get("files") or 0), "records_only": bool(e.get("records")),
                         "actor": e.get("actor") or "local", "changes": list(changes.get(e["sha"]) or [])})
-        elif e["kind"] == "handover":
+        elif e["kind"] == "handover":   # brain-kit's own commit ("<KEY>: hand off to team runner"): said in words
             out.append({"kind": "handover", "at": e["at"], "sha": str(e.get("sha") or "")[:12], "by": "person",
-                        "text": _clip(e.get("subject") or "交接", 80), "files": int(e.get("files") or 0),
+                        "text": "交给运行机", "files": int(e.get("files") or 0),
                         "records_only": bool(e.get("records")), "actor": "handover",
                         "changes": list(changes.get(str(e.get("sha") or "")) or [])})
         elif e["kind"] == "merge":
@@ -810,14 +810,14 @@ def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str,
         r = rounds[-1]
         res = r.get("results") or []
         if not res:
-            cell("verify", "verify", "verify", "lean verify", "pass" if r.get("ok") else "fail", r["at"], r["text"], "ci")
+            cell("verify", "verify", "verify", "自动检查", "pass" if r.get("ok") else "fail", r["at"], r["text"], "ci")
         seen: dict[str, int] = {}
         for name, ok in res:
             n = seen[name] = seen.get(name, 0) + 1
-            cell("verify-%s-%d" % (name, n), "verify", name, "lean verify：%s" % name, "pass" if ok else "fail", r["at"],
+            cell("verify-%s-%d" % (name, n), "verify", name, "自动检查：%s" % name, "pass" if ok else "fail", r["at"],
                  "通过" if ok else "没过：在会话里看 verify 的输出", "ci")
     else:
-        cell("verify", "verify", "verify", "lean verify", "skip", None, "还没跑过 verify（构建和测试阶段跑）", "ci", later="verify")
+        cell("verify", "verify", "verify", "自动检查", "skip", None, "还没跑过 verify（构建和测试阶段跑）", "ci", later="verify")
     # the hand-over: the bridge and the signer (not on the way of a repo done only here, or of one done here and merged)
     if not local_only and not (hand_at is None and merged_at is not None):
         cell("bridge", "handover", "桥", "桥核对交接", "pass" if A["handover"]["status"] == "merged" else
@@ -1033,7 +1033,7 @@ def _accept(f: dict[str, Any], row: dict[str, Any], A: dict[str, dict[str, Any]]
                 "who": you.strip(), "line": None, "mr_url": None, "session_url": None}
     elif do == "redo_handoff":
         why = re.sub(r"^接手被拒[：:]\s*", "", str(waits.get("text") or "")) or "看 MR 上桥写的原因"
-        step = {"text": _lines("接手被拒：%s\n改好后，在终端里、这个需求的分支上重新跑 brain handoff（它会提交交接、推送、打标签）" % why),
+        step = {"text": _lines("接手被拒：%s\n改好后，在这个需求的分支上重新交接（交接会提交、推送、打标签）" % why),
                 "who": who, "line": None, "mr_url": mr_url, "session_url": None}
     elif do == "label_handoff":
         step = {"text": waits.get("text") or "在 MR 上补上交接标签", "who": who, "line": None, "mr_url": mr_url,

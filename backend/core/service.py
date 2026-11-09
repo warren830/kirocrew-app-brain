@@ -871,7 +871,7 @@ class Service:
         f = await asyncio.to_thread(self._facts, repo, key)
         me = await asyncio.to_thread(self.me_in, repo)
         if not me or me != f.get("owner"):
-            raise AppError("只有需求负责人本人能在这里回答（git config brain.user）", "not_owner", 403)
+            raise AppError("只有需求负责人本人能在这里回答（按你在这个仓库的名字认人）", "not_owner", 403)
         run = f.get("run") or {}
         scope = scope_of(rid, key)
         park = f.get("park")
@@ -1029,7 +1029,7 @@ class Service:
     def _team_status(self) -> dict[str, Any]:
         if self.team is None:
             on = bool(self.settings["team"].get("enabled"))
-            return {"enabled": on, "ok": False, "error": "运行机模式没打开" if not on else "brain-kit 没装载",
+            return {"enabled": on, "ok": False, "error": "brain-kit 没装载" if on else "",
                     "last_loop_at": None, "loop_error": "", "same_user": False, "signer": {"pending": 0, "refused": 0}}
         return self.team.status()
 
@@ -1214,8 +1214,8 @@ class Service:
             base = await asyncio.to_thread(lambda: ((installer._kit_of(top) or {}).get("gitlab") or {}).get("base") or "")
             me = await asyncio.to_thread(lambda: identity.of(top, base, token=token))
         self.log.info("brain: git config brain.user set in %s", top)
-        return {"ok": True, "text": "这个仓库的 git config brain.user 设成了 %s" % name, "me": me,
-                "status": await self.status()}
+        return {"ok": True, "text": "你在这个仓库的名字设成了 %s" % name, "raw": "git config brain.user %s" % name,
+                "me": me, "status": await self.status()}
 
     async def import_choices(self, body: dict[str, Any]) -> dict[str, Any]:
         """Where an install (or a kit update, purpose "upgrade") goes: in place or a new branch (importer.choices)."""

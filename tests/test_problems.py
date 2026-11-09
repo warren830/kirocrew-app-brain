@@ -2,6 +2,8 @@
 cli.runner_kit_problems, crew_hook_problem, doctor_checks, crew_checks, mrdesc.write_problem / exclude_fix, brainlint,
 the bridge's verify, the signer), the fallbacks, the levels, and the runner-only severity. No brain-kit, no git."""
 
+import re
+
 import pytest
 
 from appkit import mod
@@ -257,6 +259,15 @@ def test_brain_lint_lines(level, raw, text):
     r = ok_row(P.lint(level, raw, repo=REPO))
     assert (r["level"], r["text"], r["raw"], r["repo"], r["fix"]) == (level, text, raw, REPO, None)
     assert r["todo"]
+
+
+COMMAND = r"brain (?:handoff|reflect|claim|entry|start)\b|lean verify|D01#S|PKG-|（gate）|每个 run"
+
+
+def test_what_to_do_is_said_in_words_never_a_command_or_a_code_name():
+    """REST-29: a 做什么 line says the step; a command a person types is in a copy line or under 细节, never here."""
+    rows = [P.lint(lv, raw) for lv, raw, _ in LINT] + [P.reason(raw) for raw, _ in REASONS]
+    assert [r["todo"] for r in rows if re.search(COMMAND, r["todo"])] == []
 
 
 def test_an_unknown_lint_line_keeps_its_where():
