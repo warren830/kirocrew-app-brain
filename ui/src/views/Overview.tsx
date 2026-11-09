@@ -8,13 +8,14 @@
  * ledger's state filter are in the URL; a big number, a legend entry, a week, a column, a lane or 「+N 个」 filters the
  * ledger once more (a LedgerPick, with its ✕) and scrolls to it.
  *
- * Whose turn it is and the step are the backend's (waits.who / do / since), read here as they are. A repo with no
- * remote is done only on this machine: the page says so once, and the runner's parts fold to 「这次不需要」.
+ * Whose turn it is and the step are the backend's (waits.who / do / since), read here as they are. A repo that cannot
+ * hand over (no remote, or no GitLab) is done only on this machine: the backend's sentence says so, the top has the
+ * 只在本机 tag, and the runner's parts fold to 「这次不需要」.
  *
  * Without any repo it is one big way in: 导入仓库. A repo without requirements shows only its way in: 开需求.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useAppApi } from '@kirocrew/app-sdk'
+import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, useAction, usePoll } from '../api'
 import { RoleIcon } from '../board/RoleIcon'
 import { HOW, HOW_LABEL, HOW_VAR, MiniCredits, MiniPeople, MiniUnattended, MiniWho, WHO_VAR, WeeklyChart, fmt, slash } from '../cto/charts'
@@ -23,12 +24,27 @@ import { ago, fmtCredits } from '../format'
 import type { OverviewEntry, View } from '../nav'
 import type { CtoNumbers, CtoRun, EvalMetric, EvalView, Funnel, Overview, RefreshResult, ReqState, RepoInfo, Requirement } from '../types'
 import { STATE_LABEL } from '../types'
-import { ACT, WAIT_NAME, leanProgress } from '../vocab'
+import { ACT, DECIDED_BY, WAIT_NAME, leanProgress } from '../vocab'
 import { EmptyHero, Icon, ImportCta, LeanCell, LoadState, MrLink, PendingRepo, STATE_TONE, StateChip } from '../ui'
 import type { ViewProps } from './props'
 
 const STATES = Object.keys(STATE_LABEL) as ReqState[]
-export const WHO_VOCAB = '决定表里「谁定的」（Who）那一格要写 agent、brain <条目号>、check、<化名> <凭证号> 或 owner'
+/** what decisions.md's 「谁定的」 (its Who column) may say, by who decided: brain-kit's words, typed as they are */
+const WHO_SYNTAX: [who: string, typed: string[], note: string][] = [
+  [DECIDED_BY.person, ['<化名> <凭证号>', 'owner'], '（桥送来的回答写化名和凭证号；本机做时负责人自己定的写 owner）'],
+  [DECIDED_BY.check, ['check'], ''], [DECIDED_BY.brain, ['brain <条目号>'], ''], [DECIDED_BY.agent, ['agent'], ''],
+]
+
+function WhoSyntax() {
+  return (
+    <span data-testid="who-syntax">
+      决定表（decisions.md）里「谁定的」那一格（<code>Who</code> 列）这样写：
+      {WHO_SYNTAX.map(([who, typed, note], i) => (
+        <span key={who}>{i > 0 && '；'}「{who}」写 {typed.map((t, j) => <span key={t}>{j > 0 && ' 或 '}<code>{t}</code></span>)}{note}</span>
+      ))}
+    </span>
+  )
+}
 
 export const OV_CSS = `
 .br-ov { container: brov / inline-size; --ov-person: #008300; --ov-ink: color-mix(in srgb, var(--text) 62%, var(--card)); --ov-ink-2: color-mix(in srgb, var(--text) 46%, var(--card));
@@ -64,6 +80,7 @@ export const OV_CSS = `
 .br-ov .cto-kcard .cto-ktop { flex-wrap: wrap; }
 .br-ov .cto-kmore.cto-link { text-align: left; padding: 0 4px; font-size: 12px; color: var(--accent); }
 .br-ov .cto-stats small { font-size: 14px; font-weight: 500; color: var(--text); margin-left: 4px; }
+.br-ov .cto-stats b { font-weight: inherit; white-space: nowrap; }
 .br-ov .cto-kb-h.is-off .cto-st { color: var(--muted); }
 .br-ov .br-kcell-off { display: grid; place-items: center; writing-mode: vertical-rl; letter-spacing: .2em; color: var(--muted); font-size: 12px; background: transparent; border: 1px dashed var(--border); }
 .br-ov .br-kband { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 6px 10px; border-radius: 10px; border: 1px dashed var(--border); color: var(--muted); font-size: 13px; }
@@ -76,6 +93,7 @@ export const OV_CSS = `
 .br-ov .br-ledger .br-col-nowrap { white-space: nowrap; }
 .br-ov .br-ledger .br-linecopy { margin-top: 4px; }
 .br-ov .br-lean { display: grid; gap: 3px; min-width: 116px; font-size: 12.5px; color: var(--text); }
+.br-ov .br-nw { white-space: nowrap; }
 .br-ov .br-prog > i.is-next { background: transparent; outline: 1.5px solid var(--kt-run); outline-offset: -1.5px; }
 .br-ov .br-sum code { font-size: .95em; padding: 0 4px; border-radius: 4px; background: var(--kt-glass); }
 .br-ov .br-empty-row td { color: var(--muted); padding: 18px 10px; }
@@ -87,6 +105,7 @@ export const OV_CSS = `
 .br-ov .br-funnel-rows span { display: inline-flex; align-items: center; gap: 6px; }
 .br-ov .br-funnel-rows b { color: var(--text-strong); font-variant-numeric: tabular-nums; }
 .br-ov .cto-notes li { line-height: 1.6; }
+.br-ov .cto-notes code { font-size: .92em; padding: 0 4px; border-radius: 4px; background: var(--kt-glass); }
 .br-ov .cto-table tr.cto-row-pick.is-merged td { color: var(--text); }
 
 .br-ov .br-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 8px; margin-top: 10px; }
@@ -137,11 +156,12 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
   useEffect(() => {
     if (!data) return
     const counts: Record<string, RepoCount> = Object.fromEntries((repo === 'all' ? ['all', ...repos.filter((x) => x.ok).map((x) => x.id)] : [repo]).map((id) => [id, { open: 0, you: 0 }]))
-    for (const r of data.rows.filter(isOpen)) {
+    // 轮到你 is every requirement that waits on you (a merge to write back into the Brain too), as 轮到你 lists them
+    for (const r of data.rows) {
       for (const id of repo === 'all' ? [r.repo, 'all'] : [r.repo]) {
         const c = (counts[id] ??= { open: 0, you: 0 })
-        c.open += 1
-        if (r.waits.who === 'you') c.you += 1
+        if (isOpen(r)) c.open += 1
+        if (r.waits.who === 'you' && r.state !== 'closed') c.you += 1
       }
     }
     setPillCounts((m) => (repo === 'all' ? counts : { ...m, ...counts }))
@@ -173,7 +193,8 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
   }
   const repoName = (id: string) => repos.find((x) => x.id === id)?.name
   const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
-  const localOnly = scope.length > 0 && scope.every((r) => r.remote === false)
+  // nothing here can be handed over: no origin to push to, or no GitLab for the bridge (the backend's local_only rule)
+  const localOnly = scope.length > 0 && scope.every((r) => r.remote === false || !(r.kit?.gitlab_base && r.kit?.gitlab_project))
   const manyRepos = repo === 'all' && repos.length > 1
   const team = !!status && (status.app.team || status.team.enabled)
   const newReq = () => go({ kind: 'new', ...(repo !== 'all' ? { repo } : {}) })
@@ -221,13 +242,12 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
         <section className="cto-hero" data-testid="ov-hero">
           <h2>{c.sentence}</h2>
           <p>
-            {localOnly && <><b data-testid="ov-local">{scope.length > 1 ? `这 ${scope.length} 个仓库都只在本机做` : '这个仓库只在本机做'}，不交给运行机。</b>{' '}</>}
             {c.available
-              ? `数字来自 brain-kit 的评估（读${scope.length > 1 ? '各仓库的默认分支' : `的是 ${refName(c.ref) || '默认分支'}`}）和这个 app 开的会话`
+              ? `数字来自 brain-kit 的评估（读的是${c.ref || '默认分支'}）和这个 app 开的会话`
               : 'brain-kit 的评估还没给出数字：下面先看 credits 和合并'}
             {' · '}口径见末尾
             {!c.available && status?.brainkit.modules.evaluate === false && (
-              <>。做什么：换一个带评估模块（evaluate）的 brain-kit<button type="button" className="br-link" onClick={() => go({ kind: 'settings' })}>去设置 ↗</button></>
+              <>。做什么：换一个带评估模块的 brain-kit<button type="button" className="br-link" onClick={() => go({ kind: 'settings' })}>去设置 ↗</button></>
             )}
           </p>
         </section>
@@ -284,7 +304,6 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
                   <div className="cto-desc">这个 app 开的会话报了 credits 以后才有</div>
                 </>
               )}
-              <div className="cto-foot"><span>KiroCrew 只报 credits，不报 token</span></div>
             </article>
             <FunnelCard f={data.funnel} team={team} onKey={(k) => openKey(k, true)} />
           </section>
@@ -325,7 +344,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
             {rows.length > limit && <button type="button" className="kt-btn is-small" style={{ marginTop: 10 }} onClick={() => setLimit((n) => n + 30)}>显示更多（还有 {rows.length - limit} 个）</button>}
           </section>
 
-          <EvalCard ev={data.eval} single={scope.length <= 1} onBoard={(k) => openKey(k)} onItem={(k) => openKey(k, true)} onSettings={() => go({ kind: 'settings' })} />
+          <EvalCard ev={data.eval} noModule={status?.brainkit.modules.evaluate === false} onBoard={(k) => openKey(k)} onItem={(k) => openKey(k, true)} onSettings={() => go({ kind: 'settings' })} />
         </>
       )}
 
@@ -335,8 +354,8 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
           <ul>
             <li>无人值守：brain-kit 评估里的「自主度」。交给运行机以后，除了必经的审批（需求、设计、计划、发布、验收），没有人做过任何事，而且交付正确（一次通过验收，合并后 14 天没有回滚、热修或缺陷）；14 天没满的、还没合并的算「还没评」，不算进分母。只在本机做的需求不交给运行机，也不算进分母。</li>
             <li>人介入：人在判断点上的动作是 Lean 的审批口令（批准、驳回、没被接受的口令）和等人回答的问题；交接后又推了代码、允许改验收测试、平台上的手动操作，都算判断点之外。本机做的和交给运行机的需求都算。</li>
-            <li>每个需求的 credits：这个 app 给需求开的 Kiro Crew 会话报的 credits 合计 ÷ 有 credits 的需求数。KiroCrew 只报 credits，input / output / cache token 都是 0。</li>
-            <li>决定 · 谁定的：{WHO_VOCAB}；每个决定只算一次，写了别的就算「没归类」，列出在哪一行，不猜是谁。还在分支上、没合并的需求也算；评估里的「知识有用率」只看默认分支上的引用，所以两个数的范围不一样。</li>
+            <li>每个需求的 credits：这个 app 给需求开的 Kiro Crew 会话报的 credits 合计 ÷ 有 credits 的需求数。KiroCrew 只报 credits，没有别的用量数。</li>
+            <li>决定 · 谁定的：<WhoSyntax />。每个决定只算一次，写了别的就算「没归类」，列出在哪一行，不猜是谁。还在分支上、没合并的需求也算；评估里的「知识有用率」只看默认分支上的引用，所以两个数的范围不一样。</li>
             <li>每周合并：合并进默认分支的那一周（周一起）；交付方式同上，没评估过的合并算「还没评」。</li>
             <li>轮到你、等别人：按每个需求此刻等谁；「已等」从它开始这样等的那一刻算起。</li>
           </ul>
@@ -366,12 +385,6 @@ function weekOf(r: Requirement, run: CtoRun | undefined): string | null {
   return `${m.getUTCFullYear()}-${String(m.getUTCMonth() + 1).padStart(2, '0')}-${String(m.getUTCDate()).padStart(2, '0')}`
 }
 
-/** refs/heads/main, origin/main, main @ 1a2b3c → main */
-export function refName(ref: string | null): string {
-  if (!ref) return ''
-  return ref.split(' @ ')[0].replace(/^refs\/heads\//, '').replace(/^refs\/remotes\/[^/]+\//, '').replace(/^origin\//, '').trim()
-}
-
 /** Open requirements first (the newest activity first), then the merged ones, then the closed. */
 function sortRows(rows: Requirement[]): Requirement[] {
   const rank = (r: Requirement) => (r.state === 'merged' ? 1 : r.state === 'closed' ? 2 : 0)
@@ -391,7 +404,7 @@ function YourTurn({ rows, at, repoName, onGo, onOpen, onAll }: {
     <section className="cto-card is-wait br-yours" aria-label="轮到你" data-testid="your-turn">
       <div className="cto-chart-head">
         <h3>轮到你</h3>
-        <span className="cto-dim">{rows.length} 件{by.length > 0 ? ` · ${by.map(([w, n]) => `${w} ${n}`).join(' · ')}` : ''}</span>
+        <span className="cto-dim">{rows.length} 个需求{by.length > 0 ? ` · ${by.map(([w, n]) => `${w} ${n}`).join(' · ')}` : ''}</span>
       </div>
       <ul>
         {rows.slice(0, SHOWN).map((r) => {
@@ -406,7 +419,7 @@ function YourTurn({ rows, at, repoName, onGo, onOpen, onAll }: {
               {name && <span className="cto-was">{name}</span>}
               <span>{r.waits.text}</span>
               {waited && <span className="br-waited">{waited}</span>}
-              {r.waits.line && <LineCopy line={r.waits.line} />}
+              {r.waits.line && <LineCopy line={r.waits.line} sessionUrl={r.session_url} />}
             </li>
           )
         })}
@@ -416,8 +429,9 @@ function YourTurn({ rows, at, repoName, onGo, onOpen, onAll }: {
   )
 }
 
-/** The exact line the person types themselves in the session, with 复制那一行 (it is never sent anywhere). */
-function LineCopy({ line }: { line: string }) {
+/** The exact line the person types themselves in the session, with 复制那一行 and 打开会话 (it is never sent anywhere). */
+function LineCopy({ line, sessionUrl }: { line: string; sessionUrl?: string | null }) {
+  const navigate = useNavigate()
   const [copied, setCopied] = useState<'' | 'ok' | 'fail'>('')
   const copy = async () => {
     try {
@@ -431,6 +445,7 @@ function LineCopy({ line }: { line: string }) {
     <span className="br-linecopy" data-testid="line-copy" onClick={(e) => e.stopPropagation()} title="在会话里自己打这一行：app 不会替你发">
       <code className="br-mono">{line}</code>
       <button type="button" className="br-btn is-small" onClick={() => void copy()}><Icon name="Copy" size={13} />{ACT.copyLine}</button>
+      {sessionUrl && <button type="button" className="br-btn is-small" onClick={() => navigate(sessionUrl)}><Icon name="MessageSquare" size={13} />{ACT.openSession}</button>}
       {copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制，去会话里自己打</span>}
       {copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请手动选中这一行</span>}
     </span>
@@ -512,6 +527,8 @@ function PeopleCard({ c, onPick }: { c: CtoNumbers; onPick: (p: LedgerPick) => v
 
 function FunnelCard({ f, team, onKey }: { f: Funnel; team: boolean; onKey: (key: string) => void }) {
   const people = f.rows.find((r) => r.id === 'person')?.count ?? 0
+  // the app's words for who decided (需求详情's decisions say the same), not brain-kit's labels with agent / Who in them
+  const rows = f.rows.map((r) => ({ ...r, label: DECIDED_BY[r.id] ?? r.label }))
   return (
     <article className={`cto-card${f.unclassified.length ? ' is-warn' : ''}`} aria-label="决定 · 谁定的" data-testid="funnel-card">
       <div className="cto-eyebrow">决定 · 谁定的</div>
@@ -521,9 +538,9 @@ function FunnelCard({ f, team, onKey }: { f: Funnel; team: boolean; onKey: (key:
         <>
           <div className="cto-value" data-testid="funnel-total">{f.total}<span className="cto-of">个决定</span></div>
           <div className="cto-desc">人定了 {people} 个 · {f.source === 'evaluate' ? '数字来自 brain-kit 的评估' : 'app 自己数的'} · 没合并的需求也算</div>
-          <MiniWho rows={f.rows} />
+          <MiniWho rows={rows} />
           <div className="br-funnel-rows">
-            {f.rows.filter((r) => r.count > 0).map((r) => <span key={r.id} data-row={r.id}><i className="cto-sw" style={{ background: WHO_VAR[r.id] ?? 'var(--ov-ink-3)' }} />{r.label}<b>{r.count}</b></span>)}
+            {rows.filter((r) => r.count > 0).map((r) => <span key={r.id} data-row={r.id}><i className="cto-sw" style={{ background: WHO_VAR[r.id] ?? 'var(--ov-ink-3)' }} />{r.label}<b>{r.count}</b></span>)}
           </div>
         </>
       )}
@@ -569,15 +586,17 @@ function Overlaps({ data, onKey }: { data: Overview; onKey: (key: string) => voi
   )
 }
 
-const SIZE_NAME: Record<string, string> = { small: '小', s: '小', medium: '中', m: '中', large: '大', l: '大', xl: '特大' }
+/** backend/core/mrdesc_view.py SIZE_WORD: 「（规模 small）」 reads 「（规模小）」 as the backend writes it */
+const SIZE_NAME: Record<string, string> = { small: '小', s: '小', xs: '很小', medium: '中', m: '中', large: '大', l: '大', xl: '很大' }
 
 /** The first line of a 变更说明 for the ledger: `code` as code, internal ids (D01#S002 · 097f2e9e) only on hover, 规模
- * in Chinese, and without its 「现在：…」 tail (the row's state and Lean columns say that). */
+ * in Chinese, and without its 「现在：…」 tail (the row's state and Lean columns say that). The backend sends a person's
+ * rows already plain (mrdesc_view.plain_line); this is a no-op on those and makes the runner's rows read the same. */
 export function plainSummary(s: string): { parts: { code: boolean; text: string }[]; ids: string } {
   const ids: string[] = []
   const t = s.split('现在：')[0]
     .replace(/（([^（）]*#[^（）]*)）/g, (_m, id: string) => (ids.push(id), ''))
-    .replace(/（规模\s*([A-Za-z]+)）/g, (m, z: string) => (SIZE_NAME[z.toLowerCase()] ? `（规模：${SIZE_NAME[z.toLowerCase()]}）` : m))
+    .replace(/（规模\s*([A-Za-z]+)）/g, (m, z: string) => (SIZE_NAME[z.toLowerCase()] ? `（规模${SIZE_NAME[z.toLowerCase()]}）` : m))
     .trim()
   return { parts: t.split('`').map((text, i) => ({ code: i % 2 === 1, text })).filter((p) => p.text), ids: ids.join('；') }
 }
@@ -606,7 +625,7 @@ function LeanProgress({ r }: { r: Requirement }) {
           <i key={i} className={i < l.done_n! ? 'is-done' : i < l.done_n! + skipped ? 'is-skipped' : next && i === l.done_n! + skipped ? 'is-next' : ''} />
         ))}
       </span>
-      <span>{text}</span>
+      <span>{text.split(' · ').map((part, i) => <span key={i}>{i > 0 && ' · '}<span className="br-nw">{part}</span></span>)}</span>
     </span>
   )
 }
@@ -615,7 +634,7 @@ function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
   r: Requirement; at: number; run?: CtoRun; ev: EvalView; repoName?: string; onOpen: () => void; onItem: () => void; onReplay: () => void; onGo: (v: View) => void
 }) {
   const step = stepOf(r)
-  const waited = r.waits.who !== 'nobody' && isOpen(r) ? waitedText(r, at) : ''
+  const waited = r.waits.who === 'you' || (r.waits.who !== 'nobody' && isOpen(r)) ? waitedText(r, at) : ''
   const review = ev.queue.find((q) => q.key === r.key)
   const skipped = ev.skipped.find((x) => x.key === r.key)
   return (
@@ -641,7 +660,7 @@ function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
       <td className="br-col-wait">
         <div className={r.waits.who === 'you' ? 'br-strong' : undefined}>{r.waits.text}</div>
         {waited && <div className={r.waits.who === 'you' ? 'br-waited' : 'cto-was'}>{waited}</div>}
-        {r.waits.line && <LineCopy line={r.waits.line} />}
+        {r.waits.line && <LineCopy line={r.waits.line} sessionUrl={r.session_url} />}
         {step && <StepButton step={step} onGo={onGo} primary={false} />}
       </td>
       <td>
@@ -683,18 +702,23 @@ function metricValue(v: EvalMetric['value']): string | null {
 
 /** brain-kit's eval batch: its numbers with what each means, the runs to look at again, the runs it skipped and its
  * notes. The batch is what the default branch has records of: it does not follow the ledger's filters. */
-function EvalCard({ ev, single, onBoard, onItem, onSettings }: { ev: EvalView; single: boolean; onBoard: (k: string) => void; onItem: (k: string) => void; onSettings: () => void }) {
+function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
+  ev: EvalView; noModule: boolean; onBoard: (k: string) => void; onItem: (k: string) => void; onSettings: () => void
+}) {
   return (
     <section className="cto-card br-eval" aria-label="brain-kit 的评估" data-testid="eval-batch">
       <div className="cto-chart-head">
         <h3>brain-kit 的评估</h3>
-        <span className="cto-dim">{ev.available ? `这一批：${single && refName(ev.ref) ? `${refName(ev.ref)} 分支` : '默认分支'}上已经有记录的需求 · 不跟着交付清单的筛选变` : ''}</span>
+        <span className="cto-dim">{ev.available ? `这一批：${ev.ref || '默认分支'}上已经有记录的需求 · 不跟着交付清单的筛选变` : ''}</span>
       </div>
       {!ev.available ? (
-        <p className="br-note" style={{ marginTop: 6 }}>
-          {ev.error || 'brain-kit 还没有评估模块（evaluate）'}。做什么：换一个新一点的 brain-kit，评估的数字就会出来。
-          <button type="button" className="br-link" style={{ marginLeft: 6 }} onClick={onSettings}>去设置 ↗</button>
-        </p>
+        noModule || !ev.error ? (
+          <div className="br-note" style={{ marginTop: 6 }}>
+            brain-kit 还没有评估模块。做什么：换一个新一点的 brain-kit，评估的数字就会出来。
+            <button type="button" className="br-link" style={{ marginLeft: 6 }} onClick={onSettings}>去设置 ↗</button>
+            {ev.error && <details className="br-raw"><summary>细节</summary><pre>{ev.error}</pre></details>}
+          </div>
+        ) : <p className="br-note" style={{ marginTop: 6 }}>{ev.error}</p>
       ) : (
         <>
           <div className="br-metrics">
@@ -750,22 +774,28 @@ function StateFilter({ counts, total, value, onPick }: { counts: Overview['count
 }
 
 /** 从远端取最新 (git fetch) for every repo here that has a remote; none: no button (a repo done only here has nothing
- * to fetch). */
+ * to fetch). What happened is said per repo (by its name when there are several); git's own words are under 细节. */
 function RefreshButton({ repos, onDone }: { repos: RepoInfo[]; onDone: () => void }) {
   const api = useAppApi()
   const act = useAction(async () => {
-    const out: RefreshResult[] = []
-    for (const r of repos) out.push(await api.post<RefreshResult>(paths.refresh(), { repo: r.id }))
-    return { ok: out.every((x) => x.ok), text: out.map((x) => x.text).join('；') }
+    const out: (RefreshResult & { name: string })[] = []
+    for (const r of repos) out.push({ ...(await api.post<RefreshResult>(paths.refresh(), { repo: r.id })), name: r.name })
+    return out
   })
   if (repos.length === 0) return null
   const run = async () => {
     const r = await act.run()
     if (r) onDone()
   }
+  const named = repos.length > 1
   return (
     <span className="br-refresh">
-      {act.result && <span className={`br-small ${act.result.ok ? 'br-dim' : 'br-bad-text'}`} role="status">{act.result.text}</span>}
+      {act.result?.map((x) => (
+        <span key={x.name} className={`br-small ${x.ok ? 'br-dim' : 'br-bad-text'}`} role="status" data-testid="refresh-result">
+          {named && `${x.name}：`}{x.text}
+          {x.raw && <details className="br-raw"><summary>细节</summary><pre>{x.raw}</pre></details>}
+        </span>
+      ))}
       {act.error && (
         <span className="br-small br-bad-text" role="alert">没取成：{act.error}。做什么：看看网络、远端地址和你的权限，再点一次</span>
       )}

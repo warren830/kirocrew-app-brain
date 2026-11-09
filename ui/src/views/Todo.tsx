@@ -23,7 +23,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@kirocrew/app-sdk'
 import { paths, usePoll } from '../api'
-import { ago } from '../format'
+import { fmtWaited } from '../format'
 import type { Todo, TodoItem } from '../types'
 import { CheckRows, EmptyHero, ExtLink, Icon, LoadState, RoleIcon, TYPE_IT_YOURSELF, TypeLine, type FlowStep } from '../ui'
 import { ACT, DO_NAME, approvalName } from '../vocab'
@@ -180,7 +180,7 @@ function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; 
         <b className="td-title">{it.title}</b>
         <span className="br-grow" />
         {it.approval && <span className="br-chip tone-wait">{approvalName(it.approval)}</span>}
-        {it.since !== null && <span className="br-dim br-small">{ago(it.since, now)}</span>}
+        {it.since !== null && <span className="br-dim br-small" title="从它这样等着你的那一刻算起">已等 {fmtWaited(now - it.since)}</span>}
       </div>
       {text && <p className="td-text">{text}</p>}
       {group.key === 'stuck' && <p className="td-do"><b>做什么</b>找这个需求的负责人，在 MR 上决定重开还是关掉它。</p>}

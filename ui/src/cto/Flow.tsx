@@ -30,15 +30,16 @@ const LANE_OF_WHO: Record<WaitWho, Lane | null> = {
 }
 const RUNNER_STATES = new Set(['handed_over', 'running', 'rejected', 'parked'])
 
-/** The column of a requirement on its journey: its state, else its Lean stage (1–3 需求, 4–8 设计, 9–10 构建, 11 发布). */
+/** The column of a requirement on its journey: its state (a hand-over, refused or not, is 交给运行机 whatever Lean's
+ * stage), else its Lean stage (1–3 需求, 4–8 设计, 9–10 构建, 11 发布). */
 export function colOf(r: Requirement): Col | null {
   if (r.state === 'closed') return null
   if (r.state === 'merged') return '已合并'
   if (r.state === 'acceptance') return '发布验收'
   const n = r.lean.stage_n ?? 0
   const runner = r.state === 'handed_over' || r.state === 'running' || r.state === 'rejected' || ((r.state === 'parked') && (r.mr !== null || r.run_ids.length > 0))
-  if (n >= 11) return '发布验收'
   if (runner && !r.local_only) return '交给运行机'
+  if (n >= 11) return '发布验收'
   if (r.state === 'claimed' || n <= 3) return '需求'
   if (n <= 8) return '设计'
   return '构建'
@@ -118,11 +119,14 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
   localOnly?: boolean
 } & Handlers) {
   const live = rows.filter((r) => colOf(r) && colOf(r) !== '已合并')
-  const merged = rows.filter((r) => colOf(r) === '已合并' && (r.updated_at ?? 0) >= at - 14 * 86400)
+  // a merge that still waits on you (回写 Brain) stays on the board however old it is
+  const merged = rows.filter((r) => colOf(r) === '已合并' && ((r.updated_at ?? 0) >= at - 14 * 86400 || r.waits.who === 'you'))
+    .sort((a, b) => Number(b.waits.who === 'you') - Number(a.waits.who === 'you'))
   const cell = (c: Col, l: Lane) => live.filter((r) => colOf(r) === c && laneOf(r) === l).sort((a, b) => (a.waits.since ?? Infinity) - (b.waits.since ?? Infinity) || (b.updated_at ?? 0) - (a.updated_at ?? 0))
   const count = (c: Col) => (c === '已合并' ? merged.length : live.filter((r) => colOf(r) === c).length)
   const inLane = (l: Lane) => live.filter((r) => laneOf(r) === l)
   const yours = inLane('you')
+  const mergedYours = merged.filter((r) => laneOf(r) === 'you')
   const byDo = Object.entries(yours.reduce<Record<string, number>>((m, r) => {
     const w = r.waits.do ? WAIT_NAME[r.waits.do] : ''
     return w ? { ...m, [w]: (m[w] ?? 0) + 1 } : m
@@ -142,9 +146,10 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
         {onNew && <button type="button" className="kt-btn is-small cto-noprint" onClick={onNew}>开需求 ↗</button>}
       </div>
       <div className="cto-stats" data-testid="flow-stats">
-        进行中 {live.length} 个<span>·</span>轮到你 {yours.length}{byDo.length > 0 && <small>（{byDo.map(([w, n]) => `${w} ${n}`).join(' · ')}）</small>}
-        <span>·</span>等别人 {inLane('people').length}<span>·</span>AI 在本机做 {inLane('agent').length}
-        {!localOnly && <><span>·</span>运行机在跑 {inLane('runner').length}</>}
+        <b>进行中 {live.length} 个</b><span>·</span><b>轮到你 {yours.length}</b>{byDo.length > 0 && <small>（{byDo.map(([w, n]) => `${w} ${n}`).join(' · ')}）</small>}
+        <span>·</span><b>等别人 {inLane('people').length}</b><span>·</span><b>AI 在本机做 {inLane('agent').length}</b>
+        {!localOnly && <><span>·</span><b>运行机在跑 {inLane('runner').length}</b></>}
+        {mergedYours.length > 0 && <><span>·</span><b>已合并、等你{DO_NAME.write_back} {mergedYours.length}</b></>}
       </div>
       {longest !== undefined && <div className="cto-dim" data-testid="flow-longest">轮到你的事，最久的已等 {fmtWaited(at - longest)}。</div>}
       <div className="cto-kanban br-kanban" role="table" aria-label="需求流动看板" style={{ gridTemplateColumns: template }}>
@@ -198,13 +203,13 @@ function LaneRow({ lane, name, icon, wait, first, span, cols, cell, at, hl, repo
       {merged && (
         <div className="cto-cell is-span br-merged-cell" data-col="已合并" style={{ gridRow: `span ${span}` }}>
           {merged.length === 0 && <div className="cto-kempty">近 14 天还没有合并的</div>}
-          {merged.slice(0, 5).map((r) => (
+          {merged.slice(0, 5).map((r) => (laneOf(r) === 'you' ? <Card key={`${r.repo}/${r.key}`} r={r} at={at} hl={hl} repoName={repoName(r.repo)} h={h} /> : (
             <button type="button" key={`${r.repo}/${r.key}`} data-key={r.key} className={`cto-kcard is-real${hl === r.key ? ' is-hl' : ''}`} title="打开它的需求看板（可以回放）" onClick={() => h.onOpen(r)}>
               <span className="cto-ktop"><b className="kt-mono">{r.key}</b><span>{ago(r.updated_at, at)}</span></span>
               <span className="cto-ktitle">{r.title}</span>
               <span className="cto-kmeta">{[r.owner, r.credits !== null ? `${fmtCredits(r.credits)} credits` : ''].filter(Boolean).join(' · ')}</span>
             </button>
-          ))}
+          )))}
           {merged.length > 5 && <button type="button" className="cto-kmore cto-link" onClick={() => h.onCell('已合并')}>+{merged.length - 5} 个（见下方交付清单）</button>}
         </div>
       )}
