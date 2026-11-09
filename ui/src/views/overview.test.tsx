@@ -195,6 +195,7 @@ describe('交付总览', () => {
     expect(within(flow).getByTestId('flow-stats')).toHaveTextContent('轮到你 2（等批准 1 · 要重做交接 1）·等别人 3·AI 在本机做 0·运行机在跑 0·已合并、等你回写 Brain 1')
     const card = flow.querySelector('[data-col="已合并"] [data-key="PAY-2"]') as HTMLElement
     expect(card).toHaveTextContent('已等 2 天')
+    expect(rowOf(screen.getByTestId('req-table'), 'PAY-2')).toHaveTextContent('已合并，有 1 条新知识等你回写 Brain已等 2 天')
     await user.click(within(card).getByRole('button', { name: '回写 Brain ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', reflect: 'PAY-2' })
     expect(p.go).toHaveBeenCalledTimes(1)

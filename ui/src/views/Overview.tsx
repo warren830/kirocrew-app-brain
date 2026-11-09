@@ -634,7 +634,7 @@ function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
   r: Requirement; at: number; run?: CtoRun; ev: EvalView; repoName?: string; onOpen: () => void; onItem: () => void; onReplay: () => void; onGo: (v: View) => void
 }) {
   const step = stepOf(r)
-  const waited = r.waits.who !== 'nobody' && isOpen(r) ? waitedText(r, at) : ''
+  const waited = r.waits.who === 'you' || (r.waits.who !== 'nobody' && isOpen(r)) ? waitedText(r, at) : ''
   const review = ev.queue.find((q) => q.key === r.key)
   const skipped = ev.skipped.find((x) => x.key === r.key)
   return (
