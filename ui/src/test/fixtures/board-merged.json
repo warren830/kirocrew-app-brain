@@ -50,8 +50,7 @@
     "expected_paths": [
       "src/refund/id.py"
     ],
-    "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-2-1c4e"
+    "local_only": false
   },
   "branch": "ai/alice/PAY-2-refund-id",
   "base": "main",
@@ -90,6 +89,16 @@
           "doing": "交给你批准需求"
         },
         {
+          "at": 1793631120,
+          "status": "running",
+          "doing": "批准了，接着做"
+        },
+        {
+          "at": 1793631180,
+          "status": "running",
+          "doing": "在做：下一个阶段"
+        },
+        {
           "at": 1793631300,
           "status": "running",
           "doing": "在做：应用设计"
@@ -110,6 +119,16 @@
           "doing": "交给你批准设计"
         },
         {
+          "at": 1793637960,
+          "status": "running",
+          "doing": "批准了，接着做"
+        },
+        {
+          "at": 1793638020,
+          "status": "running",
+          "doing": "在做：下一个阶段"
+        },
+        {
           "at": 1793639340.0,
           "status": "done",
           "doing": "交给运行机了"
@@ -127,7 +146,7 @@
           "kind": "work"
         },
         {
-          "a": 1793631300,
+          "a": 1793631120,
           "b": 1793633760,
           "kind": "work"
         },
@@ -135,6 +154,11 @@
           "a": 1793635080,
           "b": 1793636580,
           "kind": "fix"
+        },
+        {
+          "a": 1793637960,
+          "b": 1793639340.0,
+          "kind": "work"
         }
       ],
       "marks": [
@@ -146,7 +170,7 @@
         {
           "at": 1793632200,
           "kind": "blocked",
-          "title": "Lean 拦下了写 src/refund/service.py（inception）"
+          "title": "Lean 拦下了写 src/refund/service.py：需求和设计还没批"
         },
         {
           "at": 1793636460.0,
@@ -161,11 +185,10 @@
         {
           "at": 1793639340.0,
           "kind": "handover",
-          "title": "交接：brain handoff（9ed34417）"
+          "title": "交给运行机（提交 9ed34417）"
         }
       ],
       "facts": [
-        "Lean 做完 11/11 个阶段",
         "提交 3 次",
         "Lean 拦下 1 次",
         "会话 1 个"
@@ -209,7 +232,7 @@
         {
           "at": 1793629860,
           "kind": "request",
-          "title": "请你批准需求（REQUIREMENTS · 4b040832）"
+          "title": "请你批准需求"
         },
         {
           "at": 1793631120,
@@ -233,6 +256,11 @@
       "doing": "你批准了 · 设计",
       "since": 1793637960,
       "history": [
+        {
+          "at": 1793631120,
+          "status": "waiting",
+          "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+        },
         {
           "at": 1793633760,
           "status": "awaiting_approval",
@@ -270,7 +298,7 @@
         {
           "at": 1793633760,
           "kind": "request",
-          "title": "请你批准设计（DESIGN · 56cd1e0a）"
+          "title": "请你批准设计"
         },
         {
           "at": 1793635080,
@@ -280,7 +308,7 @@
         {
           "at": 1793636580,
           "kind": "request",
-          "title": "请你批准设计（DESIGN · 336fbcbc）"
+          "title": "请你批准设计"
         },
         {
           "at": 1793637960,
@@ -321,7 +349,7 @@
         {
           "at": 1793639340.0,
           "kind": "handover",
-          "title": "交接：brain handoff（9ed34417）"
+          "title": "交给运行机（提交 9ed34417）"
         }
       ],
       "facts": [
@@ -465,7 +493,7 @@
         {
           "at": 1793651880,
           "status": "running",
-          "doing": "做完代码生成"
+          "doing": "在做：下一个阶段"
         },
         {
           "at": 1793651940,
@@ -475,7 +503,7 @@
         {
           "at": 1793654640,
           "status": "running",
-          "doing": "做完构建测试"
+          "doing": "在做：下一个阶段"
         },
         {
           "at": 1793654700,
@@ -485,7 +513,7 @@
         {
           "at": 1793655180,
           "status": "done",
-          "doing": "交给你批准发布"
+          "doing": "交给人批准发布"
         },
         {
           "at": 1793655240.0,
@@ -505,7 +533,7 @@
         {
           "at": 1793659560,
           "status": "running",
-          "doing": "做完发布"
+          "doing": "在做：下一个阶段"
         },
         {
           "at": 1793661540.0,
@@ -652,7 +680,7 @@
         {
           "at": 1793654580,
           "status": "done",
-          "doing": "verify 通过：3 项都过了"
+          "doing": "verify 通过（3 项）"
         },
         {
           "at": 1793661540.0,
@@ -681,13 +709,13 @@
         {
           "at": 1793654580,
           "kind": "verify-ok",
-          "title": "verify 通过：3 项都过了"
+          "title": "verify 通过（3 项）"
         }
       ],
       "facts": [
         "verify 2 次",
         "没过 1 次",
-        "verify 通过：3 项都过了"
+        "verify 通过（3 项）"
       ],
       "credits": null,
       "session": null,
@@ -699,18 +727,18 @@
       "sub": "RELEASE · 验收",
       "icon": "release",
       "status": "merged",
-      "doing": "你批准了 · 发布",
+      "doing": "产品在 MR 上批准了 · 发布",
       "since": 1793659500,
       "history": [
         {
           "at": 1793655180,
           "status": "awaiting_approval",
-          "doing": "等你批准发布"
+          "doing": "等人在 MR 上批准发布"
         },
         {
           "at": 1793659500,
           "status": "merged",
-          "doing": "你批准了 · 发布"
+          "doing": "产品在 MR 上批准了 · 发布"
         }
       ],
       "spans": [
@@ -724,12 +752,12 @@
         {
           "at": 1793655180,
           "kind": "request",
-          "title": "请你批准发布（RELEASE · 32e925aa）"
+          "title": "请人在 MR 上批准发布"
         },
         {
           "at": 1793659500,
           "kind": "approved",
-          "title": "你批准了发布"
+          "title": "产品在 MR 上批准了发布"
         }
       ],
       "facts": [
@@ -745,8 +773,8 @@
       "sub": "brain reflect",
       "icon": "brain",
       "status": "done",
-      "doing": "回写分支 brain/PAY-2-reflect-1",
-      "since": 1793715540,
+      "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
+      "since": 1793715540.0,
       "history": [
         {
           "at": 1793661540.0,
@@ -756,31 +784,15 @@
         {
           "at": 1793715540.0,
           "status": "done",
-          "doing": "回写 Brain：成功"
-        },
-        {
-          "at": 1793715540,
-          "status": "done",
-          "doing": "回写分支 brain/PAY-2-reflect-1"
+          "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）"
         }
       ],
-      "spans": [
-        {
-          "a": 1793661540.0,
-          "b": 1793715540.0,
-          "kind": "wait"
-        }
-      ],
+      "spans": [],
       "marks": [
         {
           "at": 1793715540.0,
           "kind": "reflect",
-          "title": "回写 Brain：成功"
-        },
-        {
-          "at": 1793715540,
-          "kind": "reflect",
-          "title": "写好了回写分支 brain/PAY-2-reflect-1"
+          "title": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）"
         }
       ],
       "facts": [
@@ -851,7 +863,7 @@
       "kind": "start",
       "from": "person",
       "to": "local",
-      "text": "开工：brain start，在它自己的工作目录里",
+      "text": "开工：在它自己的工作目录里",
       "detail": false,
       "src": "runs/PAY-2/run.json"
     },
@@ -891,7 +903,7 @@
       "kind": "request",
       "from": "local",
       "to": "req",
-      "text": "请你批准需求（REQUIREMENTS · 4b040832）",
+      "text": "请你批准需求",
       "detail": false,
       "src": null
     },
@@ -941,7 +953,7 @@
       "kind": "blocked",
       "from": "local",
       "to": "local",
-      "text": "Lean 拦下了写 src/refund/service.py（inception）",
+      "text": "Lean 拦下了写 src/refund/service.py：需求和设计还没批",
       "detail": true,
       "src": null
     },
@@ -951,7 +963,7 @@
       "kind": "request",
       "from": "local",
       "to": "design",
-      "text": "请你批准设计（DESIGN · 56cd1e0a）",
+      "text": "请你批准设计",
       "detail": false,
       "src": null
     },
@@ -981,7 +993,7 @@
       "kind": "request",
       "from": "local",
       "to": "design",
-      "text": "请你批准设计（DESIGN · 336fbcbc）",
+      "text": "请你批准设计",
       "detail": false,
       "src": null
     },
@@ -1031,7 +1043,7 @@
       "kind": "handover",
       "from": "local",
       "to": "handover",
-      "text": "交接：brain handoff（9ed34417）",
+      "text": "交给运行机（提交 9ed34417）",
       "detail": false,
       "src": null
     },
@@ -1211,7 +1223,7 @@
       "kind": "verify",
       "from": "branch",
       "to": "checks",
-      "text": "verify 通过：3 项都过了",
+      "text": "verify 通过（3 项）",
       "detail": false,
       "src": null
     },
@@ -1241,7 +1253,7 @@
       "kind": "request",
       "from": "runner",
       "to": "release",
-      "text": "请你批准发布（RELEASE · 32e925aa）",
+      "text": "请人在 MR 上批准发布",
       "detail": false,
       "src": null
     },
@@ -1291,7 +1303,7 @@
       "kind": "approve",
       "from": "person",
       "to": "release",
-      "text": "你批准了发布",
+      "text": "产品在 MR 上批准了发布",
       "detail": false,
       "src": null
     },
@@ -1321,17 +1333,7 @@
       "kind": "reflect",
       "from": "person",
       "to": "reflect",
-      "text": "回写 Brain：成功",
-      "detail": false,
-      "src": null
-    },
-    {
-      "seq": 50,
-      "at": 1793715540,
-      "kind": "reflect",
-      "from": "person",
-      "to": "reflect",
-      "text": "写好了回写分支 brain/PAY-2-reflect-1",
+      "text": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
       "detail": false,
       "src": null
     }
@@ -1346,20 +1348,7 @@
       "files": 2,
       "records_only": true,
       "actor": "local",
-      "changes": [
-        {
-          "path": "aidlc-docs/refund-id/requirements.md",
-          "added": 41,
-          "removed": 0,
-          "status": "A"
-        },
-        {
-          "path": "runs/PAY-2/run.json",
-          "added": 29,
-          "removed": 0,
-          "status": "A"
-        }
-      ]
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1370,14 +1359,7 @@
       "files": 1,
       "records_only": true,
       "actor": "local",
-      "changes": [
-        {
-          "path": "aidlc-docs/refund-id/design.md",
-          "added": 22,
-          "removed": 8,
-          "status": "M"
-        }
-      ]
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1388,14 +1370,7 @@
       "files": 1,
       "records_only": true,
       "actor": "local",
-      "changes": [
-        {
-          "path": "runs/PAY-2/handoff.md",
-          "added": 17,
-          "removed": 0,
-          "status": "A"
-        }
-      ]
+      "changes": []
     },
     {
       "kind": "handover",
@@ -1406,20 +1381,7 @@
       "files": 2,
       "records_only": true,
       "actor": "handover",
-      "changes": [
-        {
-          "path": "runs/PAY-2/run.json",
-          "added": 6,
-          "removed": 1,
-          "status": "M"
-        },
-        {
-          "path": "runs/PAY-2/MR.md",
-          "added": 23,
-          "removed": 0,
-          "status": "A"
-        }
-      ]
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1430,26 +1392,7 @@
       "files": 3,
       "records_only": false,
       "actor": "runner",
-      "changes": [
-        {
-          "path": "src/refund/id.py",
-          "added": 38,
-          "removed": 0,
-          "status": "A"
-        },
-        {
-          "path": "src/refund/models.py",
-          "added": 14,
-          "removed": 2,
-          "status": "M"
-        },
-        {
-          "path": "src/refund/__init__.py",
-          "added": 1,
-          "removed": 0,
-          "status": "M"
-        }
-      ]
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1460,32 +1403,7 @@
       "files": 4,
       "records_only": false,
       "actor": "runner",
-      "changes": [
-        {
-          "path": "src/refund/id.py",
-          "added": 27,
-          "removed": 6,
-          "status": "M"
-        },
-        {
-          "path": "src/refund/service.py",
-          "added": 33,
-          "removed": 4,
-          "status": "M"
-        },
-        {
-          "path": "src/refund/api.py",
-          "added": 9,
-          "removed": 1,
-          "status": "M"
-        },
-        {
-          "path": "src/refund/models.py",
-          "added": 3,
-          "removed": 1,
-          "status": "M"
-        }
-      ]
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1496,38 +1414,7 @@
       "files": 5,
       "records_only": false,
       "actor": "runner",
-      "changes": [
-        {
-          "path": "src/refund/retry.py",
-          "added": 44,
-          "removed": 0,
-          "status": "A"
-        },
-        {
-          "path": "src/refund/service.py",
-          "added": 12,
-          "removed": 5,
-          "status": "M"
-        },
-        {
-          "path": "src/refund/id.py",
-          "added": 6,
-          "removed": 2,
-          "status": "M"
-        },
-        {
-          "path": "src/refund/errors.py",
-          "added": 18,
-          "removed": 0,
-          "status": "A"
-        },
-        {
-          "path": "src/refund/api.py",
-          "added": 4,
-          "removed": 2,
-          "status": "M"
-        }
-      ]
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1538,44 +1425,7 @@
       "files": 6,
       "records_only": false,
       "actor": "runner",
-      "changes": [
-        {
-          "path": "tests/test_refund_id.py",
-          "added": 52,
-          "removed": 0,
-          "status": "A"
-        },
-        {
-          "path": "tests/test_retry.py",
-          "added": 37,
-          "removed": 0,
-          "status": "A"
-        },
-        {
-          "path": "tests/conftest.py",
-          "added": 8,
-          "removed": 1,
-          "status": "M"
-        },
-        {
-          "path": "tests/test_api.py",
-          "added": 19,
-          "removed": 3,
-          "status": "M"
-        },
-        {
-          "path": "tests/test_service.py",
-          "added": 24,
-          "removed": 0,
-          "status": "A"
-        },
-        {
-          "path": "pytest.ini",
-          "added": 2,
-          "removed": 0,
-          "status": "M"
-        }
-      ]
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1586,20 +1436,7 @@
       "files": 2,
       "records_only": false,
       "actor": "runner",
-      "changes": [
-        {
-          "path": "src/refund/id.py",
-          "added": 7,
-          "removed": 4,
-          "status": "M"
-        },
-        {
-          "path": "tests/test_refund_id.py",
-          "added": 6,
-          "removed": 1,
-          "status": "M"
-        }
-      ]
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1610,20 +1447,7 @@
       "files": 2,
       "records_only": false,
       "actor": "runner",
-      "changes": [
-        {
-          "path": "tests/test_retry.py",
-          "added": 5,
-          "removed": 3,
-          "status": "M"
-        },
-        {
-          "path": "src/refund/retry.py",
-          "added": 2,
-          "removed": 2,
-          "status": "M"
-        }
-      ]
+      "changes": []
     },
     {
       "kind": "merge",
@@ -1643,7 +1467,7 @@
         "id": "gate-REQUIREMENTS",
         "group": "gate",
         "label": "需求",
-        "name": "需求审批（REQUIREMENTS）",
+        "name": "需求审批",
         "status": "pass",
         "at": 1793631120,
         "detail": "你批准了",
@@ -1653,7 +1477,7 @@
         "id": "gate-DESIGN",
         "group": "gate",
         "label": "设计",
-        "name": "设计审批（DESIGN）",
+        "name": "设计审批",
         "status": "pass",
         "at": 1793637960,
         "detail": "你批准了",
@@ -1663,10 +1487,10 @@
         "id": "gate-RELEASE",
         "group": "gate",
         "label": "发布",
-        "name": "发布审批（RELEASE）",
+        "name": "发布审批",
         "status": "pass",
         "at": 1793659500,
-        "detail": "你批准了",
+        "detail": "产品在 MR 上批准了",
         "actor": "release"
       },
       {
@@ -1734,15 +1558,18 @@
         "group": "after",
         "label": "14 天",
         "name": "合并后 14 天没有回滚或热修",
-        "status": "wait",
+        "status": "watch",
         "at": null,
-        "detail": "还在观察：到 2026-11-16",
+        "detail": "观察中：到 2026-11-16",
         "actor": "release"
       }
     ],
     "passed": 9,
     "failed": 0,
-    "total": 10,
+    "total": 9,
+    "todo": [
+      "合并后 14 天"
+    ],
     "at": 1793659500,
     "history": [
       {
@@ -1755,8 +1582,7 @@
         "passed": 3,
         "failed": 0
       }
-    ],
-    "todo": []
+    ]
   },
   "accept": {
     "state": "merged",
@@ -1779,10 +1605,10 @@
         "count": 2
       }
     ],
-    "checks": "检查 9/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "checks": "目前 9 项都过 · 还剩 合并后 14 天",
     "done": {
       "at": 1793661540.0,
-      "who": "P-9E3B",
+      "who": "产品",
       "how": "合并提交"
     }
   },
