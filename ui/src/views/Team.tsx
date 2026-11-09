@@ -2,9 +2,10 @@
  * 运行机 (team mode only), in the sample board's look: the bridge loop's status as a card with 「现在跑一轮」 (POST
  * /team/loop); the ledger's counts as counter cards (runs by brain-kit's run states, questions by their states,
  * hand-overs, the signer's pending and refused) with a segment bar each; what the bridge said about each labelled MR in
- * the last round as a conveyor (accepted, rejected, seen, unlabelled, waiting, error); the runs as a ledger table with
- * their MRs and sessions; the signer's pending and refused requests and the vouchers it has not answered yet (asked for
- * again next round) as cards.
+ * the last round as a conveyor (accepted, rejected, seen, unlabelled, waiting, error) between its two ends, which stay
+ * in sight however many MRs there are; the runs as a ledger table with their MRs and sessions; the signer's pending and
+ * refused requests and the vouchers it has not answered yet (asked for again next round) as cards. Every state, step
+ * and kind is said in words (a round's steps, the vouchers' kinds); brain-kit's own words are folded under 细节.
  */
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
@@ -16,6 +17,29 @@ import type { ViewProps } from './props'
 
 export const TEAM_POLL_MS = 10_000
 export const SIGNER_SAME_USER = '签名服务和 app 是同一个系统用户：它签不签都由 app 说了算，只适合本机试用'
+export const SIGNER_SAME_USER_DO = '正式给团队用之前，让签名服务换成另一个系统用户来跑（app 和 AI 的会话都改不了它的文件）。'
+
+/** A round's steps (bridgehost.loop_once's summary keys and loop_error's prefixes), in words. */
+export const LOOP_STEP: Record<string, { name: string; did: string }> = {
+  poll: { name: '看 MR', did: '看了 MR' },
+  runnerd: { name: '准备工作区', did: '准备好工作区' },
+  prepared: { name: '准备工作区', did: '准备好工作区' },
+  dispatch: { name: '派给会话', did: '派给会话' },
+  watch: { name: '看会话', did: '看了会话' },
+  collect: { name: '收结果', did: '收回结果' },
+  reconcile: { name: '对账', did: '对了账' },
+}
+/** what a signature is for (the signer spool's request kinds) */
+export const SIGN_KIND: Record<string, string> = { answer: '回答的凭证', handoff: '交接的合同' }
+const signKind = (k: string) => SIGN_KIND[k] ?? '其他'
+/** brain-kit's name for a voucher it waits on (「answer D-2」, 「handoff shop/shop-pay!41 <sha>#<event>」) in words */
+export const waitingRef = (ref: string): string => {
+  const [kind, what] = ref.split(/\s+/, 2)
+  return SIGN_KIND[kind] ? `${kind === 'answer' ? '回答' : '交接'} ${what ?? ''}`.trim() : ref
+}
+/** The steps a round could not do (loop_error: 「poll: …；collect: …」), in words. */
+const failedSteps = (loopError: string) => Array.from(new Set(loopError.split('；').map((x) => x.split(':', 1)[0].trim()).filter(Boolean)))
+  .map((k) => LOOP_STEP[k]?.name ?? '其他一步')
 
 /** brain-kit's run states (the bridge ledger's), in words. */
 export const RUN_STATE: Record<RunState, { label: string; tone: Tone }> = {
@@ -39,7 +63,7 @@ export const HANDOVER_RESULT: Record<HandoverResult, { label: string; tone: Tone
   accepted: { label: '接手了', tone: 'ok', hint: '' },
   rejected: { label: '拒绝接手', tone: 'bad', hint: '原因在 MR 上（AI 接手被拒）' },
   seen: { label: '看过了', tone: 'idle', hint: '这个提交和这次打标签以前检查过，结果在账本里' },
-  unlabelled: { label: '标签刚被拿掉', tone: 'warn', hint: '最新的标签事件拿掉了交接标签（brain handoff 重打标签时会这样）：下一轮再看' },
+  unlabelled: { label: '标签刚被拿掉', tone: 'warn', hint: '交接标签刚被拿掉（重新交接、再打一次标签时会这样）：下一轮再看' },
   waiting: { label: '正在别处签名', tone: 'hand', hint: '这份交接的合同正在别处签（另一个桥进程，或停下的桥留下的占位）：下一轮再看' },
   error: { label: '这一轮没查成', tone: 'warn', hint: '下一轮再试' },
 }
@@ -57,7 +81,7 @@ const RUNNER_FLOW: FlowStep[] = [
   { icon: 'handover', title: '交接', text: 'MR 打上交接标签' },
   { icon: 'bridge', title: '桥', text: '每一轮看 MR，检查交接' },
   { icon: 'signer', title: '签名', text: '单独的签名服务签合同' },
-  { icon: 'runner', title: '运行机会话', text: 'brain-run 接着做' },
+  { icon: 'runner', title: '运行机会话', text: '运行机上的会话接着做' },
   { icon: 'release', title: 'MR 上回答、验收', text: '以 GitLab 身份' },
 ]
 
@@ -81,7 +105,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
         <EmptyHero
           testid="team-off"
           title="这台机器不是团队运行机"
-          text={['这台机器没开团队模式。要当团队运行机，在设置里打开团队模式，填上桥（bridge.json）和 runnerd 的配置。']}
+          text={['这台机器没开团队模式。要当团队运行机：在设置里打开团队模式，填上桥和运行机工作区的配置文件。']}
           punch="运行机接手交接过来的需求，问题和验收都在 MR 上，以 GitLab 身份回答。"
           flow={RUNNER_FLOW}
         >
@@ -101,6 +125,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
       {st?.same_user && (
         <div className="br-banner tm-same" role="alert" data-testid="signer-same-user">
           <span className="br-row"><RoleIcon role="signer" size={18} /><b className="br-strong">{SIGNER_SAME_USER}</b></span>
+          <span className="tm-do"><b>做什么</b>{SIGNER_SAME_USER_DO}</span>
         </div>
       )}
       <header className="tm-top">
@@ -131,14 +156,14 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
             </button>
           </div>
           {st.error && <p className="br-error br-pre">{st.error}</p>}
-          {st.loop_error && <p className="br-pre br-bad-text"><b>上一轮出错：</b>{st.loop_error}</p>}
-          {loop.result && (
-            <div className={`tm-loop ${loop.result.ok ? 'is-ok' : 'is-bad'}`} role="status" data-testid="loop-result">
-              <b>{loop.result.ok ? '这一轮跑完了' : '这一轮没跑成'}</b>
-              {Object.entries(loop.result.summary).map(([k, n]) => <span key={k} className="br-tag">{k} {n}</span>)}
-              {loop.result.error && <span className="br-bad-text br-pre">{loop.result.error}</span>}
+          {st.loop_error && (
+            <div className="tm-loop-error" data-testid="loop-error">
+              <p className="br-bad-text"><b>上一轮有一步没成：</b>{failedSteps(st.loop_error).join('、')}</p>
+              <span className="tm-do"><b>做什么</b>下一轮会自动再试；一直这样的话，把「细节」里的原话发给管运行机的人。</span>
+              <details className="br-raw"><summary>细节</summary><pre>{st.loop_error}</pre></details>
             </div>
           )}
+          {loop.result && <LoopResult r={loop.result} />}
           {loop.error && <p className="br-error" role="alert">{loop.error}</p>}
         </section>
       )}
@@ -193,6 +218,21 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
   )
 }
 
+/** What one round did, step by step in words; anything else it reported and its error under 细节. */
+function LoopResult({ r }: { r: TeamLoopResult }) {
+  const known = Object.entries(r.summary).filter(([k]) => LOOP_STEP[k])
+  const other = Object.entries(r.summary).filter(([k]) => !LOOP_STEP[k])
+  const raw = [...other.map(([k, n]) => `${k} ${n}`), r.error].filter(Boolean).join('\n')
+  return (
+    <div className={`tm-loop ${r.ok ? 'is-ok' : 'is-bad'}`} role="status" data-testid="loop-result">
+      <b>{r.ok ? '这一轮跑完了' : '这一轮没跑成'}</b>
+      {known.map(([k, n]) => <span key={k} className="br-tag">{LOOP_STEP[k].did} {n} 个</span>)}
+      {!r.ok && <span className="tm-do"><b>做什么</b>等一会儿再跑一轮；还不成就把「细节」里的原话发给管运行机的人。</span>}
+      {raw && <details className="br-raw"><summary>细节</summary><pre>{raw}</pre></details>}
+    </div>
+  )
+}
+
 /** A ledger count as a counter card: the total (or one state's count), a segment bar by state, the states in words. */
 function LedgerKpi({ k, label, unit, counts, big }: { k: LedgerKey; label: string; unit: string; counts: Record<string, number>; big?: string }) {
   const rows = Object.entries(counts).filter(([, n]) => n > 0)
@@ -209,7 +249,7 @@ function LedgerKpi({ k, label, unit, counts, big }: { k: LedgerKey; label: strin
       ) : <div className="tm-stack is-empty" aria-hidden="true"><i /></div>}
       <div className="tm-legs">
         {rows.length === 0 ? <span className="br-dim">—</span> : rows.map(([s, n]) => (
-          <span key={s} className="tm-leg" title={s}><i className={`tone-${ledgerMeta(k, s).tone}`} aria-hidden="true" />{ledgerMeta(k, s).label} <b>{n}</b></span>
+          <span key={s} className="tm-leg"><i className={`tone-${ledgerMeta(k, s).tone}`} aria-hidden="true" />{ledgerMeta(k, s).label} <b>{n}</b></span>
         ))}
       </div>
     </div>
@@ -223,9 +263,9 @@ function SignerKpi({ signer }: { signer: TeamView['signer'] }) {
       <div className="br-kpi-label">签名</div>
       <div><span className="br-kpi-big">{p}</span><span className="br-kpi-of">等签名</span></div>
       <div className="tm-cells" aria-hidden="true">
-        {signer.pending.map((x) => <i key={x.req_id} className="is-wait" title={x.req_id} />)}
-        {signer.refused.map((x) => <i key={x.req_id} className="is-bad" title={x.req_id} />)}
-        {signer.waiting.map((x) => <i key={x.ref} className="is-warn" title={x.ref} />)}
+        {signer.pending.map((x) => <i key={x.req_id} className="is-wait" title={`等签名：${signKind(x.kind)}`} />)}
+        {signer.refused.map((x) => <i key={x.req_id} className="is-bad" title={`拒签：${signKind(x.kind)}`} />)}
+        {signer.waiting.map((x) => <i key={x.ref} className="is-warn" title={`上一轮没等到：${waitingRef(x.ref)}`} />)}
       </div>
       <div className="br-kpi-note">拒签 <b className={r ? 'br-bad-text' : ''}>{r}</b> · 上一轮没等到 <b>{w}</b></div>
     </div>
@@ -253,28 +293,30 @@ function Handovers({ rows, at }: { rows: TeamHandover[]; at: number | null }) {
         )}
       </header>
       {rows.length === 0 ? <p className="br-empty">上一轮没有打着交接标签的 MR。</p> : (
-        <ol className="kt-belt tm-belt">
-          <li className="kt-belt-end" title="桥上一轮看 MR 的时候">
+        <div className="tm-belt-row">
+          <span className="kt-belt-end" title="桥上一轮看 MR 的时候">
             <RoleIcon role="bridge" size={14} />上一轮{at ? ` · ${ago(at)}` : ''}
-          </li>
-          {rows.map((h) => {
-            const m = handoverMeta(h.result)
-            const hint = h.error || m.hint
-            return (
-              <li key={`${h.project}!${h.iid}`} className={`kt-belt-chip ${CHIP_CLASS[h.result] ?? ''}`} data-result={h.result}>
-                <span className="tm-chip-top">
-                  <ExtLink href={h.mr_url} className="kt-belt-role tm-mr">{h.project}!{h.iid}</ExtLink>
-                  <span className={`kt-pill tone-${m.tone}`}>{m.label}</span>
-                </span>
-                {h.sha && <span className="kt-belt-meta"><code>{h.sha.slice(0, 12)}</code></span>}
-                {hint && <span className="tm-hint">{hint}</span>}
-              </li>
-            )
-          })}
-          <li className="kt-belt-end is-head" title="接手的交接在运行机上接着做">
+          </span>
+          <ol className="kt-belt tm-belt">
+            {rows.map((h) => {
+              const m = handoverMeta(h.result)
+              const hint = h.error || m.hint
+              return (
+                <li key={`${h.project}!${h.iid}`} className={`kt-belt-chip ${CHIP_CLASS[h.result] ?? ''}`} data-result={h.result}>
+                  <span className="tm-chip-top">
+                    <ExtLink href={h.mr_url} className="kt-belt-role tm-mr">{h.project}!{h.iid}</ExtLink>
+                    <span className={`kt-pill tone-${m.tone}`}>{m.label}</span>
+                  </span>
+                  {h.sha && <span className="kt-belt-meta"><code>{h.sha.slice(0, 12)}</code></span>}
+                  {hint && <span className="tm-hint">{hint}</span>}
+                </li>
+              )
+            })}
+          </ol>
+          <span className="kt-belt-end is-head" title="接手的交接在运行机上接着做">
             <RoleIcon role="runner" size={14} />运行机
-          </li>
-        </ol>
+          </span>
+        </div>
       )}
     </section>
   )
@@ -295,8 +337,8 @@ function Signer({ signer }: { signer: TeamView['signer'] }) {
             <ul className="tm-sigs">
               {signer.pending.map((p) => (
                 <li key={p.req_id} className="tm-sig is-wait">
-                  <span className="br-row"><b className="br-mono">{p.req_id}</b><span className="br-tag">{p.kind}</span><span className="br-grow" /><span className="br-dim br-small">{fmtIso(p.since)}</span></span>
-                  <span className="br-mono br-dim br-small">{p.run_id}</span>
+                  <span className="br-row"><b>{signKind(p.kind)}</b><span className="br-grow" /><span className="br-dim br-small">{fmtIso(p.since)}</span></span>
+                  <span className="br-mono br-dim br-small" title={p.req_id}>{p.run_id}</span>
                 </li>
               ))}
             </ul>
@@ -308,8 +350,9 @@ function Signer({ signer }: { signer: TeamView['signer'] }) {
             <ul className="tm-sigs">
               {signer.refused.map((p) => (
                 <li key={p.req_id} className="tm-sig is-bad">
-                  <span className="br-row"><b className="br-mono">{p.req_id}</b><span className="br-tag">{p.kind}</span></span>
+                  <span className="br-row"><b>{signKind(p.kind)}</b><span className="br-grow" /><span className="br-mono br-dim br-small">{p.req_id}</span></span>
                   <ul className="br-list br-bad-text">{p.reasons.map((x, i) => <li key={i}>{x}</li>)}</ul>
+                  {p.raw.some(Boolean) && <details className="br-raw"><summary>细节</summary><pre>{p.raw.join('\n')}</pre></details>}
                 </li>
               ))}
             </ul>
@@ -321,7 +364,7 @@ function Signer({ signer }: { signer: TeamView['signer'] }) {
             <ul className="tm-sigs" data-testid="signer-waiting">
               {signer.waiting.map((w) => (
                 <li key={w.ref} className="tm-sig is-warn">
-                  <span className="br-row"><b className="br-mono">{w.ref}</b><span className="br-tag">{w.kind}</span><span className="br-grow" /><span className="br-dim br-small">{fmtIso(w.since)}</span></span>
+                  <span className="br-row"><b>{waitingRef(w.ref)}</b><span className="br-tag">{signKind(w.kind)}</span><span className="br-grow" /><span className="br-dim br-small">{fmtIso(w.since)}</span></span>
                   <span className="br-mono br-dim br-small">{w.run_id}</span>
                 </li>
               ))}
@@ -361,7 +404,13 @@ const TM_CSS = `
 .tm-loop.is-bad { background: color-mix(in srgb, var(--kt-bad) 9%, transparent); border: 1px solid var(--kit-bad); }
 .tm-loop.is-bad > b { color: var(--kt-bad); }
 .tm-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-@media (max-width: 1100px) { .tm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container br-app (max-width: 1100px) { .tm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tm-do { font-size: .93em; color: var(--text); }
+.tm-do b { color: var(--muted); font-weight: 650; margin-right: .5em; }
+.tm-same { display: grid; gap: .3em; }
+.tm-loop-error { display: grid; gap: .3em; }
+.tm-loop-error p { margin: 0; }
+.tm-belt-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
 .tm-stack { display: flex; gap: 2px; height: .75em; margin-top: .2em; border-radius: .3em; overflow: hidden; }
 .tm-stack i { flex: 1 1 0; min-width: .4em; background: var(--kt-tone); }
 .tm-stack.is-empty i { background: color-mix(in srgb, var(--muted) 22%, transparent); }
@@ -373,7 +422,7 @@ const TM_CSS = `
 .tm-cells i { width: 1.4em; height: 1.4em; border-radius: .4em; border: 2px solid var(--kt-c); background: color-mix(in srgb, var(--kt-c) 22%, transparent); }
 .tm-cells i.is-wait { --kt-c: var(--kt-approve); } .tm-cells i.is-bad { --kt-c: var(--kt-bad); } .tm-cells i.is-warn { --kt-c: var(--kt-warn); border-style: dashed; }
 .tm-belt { align-items: stretch; padding-top: .5em; padding-bottom: .5em; }
-.tm-belt > li.kt-belt-end { align-self: center; }
+@container br-app (max-width: 760px) { .tm-belt-row { grid-template-columns: minmax(0, 1fr); } .tm-belt-row > .kt-belt-end { justify-self: start; } }
 .tm-belt .kt-belt-chip { gap: .25em; max-width: 26em; padding: .55em .8em .6em; }
 .tm-belt .kt-belt-chip.is-pending { border-color: color-mix(in srgb, var(--kt-warn) 55%, var(--border)); background: color-mix(in srgb, var(--kt-warn) 6%, var(--card)); }
 .tm-belt .kt-belt-chip.is-seen { border: 1px solid var(--border); background: var(--card); }
