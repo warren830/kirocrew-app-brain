@@ -355,7 +355,7 @@ def test_a_design_lean_skipped_is_not_needed_and_the_wall_says_what_is_still_to_
     w = b["checks"]
     assert (w["passed"], w["failed"], w["total"], w["todo"]) == (2, 0, 2, ["发布审批"])
     assert b["accept"]["checks"] == "目前 2 项都过 · 还剩 发布审批"
-    assert "verify 通过（1 项）" in [e["text"] for e in b["events"] if e["kind"] == "verify"]
+    assert "自动检查通过（1 项）" in [e["text"] for e in b["events"] if e["kind"] == "verify"]
 
 
 def merged_trace(merged_at, window_end):

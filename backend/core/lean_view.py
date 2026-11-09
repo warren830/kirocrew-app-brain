@@ -318,7 +318,7 @@ def stage_events(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
             out.append({"at": at, "kind": "blocked", "label": "Lean 拦下（%s）" % (d.get("gate") or "?"),
                         "detail": str(d.get("path") or d.get("tool") or "")[:120] or None, "who": None, "src": src})
         elif ev == "VERIFY":
-            out.append({"at": at, "kind": "verify", "label": "verify %s" % ("通过" if d.get("ok") else "没过"),
+            out.append({"at": at, "kind": "verify", "label": "自动检查%s" % ("通过" if d.get("ok") else "没过"),
                         "detail": None, "who": None, "src": src})
         elif ev in ("SESSION_START", "HUMAN_TURN"):
             out.append({"at": at, "kind": "session", "label": "会话开始" if ev == "SESSION_START" else "人发了一条消息",

@@ -216,7 +216,7 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                           "label": "%s %s" % (d.get("id"), d.get("state") or ""), "detail": d.get("choice"),
                           "who": d.get("who"), "src": ", ".join(d.get("src") or [])[:200] or None})
     for r in (t.get("checks") or {}).get("verify") or []:
-        items.append({"at": r.get("at"), "kind": "verify", "label": "verify %s" % ("通过" if r.get("ok") else "没过"),
+        items.append({"at": r.get("at"), "kind": "verify", "label": "自动检查%s" % ("通过" if r.get("ok") else "没过"),
                       "detail": None, "who": None, "src": r.get("src")})
     m = ((t.get("outcome") or {}).get("merged_at") or {})
     if m.get("value"):
