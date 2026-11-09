@@ -305,13 +305,13 @@ describe('需求看板', () => {
     })
     // nothing hovered: the one that failed
     const inspect = within(wall).getByTestId('kt-inspect')
-    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、verify 引用')
+    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、verify · 没过的是 引用')
     const plan = b.checks.cells.find((c) => c.id === 'gate-PLAN')!
     const cell = within(wall).getByRole('button', { name: `${plan.name}：等你，${plan.detail}` })
     fireEvent.focus(cell)
     expect(inspect).toHaveTextContent(`✋ ${plan.name}${plan.detail}`)
     fireEvent.blur(cell)
-    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、verify 引用')
+    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、verify · 没过的是 引用')
   })
 
   test('the event feed: the trace newest first; Lean 细节 hides the many quiet steps', async () => {

@@ -84,9 +84,9 @@ export function CheckWall({ board, focus, onActor, flips, onSettings }: {
               <span>{current.detail}</span>
             </>
           ) : failing.length ? (
-            <span><strong className="tone-bad">{say.text}</strong> {failing.map((c) => c.label).join('、')}<span className="kt-dim"> · 悬停或聚焦格子看原因</span></span>
+            <span><strong className="tone-bad">{say.text}</strong> · 没过的是 {failing.map((c) => c.label).join('、')}<span className="kt-dim"> · 悬停或聚焦格子看原因</span></span>
           ) : waiting.length ? (
-            <span><strong className={`tone-${say.tone}`}>{say.text}</strong> {waiting.map((c) => c.label).join('、')}<span className="kt-dim"> · 悬停看要做什么</span></span>
+            <span><strong className={`tone-${say.tone}`}>{say.text}</strong> · 等的是 {waiting.map((c) => c.label).join('、')}<span className="kt-dim"> · 悬停看要做什么</span></span>
           ) : (
             <span><strong className={`tone-${say.tone}`}>{say.text}{green ? ' ✓' : ''}</strong>{!green && <span className="kt-dim"> · 悬停看每一格</span>}</span>
           )}
