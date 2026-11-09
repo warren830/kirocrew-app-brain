@@ -152,7 +152,7 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
         {COLS.map(([key, name, sub]) => (
           <div className={`cto-kb-h${localOnly && key === '交给运行机' ? ' is-off' : ''}`} key={key}>
             <button type="button" onClick={() => h.onCell(key)} title={`在下方交付清单里看「${name}」这一列`}>
-              <div><b>{name}</b><span className="cto-n">{count(key)}</span></div>
+              <div><b>{name}</b>{!(localOnly && key === '交给运行机') && <span className="cto-n">{count(key)}</span>}</div>
               <div className="cto-st">{localOnly && key === '交给运行机' ? '这次不需要' : sub}</div>
             </button>
           </div>

@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppApi } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, useAction, usePoll } from '../api'
 import { RoleIcon } from '../board/RoleIcon'
-import { HOW_LABEL, HOW_VAR, MiniCredits, MiniPeople, MiniUnattended, MiniWho, WHO_VAR, WeeklyChart, fmt, slash } from '../cto/charts'
+import { HOW, HOW_LABEL, HOW_VAR, MiniCredits, MiniPeople, MiniUnattended, MiniWho, WHO_VAR, WeeklyChart, fmt, slash } from '../cto/charts'
 import { COL_NAME, Flow, LANE_NAME, StepButton, colOf, laneOf, stepOf, waitedText, type Col, type Lane } from '../cto/Flow'
 import { ago, fmtCredits } from '../format'
 import type { OverviewEntry, View } from '../nav'
@@ -28,7 +28,6 @@ import { EmptyHero, Icon, ImportCta, LeanCell, LoadState, MrLink, PendingRepo, S
 import type { ViewProps } from './props'
 
 const STATES = Object.keys(STATE_LABEL) as ReqState[]
-const HOWS: CtoRun['how'][] = ['unattended', 'people', 'pending', 'local']
 export const WHO_VOCAB = '决定表里「谁定的」（Who）那一格要写 agent、brain <条目号>、check、<化名> <凭证号> 或 owner'
 
 export const OV_CSS = `
@@ -175,6 +174,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
   const repoName = (id: string) => repos.find((x) => x.id === id)?.name
   const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
   const localOnly = scope.length > 0 && scope.every((r) => r.remote === false)
+  const manyRepos = repo === 'all' && repos.length > 1
   const team = !!status && (status.app.team || status.team.enabled)
   const newReq = () => go({ kind: 'new', ...(repo !== 'all' ? { repo } : {}) })
 
@@ -263,7 +263,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
 
       {data && c && !empty && (
         <>
-          {yours.length > 0 && <YourTurn rows={yours} at={data.at} repoName={repos.length > 1 ? repoName : () => undefined} onGo={go} onOpen={(r) => toBoard(r)}
+          {yours.length > 0 && <YourTurn rows={yours} at={data.at} repoName={manyRepos ? repoName : () => undefined} onGo={go} onOpen={(r) => toBoard(r)}
             onAll={() => filterTo(cellPick(undefined, 'you'))} />}
 
           <section className="cto-cards" data-testid="ov-cards">
@@ -316,7 +316,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
                     </td></tr>
                   )}
                   {rows.slice(0, limit).map((r) => (
-                    <Row key={idOf(r)} r={r} at={data.at} run={runsBy.get(idOf(r))} ev={data.eval} repoName={repos.length > 1 ? repoName(r.repo) : undefined}
+                    <Row key={idOf(r)} r={r} at={data.at} run={runsBy.get(idOf(r))} ev={data.eval} repoName={manyRepos ? repoName(r.repo) : undefined}
                       onOpen={() => toBoard(r)} onItem={() => toItem(r)} onReplay={() => toBoard(r, true)} onGo={go} />
                   ))}
                 </tbody>
@@ -474,7 +474,7 @@ function UnattendedCard({ c, localOnly, pick, onPick }: { c: CtoNumbers; localOn
       )}
       {c.runs.length > 0 && (
         <div className="cto-legend">
-          {HOWS.filter((h) => count(h) > 0).map((h) => (
+          {HOW.filter((h) => count(h) > 0).map((h) => (
             <button type="button" key={h} aria-pressed={pick?.id === `how:${h}`} title={`在交付清单里看「${HOW_LABEL[h]}」的需求`} onClick={() => onPick(howPick([h], `交付方式：${HOW_LABEL[h]}`))}>
               <i className="cto-sw" style={{ background: HOW_VAR[h] }} />{HOW_LABEL[h]}<b>{count(h)}</b>
             </button>

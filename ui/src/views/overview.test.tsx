@@ -57,7 +57,7 @@ describe('交付总览', () => {
     expect(screen.getByRole('article', { name: '人介入' })).toHaveTextContent('5 次落在判断点上（批准、驳回、回答），0 次在判断点之外 · 本机做的也算')
     expect(screen.getByTestId('ov-credits')).toHaveTextContent(/^21\.1$/)
     expect(screen.getByRole('article', { name: '每个需求的 credits' })).toHaveTextContent('有 credits 的 4 个需求，合计 84.3')
-    expect(screen.getByRole('img', { name: '评估过的需求，按交付方式：无人值守 0，有人插手 1，还没评 2，只在本机 0' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: '评估过的需求，按交付方式：无人值守 0，有人插手 1，只在本机 0，还没评 2' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: '人介入：判断点上 5 次，判断点之外 0 次' })).toBeInTheDocument()
     const notes = screen.getByText('口径').closest('details') as HTMLDetailsElement
     expect(notes.open).toBe(false)

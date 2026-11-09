@@ -128,7 +128,7 @@ function StackRow({ y0, bh, L, pw, max, segs, total, label, strong, onTip, tipLa
 export function MiniUnattended({ c }: { c: CtoNumbers }) {
   const count = (h: CtoRun['how']) => c.runs.filter((r) => r.how === h).length
   const bh = 22, H = bh + 6, R = 50
-  const segs = (['unattended', 'people', 'pending', 'local'] as CtoRun['how'][]).map((h) => ({ key: h, n: count(h), fill: HOW_VAR[h], name: HOW_LABEL[h] }))
+  const segs = HOW.map((h) => ({ key: h, n: count(h), fill: HOW_VAR[h], name: HOW_LABEL[h] }))
   const total = segs.reduce((a, x) => a + x.n, 0)
   return (
     <Mini label={`评估过的需求，按交付方式：${segs.map((x) => `${x.name} ${x.n}`).join('，')}`} height={H}>
