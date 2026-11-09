@@ -1,7 +1,8 @@
 """你是谁: the name brain-kit goes by in a repo, shown where the app shows who you are (status, 开需求, 检查), and
 「你的 GitLab 用户名」 / 「你的名字」 when brain-kit would not know: git config brain.user in that repo (brain-kit's
-USER_RE, no shell, no token). Both brain-kits: the clean clone (48b6b97: no name, no start) and a copy of it with
-brain-kit 91e2fee's rule applied (a repo without GitLab uses the login name). Throwaway repos only."""
+USER_RE, no shell, no token). Both brain-kits: one without brain-kit 91e2fee's login-name rule (48b6b97: no name, no
+start) and one with it (a repo without GitLab uses the login name): the clean clone is whichever it is, the other one a
+copy of 48b6b97 with the rule applied (a clone of 91e2fee or later already has it). Throwaway repos only."""
 
 import json
 import shutil
@@ -46,9 +47,16 @@ def _login_name() -> str:
 def _store('''
 
 
+HAS_LOGIN_RULE = "def _login_name" in (BRAINKIT / "brainkit" / "cli.py").read_text(encoding="utf-8") \
+    if (BRAINKIT / "brainkit" / "cli.py").is_file() else False
+
+
 @pytest.fixture(scope="module")
 def fallback_kit(tmp_path_factory):
-    """The clean clone with brain-kit 91e2fee's identity rule (cli._me falls back to the login name without GitLab)."""
+    """A brain-kit with 91e2fee's identity rule (cli._me falls back to the login name without GitLab): the clean clone
+    itself when it has the rule, else a copy of it with the rule applied."""
+    if HAS_LOGIN_RULE:
+        return BRAINKIT
     dst = tmp_path_factory.mktemp("bk") / "brain-kit"
     shutil.copytree(BRAINKIT, dst, ignore=shutil.ignore_patterns(".git", "__pycache__"))
     cli = dst / "brainkit" / "cli.py"
@@ -85,6 +93,7 @@ def start_body(**kw):
     return dict({"repo": "r1", "slug": "refund", "title": "退款", "docs": [], "open_session": False}, **kw)
 
 
+@pytest.mark.skipif(HAS_LOGIN_RULE, reason="this brain-kit (91e2fee or later) uses the login name: the tests of the new one cover it")
 def test_without_gitlab_the_old_brainkit_asks_for_a_name_and_the_start_says_why(tmp_path, home, login):
     repo = project(tmp_path)
     svc = make_service(tmp_path, [repo])

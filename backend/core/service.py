@@ -416,7 +416,8 @@ class Service:
             row = deliveries.base_row("runner", facts)
             row["where"] = "runner"
             decs = [d for d in led["decisions"] if d["run_id"] in all_ids[key]]
-            deliveries.team_classify(row, r, decs, facts.get("park"))
+            deliveries.team_classify(row, r, decs, facts.get("park"),
+                                     notes=notices_by_run(led.get("notices") or [], led.get("outbox") or []).get(r["run_id"], []))
             if r.get("state") in ("merged", "closed"):
                 row["state"] = "merged" if r["state"] == "merged" else "closed"
                 row["state_label"] = deliveries.STATE_LABEL[row["state"]]
@@ -510,13 +511,14 @@ class Service:
                 threading_start(self._eval_compute, rid, sha, credits)
         if not views:
             return {"available": False, "error": "正在算 Eval…" if ids else "没有仓库", "ref": None, "metrics": [],
-                    "queue": [], "skipped": [], "notes": []}, None
+                    "queue": [], "skipped": [], "notes": [], "families": []}, None
         if len(views) == 1:
             return views[0], (dict(funnels[0]) if funnels else None)
         merged = {"available": any(v["available"] for v in views), "error": "；".join(v["error"] for v in views if v["error"]),
                   "ref": None, "metrics": [], "queue": [q for v in views for q in v["queue"]],
                   "skipped": [x for v in views for x in v.get("skipped") or []],
-                  "notes": [x for v in views for x in v.get("notes") or []]}
+                  "notes": [x for v in views for x in v.get("notes") or []],
+                  "families": [x for v in views for x in v.get("families") or []]}
         for m in views[0]["metrics"]:
             vals = [next((x["value"] for x in v["metrics"] if x["id"] == m["id"]), None) for v in views]
             pairs = [x for x in vals if isinstance(x, list)]
@@ -536,11 +538,12 @@ class Service:
             if repo is None:
                 return
             view, funnel = deliveries.evaluate(repo.path, repo.cfg, repo.main_ref(), credits)
+            view["families"] = [dict(x, repo=rid) for x in view.get("families") or []]
             self._eval[rid] = (sha, time.monotonic(), view, funnel)
         except Exception as exc:  # noqa: BLE001
             self._eval[rid] = (sha, time.monotonic(), {"available": False, "error": "Eval 算不出来：%s" % str(exc)[:200],
                                                         "ref": None, "metrics": [], "queue": [], "skipped": [],
-                                                        "notes": []}, None)
+                                                        "notes": [], "families": []}, None)
         finally:
             self._eval_running.discard(rid)
 
@@ -1361,8 +1364,9 @@ class Service:
 
     async def team_view(self) -> dict[str, Any]:
         if self.team is None:
-            return {"status": self._team_status(), "ledger": {"runs": {}, "decisions": {}, "handoffs": {}}, "runs": [],
-                    "handovers": [], "signer": {"pending": [], "refused": [], "waiting": []}}
+            return {"status": self._team_status(), "ledger": {"runs": {}, "decisions": {}, "handoffs": {}, "outbox": {}},
+                    "runs": [], "handovers": [], "signer": {"pending": [], "refused": [], "waiting": []}, "config": [],
+                    "hooks": []}
         led = await asyncio.to_thread(self.team.ledger)
         signer = await asyncio.to_thread(self.team.signer_view)
         signer["waiting"] = await asyncio.to_thread(self.team.pending)
@@ -1375,11 +1379,13 @@ class Service:
             got = problems.reason(row["error"]) if row["error"] else None
             row.update(error=got["text"] if got else "", raw=(got["raw"] or "") if got else "")
             handovers.append(row)
+        notes = notices_by_run(led.get("notices") or [], led.get("outbox") or [])
         return {"status": self.team.status(), "ledger": self.team.counts(led),
                 "runs": [{"run_id": r["run_id"], "req": r["req"], "project": r["project"], "iid": int(r["iid"]),
                           "state": r["state"], "slot": r.get("slot"), "mr_url": self.team.mr_url(r["project"], r["iid"]),
-                          "updated": r.get("updated")} for r in led["runs"]],
-                "handovers": handovers, "signer": signer}
+                          "updated": r.get("updated"), "notes": notes.get(r["run_id"], [])} for r in led["runs"]],
+                "handovers": handovers, "signer": signer, "config": self.team.config_view(),
+                "hooks": await asyncio.to_thread(self.team.hook_rows)}
 
     async def team_loop(self) -> dict[str, Any]:
         if self.team is None or self.team.host is None:
@@ -1389,6 +1395,30 @@ class Service:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "summary": {}, "error": str(exc)[:300]}
         return {"ok": not self.team.loop_error, "summary": summary, "error": self.team.loop_error}
+
+
+def notices_by_run(notices: list[dict[str, Any]], outbox: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """{run id: [TeamNote]}: what brain-kit's bridge (0d52e97) holds about a run in its ledger, said plainly
+    (deliveries.team_note): the notices it told the MR or counts (CI holding the acceptance question, runnerd silent,
+    sends that keep failing, queued …) and the messages into its session that are not known to have landed."""
+    out: dict[str, list[dict[str, Any]]] = {}
+    sent = {str(o.get("send_id")) for o in outbox if o.get("state") == "sent"}
+    holding = {str(n.get("key") or "").split(":")[1] for n in notices
+               if str(n.get("key") or "").startswith("ciheld:") and n.get("state") == "counting"}
+    for n in notices:
+        key = str(n.get("key") or "")
+        if key.startswith("gaveup:") and key[len("gaveup:"):] in sent:
+            continue        # it landed in the end
+        if key.startswith(("ciheld-wait:", "ciheld-person:", "ciheld-red:")) and str(n.get("run_id")) not in holding:
+            continue        # the pipeline it was about is green, or another push started another wait
+        got = deliveries.team_note(n)
+        if got and n.get("run_id"):
+            out.setdefault(str(n["run_id"]), []).append(got)
+    for o in outbox:
+        got = deliveries.outbox_note(o)
+        if got and o.get("run_id"):
+            out.setdefault(str(o["run_id"]), []).append(got)
+    return out
 
 
 def runner_repo(cfg: dict[str, Any], facts: list[dict[str, Any]]) -> bool:

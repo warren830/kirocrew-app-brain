@@ -15,8 +15,8 @@ from . import bk, lean_view
 
 STATE_LABEL = {"claimed": "已认领", "local": "本地开发中", "handed_over": "已交接", "rejected": "接手被拒",
                "running": "运行机在跑", "parked": "停下等回答", "acceptance": "等验收", "merged": "已合并",
-               "closed": "已关闭"}
-OPEN_STATES = ("claimed", "local", "handed_over", "running", "parked", "acceptance", "rejected")
+               "closed": "已关闭", "unclaimed": "待认领", "merged_into_parent": "已合进大需求"}
+OPEN_STATES = ("claimed", "local", "handed_over", "running", "parked", "acceptance", "rejected", "unclaimed")
 KIND_LABEL = {"clarify": "澄清", "design": "设计", "plan": "计划", "acceptance": "验收", "action": "危险动作",
               "other": "其他", "requirements": "需求批准"}
 ASK_WHO = {"product": "product", "builder": "builder", "owner": "you", "security": "people", "data": "people"}
@@ -64,6 +64,7 @@ def base_row(repo_id: str, f: dict[str, Any]) -> dict[str, Any]:
         "updated_at": None, "mr": None, "worktree": f.get("worktree"), "run_ids": [], "sessions": 0,
         "overlap": [], "open_questions": [],
         "expected_paths": [p for p in run.get("expected_paths") or [] if isinstance(p, str)][:50],
+        "family": None,      # a 大需求 or one of its 小需求 (family.families), filled in by the service
     }
 
 
@@ -104,10 +105,23 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
         return put("merged", "nobody", "MR 已合并")
     if mr and mr.get("state") == "closed":
         return put("closed", "nobody", "MR 已关闭")
+    note = fresh_note(mr, f)
     if cfg.get("rejected_label") in labels:
+        if note and note["kind"] == "failed":     # brain-kit 0d52e97: the run could not start (labelled rejected)
+            return put("rejected", "you", note["text"][:200], raw=str(note.get("raw") or "")[:2000])
         return put("rejected", "you", "接手被拒：" + (str((mr or {}).get("rejected_reason") or "看 MR 上的说明")[:200]),
                    raw=str((mr or {}).get("rejected_raw") or "")[:2000])   # the bridge's own words (problems.reason)
-    open_q = [q for q in (mr or {}).get("questions") or [] if q.get("state") == "open"]
+    qs = (mr or {}).get("questions") or []
+    open_q = [q for q in qs if q.get("state") == "open"]
+    if park_waiting(park) and not open_q:
+        # brain-kit 0d52e97 trace's `answered`: park.json still waits, but the bridge has its answer (nobody answers
+        # again): the run (or the bridge) has not gone on yet
+        h = str(f.get("park_sha") or "")[:12]
+        got = [q for q in qs if h and q.get("park") == h and q.get("state") in ANSWERED_TEXT]
+        if got:
+            q = got[-1]
+            who, text = ANSWERED_TEXT[q["state"]]
+            return put("parked", who, text % q["id"])
     if park_waiting(park) or open_q:
         q = open_q[-1] if open_q else {}
         kind = str(q.get("kind") or (park or {}).get("kind") or "other")
@@ -117,10 +131,39 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
         who = ASK_WHO.get(str((park or {}).get("ask") or ""), "people")
         return put("parked", who, "等回答%s（%s）" % (" " + did if did else "", KIND_LABEL.get(kind, kind)))
     if cfg.get("running_label") in labels or bot_commits:
+        if note and note["kind"] in RUNNING_NOTES:      # e.g. the acceptance question held until CI is green
+            return put("running", RUNNING_NOTES[note["kind"]], note["text"][:200], raw=str(note.get("raw") or "")[:2000])
         return put("running", "runner", "运行机在跑")
     if at_handover and not_labelled(f, mr, cfg):
         return put("handed_over", "you", NOT_LABELLED % cfg.get("handoff_label"))
+    if note and note["kind"] in WAITING_NOTES:          # taken, but the runner has not started it yet
+        return put("handed_over", WAITING_NOTES[note["kind"]], note["text"][:200], raw=str(note.get("raw") or "")[:2000])
     return put("handed_over", "bridge", "等桥核对交接")
+
+
+# the bridge holds the answer while park.json at the tip still waits (who it waits on, the line)
+ANSWERED_TEXT = {"held": ("bridge", "%s 有了回复：等 GitLab 能查回复有没有被改过再核对（不用重新回复）"),
+                 "answered": ("bridge", "%s 有了回答：桥还在签名、送回 run（不用再答）"),
+                 "delivered": ("runner", "%s 的回答送到了，run 还没接着做：去 KiroCrew 看它的会话"),
+                 "delivery_unknown": ("bridge", "%s 的回答不知道送到没有：桥每轮看一下会话，确认没送到才再送；一直这样就要人去 KiroCrew 看一下（不用再答）")}
+# the run's own MR notes (mrinfo.RUNNER_NOTES) that say why a running run waits, and on whom
+RUNNING_NOTES = {"ci_wait": "runner", "ci_person": "people", "ci_red": "people", "nobody": "people",
+                 "gaveup": "people", "send_unknown": "bridge"}
+# ... and why a taken hand-over has not started on the runner yet
+WAITING_NOTES = {"runnerd_silent": "people", "runnerd_retry": "runner", "setup": "people", "queued": "runner",
+                 "send_unknown": "bridge", "gaveup": "people"}
+
+
+def fresh_note(mr: dict[str, Any] | None, f: dict[str, Any]) -> dict[str, Any] | None:
+    """The run's newest own note on the MR (mrinfo's ``runner``), only while nothing was pushed after it: a later
+    commit means the run went on (the note is about an older head)."""
+    note = (mr or {}).get("runner") if isinstance((mr or {}).get("runner"), dict) else None
+    if not note or not note.get("kind"):
+        return None
+    at, tip = lean_view.epoch(note.get("at")), f.get("tip_at")
+    if isinstance(tip, (int, float)) and at is not None and tip > at:
+        return None
+    return note
 
 
 def not_labelled(f: dict[str, Any], mr: dict[str, Any] | None, cfg: dict[str, Any]) -> bool:
@@ -138,12 +181,68 @@ def not_labelled(f: dict[str, Any], mr: dict[str, Any] | None, cfg: dict[str, An
     return not tip or not mr.get("sha") or mr.get("sha") == tip
 
 
+# brain-kit 0d52e97's ledger notices (bridge/delivery.py tell_mr_once, the counters): the key's first part -> (kind,
+# who it waits on, the plain line). Only what tells why a run waits; the rest (replies, conflicts) is the MR's.
+NOTICE_KIND = {
+    "ciheld": ("ci_wait", "runner", "验收问题等 MR 的流水线通过才发（通过以后桥自动发）"),
+    "ciheld-wait": ("ci_wait", "runner", "流水线跑了很久还没完：验收问题还在等它"),
+    "ciheld-person": ("ci_person", "people", "流水线要有人处理（重新运行，或跑完手动的 job），验收问题才发"),
+    "ciheld-red": ("ci_red", "people", "流水线一直没过：验收问题没发，请负责人看一下"),
+    "ci-accepted": ("ci_red", "people", "产品验收以后流水线没过：请负责人决定怎么办"),
+    "runnerd-silent": ("runnerd_silent", "people", "运行机很久没准备好工作区、也没报错：请负责人看一下 brain-runnerd"),
+    "runnerd-retry": ("runnerd_retry", "runner", "运行机建工作区没成，过一会儿再试"),
+    "setup": ("setup", "people", "KiroCrew 开会话失败，桥每轮重试：一直这样就看一下 KiroCrew"),
+    "queued": ("queued", "runner", "在排队：运行机上的 run 满了，有空位就开始"),
+    "send_unknown": ("send_unknown", "people", "接手消息送没送到不清楚：桥每轮看会话，看到了就接着做；一直这样就要人看一下"),
+    "gaveup": ("gaveup", "people", "消息送了 3 次都没进会话：桥接着送，一直不行就看一下 KiroCrew"),
+    "failed": ("failed", "people", "没能开始：MR 上写了原因，处理好以后重新 brain handoff"),
+    "nobody": ("nobody", "people", "问题发不出：没人能回答这类决定（配 decision_roles）"),
+    "edits-down-told": ("held", "bridge", "%s 的回答先等着：GitLab 查不到回复有没有被改过（不用重新回复）"),
+}
+OUTBOX_WHAT = {"handover": "接手消息", "answer": "%s 的回答", "notice": "给 run 的通知"}
+
+
+def team_note(n: dict[str, Any]) -> dict[str, Any] | None:
+    """A ledger notice as a TeamNote {kind, text, at}, or None (one that tells nothing about why a run waits, or is
+    still being told)."""
+    key = str(n.get("key") or "")
+    head, _, rest = key.partition(":")
+    hit = NOTICE_KIND.get(head)
+    if not hit or n.get("state") not in ("told", "counting"):
+        return None
+    kind, _, text = hit
+    if "%s" in text:
+        text = text % (rest.split(":", 1)[0] or "?")
+    return {"kind": kind, "text": text, "at": lean_view.epoch(n.get("updated") or n.get("created"))}
+
+
+def outbox_note(o: dict[str, Any]) -> dict[str, Any] | None:
+    """A message into the run's session that is not known to have landed, or that is not sent any more (brain-kit
+    0d52e97's outbox: sending, interrupted, sent, unknown, dropped), as a TeamNote; None for one that landed."""
+    st = str(o.get("state") or "")
+    if st not in ("unknown", "interrupted", "dropped"):
+        return None
+    what, _, rest = str(o.get("what") or "").partition(":")
+    name = OUTBOX_WHAT.get(what, "消息")
+    if "%s" in name:
+        name = name % (rest or "?")
+    tries = int(o.get("tries") or 0)
+    text = {"unknown": "%s不知道送到会话没有（送过 %d 次）：桥每轮看一下会话，看到了就算送到；一直这样就要人看一下会话" % (name, tries),
+            "interrupted": "%s送的时候桥停了：桥每轮看一下会话，看到了就算送到；一直这样就要人看一下会话" % name,
+            "dropped": "%s不送了：%s" % (name, "KiroCrew 一直没收下，这个 run 算没能开始" if what == "handover"
+                                        else "分支有了新推送，或者 run 结束了" if what == "answer" else "已经不适用")}[st]
+    return {"kind": "outbox_" + st, "text": text, "at": lean_view.epoch(o.get("updated") or o.get("created"))}
+
+
 def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[dict[str, Any]],
-                  park: Any) -> None:
+                  park: Any, notes: list[dict[str, Any]] | None = None) -> None:
     """Team mode: the ledger's run state and its decisions (brain-kit's states). A run id reserved while the signer
     signs its contract (``signing``) is a hand-over not taken yet; a decision whose answer the signer refused, that is
-    void, or that could not be asked leaves the run waiting until a person looks."""
+    void, or that could not be asked leaves the run waiting until a person looks. *notes* (team_note, outbox_note):
+    what brain-kit 0d52e97's bridge holds about the run, e.g. the acceptance question held until CI is green."""
     st = run_row.get("state")
+    notes = sorted(notes or [], key=lambda x: x.get("at") or 0)
+    latest = {x["kind"]: x for x in notes}
     open_d = [d for d in decisions if d.get("state") == "open"]
     posting = [d for d in decisions if d.get("state") in NOT_POSTED]    # brain-kit: not on the MR yet
     mine = [d for d in decisions if not run_row.get("run_id") or d.get("run_id") in (None, run_row.get("run_id"))]
@@ -155,14 +254,22 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
     row["open_questions"] = [d["id"] for d in open_d]
     if st == "closed":
         return put("merged", "nobody", "MR 已合并或关闭，运行结束")
-    if st == "failed":
-        return put("rejected", "people", "工作区没建成，要人看一下")
+    if st == "failed":     # 0d52e97: runnerd failed for good, or KiroCrew never took the hand-over
+        return put("rejected", "people", "没能开始（工作区没建成，或接手消息一直送不进会话）：要人看一下，处理好以后重新交接")
     if st == "signing":
         return put("handed_over", "bridge", "签名服务在签接手合同（%s 先占着）" % (run_row.get("run_id") or "run 号"))
     if st in ("spooled", "ready"):
+        for k in ("runnerd_silent", "setup", "runnerd_retry", "queued", "gaveup", "outbox_unknown"):
+            if k in latest:
+                _, who, _ = NOTICE_KIND.get({"runnerd_silent": "runnerd-silent", "runnerd_retry": "runnerd-retry"}.get(
+                    k, k), ("", "runner", ""))
+                return put("handed_over", who if k != "outbox_unknown" else "bridge", latest[k]["text"])
         return put("handed_over", "runner", "运行机在准备工作区")
     if st == "send_unknown":
-        return put("running", "people", "消息送没送到不清楚：要人看一下会话 %s" % (run_row.get("slot") or ""))
+        # the app's KiroCrew adapter shows the bridge a slot's messages only (no running / queue): brain-kit sees a send
+        # that landed, never one that did not, so it does not send it again by itself
+        return put("running", "people", "接手消息送没送到不清楚：桥每轮看一下会话 %s，看到了就接着做；一直这样就要人看一下它"
+                   % (run_row.get("slot") or ""))
     if open_d:
         d = open_d[-1]
         if d.get("kind") == "acceptance":
@@ -174,8 +281,19 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
     if last and last.get("state") in STUCK_DECISION and (park is None or park_waiting(park)) and \
             (not run_row.get("last_sha") or not last.get("sha") or last["sha"] == run_row["last_sha"]):
         return put("parked", "people", STUCK_DECISION[last["state"]] % last["id"])
+    answered = [d for d in mine if d.get("state") in ("answered", "delivered", "delivery_unknown")]
+    if park_waiting(park) and answered and answered[-1] is last:
+        # brain-kit 0d52e97's `answered`: the bridge has the answer, park.json still waits
+        who, text = ANSWERED_TEXT[answered[-1]["state"]]
+        return put("parked", who, text % answered[-1]["id"])
     if park_waiting(park):
+        if "nobody" in latest:
+            return put("parked", "people", latest["nobody"]["text"])
         return put("parked", "bridge", "run 停下了：等桥把问题贴到 MR 上")
+    for k in ("ci_red", "ci_person", "ci_wait", "gaveup"):
+        if k in latest:
+            return put("running", NOTICE_KIND.get({"ci_red": "ciheld-red", "ci_person": "ciheld-person",
+                                                   "ci_wait": "ciheld"}.get(k, k), ("", "runner", ""))[1], latest[k]["text"])
     return put("running", "runner", "运行机在跑")
 
 
@@ -247,7 +365,8 @@ def _pair(x: Any) -> list[int] | None:
 def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict[str, Any] | None,
              ledger_path: str | None = None, vouchers_dir: str | None = None) -> tuple[dict[str, Any], dict | None]:
     """(EvalView, the funnel from brainkit.evaluate or None). Without the module: available false."""
-    view = {"available": False, "error": "", "ref": ref, "metrics": [], "queue": [], "skipped": [], "notes": []}
+    view = {"available": False, "error": "", "ref": ref, "metrics": [], "queue": [], "skipped": [], "notes": [],
+            "families": []}
     if not bk.has("evaluate"):
         view["error"] = "brain-kit 还没有 evaluate 模块" + (
             "（%s）" % bk.info()["module_errors"].get("evaluate") if bk.info()["module_errors"].get("evaluate") else "")
@@ -308,7 +427,8 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
                        and r.get("correct") == "wrong_open"} - set(wrong_open))
     if unmerged:
         notes.append("已知有问题、还没合并（验收被驳回过；合并满 14 天才算进自主度）：%s" % "、".join(unmerged[:20]))
-    view.update(available=True, queue=queue, ref=data.get("ref") or ref, skipped=skipped, notes=notes)
+    view.update(available=True, queue=queue, ref=data.get("ref") or ref, skipped=skipped, notes=notes,
+                families=family_rows(data))
     view["_cto"] = cto_part(data)   # the 交付总览's numbers (the service takes it out before the page gets the view)
     f = data.get("funnel") if isinstance(data.get("funnel"), dict) else None
     funnel = None
@@ -346,8 +466,57 @@ def now() -> float:
 
 # ---------------------------------------------------------------- the 交付总览's three numbers (the CTO 视图's)
 
+# a handed-over run whose eval state ends it without a delivery (brain-kit evaluate.ENDED, 0d52e97)
+ENDED = ("failed", "closed")
 ACT_LABEL = {"approval": "批准", "rejection": "退回", "answer": "回答问题", "approval_refused": "口令没被接受",
-             "push_after_handover": "交接后推代码", "allow_test_change": "允许改验收测试"}
+             "push_after_handover": "交接后推代码", "allow_test_change": "允许改验收测试",
+             # brain-kit 0d52e97: a handed-over run that ended without delivering is never autonomous
+             "runner_failed": "运行机没能开始", "closed_unmerged": "MR 关了没合并"}
+# brain-kit's eval states of a run (evaluate.STATE_LABEL, 0d52e97), its families' and its deliveries': brain-kit's own
+# words when the loaded brain-kit has them, else these (the same ones)
+EVAL_STATE = {"merged": "已合并", "accepted": "验收过了、没合并", "waiting": "在等回答",
+              "answered": "有了回答、run 没接着做", "open": "进行中", "closed": "MR 关了（没合并）", "failed": "运行机失败",
+              "unknown": "派单结果不明", "merged_not_here": "桥说已合并（这里的 main 没有）",
+              "not_readable": "读不到（只有桥上的记录）", "unreadable": "run.json 读不了", "merged_into_parent": "已合进大需求"}
+EVAL_FAMILY = {"in_progress": "小需求在做", "ready_to_release": "小需求都合进了，等发布"}
+EVAL_DELIVERY = {"correct": "对", "wrong": "不对", "pending": "14 天未满", "wrong_open": "有问题（14 天未满）",
+                 "unknown": "没有验收记录", "open": "还没合并", "closed": "没合并",
+                 "merged_not_here": "桥说合并了（这里读不到合并，对不对不知道）"}
+
+
+def eval_words(name: str, mine: dict[str, str]) -> dict[str, str]:
+    """brain-kit's own table of words (evaluate.STATE_LABEL …) over the app's copy of it."""
+    got = getattr(bk.m("evaluate"), name, None) if bk.has("evaluate") else None
+    return {**mine, **{str(k): str(v) for k, v in got.items()}} if isinstance(got, dict) else dict(mine)
+
+
+def state_label(state: Any) -> str:
+    """An eval state (or a family's) in brain-kit's words; another value as it is."""
+    s = str(state or "")
+    words = eval_words("STATE_LABEL", EVAL_STATE)
+    words.update({k: v for k, v in eval_words("FAMILY_LABEL", EVAL_FAMILY).items() if k not in words})
+    return words.get(s, s)
+
+
+def delivery_label(delivery: Any) -> str:
+    d = str(delivery or "")
+    return eval_words("DELIVERY_LABEL", EVAL_DELIVERY).get(d, d)
+
+
+def family_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """brain-kit's eval ``families`` (0d52e97): one row per big requirement split into small ones; [] without."""
+    out = []
+    for x in data.get("families") or []:
+        if not isinstance(x, dict) or not x.get("key"):
+            continue
+        j = _pair(x.get("judgment")) or [0, 0]
+        c = x.get("credits")
+        out.append({"key": str(x["key"]), "repo": "", "children": [str(k) for k in x.get("children") or []][:50],
+                    "merged": int(x.get("merged") or 0), "total": int(x.get("total") or 0),
+                    "state": str(x.get("state") or ""), "state_label": state_label(x.get("state")),
+                    "at_points": j[0], "outside": j[1], "questions": int(x.get("questions") or 0),
+                    "credits": round(float(c), 2) if isinstance(c, (int, float)) and not isinstance(c, bool) else None})
+    return out[:100]
 
 
 def act_label(kind: str) -> str:
@@ -363,30 +532,45 @@ def cto_part(data: dict[str, Any]) -> dict[str, Any]:
     credits, its merge), autonomy's [unattended, judged] and judgment's acts."""
     a = data.get("autonomy") if isinstance(data.get("autonomy"), dict) else {}
     rows = {str(r.get("key")): r for r in a.get("runs") or [] if isinstance(r, dict) and r.get("key")}
+    # brain-kit 0d52e97: each run of the batch with its state, a split child's parent, what blocks its autonomy
+    batch = {str(b.get("key")): b for b in data.get("batch") or [] if isinstance(b, dict) and b.get("key")}
     runs = []
     for t in data.get("traces") or []:
         if not isinstance(t, dict) or not t.get("key"):
             continue
         key = str(t["key"])
         r = rows.get(key) or {}
+        b = batch.get(key) or {}
         o = t.get("outcome") if isinstance(t.get("outcome"), dict) else {}
         handed = bool((o.get("handed_over") or {}).get("value"))
         st = r.get("status")
-        if not handed or st == "local only":
-            how = "local"
+        landed = bool((o.get("merged_at") or {}).get("value")) or b.get("state") in ("merged", "merged_into_parent")
+        if handed and (b.get("state") in ENDED or st in ENDED):
+            how = "ended"           # handed over, ended without a delivery: the runner failed, or the MR was closed
+        elif st == "local only" or (not handed and landed):
+            how = "local"           # done on this machine (merged; a small one: into its big one's branch)
+        elif not handed:
+            how = "pending"         # 0d52e97's eval reads unmerged runs too: one still being built is not judged yet
         elif st == "counted":
             how = "unattended" if r.get("autonomous") and r.get("correct") == "correct" else "people"
         else:
             how = "pending"
         humans = [h for h in t.get("humans") or [] if isinstance(h, dict)]
-        beyond = sorted({act_label(str(x).split(" ", 1)[0]) for x in r.get("beyond") or []})
+        beyond = sorted({act_label(str(x).split(" ", 1)[0]) for x in (r.get("beyond") or []) + (b.get("beyond") or [])})
         cost = t.get("cost") if isinstance(t.get("cost"), dict) else {}
         c = cost.get("credits")
+        fam = t.get("family") if isinstance(t.get("family"), dict) else {}
         runs.append({"key": key, "repo": "", "how": how, "beyond": beyond,
                      "at_points": sum(1 for h in humans if h.get("judgment_point")),
                      "outside": sum(1 for h in humans if not h.get("judgment_point")),
                      "credits": round(float(c), 2) if isinstance(c, (int, float)) and not isinstance(c, bool) else None,
-                     "merged_at": lean_view.epoch(((o.get("merged_at") or {}).get("value")))})
+                     "merged_at": lean_view.epoch(((o.get("merged_at") or {}).get("value"))),
+                     "state": str(b["state"]) if b.get("state") else None,
+                     "state_label": state_label(b.get("state")) if b.get("state") else "",
+                     "stuck": b["stuck"] if isinstance(b.get("stuck"), bool) else None,
+                     "delivery": str(b["delivery"]) if b.get("delivery") else None,
+                     "delivery_label": delivery_label(b.get("delivery")) if b.get("delivery") else "",
+                     "parent": str(b.get("parent") or fam.get("parent") or "") or None})
     j = data.get("judgment") if isinstance(data.get("judgment"), dict) else {}
     kinds: dict[tuple, int] = {}
     for k, n in (j.get("by_kind") or {}).items():
@@ -440,7 +624,7 @@ def cto_numbers(parts: list[tuple[str, dict[str, Any]]], rows: list[dict[str, An
         if r.get("merged_at"):
             judged.add((r["repo"], r["key"]))
             w = _week(r["merged_at"])
-            if w in weekly:
+            if w in weekly and r["how"] in weekly[w]:
                 weekly[w][r["how"]] += 1
     for row in rows:
         if row.get("state") == "merged" and (row.get("repo"), row.get("key")) not in judged and row.get("updated_at"):

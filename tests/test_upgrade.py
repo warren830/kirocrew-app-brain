@@ -6,6 +6,7 @@ team runner is a reminder (WARN) for a local-only repo and FAIL for one handed t
 a requirement with a hand-over). Throwaway repos in temp dirs, a bare repo as origin; no network."""
 
 import json
+import re
 
 import pytest
 
@@ -23,6 +24,10 @@ GITLAB = {"base": "https://gitlab.example.com", "project": "grp/pay"}
 HAS_VERSION_CHECK = "def crew_hook_problem" in (BRAINKIT / "brainkit" / "cli.py").read_text(encoding="utf-8") \
     if (BRAINKIT / "brainkit" / "cli.py").is_file() else False
 needs_d4 = pytest.mark.skipif(not HAS_VERSION_CHECK, reason="this brain-kit has no crew_hook_problem (older than d46765f)")
+# the hook adapter version the brain-kit under test needs (cli.CREW_HOOK_VERSION: 2 at d46765f, 3 at 0d52e97)
+_m = re.search(r"^CREW_HOOK_VERSION = ([0-9]+)", (BRAINKIT / "brainkit" / "cli.py").read_text(encoding="utf-8"), re.M) \
+    if (BRAINKIT / "brainkit" / "cli.py").is_file() else None
+NEED = int(_m.group(1)) if _m else 2
 
 
 def older_kit(tmp_path, *, origin=True, kit=None, adapter=None, runs=True, name="pay"):
@@ -114,8 +119,8 @@ def test_the_kit_fix_reinstalls_on_a_new_branch_and_never_touches_the_checkout(t
     if HAS_VERSION_CHECK:
         old = [r for r in rows if "是旧版" in r["text"]]
         assert len(old) == 1 and old[0]["level"] == "WARN" and old[0]["fix"] == "kit"
-        assert old[0]["text"] == ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）"
-        assert "is an older adapter (version 0, needs 2)" in old[0]["raw"]
+        assert old[0]["text"] == ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 %d 版）" % NEED
+        assert "is an older adapter (version 0, needs %d)" % NEED in old[0]["raw"]
     assert not [i for i in got["todo"]["items"] if i["kind"] == "crew"]                 # a WARN is no 待办 item
 
     done = got["first"]
@@ -138,7 +143,7 @@ def test_the_kit_fix_reinstalls_on_a_new_branch_and_never_touches_the_checkout(t
     if HAS_VERSION_CHECK:
         shipped = (BRAINKIT / "kit" / ".kiro" / "brain" / "lean-hook.py").read_text(encoding="utf-8")
         assert sh("git", "-C", repo, "show", "brain/upgrade-kit:" + ADAPTER).stdout == shipped
-        assert "\nADAPTER_VERSION = 2" in shipped
+        assert "\nADAPTER_VERSION = %d" % NEED in shipped        # the kit fix installs the adapter brain-kit needs
     c = r["commit"]
     assert c["ok"] and not c["blocked"] and "Alice Example <alice@example.com>" in c["text"]
     log = sh("git", "-C", repo, "log", "-1", "--format=%an <%ae>|%cn <%ce>|%s|%P", "brain/upgrade-kit").stdout.strip()
@@ -293,8 +298,8 @@ def test_an_older_adapter_is_a_reminder_locally_and_fail_for_a_team_repo(tmp_pat
     rows = repo_rows(crew, repo)
     assert len(rows) == 1, rows
     r = rows[0]
-    assert (r["level"], r["text"], r["fix"]) == ("FAIL" if team else "WARN", ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）",
-                                                 "kit")
+    assert (r["level"], r["text"], r["fix"]) == ("FAIL" if team else "WARN",
+                                                 ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 %d 版）" % NEED, "kit")
     assert r["raw"] == probs[0]      # brain-kit's own words
 
 

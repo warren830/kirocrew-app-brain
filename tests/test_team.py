@@ -333,7 +333,7 @@ def test_the_page_reads_the_ledger_while_a_round_runs(world, tmp_path):
     view = run(go())
     assert errors == [] and reads
     assert view["ledger"]["decisions"] == {"open": 1} and view["ledger"]["runs"] == {"dispatched": 1}
-    assert rts[0].ledger() == {"runs": [], "decisions": [], "handoffs": []}   # stopped: closed, nothing to read
+    assert rts[0].ledger() == {"runs": [], "decisions": [], "handoffs": [], "outbox": [], "notices": []}   # stopped: closed
 
 
 def test_the_page_lists_the_spool_without_blocking_on_odd_files(world, tmp_path):
