@@ -25,7 +25,7 @@ from . import todo as todo_mod
 from .constants import APP_NAME, APP_ROOT, KEY_RE, LOCAL_AGENT, LOCAL_FOLDER, REPO_ID_RE, TICK_S, VERSION
 from .gateway import Gateway
 from .httpkit import AppError
-from .repo import Git, Repo, Source, read_facts
+from .repo import Git, Repo, Source, read_claim, read_facts
 from .sessions import SessionManager
 from . import store as store_mod
 from .store import Store
@@ -423,8 +423,11 @@ class Service:
                      "worktree": None, "stages": [], "events": [], "approvals": [], "run": None, "park": None}
             path = r.get("path")
             if path and os.path.isdir(path):
-                got = read_facts(Source(Git(path), path=path), key, "runs")
-                facts.update(got, worktree=path, stages=lean_view.stages(got["events"]))
+                g = Git(path)
+                got = read_facts(Source(g, path=path), key, "runs")
+                # runnerd's clone fetches every branch: the claim says the requirement's title, as a person's row does
+                facts.update(got, worktree=path, stages=lean_view.stages(got["events"]),
+                             claim=read_claim(g, "refs/remotes/origin/claim/" + key, "refs/heads/claim/" + key))
                 facts["branch"] = (got["run"] or {}).get("branch")
             row = deliveries.base_row("runner", facts)
             row["where"] = "runner"

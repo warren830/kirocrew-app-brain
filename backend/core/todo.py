@@ -20,7 +20,7 @@ import os
 from typing import Any
 
 from .deliveries import approve_text
-from .detail import mr_questions, park_question
+from .detail import ledger_questions, mr_questions, park_question
 
 # the step a row waits on (Waits.do) -> the 待办 kind, when nothing more specific was listed for it
 DO_KIND = {"reply": "reply", "tool": "reply", "start": "start", "write_back": "write_back", "approve": "lean_approval",
@@ -45,10 +45,7 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
             for d in e.get("decisions") or []:
                 if d.get("state") != "open":      # on the MR, waiting for a person (brain-kit's states)
                     continue
-                q = {"source": "bridge", "id": d["id"], "kind": d.get("kind") or "other", "kind_label": d.get("kind_label") or "",
-                     "question": "", "options": [], "recommend": None, "lean_request": d.get("lean_request"), "refs": [],
-                     "state": d.get("state"), "answer": None, "answerer": None, "voucher_id": None,
-                     "mr_url": e.get("mr_url"), "at": None, "answerable_here": False, "answer_via": None}
+                q = ledger_questions([d], e.get("mr_url"))[0]     # as 需求详情 shows it: its kind in words
                 kind = "acceptance" if d.get("kind") == "acceptance" else "question"
                 items.append({**base, "kind": kind, "mr_url": e.get("mr_url"), "question": q,
                               "text": "%s 等人在 MR 上回答" % d["id"] if kind == "question" else "%s 等产品在 MR 上验收" % d["id"]})

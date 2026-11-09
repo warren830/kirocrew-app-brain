@@ -175,6 +175,19 @@ def empty_facts() -> dict[str, Any]:
             "events": [], "approvals": [], "review": None}
 
 
+def read_claim(git: Git, *refs: str | None) -> dict[str, Any] | None:
+    """claim.json of the first of *refs* (claim/<KEY> branches) that has one: owner, title, source, closed."""
+    for ref in refs:
+        raw = git.show(ref, "claim.json") if ref else None
+        try:
+            claim = json.loads(raw.decode("utf-8")) if raw else None
+        except (ValueError, UnicodeDecodeError):
+            claim = None
+        if isinstance(claim, dict):
+            return claim
+    return None
+
+
 def read_facts(src: Source, key: str, runs_dir: str) -> dict[str, Any]:
     """run.json, park.json, the Lean note, decisions.md and ledger of one requirement in one place."""
     out = empty_facts()
@@ -338,15 +351,7 @@ class Repo:
             intent = run.get("intent")
             if not (src and src.path and intent) or cached[1].get("_isig") == src.sig(self._intent_dirs(intent)):
                 return cached[1]
-        claim = None
-        if claim_ref:
-            raw = self.git.show(claim_ref, "claim.json")
-            try:
-                claim = json.loads(raw.decode("utf-8")) if raw else None
-            except (ValueError, UnicodeDecodeError):
-                claim = None
-            if not isinstance(claim, dict):
-                claim = None
+        claim = read_claim(self.git, claim_ref)
         got = read_facts(src, key, runs) if src is not None else empty_facts()
         run, park, park_sha = got["run"], got["park"], got["park_sha"]
         state_text, decisions_text, evs, approvals = (got["state_text"], got["decisions_text"], got["events"],

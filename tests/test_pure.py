@@ -451,6 +451,21 @@ def test_todo_lists_what_waits_for_you_the_way_the_rows_say_it():
     assert got["items"][0]["session"] == sess and got["items"][0]["since"] == 9.0 and got["items"][1]["since"] == 5.0
 
 
+def test_team_todo_says_a_runner_question_as_the_detail_does_its_kind_in_words():
+    """Team 待办's question cards said 「design」 / 「acceptance」: the ledger has no kind_label. They are the ones
+    需求详情 shows for the same decisions (detail.ledger_questions)."""
+    todo, detail = mod("todo"), mod("detail")
+    url = "https://gl.example/grp/repo/-/merge_requests/5"
+    decs = [{"id": "D-2", "kind": "design", "state": "open", "created": "2026-11-09T01:00:00Z", "run_id": "RUN-PAY-4-1"},
+            {"id": "D-3", "kind": "acceptance", "state": "open", "lean_request": "RELEASE 0c9a7e21", "run_id": "RUN-PAY-4-1"}]
+    row = {"repo": "runner", "key": "PAY-4", "title": "对账单按商户拆分", "state": "parked", "mr": {"url": url},
+           "updated_at": 5.0, "waits": deliveries.waits("people", "answer", "等人在 MR 上回答 D-2（设计）")}
+    got = todo.build([{"row": row, "decisions": decs, "mr_url": url}], team=True, crew_rows=[])["items"]
+    assert [(i["kind"], i["title"], i["question"]["kind_label"]) for i in got] == [
+        ("question", "对账单按商户拆分", "设计"), ("acceptance", "对账单按商户拆分", "验收")]
+    assert [i["question"] for i in got] == detail.ledger_questions(decs, url)
+
+
 def test_the_eval_queue_says_what_people_did_in_words():
     """brain-kit's reasons name an act by its code name in brackets: a person sees the act (OVERVIEW-19)."""
     assert deliveries.acts_in_words("判断点之外有人介入 2 次（push_after_handover）") == "判断点之外有人介入 2 次（交接后推代码）"
