@@ -6,7 +6,7 @@
  * name or a password?) is listed under 「请你确认」: not masked, and not stopping the start.
  *
  * KiroCrew's failing or doubtful checks (GET /crew) are listed above the form with their fix buttons: a start that
- * opens a session needs them.
+ * opens a session needs them. Without any repo there is no form: 导入仓库 instead.
  */
 import { useState } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
@@ -14,7 +14,7 @@ import { paths, useAction, usePoll } from '../api'
 import { lines, splitPaths } from '../format'
 import { KEY_RE, type NewEntry } from '../nav'
 import { CLASS_LABEL, type Classification, type CrewChecks, type IntakeBody, type IntakeCheck, type IntakeNext, type StartBody, type StartResult } from '../types'
-import { CheckRows, Icon } from '../ui'
+import { CheckRows, Icon, ImportCta } from '../ui'
 import type { ViewProps } from './props'
 
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,39}$/
@@ -100,6 +100,15 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
   }
 
   const c = checked?.result ?? null
+  if (props.status && props.status.repos.length === 0) {
+    return (
+      <main className="br-view" data-testid="br-new">
+        <h2>开需求</h2>
+        <ImportCta title="开需求之前，先导入一个仓库" onImport={() => props.go({ kind: 'import' })} />
+      </main>
+    )
+  }
+  const waiting = (props.status?.repos ?? []).filter((r) => r.pending).length
   return (
     <main className="br-view" data-testid="br-new">
       <h2>开需求</h2>
@@ -112,9 +121,10 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
       )}
       {crewOk && <div className="br-banner is-ok" role="status">{crewOk}</div>}
       {props.status && repos.length === 0 && (
-        <div className="br-banner is-error" role="alert">
+        <div className="br-banner is-error" role="alert" data-testid="no-usable-repo">
           <div className="br-row">
-            <span>没有能用的仓库。</span>
+            <span>没有能用的仓库{waiting ? `：${waiting} 个在等 brain-kit 的分支合并` : ''}。</span>
+            <button type="button" className="br-btn is-small" onClick={() => props.go({ kind: 'import' })}>导入仓库</button>
             <button type="button" className="br-btn is-small" onClick={() => props.go({ kind: 'settings' })}>去设置</button>
           </div>
         </div>

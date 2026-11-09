@@ -1,12 +1,12 @@
 /**
- * The bar every view shares: the app's name, the views as tabs (待办 with its count, 运行机 only in team mode) and
- * 设置 at the right. It stays where it is when the view changes. 需求详情 opens the requirement in hand (the last one
- * opened); without one it is off.
+ * The bar every view shares: the app's name, the views as tabs (待办 with its count, 运行机 only in team mode), and at
+ * the right 导入仓库 (how a repo gets into the app) and 设置. It stays where it is when the view changes. 需求详情
+ * opens the requirement in hand (the last one opened); without one it is off.
  */
 import type { ViewKind } from './nav'
 import { Icon } from './ui'
 
-const TABS: [Exclude<ViewKind, 'settings'>, string, string][] = [
+const TABS: [Exclude<ViewKind, 'settings' | 'import'>, string, string][] = [
   ['overview', '交付总览', '每个需求现在在哪、等谁'],
   ['item', '需求详情', '一个需求：Lean 进度、决定、问题、时间线、会话'],
   ['new', '开需求', '认领一个需求，文档过五关，开工'],
@@ -40,6 +40,9 @@ export function AppBar({ view, onView, item, todo, team }: {
         ))}
       </div>
       <span className="br-grow" />
+      <button type="button" className="br-btn" aria-pressed={view === 'import'} onClick={() => view !== 'import' && onView('import')} title="本机目录或克隆：检查它，没装 brain-kit 就装到新分支上">
+        <Icon name="FolderPlus" size={14} />导入仓库
+      </button>
       <button type="button" className="br-btn" aria-pressed={view === 'settings'} onClick={() => view !== 'settings' && onView('settings')} title="brain-kit、仓库、团队模式">
         <Icon name="Settings" size={14} />设置
       </button>

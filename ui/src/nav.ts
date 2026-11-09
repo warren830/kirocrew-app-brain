@@ -12,12 +12,13 @@
  *   ?view=todo                                    待办
  *   ?view=team                                    运行机 (team mode only)
  *   ?view=settings                                设置
+ *   ?view=import&path=<absolute path>             导入仓库 (the path only fills the box: nothing runs until 检查)
  *
  * Anything that does not match its pattern is left out (never put into a request or the page as it came).
  */
 import { STATE_LABEL, type ReqState } from './types'
 
-export type ViewKind = 'overview' | 'item' | 'new' | 'brain' | 'todo' | 'team' | 'settings'
+export type ViewKind = 'overview' | 'item' | 'new' | 'brain' | 'todo' | 'team' | 'settings' | 'import'
 export type ItemFrom = 'overview' | 'todo' | 'brain'
 export type BrainFile = 'PRODUCT' | 'TECH' | 'IMPROVEMENT' | 'PROJECT'
 export const BRAIN_FILES: readonly BrainFile[] = ['PRODUCT', 'TECH', 'IMPROVEMENT', 'PROJECT']
@@ -26,6 +27,7 @@ export type OverviewEntry = { repo?: string; state?: ReqState }
 export type ItemEntry = { repo: string; key: string; from?: ItemFrom }
 export type NewEntry = { repo?: string }
 export type BrainEntryRef = { repo?: string; file?: BrainFile; id?: string; reflect?: string }
+export type ImportEntry = { path?: string }
 
 export type View =
   | ({ kind: 'overview' } & OverviewEntry)
@@ -35,11 +37,14 @@ export type View =
   | { kind: 'todo' }
   | { kind: 'team' }
   | { kind: 'settings' }
+  | ({ kind: 'import' } & ImportEntry)
 
 export const REPO_RE = /^(r[1-9][0-9]{0,2}|runner)$/
 export const KEY_RE = /^[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}$/
 /** <side letter>-<KEY>-<n>, or a legacy <letter>-<n> */
 export const ENTRY_RE = /^[A-Z]-(?:[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,3}|[0-9]{1,5})$/
+/** an absolute path (or ~/…) without control characters: what 导入仓库 may be opened with */
+export const PATH_RE = /^(?:\/|~\/)[^\u0000-\u001f\u007f]{0,1023}$/
 const STATES = Object.keys(STATE_LABEL) as ReqState[]
 const FROM: readonly string[] = ['overview', 'todo', 'brain']
 
@@ -70,6 +75,10 @@ export function parseView(search: string): View {
     return v
   }
   if (view === 'todo' || view === 'team' || view === 'settings') return { kind: view }
+  if (view === 'import') {
+    const path = q.get('path') ?? ''
+    return { kind: 'import', ...(PATH_RE.test(path) ? { path } : {}) }
+  }
   const v: View = { kind: 'overview', ...repoOf(q) }
   const state = q.get('state') ?? ''
   if ((STATES as string[]).includes(state)) v.state = state as ReqState
@@ -101,6 +110,10 @@ export function searchOf(v: View): string {
       put('file', v.file)
       put('id', v.id)
       put('reflect', v.reflect)
+      break
+    case 'import':
+      q.set('view', 'import')
+      put('path', v.path && PATH_RE.test(v.path) ? v.path : undefined)
       break
     default:
       q.set('view', v.kind)

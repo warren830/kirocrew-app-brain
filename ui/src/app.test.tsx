@@ -115,6 +115,45 @@ describe('the app: one bar over the views', () => {
     expect(within(screen.getByTestId('br-no-brainkit')).queryByRole('button', { name: '去设置' })).toBeNull() // … without the way to it
   })
 
+  test('导入仓库 is on the bar of every view; with no repo the overview and 开需求 are one big way in', async () => {
+    const user = userEvent.setup()
+    const s = fx.status()
+    s.repos = []
+    installFixtureRoutes({ [`GET ${API}/status`]: () => s })
+    render(<BrainApp pollMs={60_000} />)
+    const cta = await screen.findByTestId('import-cta')
+    expect(cta).toHaveTextContent('还没有仓库')
+    expect(screen.queryByTestId('req-table')).toBeNull()
+    await user.click(within(cta).getByRole('button', { name: '导入仓库' }))
+    expect(parseView(window.location.search)).toEqual({ kind: 'import' })
+    expect(await screen.findByTestId('br-import')).toBeInTheDocument()
+    expect(bar().getByRole('button', { name: '导入仓库' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(bar().getByRole('tab', { name: '开需求' }))
+    const cta2 = await screen.findByTestId('import-cta')
+    expect(cta2).toHaveTextContent('开需求之前，先导入一个仓库')
+    expect(screen.queryByRole('form', { name: '开需求' })).toBeNull()
+    await user.click(bar().getByRole('button', { name: '设置' }))
+    expect(within(await screen.findByRole('region', { name: '仓库' })).getByText('还没有仓库：点「导入仓库」。')).toBeInTheDocument()
+    await user.click(bar().getByRole('button', { name: '导入仓库' }))
+    expect(navigations.at(-1)).toBe('/apps/brain?view=import')
+  })
+
+  test('a repo whose brain-kit is only on the install branch is said above the overview, not as an error', async () => {
+    const user = userEvent.setup()
+    const s = fx.status()
+    s.repos[1] = { ...s.repos[1], error: '', pending: fx.importInspectPending().pending }
+    const ov = fx.overview()
+    ov.errors = []
+    installFixtureRoutes({ [`GET ${API}/status`]: () => s, [`GET ${API}/overview*`]: () => ov })
+    render(<BrainApp pollMs={60_000} />)
+    const note = await screen.findByTestId('repo-pending')
+    expect(note).toHaveTextContent('shop-web：安装在 brain/install 分支上，合并后生效。推送并开 MR（在「导入仓库」里），合并以后就能用了')
+    expect(within(screen.getByRole('combobox', { name: '仓库' })).getByRole('option', { name: 'shop-web（等合并）' })).toBeDisabled()
+    await user.click(within(note).getByRole('button', { name: '去导入仓库' }))
+    expect(parseView(window.location.search)).toEqual({ kind: 'import', path: '/Users/alice/workplace/shop-web' })
+    expect(await screen.findByLabelText('仓库目录')).toHaveValue('/Users/alice/workplace/shop-web')
+  })
+
   test('a status that cannot be read is a banner with errorText', async () => {
     installFixtureRoutes({ [`GET ${API}/status`]: () => { throw apiError(403, 'forbidden', '只接受 dashboard 主人本人的请求') } })
     render(<BrainApp pollMs={60_000} />)

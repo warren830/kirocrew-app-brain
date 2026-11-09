@@ -1,30 +1,32 @@
 /**
- * 设置: where brain-kit is, the project repos, where worktrees go, team mode (POST /settings); and what the app sees
- * with them (GET /status): brain-kit's version and modules, each repo, who this machine says you are (a token is
- * only said to be there, never shown), KiroCrew's checks with their fix buttons, the team runner's status.
+ * 设置: where brain-kit is, where worktrees go, team mode (POST /settings, which keeps the repo list as it is); and what
+ * the app sees with them (GET /status): brain-kit's version and modules, each repo with 「移出列表」 (the app's list
+ * only: no file changes) and 「导入仓库」 (how a repo gets in), who this machine says you are (a token is only said to be
+ * there, never shown), KiroCrew's checks with their fix buttons, the team runner's status.
  */
 import { useEffect, useState } from 'react'
 import { useAppApi } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
-import { ago, lines } from '../format'
-import type { Settings, Status } from '../types'
-import { CheckRows, Icon, LoadState } from '../ui'
+import { ago } from '../format'
+import type { RemoveResult, RepoInfo, Settings, Status } from '../types'
+import { CheckRows, Icon, LoadState, PendingRepo } from '../ui'
 import type { ViewProps } from './props'
 import { SIGNER_SAME_USER } from './Team'
 
 export const SAME_USER_WARNING = '签名器和 app 用同一个系统用户，签名私钥这个用户就能读到，签名挡不住 app 自己：只适合本机试用，不能用在正式的运行机上。'
 const BRIDGE_HINT = 'bridge.json：带 "signer": {"type": "spool", "spool_dir", "allowed_signers"}，不写 signing_key'
 
-type Form = { brainkit: string; repos: string; work_root: string; team: Settings['team'] }
-const formOf = (s: Settings): Form => ({ brainkit: s.brainkit, repos: s.repos.join('\n'), work_root: s.work_root, team: { ...s.team } })
-const settingsOf = (f: Form): Settings => ({ brainkit: f.brainkit.trim(), repos: lines(f.repos), work_root: f.work_root.trim(), team: { ...f.team } })
+/** The form: everything but the repos (导入仓库 adds them, 移出列表 removes them; the backend keeps a key left out). */
+type Form = Omit<Settings, 'repos'>
+const formOf = (s: Settings): Form => ({ brainkit: s.brainkit, work_root: s.work_root, team: { ...s.team } })
+const settingsOf = (f: Form): Form => ({ brainkit: f.brainkit.trim(), work_root: f.work_root.trim(), team: { ...f.team } })
 
 const TEAM_FIELDS: [Exclude<keyof Settings['team'], 'enabled' | 'dev_same_user'>, string, string][] = [
   ['bridge_config', 'bridge 的配置', 'bridge.json'],
   ['runnerd_config', 'runnerd 的配置', 'runnerd.json'],
 ]
 
-export function SettingsView({ status, setStatus, reloadStatus }: ViewProps) {
+export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps) {
   const api = useAppApi()
   const got = usePoll<Settings>(paths.settings(), 0)
   const [form, setForm] = useState<Form | null>(null)
@@ -32,7 +34,7 @@ export function SettingsView({ status, setStatus, reloadStatus }: ViewProps) {
   useEffect(() => {
     if (got.data && !form) setForm(formOf(got.data))
   }, [got.data]) // eslint-disable-line react-hooks/exhaustive-deps
-  const save = useAction((s: Settings) => api.post<{ ok: boolean; settings: Settings; status: Status }>(paths.settings(), s))
+  const save = useAction((s: Form) => api.post<{ ok: boolean; settings: Settings; status: Status }>(paths.settings(), s))
   const edit = (f: Partial<Form>) => {
     setSaved(false)
     setForm((x) => (x ? { ...x, ...f } : x))
@@ -58,11 +60,6 @@ export function SettingsView({ status, setStatus, reloadStatus }: ViewProps) {
               <label htmlFor="set-brainkit">brain-kit 在哪</label>
               <input id="set-brainkit" type="text" className="br-mono" value={form.brainkit} onChange={(e) => edit({ brainkit: e.target.value })} />
               <p className="br-hint">app 只读它，不改它。</p>
-            </div>
-            <div className="br-field">
-              <label htmlFor="set-repos">项目仓库（一行一个）</label>
-              <textarea id="set-repos" rows={3} value={form.repos} onChange={(e) => edit({ repos: e.target.value })} />
-              <p className="br-hint">装过 brain-kit 的仓库（brain install）。</p>
             </div>
             <div className="br-field">
               <label htmlFor="set-work">每个需求的工作目录放在哪</label>
@@ -97,14 +94,19 @@ export function SettingsView({ status, setStatus, reloadStatus }: ViewProps) {
           </form>
         )}
       </section>
-      {status && <StatusCards status={status} onFixed={reloadStatus} />}
+      {status && <StatusCards status={status} onFixed={reloadStatus} onImport={(path) => go({ kind: 'import', ...(path ? { path } : {}) })} onRemoved={setStatus} />}
     </main>
   )
 }
 
 const yes = (b: boolean) => (b ? '有' : '没有')
 
-function StatusCards({ status: s, onFixed }: { status: Status; onFixed: () => void }) {
+function StatusCards({ status: s, onFixed, onImport, onRemoved }: {
+  status: Status
+  onFixed: () => void
+  onImport: (path?: string) => void
+  onRemoved: (s: Status) => void
+}) {
   return (
     <div className="br-cards">
       <section className="br-card" aria-label="brain-kit">
@@ -132,24 +134,14 @@ function StatusCards({ status: s, onFixed }: { status: Status; onFixed: () => vo
       </section>
 
       <section className="br-card" aria-label="仓库">
-        <header><h2>仓库</h2><span className="br-dim br-small">{s.repos.length} 个</span></header>
-        {s.repos.length === 0 ? <p className="br-note">还没有仓库：在上面加一个。</p> : (
+        <header>
+          <h2>仓库</h2><span className="br-dim br-small">{s.repos.length} 个</span>
+          <span className="br-grow" />
+          <button type="button" className="br-btn is-small" onClick={() => onImport()}><Icon name="FolderPlus" size={13} />导入仓库</button>
+        </header>
+        {s.repos.length === 0 ? <p className="br-note">还没有仓库：点「导入仓库」。</p> : (
           <ul className="br-plain">
-            {s.repos.map((r) => (
-              <li key={r.id} className="br-stack" style={{ gap: 2 }} data-repo={r.id}>
-                <span className="br-row">
-                  <b className="br-strong">{r.name}</b>
-                  <span className={`br-chip tone-${r.ok ? 'ok' : 'bad'}`}>{r.ok ? '能用' : '读不到'}</span>
-                  <span className="br-mono br-dim br-small">{r.path}</span>
-                </span>
-                {r.error && <span className="br-bad-text br-small">{r.error}</span>}
-                {r.kit && (
-                  <span className="br-small br-dim">
-                    需求号 {r.kit.req_prefix}-n · 跟踪 {r.kit.tracker} · 默认分支 {r.kit.default_branch} · GitLab {r.kit.gitlab_project}（{r.kit.gitlab_base}）
-                  </span>
-                )}
-              </li>
-            ))}
+            {s.repos.map((r) => <RepoRow key={r.path} r={r} onImport={onImport} onRemoved={onRemoved} />)}
           </ul>
         )}
       </section>
@@ -175,5 +167,50 @@ function StatusCards({ status: s, onFixed }: { status: Status; onFixed: () => vo
         )}
       </section>
     </div>
+  )
+}
+
+/** One repo of the list: whether the app can use it, why not, what waits (the install branch), and 「移出列表」 after a
+ * confirm that says what it does (the app's list only: no file, branch or worktree changes). */
+function RepoRow({ r, onImport, onRemoved }: { r: RepoInfo; onImport: (path?: string) => void; onRemoved: (s: Status) => void }) {
+  const api = useAppApi()
+  const [asking, setAsking] = useState(false)
+  const rm = useAction(() => api.post<RemoveResult>(paths.repoRemove(), { path: r.path }))
+  const remove = async () => {
+    const x = await rm.run()
+    if (x) onRemoved(x.status)
+  }
+  return (
+    <li className="br-stack" style={{ gap: 2 }} data-repo={r.id}>
+      <span className="br-row">
+        <b className="br-strong">{r.name}</b>
+        <span className={`br-chip tone-${r.ok ? 'ok' : r.pending ? 'wait' : 'bad'}`}>{r.ok ? '能用' : r.pending ? '等合并' : '读不到'}</span>
+        <span className="br-mono br-dim br-small">{r.path}</span>
+        <span className="br-grow" />
+        {!asking && <button type="button" className="br-btn is-small" onClick={() => setAsking(true)}>移出列表</button>}
+      </span>
+      {asking && (
+        <div className="br-confirm" role="group" aria-label={`移出 ${r.name}`}>
+          <span>只从 app 的列表里去掉 {r.name}：不删文件，不动分支和工作目录。以后可以再导入。</span>
+          <div className="br-row">
+            <button type="button" className="br-btn is-small is-danger" disabled={rm.busy} onClick={() => void remove()}>{rm.busy ? '正在移出…' : '移出'}</button>
+            <button type="button" className="br-btn is-small" disabled={rm.busy} onClick={() => setAsking(false)}>取消</button>
+          </div>
+        </div>
+      )}
+      {r.error && (
+        <span className="br-row">
+          <span className="br-bad-text br-small">{r.error}</span>
+          <button type="button" className="br-btn is-small" onClick={() => onImport(r.path)}>去检查</button>
+        </span>
+      )}
+      {r.pending && <PendingRepo repo={r} onOpen={() => onImport(r.path)} />}
+      {r.kit && (
+        <span className="br-small br-dim">
+          需求号 {r.kit.req_prefix}-n · 跟踪 {r.kit.tracker} · 默认分支 {r.kit.default_branch} · GitLab {r.kit.gitlab_project}（{r.kit.gitlab_base}）
+        </span>
+      )}
+      {rm.error && <p className="br-error" role="alert">{rm.error}</p>}
+    </li>
   )
 }

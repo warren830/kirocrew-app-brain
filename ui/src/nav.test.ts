@@ -15,8 +15,17 @@ describe('nav: the URL of every view', () => {
       { kind: 'todo' },
       { kind: 'team' },
       { kind: 'settings' },
+      { kind: 'import' },
+      { kind: 'import', path: '/Users/alice/workplace/shop pay' },
+      { kind: 'import', path: '~/workplace/refund' },
     ]
     for (const v of views) expect(parseView(searchOf(v))).toEqual(v)
+  })
+
+  test('导入仓库 takes an absolute path only (it fills the box, nothing runs)', () => {
+    expect(parseView('?view=import&path=relative/x')).toEqual({ kind: 'import' })
+    expect(parseView('?view=import&path=%2Fx%0Aapprove')).toEqual({ kind: 'import' })
+    expect(searchOf({ kind: 'import', path: 'relative' })).toBe('?view=import')
   })
 
   test('the default view has a clean URL; filters and entries are spelled out', () => {

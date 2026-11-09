@@ -4,7 +4,9 @@
  * src/test/fixtures (writes answer something plausible and change nothing). Built by `npm run preview:build` into
  * preview-dist/index.html (one file, opens from file:// too).
  *
- * The bar above the app switches the world: 团队模式, 找不到 brain-kit, KiroCrew 有 FAIL, 没有 evaluate, light/dark.
+ * The bar above the app switches the world: 团队模式, 找不到 brain-kit, KiroCrew 有 FAIL, 没有 evaluate, 没有仓库, light/dark.
+ * 导入仓库 is played through: a path ending in /ready is installed already; any other is not, and its install (or a clone)
+ * runs as a job whose steps advance over a few seconds; 加入列表 and 移出列表 change the preview's list.
  * The switches live in sessionStorage (the app rewrites the URL as you move); `?pv=team,light,…` sets them from a link.
  * Every fixture time is moved so that the fixtures' `at` is now. Opening a session is shown, not done.
  */
@@ -14,11 +16,13 @@ import App from '../src/main'
 import { FIXTURE_AT, clone, fx } from '../src/test/data'
 import { API, fixtureRoutes } from '../src/test/routes'
 import { StubApiError, setApiRoutes, setNavigateHook } from '../src/test/stubs/app-sdk'
-import type { CrewFixBody, IntakeBody, ReflectApplyBody, ReflectApplyResult, RequirementDetail, Settings, StartBody, Status } from '../src/types'
+import type {
+  CrewFixBody, ImportInspect, ImportJob, IntakeBody, ReflectApplyBody, ReflectApplyResult, RepoInfo, RequirementDetail, Settings, StartBody, Status,
+} from '../src/types'
 
-const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'light'] as const
+const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'norepos', 'light'] as const
 type Flag = (typeof FLAGS)[number]
-const FLAG_NAME: Record<Flag, string> = { team: '团队模式', nokit: '找不到 brain-kit', crewfail: 'KiroCrew 有 FAIL', noeval: '没有 evaluate', light: '亮色' }
+const FLAG_NAME: Record<Flag, string> = { team: '团队模式', nokit: '找不到 brain-kit', crewfail: 'KiroCrew 有 FAIL', noeval: '没有 evaluate', norepos: '没有仓库', light: '亮色' }
 const KEY = 'brain-preview-flags'
 
 function readFlags(): Set<Flag> {
@@ -50,9 +54,11 @@ function shift<T>(x: T): T {
 
 let settings: Settings = fx.settings()
 let crewFixed = false
+let repos: RepoInfo[] = flags.has('norepos') ? [] : fx.status().repos
 
 function status(): Status {
   const s = fx.status()
+  s.repos = clone(repos)
   if (flags.has('team')) {
     s.app.team = true
     s.team = fx.team().status
@@ -116,9 +122,10 @@ setApiRoutes({
     return o
   },
   [`POST ${API}/settings`]: (body) => {
-    settings = clone(body as Settings)
+    settings = { ...settings, ...clone(body as Partial<Settings>) }
     return { ok: true, settings: clone(settings), status: status() }
   },
+  ...importRoutes(),
   [`POST ${API}/refresh`]: (body) => ({ ok: true, text: `预览：没有真的跑 git fetch（${(body as { repo: string }).repo}）` }),
   [`POST ${API}/requirements/*`]: (body, path) => {
     if (path.endsWith('/session')) return { ok: true, slot: 'brain-PAY-3-7f3a', url: '/chat?sid=brain-PAY-3-7f3a' }
@@ -158,6 +165,80 @@ setApiRoutes({
   },
   [`POST ${API}/team/loop`]: () => ({ ok: true, summary: { handoffs: 0, answers: 1, signed: 1 }, error: '' }),
 })
+
+/** 导入仓库 in the preview: the fixtures moved to the path asked for; jobs whose steps advance with the clock. */
+function importRoutes() {
+  const FIXTURE_PATH = fx.importInspect().path as string
+  const pendingPaths = new Set<string>()
+  const jobs = new Map<string, { job: ImportJob<unknown>; at: number; path: string }>()
+  const at = (p: string) => <T,>(x: T): T => JSON.parse(JSON.stringify(x).split(FIXTURE_PATH).join(p)) as T
+  const inspect = (path: string): ImportInspect => {
+    const listed = repos.find((r) => r.path === path)
+    if (pendingPaths.has(path)) return { ...at(path)(fx.importInspectPending()), ...(listed ? { next: 'listed' as const, listed: listed.id } : {}) }
+    const c = at(path)(fx.importInspect())
+    if (path.endsWith('/ready') || listed) {
+      c.next = listed ? 'listed' : 'add'
+      c.listed = listed?.id ?? null
+      c.kit = { state: 'checkout', values: { tracker: 'none', req_prefix: 'READY', default_branch: 'main', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/ready' } }
+      c.checks = c.checks.map((x) => (['kit', 'lean', 'brain', 'agents'].includes(x.id) ? { ...x, level: 'OK' as const, why: '装了', todo: '' } : x))
+    }
+    return c
+  }
+  const start = (job: ImportJob<unknown>, path: string) => {
+    const id = Math.random().toString(16).slice(2, 14).padEnd(12, '0')
+    jobs.set(id, { job: { ...job, id, target: path, started_at: Date.now() / 1000 }, at: Date.now(), path })
+    return { job: progress(id) }
+  }
+  const progress = (id: string) => {
+    const got = jobs.get(id)
+    if (!got) throw new StubApiError(404, { error: '没有这个任务', code: 'no_job' })
+    const done = Math.floor((Date.now() - got.at) / 700)
+    const j = clone(got.job)
+    if (done < j.steps.length) {
+      j.state = 'running'
+      j.result = null
+      j.ended_at = null
+      j.steps = j.steps.map((s, i) => (i < done ? s : { ...s, state: i === done ? 'running' : 'todo', detail: '' }))
+    } else if (j.kind === 'install') {
+      pendingPaths.add(got.path)
+    }
+    return j
+  }
+  return {
+    [`POST ${API}/import/inspect`]: (body: unknown) => inspect(String((body as { path: string }).path).replace(/\/+$/, '')),
+    [`POST ${API}/import/clone`]: (body: unknown) => {
+      const b = body as { url: string; parent: string; name: string }
+      const name = b.name || b.url.replace(/\/+$/, '').split(/[/:]/).pop()?.replace(/\.git$/, '') || 'repo'
+      const path = `${b.parent.replace(/\/+$/, '')}/${name}`
+      return start(at(path)(fx.importCloneJob()), path)
+    },
+    [`POST ${API}/import/install`]: (body: unknown) => {
+      const path = (body as { path: string }).path
+      return start(at(path)(fx.importJob()), path)
+    },
+    [`GET ${API}/import/jobs/*`]: (_b: unknown, path: string) => progress(path.split('/').pop() ?? ''),
+    [`POST ${API}/import/commit`]: () => ({ ok: true, sha: 'e'.repeat(40), blocked: false, text: '提交了 eeeeeeee（作者 alice）', output: '' }),
+    [`POST ${API}/import/publish`]: (body: unknown) => {
+      const r = at((body as { path: string }).path)(fx.importPublish())
+      r.text = `预览：没有真的推送。${r.text}`
+      return r
+    },
+    [`POST ${API}/import/add`]: (body: unknown) => {
+      const path = (body as { path: string }).path
+      const id = `r${repos.length + 1}`
+      const pending = pendingPaths.has(path) ? at(path)(fx.importInspectPending()).pending : null
+      repos = [...repos, { id, path, name: path.split('/').pop() ?? path, ok: !pending, error: '', pending,
+        kit: pending ? null : { tracker: 'none', req_prefix: 'READY', default_branch: 'main', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/ready' } }]
+      return { ok: true, id, text: `预览：加入了（${id}）${pending ? `：${pending.text}` : ''}`, status: status() }
+    },
+    [`POST ${API}/repos/remove`]: (body: unknown) => {
+      const path = (body as { path: string }).path
+      const name = path.split('/').pop()
+      repos = repos.filter((r) => r.path !== path).map((r, i) => ({ ...r, id: `r${i + 1}` }))
+      return { ok: true, text: `预览：从列表里移出了 ${name}（文件、分支都没动）`, status: status() }
+    },
+  }
+}
 
 let notice: (s: string) => void = () => {}
 // a session is KiroCrew's: the preview says where it would go and stays

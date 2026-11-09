@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { fx } from '../test/data'
@@ -13,26 +13,56 @@ const props = (over: Partial<ViewProps> = {}): ViewProps => ({
 })
 
 describe('设置', () => {
-  test('save posts the edited settings, puts the answered status in place and says 已保存', async () => {
+  test('save posts the edited settings without the repos (the list is 导入仓库’s and 移出列表’s), puts the answered status in place', async () => {
     const user = userEvent.setup()
     const answered = fx.status()
-    answered.repos = answered.repos.slice(0, 1)
     installFixtureRoutes({
-      [`POST ${API}/settings`]: (body) => ({ ok: true, settings: body as Settings, status: answered }),
+      [`POST ${API}/settings`]: (body) => ({ ok: true, settings: { ...fx.settings(), ...(body as Partial<Settings>) }, status: answered }),
     })
     const p = props()
     render(<SettingsView {...p} />)
-    const repos = await screen.findByLabelText('项目仓库（一行一个）')
-    expect(repos).toHaveValue('/Users/alice/workplace/shop-pay\n/Users/alice/workplace/shop-web')
-    await user.clear(repos)
-    await user.type(repos, '/Users/alice/workplace/shop-pay{enter}{enter}')
+    await screen.findByLabelText('brain-kit 在哪')
+    expect(screen.queryByLabelText('项目仓库（一行一个）')).toBeNull()
     await user.click(screen.getByRole('checkbox', { name: '这台机器是团队运行机' }))
     await user.click(screen.getByRole('button', { name: '保存' }))
     expect(await screen.findByText('已保存')).toBeInTheDocument()
     const post = apiCalls.find((c) => c.method === 'POST')
     expect(post?.path).toBe(`${API}/settings`)
-    expect(post?.body).toEqual({ ...fx.settings(), repos: ['/Users/alice/workplace/shop-pay'], team: { ...fx.settings().team, enabled: true } })
+    const { repos: _repos, ...rest } = fx.settings()
+    expect(post?.body).toEqual({ ...rest, team: { ...fx.settings().team, enabled: true } })
     expect(p.setStatus).toHaveBeenCalledWith(answered)
+  })
+
+  test('仓库: 导入仓库, and 移出列表 after a confirm that says it changes no file', async () => {
+    const user = userEvent.setup()
+    const after = fx.status()
+    after.repos = after.repos.slice(1).map((r) => ({ ...r, id: 'r1' }))
+    installFixtureRoutes({ [`POST ${API}/repos/remove`]: () => ({ ok: true, text: '从列表里移出了 shop-pay（文件、分支都没动）', status: after }) })
+    const p = props()
+    render(<SettingsView {...p} />)
+    const card = screen.getByRole('region', { name: '仓库' })
+    await user.click(within(card).getByRole('button', { name: '导入仓库' }))
+    expect(p.go).toHaveBeenCalledWith({ kind: 'import' })
+    const r1 = card.querySelector('[data-repo="r1"]') as HTMLElement
+    await user.click(within(r1).getByRole('button', { name: '移出列表' }))
+    const ask = within(r1).getByRole('group', { name: '移出 shop-pay' })
+    expect(ask).toHaveTextContent('只从 app 的列表里去掉 shop-pay：不删文件，不动分支和工作目录。')
+    expect(apiCalls.some((c) => c.path === `${API}/repos/remove`)).toBe(false)
+    await user.click(within(ask).getByRole('button', { name: '移出' }))
+    await waitFor(() => expect(p.setStatus).toHaveBeenCalledWith(after))
+    expect(apiCalls.find((c) => c.path === `${API}/repos/remove`)?.body).toEqual({ path: '/Users/alice/workplace/shop-pay' })
+  })
+
+  test('a repo whose brain-kit is on the install branch says so, with its MR', () => {
+    const s = fx.status()
+    s.repos[1] = { ...s.repos[1], error: '', pending: { ...fx.importInspectPending().pending!, mr_url: 'https://gitlab.example.com/shop/shop-web/-/merge_requests/3', next: '在 GitLab 上审核并合并 MR，然后在这个目录里 git pull' } }
+    installFixtureRoutes({})
+    render(<SettingsView {...props({ status: s })} />)
+    const r2 = screen.getByRole('region', { name: '仓库' }).querySelector('[data-repo="r2"]') as HTMLElement
+    expect(r2).toHaveTextContent('等合并')
+    expect(r2).toHaveTextContent('安装在 brain/install 分支上，合并后生效。在 GitLab 上审核并合并 MR，然后在这个目录里 git pull')
+    expect(within(r2).getByRole('link', { name: /看 MR/ })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-web/-/merge_requests/3')
+    expect(r2).not.toHaveTextContent('读不到')
   })
 
   test('team mode asks for bridge.json and runnerd.json only: the signer is named inside bridge.json, never a key', async () => {

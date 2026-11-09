@@ -29,6 +29,15 @@ export const paths = {
   todo: () => `${BASE}/todo`,
   team: () => `${BASE}/team`,
   teamLoop: () => `${BASE}/team/loop`,
+  importDefaults: () => `${BASE}/import/defaults`,
+  importInspect: () => `${BASE}/import/inspect`,
+  importClone: () => `${BASE}/import/clone`,
+  importInstall: () => `${BASE}/import/install`,
+  importJob: (id: string) => `${BASE}/import/jobs/${enc(id)}`,
+  importCommit: () => `${BASE}/import/commit`,
+  importPublish: () => `${BASE}/import/publish`,
+  importAdd: () => `${BASE}/import/add`,
+  repoRemove: () => `${BASE}/repos/remove`,
 }
 
 /** The API error's text in Chinese (the SDK rejects with `API <status>: <body>`, the body `{"error", "code"}`). */

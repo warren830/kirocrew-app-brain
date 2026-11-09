@@ -12,7 +12,8 @@ import { paths, useAction } from './api'
 import { fmtRate } from './format'
 import type { Tone } from './styles'
 import type {
-  AnswerBody, AnswerResult, ApprovalState, CheckRow, CrewFixBody, CrewFixResult, LeanSummary, Level, MrRef, Question, ReqState, StageState,
+  AnswerBody, AnswerResult, ApprovalState, CheckRow, CrewFixBody, CrewFixResult, LeanSummary, Level, MrRef, Question, ReqState, RepoInfo,
+  StageState,
 } from './types'
 import { STATE_LABEL } from './types'
 
@@ -274,6 +275,37 @@ export function AnswerForm({ question, repo, reqKey, onDone }: { question: Quest
       {act.result && <p className="br-pre br-ok-text" role="status">{act.result.text}</p>}
       {act.error && <p className="br-error" role="alert">{act.error}</p>}
     </form>
+  )
+}
+
+export const IMPORT_WHY = '先导入一个项目仓库：本机的目录，或者从 GitLab 克隆。app 会先检查它；没装 brain-kit 的，可以装到一个新分支上，不动你现在的检出。'
+
+/** No repo yet: the way in, big (交付总览, 开需求). */
+export function ImportCta({ onImport, title = '还没有仓库' }: { onImport: () => void; title?: string }) {
+  return (
+    <section className="br-card br-cta" aria-label="导入仓库" data-testid="import-cta">
+      <h2>{title}</h2>
+      <p>{IMPORT_WHY}</p>
+      <button type="button" className="br-btn is-primary is-big" onClick={onImport}>
+        <Icon name="FolderPlus" size={16} />导入仓库
+      </button>
+    </section>
+  )
+}
+
+/** A listed repo whose brain-kit is on its way: what it waits for, and the MR or the way to 导入仓库. */
+export function PendingRepo({ repo, onOpen, banner = false }: { repo: RepoInfo; onOpen: () => void; banner?: boolean }) {
+  const p = repo.pending
+  if (!p) return null
+  return (
+    <div className={banner ? 'br-banner' : 'br-stack'} style={banner ? undefined : { gap: 2 }} role="status" data-testid="repo-pending" data-repo={repo.id}>
+      <div className="br-row">
+        <span>{banner && <b className="br-strong">{repo.name}：</b>}{p.text}。{p.next}</span>
+        {p.mr_url ? <ExtLink href={p.mr_url}>看 MR</ExtLink> : (
+          <button type="button" className="br-btn is-small" onClick={onOpen}>去导入仓库</button>
+        )}
+      </div>
+    </div>
   )
 }
 

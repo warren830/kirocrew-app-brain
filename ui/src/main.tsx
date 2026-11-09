@@ -8,7 +8,7 @@
  * checks with their fix buttons.
  *
  * Views: 交付总览 (views/Overview.tsx, the default), 需求详情 (Detail), 开需求 (NewReq), Brain (Brain), 待办 (Todo),
- * 运行机 (Team, team mode only), 设置 (Settings).
+ * 运行机 (Team, team mode only), 设置 (Settings), 导入仓库 (Import: the bar's button, and every place that has no repo).
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavBadge, useNavigate } from '@kirocrew/app-sdk'
@@ -20,6 +20,7 @@ import type { Status } from './types'
 import { CheckRows } from './ui'
 import { BrainPage } from './views/Brain'
 import { DetailView } from './views/Detail'
+import { ImportView } from './views/Import'
 import { NewView } from './views/NewReq'
 import { OverviewView } from './views/Overview'
 import type { ViewProps } from './views/props'
@@ -131,6 +132,9 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
     body = <TeamPage key={n} {...props} />
   } else if (v.kind === 'settings') {
     body = <SettingsView key={n} {...props} />
+  } else if (v.kind === 'import') {
+    const { kind: _k, ...entry } = v
+    body = <ImportView key={n} entry={entry} {...props} />
   } else {
     const { kind: _k, ...entry } = v
     body = <OverviewView key={n} entry={entry} {...props} />

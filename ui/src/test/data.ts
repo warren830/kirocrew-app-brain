@@ -5,11 +5,18 @@
  * file, and `Extra<J, T>` (the file's keys the contract does not have) must be never.
  */
 import type {
-  BrainView, CrewChecks, IntakeCheck, IntakeNext, Overview, ReflectPreview, RequirementDetail, Settings, StartResult, Status, TeamView, Todo,
+  BrainView, CloneResult, CrewChecks, ImportDefaults, ImportInspect, ImportJob, InstallResult, IntakeCheck, IntakeNext, Overview,
+  PublishResult, ReflectPreview, RequirementDetail, Settings, StartResult, Status, TeamView, Todo,
 } from '../types'
 import brainJson from './fixtures/brain.json'
 import crewJson from './fixtures/crew.json'
 import detailJson from './fixtures/detail.json'
+import importCloneJobJson from './fixtures/import-clone-job.json'
+import importDefaultsJson from './fixtures/import-defaults.json'
+import importInspectPendingJson from './fixtures/import-inspect-pending.json'
+import importInspectJson from './fixtures/import-inspect.json'
+import importJobJson from './fixtures/import-job.json'
+import importPublishJson from './fixtures/import-publish.json'
 import intakeCheckJson from './fixtures/intake-check.json'
 import intakeNextJson from './fixtures/intake-next.json'
 import overviewJson from './fixtures/overview.json'
@@ -52,6 +59,12 @@ const files = {
   reflect: exact<ReflectPreview>()(reflectJson),
   team: exact<TeamView>()(teamJson),
   settings: exact<Settings>()(settingsJson),
+  importDefaults: exact<ImportDefaults>()(importDefaultsJson),
+  importInspect: exact<ImportInspect>()(importInspectJson),
+  importInspectPending: exact<ImportInspect>()(importInspectPendingJson),
+  importJob: exact<ImportJob<InstallResult>>()(importJobJson),
+  importCloneJob: exact<ImportJob<CloneResult>>()(importCloneJobJson),
+  importPublish: exact<PublishResult>()(importPublishJson),
 }
 
 export const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T

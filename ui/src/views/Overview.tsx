@@ -1,7 +1,8 @@
 /**
  * 交付总览: every requirement — where it is, what it waits on, its Lean stage, its credits and MR, the first line of its
  * 变更说明 — with the repo and state filters (in the URL), the overlap warnings, the eval card and the decision funnel.
- * Polls /overview.
+ * Polls /overview. Without any repo it is one big way in: 导入仓库. A repo whose brain-kit is on its way (the install
+ * branch) is said above the table.
  */
 import { useMemo, useState } from 'react'
 import { useAppApi } from '@kirocrew/app-sdk'
@@ -10,7 +11,7 @@ import { ago, fmtCredits } from '../format'
 import type { EvalView, Funnel, Overview, RefreshResult, ReqState, Requirement } from '../types'
 import { STATE_LABEL } from '../types'
 import type { OverviewEntry } from '../nav'
-import { Icon, LeanCell, LoadState, MrLink, Rate, STATE_TONE, StateChip } from '../ui'
+import { Icon, ImportCta, LeanCell, LoadState, MrLink, PendingRepo, Rate, STATE_TONE, StateChip } from '../ui'
 import type { ViewProps } from './props'
 
 const STATES = Object.keys(STATE_LABEL) as ReqState[]
@@ -18,9 +19,10 @@ const STATES = Object.keys(STATE_LABEL) as ReqState[]
 export function OverviewView({ entry, status, go, replace, pollMs }: { entry: OverviewEntry } & ViewProps) {
   const [repo, setRepo] = useState(entry.repo ?? 'all')
   const [state, setState] = useState<ReqState | undefined>(entry.state)
-  const ov = usePoll<Overview>(paths.overview(repo), pollMs ?? POLL_MS)
-  const data = ov.data
   const repos = status?.repos ?? []
+  const noRepos = !!status && repos.length === 0
+  const ov = usePoll<Overview>(noRepos ? null : paths.overview(repo), pollMs ?? POLL_MS)
+  const data = ov.data
   const pick = (r: string, s: ReqState | undefined) => {
     setRepo(r)
     setState(s)
@@ -36,6 +38,13 @@ export function OverviewView({ entry, status, go, replace, pollMs }: { entry: Ov
   }
   const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
 
+  if (noRepos) {
+    return (
+      <main className="br-view" data-testid="overview">
+        <ImportCta onImport={() => go({ kind: 'import' })} />
+      </main>
+    )
+  }
   return (
     <main className="br-view" data-testid="overview">
       <div className="br-row">
@@ -44,7 +53,7 @@ export function OverviewView({ entry, status, go, replace, pollMs }: { entry: Ov
           <select value={repo} onChange={(e) => pick(e.target.value, state)} aria-label="仓库">
             <option value="all">全部仓库</option>
             {repos.map((r) => (
-              <option key={r.id} value={r.id} disabled={!r.ok}>{r.name}{r.ok ? '' : '（读不到）'}</option>
+              <option key={r.id} value={r.id} disabled={!r.ok}>{r.name}{r.ok ? '' : r.pending ? '（等合并）' : '（读不到）'}</option>
             ))}
           </select>
         </label>
@@ -52,6 +61,9 @@ export function OverviewView({ entry, status, go, replace, pollMs }: { entry: Ov
         {scope.map((r) => <RefreshButton key={r.id} repo={r.id} name={scope.length > 1 ? r.name : ''} onDone={ov.reload} />)}
       </div>
 
+      {repos.filter((r) => r.pending && (repo === 'all' || r.id === repo)).map((r) => (
+        <PendingRepo key={r.id} repo={r} banner onOpen={() => go({ kind: 'import', path: r.path })} />
+      ))}
       {data && <StateFilter counts={data.counts} total={data.rows.length} value={state} onPick={(s) => pick(repo, s)} />}
       <LoadState loading={ov.loading} error={ov.error} has={!!data} />
       {data?.errors.map((e) => (

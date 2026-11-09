@@ -163,4 +163,19 @@ button.br-tag:hover { border-color: var(--accent); color: var(--text-strong); }
 .br-section > h3 { margin-top: 6px; }
 .br-group { display: grid; gap: 8px; }
 .br-item { display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); }
+
+/* ---------- 导入仓库: the call to action, the checks, the steps ---------- */
+.br-cta { justify-items: start; padding: 26px 28px; gap: 12px; border-style: dashed; border-color: var(--border-strong, var(--border)); }
+.br-cta p { margin: 0; max-width: 46em; color: var(--text); }
+.br-btn.is-big { padding: 9px 18px; font-size: 1em; border-radius: 12px; }
+.br-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.br-checks li { display: grid; grid-template-columns: 1.4em minmax(6em, max-content) 1fr; gap: 2px 10px; align-items: baseline; }
+.br-checks .br-todo { grid-column: 3; font-size: .88em; color: var(--muted); }
+.br-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.br-steps li { display: grid; grid-template-columns: 1.4em 1fr; gap: 2px 10px; align-items: baseline; }
+.br-steps li.is-todo { color: var(--muted); }
+.br-steps li.is-running { color: var(--text-strong); font-weight: 650; }
+.br-steps .br-hint { grid-column: 2; font-weight: 400; }
+.br-choice { display: flex; gap: 6px 18px; flex-wrap: wrap; }
+.br-changes { max-height: 16em; overflow: auto; }
 `
