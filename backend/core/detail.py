@@ -191,9 +191,11 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
     """Timeline items from brainkit.trace.build's record (who is a username, a pseudonym or a role, never an email)."""
     items = []
     for s in t.get("stages") or []:
+        stage, _, unit = str(s.get("id", "")).partition("/")     # brainkit.trace: <stage>/<unit> for a unit's stage
         items.append({"at": s.get("at"), "kind": "stage",
-                      "label": "%s：%s" % (lean_view.STAGE_LABEL.get(str(s.get("id", "")).split("/")[0], s.get("id")),
-                                          {"started": "开始", "done": "完成", "skipped": "跳过"}.get(s.get("state"), s.get("state"))),
+                      "label": "%s：%s" % (lean_view.STAGE_LABEL.get(stage, stage),
+                                          {"started": "开始", "done": "完成", "skipped": "跳过"}.get(s.get("state"), s.get("state")))
+                      + ("（%s）" % unit if unit else ""),
                       "detail": s.get("note"), "who": None, "src": s.get("src")})
     for h in t.get("humans") or []:
         items.append({"at": h.get("at"), "kind": "human", "label": _human_label(h), "detail": h.get("voucher_id"),
