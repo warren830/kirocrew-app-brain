@@ -180,6 +180,26 @@ describe('需求详情', () => {
     expect(go).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', reflect: 'PAY-3' })
   })
 
+  test('此刻 while the AI is at it: no 「等…」 chip (nobody has to act), just what goes on', async () => {
+    withDetail((d) => { d.row.waits = { who: 'agent', text: 'AI 在本机做', line: null, raw: '', do: 'none', since: null, where: null } })
+    renderDetail()
+    const bar = await screen.findByRole('region', { name: '此刻' })
+    expect(bar).toHaveTextContent(/^此刻AI 在本机做$/)
+    expect(within(bar).queryByRole('button')).toBeNull()
+  })
+
+  test('此刻 for a refused hand-over: what to do, 打开会话, the bridge’s own words folded under 细节', async () => {
+    withDetail((d) => {
+      d.row.state = 'rejected'
+      d.row.waits = { who: 'you', text: '接手被拒：标签是 bob 打的，不是负责人 alice', line: null, raw: 'label added by bob, not the owner alice', do: 'redo_handoff', since: null, where: 'session' }
+    })
+    renderDetail()
+    const bar = await screen.findByRole('region', { name: '此刻' })
+    expect(bar).toHaveTextContent('做什么：改好后重新交接（在会话里改，再交接一次）。')
+    expect(within(bar).getByText('细节').closest('details')).toHaveTextContent('label added by bob')
+    expect(within(bar).getByRole('button', { name: '打开会话' })).toBeInTheDocument()
+  })
+
   describe('claimed, not started', () => {
     const claimed = (d: RequirementDetail, who: 'you' | 'people' = 'you') => {
       Object.assign(d.row, { state: 'claimed', state_label: '已认领', where: 'claim', branch: null, intent: null, worktree: null, stage: null })

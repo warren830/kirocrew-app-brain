@@ -87,7 +87,7 @@ export const DETAIL_CSS = `
 .br-detail .br-detail-facts > details { grid-column: 1 / -1; }
 .br-detail .br-detail-facts dt { font-size: .86em; }
 .br-detail .br-detail-facts dd { overflow-wrap: anywhere; }
-.br-detail .br-path > span { white-space: nowrap; }
+.br-detail :is(.br-path > span, .br-nowrap) { white-space: nowrap; }
 .br-detail .br-rawlist { margin: 6px 0 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; }
 .br-detail .br-rawlist dd { margin: 0; overflow-wrap: anywhere; }
 .br-detail .br-stagecells { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; list-style: none; margin: 0; padding: 0; }
@@ -407,15 +407,19 @@ function Facts({ x, start, localOnly }: { x: RequirementDetail; start: number | 
       {x.claim && (
         <div>
           <dt>认领</dt>
-          <dd>{x.claim.owner ?? '—'} · {fmtIso(x.claim.created_at)}{x.claim.source ? ` · 来自${sourceName(x.claim.source)}` : ''}{x.claim.closed ? ` · 已关闭：${x.claim.closed}` : ''}</dd>
+          <dd>
+            {x.claim.owner ?? '—'} · {fmtIso(x.claim.created_at)}{x.claim.source && <> · <span className="br-nowrap">来自{sourceName(x.claim.source)}</span></>}
+            {x.claim.closed ? ` · 已关闭：${x.claim.closed}` : ''}
+          </dd>
         </div>
       )}
       {run && (
         <div>
           <dt>开工</dt>
           <dd>
-            {start ? fmtTime(start) : fmtIso(run.created_at)}{run.origin === 'local' ? ' · 在本机开工' : run.origin ? ` · 来自${sourceName(run.origin)}` : ''}
-            {run.brain_commit && <> · Brain 版本 <code title={run.brain_commit}>{run.brain_commit.slice(0, 8)}</code></>}
+            {start ? fmtTime(start) : fmtIso(run.created_at)}
+            {run.origin && <> · <span className="br-nowrap">{run.origin === 'local' ? '在本机开工' : `来自${sourceName(run.origin)}`}</span></>}
+            {run.brain_commit && <> · <span className="br-nowrap">Brain 版本 <code title={run.brain_commit}>{run.brain_commit.slice(0, 8)}</code></span></>}
           </dd>
         </div>
       )}
@@ -490,7 +494,7 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
   const review = now.do === 'reply' ? reviewOf(x.lean.next) : null
   const say = useCopy(review?.say ?? '')
   const mine = now.who === 'you'
-  const person = !['agent', 'runner', 'nobody'].includes(now.who)
+  const person = !['agent', 'runner', 'bridge', 'nobody'].includes(now.who)
   const waited = person && now.since ? fmtSpan(at - now.since) : null
   const onMr = now.where === 'mr'
   const openSession = now.sessionUrl && !canOpen
@@ -551,9 +555,16 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
       break
     case 'tool':
     case 'redo_handoff':
+      body = (
+        <div>
+          <p>做什么：{now.do === 'tool' ? '在会话里批准这个工具调用' : `${DO_NAME.redo_handoff}（在会话里改，再交接一次）`}。</p>
+          {x.row.waits.raw && <details className="br-raw"><summary>细节</summary><pre>{x.row.waits.raw}</pre></details>}
+        </div>
+      )
       acts = openSession
       break
     case 'label_handoff':
+      body = <p>做什么：{DO_NAME.label_handoff}（在 MR 上加交接标签）。</p>
       acts = now.mrUrl ? <a className="kt-btn is-primary" href={now.mrUrl} target="_blank" rel="noopener noreferrer">去 MR 上看 <Icon name="ExternalLink" size={12} /></a> : null
       break
     case 'start':
@@ -568,7 +579,7 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
     <section className={`br-now${mine ? ' is-you' : ''}`} aria-label="此刻" data-testid="detail-waits" data-do={now.do}>
       <div className="br-now-head">
         <span className="cto-eyebrow">此刻</span>
-        {waitsOn(now.who) && <span className={`br-chip tone-${mine ? 'wait' : now.who === 'agent' || now.who === 'runner' ? 'run' : 'idle'}`}>{waitsOn(now.who)}</span>}
+        {person && <span className={`br-chip tone-${mine ? 'wait' : 'idle'}`}>{waitsOn(now.who)}</span>}
         <span className="br-now-text">{now.text || '—'}</span>
         {waited && <span className="br-dim">已等 {waited}</span>}
       </div>
