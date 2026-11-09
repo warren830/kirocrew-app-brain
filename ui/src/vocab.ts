@@ -68,3 +68,9 @@ export function leanProgress(lean: Pick<LeanSummary, 'done_n' | 'skipped_n' | 'n
   parts.push(lean.next ? `下一步：${lean.next.label}` : '全部做完')
   return parts.join(' · ')
 }
+
+/** the step (Waits.do) as what the requirement is waiting for: the counters of 交付总览 (「轮到你 5：等回话 2 · 等开工 3」) */
+export const WAIT_NAME: Record<WaitDo, string> = {
+  approve: '等批准', reply: '等回话', tool: '等批准工具调用', start: '等开工', answer: '等回答', accept: '等验收',
+  redo_handoff: '要重做交接', label_handoff: '要补交接标签', write_back: '要回写 Brain', watch: '观察中', none: '',
+}
