@@ -189,6 +189,18 @@ describe('需求详情', () => {
     expect(within(bar).queryByRole('button')).toBeNull()
   })
 
+  test('此刻 when the waits say a review in a new session is next, without Lean’s note: 开审查会话 all the same', async () => {
+    withDetail((d) => {
+      d.row.waits = { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: AT - 3600, where: 'session' }
+      d.sessions[0].awaiting = false
+      d.lean.next = []
+    })
+    renderDetail()
+    const bar = await screen.findByRole('region', { name: '此刻' })
+    expect(within(bar).getByRole('button', { name: '开审查会话' })).toBeInTheDocument()
+    expect(bar).toHaveTextContent('Lean 的下一步是审查：写代码的会话不能自己审，要开一个新会话来审。')
+  })
+
   test('此刻 for a refused hand-over: what to do, 打开会话, the bridge’s own words folded under 细节', async () => {
     withDetail((d) => {
       d.row.state = 'rejected'
@@ -449,10 +461,11 @@ describe('需求详情', () => {
     expect(cell('D-2', '阶段')).toHaveTextContent(/^应用设计$/)
     expect(cell('D-1', '谁定的')).toHaveTextContent(/^照 Brain P-PAY-2-1$/)
     expect(cell('D-2', '谁定的')).toHaveTextContent(/^AI 自己定的$/)
-    expect(cell('D-3', '谁定的')).toHaveTextContent(/^人（化名 P-1A2B）$/)
+    expect(cell('D-3', '谁定的')).toHaveTextContent(/^一位组员$/)
+    expect(cell('D-3', '谁定的').title).toContain('化名 P-1A2B：brain-kit 不写真名')
     expect(cell('D-3', '谁定的').title).toContain('凭证 V-1a2b3c4d5e')
     expect(cell('D-4', '谁定的')).toHaveTextContent(/^没归类$/)
-    expect(cell('D-4', '谁定的')).toHaveAttribute('title', 'Who 不是规定的写法：没归类，也不猜是谁')
+    expect(cell('D-4', '谁定的')).toHaveAttribute('title', '「谁定的」那一格不是规定的写法：没归类，也不猜是谁')
     expect(card).not.toHaveTextContent(/requirements|application-design|code-generation|V-1a2b/)
     for (const d of ds) {
       expect(row(d.id).children[0].getAttribute('title')).toContain(d.src)

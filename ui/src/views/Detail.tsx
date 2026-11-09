@@ -484,7 +484,8 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
 }) {
   const navigate = useNavigate()
   const line = useCopy(now.line ?? '')
-  const review = now.do === 'reply' ? reviewOf(x.lean.next) : null
+  // Lean's next note says the line to say; without it, the waits' words still tell a review is next
+  const review = now.do === 'reply' ? reviewOf(x.lean.next) ?? (isReview(now.text) ? { say: null } : null) : null
   const say = useCopy(review?.say ?? '')
   const mine = now.who === 'you'
   const person = !['agent', 'runner', 'bridge', 'nobody'].includes(now.who)
@@ -885,7 +886,8 @@ function StageCell({ s, next }: { s: Stage; next: boolean }) {
 /** Who settled a decision, in words: the owner (you, when it is you), a person by their pseudonym, the Brain entries,
  * the AI itself, a check, the bridge; a Who cell outside brain-kit's vocabulary stays 没归类 (never a guessed name). */
 function decidedBy(d: Decision, owner: string | null, me: boolean): string {
-  if (d.by === 'person') return d.who === 'owner' ? (me ? '你（负责人）' : `负责人${owner ? ` ${owner}` : ''}`) : `人${d.who ? `（化名 ${d.who}）` : ''}`
+  // a person other than the owner is a pseudonym (brain-kit never writes a real name): 一位组员, as 需求看板 says it
+  if (d.by === 'person') return d.who === 'owner' ? (me ? '你（负责人）' : `负责人${owner ? ` ${owner}` : ''}`) : d.who ? '一位组员' : '人'
   if (d.by === 'brain') return `${DECIDED_BY.brain}${d.who ? ` ${d.who}` : ''}`
   if (d.by) return DECIDED_BY[d.by] ?? d.by
   return d.who ?? '—'
@@ -925,8 +927,8 @@ function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt, picked }:
             {decisions.map((dd) => {
               const t = atOf(dd)
               const tip = [
-                dd.by === 'unclassified' ? 'Who 不是规定的写法：没归类，也不猜是谁' : '',
-                dd.by === 'person' && dd.who && dd.who !== 'owner' ? '化名：brain-kit 不写真名' : '',
+                dd.by === 'unclassified' ? '「谁定的」那一格不是规定的写法：没归类，也不猜是谁' : '',
+                dd.by === 'person' && dd.who && dd.who !== 'owner' ? `化名 ${dd.who}：brain-kit 不写真名` : '',
                 dd.vouchers.length ? `凭证 ${dd.vouchers.join('、')}` : '',
               ].filter(Boolean).join('；')
               return (
