@@ -24,13 +24,13 @@ bridge's KiroCrew surface (`adapter_create / set_project / send / slot / stop`).
 
 | View | What it shows | Where it comes from |
 | --- | --- | --- |
-| **交付总览** | The sample's CTO view: one sentence and three numbers from brain-kit's eval (how many handed-over requirements ran unattended end to end, how often a person stepped in at the judgment points against outside them, credits per requirement), each with its small chart, and who settled the decisions (the funnel); 每周合并 (12 weeks, by how they were delivered, 图 / 表格); 需求流动, the kanban of what is in progress (columns 需求 → 设计 → 构建 → 交给运行机 → 发布 · 验收 → 已合并, lanes 等人批准 / 等人回答问题 / AI 在做（本机） / 运行机在做; a card opens the requirement's 需求看板); 交付清单, the ledger with the eval batch's summary rows. Every requirement: claimed, local, handed over, running on the runner, parked with D-n, waiting acceptance, merged; owner, the current Lean stage n/11 (`lean` and the row's `stage` text, e.g. `2/11 需求分析`, `11/11 发布（下一步）`, `11/11 发布（做完）`: the same stages the detail lists, null only before Lean recorded one), what it waits on (with the exact approval line; a hand-over that was pushed but whose MR carries no hand-over label says that nothing was handed over), the first line of its 变更说明 (`summary`, made in the background), credits, overlap warnings; Eval numbers, the runs Eval skipped and its notes (also the runs known wrong that wait for their merge: autonomy's `wrong_open`), and the low-score queue (复看队列); the decision funnel, with the decisions.md rows whose Who is not in the vocabulary (没归类) | git refs (`claim/*`, run branches, the default branch), worktree files, run.json, park.json, the Lean ledger; `brainkit.evaluate` when present; `brainkit.mrdesc`; the bridge ledger in team mode; the MR via GitLab (person's token) |
-| **需求看板** | One requirement as the sample's team board: the hero graph of who acts on it (you, the local `brain-dev` session, Lean's approvals REQUIREMENTS / DESIGN / RELEASE, the hand-over, the bridge, the signer, the runner session, the CI checks, the write-back into the Brain) with each one's state in colour, shape and words, the person's line to whoever waits on them, the run branch as a rail with its commits and the check ring; KPIs; 验收 (the 变更说明, the decisions and who made them, the checks, the one step a person takes: the line to type, the MR to answer on); 提交传送带 (commits, the hand-over, the merge); a lane per actor on one time axis; 检查墙 (Lean approvals, verify, the hand-over, the Brain and the repo's kit, after the merge); open questions; the event feed. Polled every 2 s. 回放 plays a finished requirement's trace (1× / 2× / 4×, scrubber; the URL says `replay=1`) | `GET /board/{repo}/{key}`: `backend/core/board.py` folds `brainkit.trace.build`, the Lean audit events, the run branch's commits, park.json, the MR and the app's sessions into one snapshot |
-| **需求详情** | The sample's 交付详情 layout: 周期, 时间花在哪, 成本, 检查; 价值流 (AI on this machine, the runner, waits for people, rework, with the key moments); Lean's 11 stages and approvals, Session notes, decisions with their Brain citations and who settled each (brain-kit's Who vocabulary: `agent` or a bot user, `brain <entry id>`, `check`, `<P-xxxx> <V-xxxxxxxxxx>`, `owner`; anything else is 没归类 and not shown, it may be a real name), parked questions and answers (MR link), the MR's 变更说明 (its first line, the whole Markdown folded, 复制 for the MR description), the run trace timeline (a commit's author date, and its commit date when it differs; how it was merged, in words), the sessions this app opened with their credits, Brain usage | `brainkit.trace.build` (else the Lean ledger, its audit files shown as `L-<6 hex>.jsonl` like brain-kit's), decisions.md, `sessions.slot_stats`; the 变更说明: `runs/<KEY>/MR.md` at the commit when the branch has it, else `brainkit.mrdesc.build` / `render` at that commit |
-| **开需求** | The way in five steps, then the form: repo, title, slug, key, expected paths (separated by commas, spaces or new lines); the five gates (consent, classification incl. 不确定, business keep/mask, exclude globs); 先检查 shows brain-kit's dry-run findings verbatim, and what may be a name or a password but may as well be a word (brain-kit's review findings, not masked, stopping nothing) once more per file under 请你确认; 认领人, the name brain-kit will claim it with (开工 waits for 「你的 GitLab 用户名」 when brain-kit would not know); 开工 runs `brain start` and opens a `brain-dev` session in the run's own worktree | `brainkit.intake.package.build(dry_run=True)`, `bin/brain start` |
+| **交付总览** | The sample's CTO view: one sentence and three numbers from brain-kit's eval (how many handed-over requirements ran unattended end to end, how often a person stepped in at the judgment points against outside them, credits per requirement), each with its small chart, and who settled the decisions (the funnel); 每周合并 (12 weeks, by how they were delivered, 图 / 表格); 需求流动, the kanban of what is in progress (columns 需求 → 设计 → 构建 → 交给运行机 → 发布 · 验收 → 已合并, lanes 等人批准 / 等人回答问题 / AI 在做（本机） / 运行机在做; a card opens the requirement's 需求看板); 交付清单, the ledger with the eval batch's summary rows. Every requirement: claimed, local, handed over, running on the runner, parked with D-n, waiting acceptance, merged; owner, the current Lean stage n/11 (`lean` and the row's `stage` text, e.g. `2/11 需求分析`, `11/11 发布（下一步）`, `11/11 发布（做完）`: the same stages the detail lists, null only before Lean recorded one), what it waits on (with the exact approval line; a hand-over that was pushed but whose MR carries no hand-over label says that nothing was handed over), the first line of its 变更说明 (`summary`, made in the background), credits, overlap warnings; Eval numbers, the runs Eval skipped and its notes (also the runs known wrong that wait for their merge: autonomy's `wrong_open`), and the low-score queue (复看队列); the decision funnel, with the decisions.md rows whose Who is not in the vocabulary (没归类). 大需求拆成小需求 (brain-kit 0d52e97): 需求流动's 待认领 lane (a small requirement nobody has claimed, in 构建); a big requirement's card with its 已合并 n/m as segments and its small ones in short; a small one's card with its big one, its unit, its dependencies and what holds it; the 交付清单 with the small ones under their big one (a fold on its row: 「小需求 1/3 ▾」) and eval's families as summary rows (已合并 n/m, its state, a person's acts at and outside the judgment points, questions, credits); the 交付方式 column with eval's state of the run when it says more (有了回答、run 没接着做, 已合进大需求 …), 停住了, and 没交付就结束 (运行机没能开始 / MR 关了没合并, left out of 无人值守's count) | git refs (`claim/*`, run branches, the default branch), worktree files, run.json, park.json, the Lean ledger; `brainkit.evaluate` when present; `brainkit.mrdesc`; the bridge ledger in team mode; the MR via GitLab (person's token); `brain intent list --all --json` for families |
+| **需求看板** | One requirement as the sample's team board: the hero graph of who acts on it (you, the local `brain-dev` session, Lean's approvals REQUIREMENTS / DESIGN / RELEASE, the hand-over, the bridge, the signer, the runner session, the CI checks, the write-back into the Brain) with each one's state in colour, shape and words, the person's line to whoever waits on them, the run branch as a rail with its commits and the check ring; KPIs; 验收 (the 变更说明, the decisions and who made them, the checks, the one step a person takes: the line to type, the MR to answer on); 提交传送带 (commits, the hand-over, the merge); a lane per actor on one time axis; 检查墙 (Lean approvals, verify, the hand-over, the Brain and the repo's kit, after the merge); open questions; the event feed. Polled every 2 s. 回放 plays a finished requirement's trace (1× / 2× / 4×, scrubber; the URL says `replay=1`). A big requirement: 「大需求 · 已合并 n/m」 in the top bar (a jump to its family card), the card 拆成的小需求 under the conveyor: 已合并 n/m as segments, the counts by state (待认领 / 认领了 / 在做 / 已关闭), each small one as a lane (its unit, title, dependencies with ✓ or 等, what holds it, who has it, its own numbers from the trace), the roll-up 整个大需求加起来 (commits, verify, a person's acts, credits; what brain-kit could not count is named, not 0), and 拆成小需求: brain-kit's dry run first (per unit: 新登记 / 没变 / 改了 / 关掉 …, its warnings), 确定拆 applies it. A small one: its big one in the crumb and the top bar (a link), the card 「PAY-8 的小需求 · 单元 web」 (dependencies, paths, contracts, the big one's branch, what holds it) with 认领 (the first claim wins; the one who was late is told who has it), 放弃认领, 开工 (`brain start --key`, then a `brain-dev` session in its own worktree; held with the dependency named; 「在 <DEP> 的分支上先做」 = `--on` only when brain-kit would allow it), 同步 (`brain sync`, conflicts by file); before it starts, the way of a small one (认领 → 开工 → 做 · 同步 → 交接 to the big one's branch → 合并) | `GET /board/{repo}/{key}`: `backend/core/board.py` folds `brainkit.trace.build`, the Lean audit events, the run branch's commits, park.json, the MR and the app's sessions into one snapshot; the family from `backend/core/family.py` (`brain intent list --all --json` in the background, else the claims here); `POST …/split`, `/claim`, `/start`, `/sync` run `bin/brain` |
+| **需求详情** | The sample's 交付详情 layout: 周期, 时间花在哪, 成本, 检查; 价值流 (AI on this machine, the runner, waits for people, rework, with the key moments); Lean's 11 stages and approvals, Session notes, decisions with their Brain citations and who settled each (brain-kit's Who vocabulary: `agent` or a bot user, `brain <entry id>`, `check`, `<P-xxxx> <V-xxxxxxxxxx>`, `owner`; anything else is 没归类 and not shown, it may be a real name), parked questions and answers (MR link), the MR's 变更说明 (its first line, the whole Markdown folded, 复制 for the MR description), the run trace timeline (a commit's author date, and its commit date when it differs; how it was merged, in words; a bridge decision in the words of its state, with the commit it was asked at; the trace's runs of this requirement on another branch, 别的分支上的 run, not counted in it), the sessions this app opened with their credits, Brain usage; a big or small requirement's family card (the same as on its 需求看板, with the same buttons) | `brainkit.trace.build` (else the Lean ledger, its audit files shown as `L-<6 hex>.jsonl` like brain-kit's), decisions.md, `sessions.slot_stats`; the 变更说明: `runs/<KEY>/MR.md` at the commit when the branch has it, else `brainkit.mrdesc.build` / `render` at that commit |
+| **开需求** | The way in five steps, then the form: repo, title, slug, key, expected paths (separated by commas, spaces or new lines); the five gates (consent, classification incl. 不确定, business keep/mask, exclude globs); 先检查 shows brain-kit's dry-run findings verbatim, and what may be a name or a password but may as well be a word (brain-kit's review findings, not masked, stopping nothing) once more per file under 请你确认; 认领人, the name brain-kit will claim it with (开工 waits for 「你的 GitLab 用户名」 when brain-kit would not know); 开工 runs `brain start` and opens a `brain-dev` session in the run's own worktree. 「大需求：先拆成小需求」 (one line: requirements and design as usual, the units in the design, then 拆成小需求 on its 需求看板; off, with why, when the repo has a tracker or brain-kit has no `brain split`): the session's first message says so | `brainkit.intake.package.build(dry_run=True)`, `bin/brain start` |
 | **Brain** | Entries by file and section with type, sources, usage counts and withdraw candidates; lint; reflect preview, apply on a new branch (the reply names the branch and the worktree brain-kit wrote it in, `~/.brain/worktrees/<repo>/…`), apply and open the MR | `brainkit.entries`, `usage`, `brainlint`, `reflect`; `bin/brain reflect --apply [--push]` |
-| **待办** | Lean approvals pending (the line the person types in that session), D-n questions on the runner (link to the MR), runner questions stuck for good (the signer refused the answer, the question is void or could not be asked), the person's own clarify questions (answer here), acceptance, refused hand-overs, hand-overs pushed without their label (没交出去的交接), Kiro Crew problems | as above |
-| **运行机** (team mode) | The bridge ledger (questions in brain-kit's states, `asking`: a bridge posting it right now), what the bridge said about each labelled MR last round (接手了, 拒绝接手, 看过了, 标签刚被拿掉 = `unlabelled`, 正在别处签名 = `waiting`, 这一轮没查成), runs in brain-kit's states (`signing`: the run id reserved while the signer signs the contract), signature requests waiting for the signer, the ones it refused, and vouchers it has not answered yet (asked for again, the same voucher, next round) | the hosted bridge, the signer spool |
+| **待办** | Lean approvals pending (the line the person types in that session), D-n questions on the runner (link to the MR), runner questions stuck for good (the signer refused the answer, the question is void or could not be asked), the person's own clarify questions (answer here), acceptance, refused hand-overs, hand-overs pushed without their label (没交出去的交接), Kiro Crew problems; small requirements you claimed whose dependencies all merged (可以开工的小需求, 开工 here), and your big requirements whose small ones all merged (等评审、发布的大需求, to its 需求看板) | as above |
+| **运行机** (team mode) | The bridge ledger (questions in brain-kit's states, `asking`: a bridge posting it right now; 0d52e97: the messages into the runs' sessions by outbox state, 送进会话的消息), what the bridge said about each labelled MR last round (接手了, 拒绝接手, 看过了, 标签刚被拿掉 = `unlabelled`, 正在别处签名 = `waiting`, 这一轮没查成), runs in brain-kit's states (`signing`: the run id reserved while the signer signs the contract; `failed` 没能开始) with what the bridge holds about each under it (the acceptance question held until the pipeline is green, runnerd silent, sends that keep failing, queued, a message not known to have landed), signature requests waiting for the signer, the ones it refused, and vouchers it has not answered yet (asked for again, the same voucher, next round); 配置: the bridge.json and runnerd.json keys brain-kit reads, each with its value or default and one line; 运行机的 Lean hook: brain-runnerd's own check (`cli.runner_hook_problems`) | the hosted bridge (its ledger's outbox and notices), bridge.json and runnerd.json, the signer spool |
 | **导入仓库** | How a repo gets into the app (the bar's button, and every place that has no repo: 交付总览's empty state, 开需求, 设置's 仓库 card). 本机目录 or 克隆; 检查 (✓ / ! / ✗ with why and what to do, 你是谁 among them); not installed: the kit.json form and 安装, by default in place on the checkout's branch (usable at once), or on a new branch for an MR when that is the better way (each way one line, the recommended one marked); 推送 / 推送并开 MR only after a confirm; a branch install's 合并到 main and 拉取; 加入列表 | `/import/*` (backend/core/importer.py, installer.py, inplace.py, landing.py), `imports.json` / `upgrades.json` in the app's data dir |
 | **设置** | brain-kit checkout, work root, team mode; the repos with 移出列表 (the app's list only), 导入仓库 and, per repo, 你是谁 (the name brain-kit goes by there, or 「你的 GitLab 用户名」 / 「你的名字」 when it would not know); Kiro Crew checks with their fixes (and, per repo, Lean's lean.json leaving `runs/**` out of its code fingerprint; an old hook adapter, which matters only for a repo that hands over to the team runner: ! there, not 有问题, with 重装 kit 文件) | `settings.json` in the app's data dir |
 
@@ -63,7 +63,13 @@ all three answer `{job}`; `GET /import/jobs/{id}` until it is not running; no `m
 local merge), `POST /import/merge {path, confirm?, purpose?}` (「合并到 main」: a fast-forward; `confirm: true` for a
 repo with a remote), `POST /import/pull {path}` (「拉取」: `git pull --ff-only`), `POST /import/add {path}`, `POST
 /repos/remove {path}` (`purpose`: `install`, the default, or `upgrade`); and `POST /me/name {path, name}` (`git
-config brain.user <name>` in that repo, brain-kit's USER_RE). Every
+config brain.user <name>` in that repo, brain-kit's USER_RE). 大需求拆成小需求 (brain-kit 0d52e97): `POST
+/requirements/{repo}/{key}/split {apply}` (`apply` false: the preview, `brain split --dry-run --json`, nothing written;
+true: the split), `POST /requirements/{repo}/{key}/claim {release?}` (认领, first one wins; 放弃认领), `POST
+/requirements/{repo}/{key}/start {on?, open_session?, trust?}` (开工 on a small one: `brain start --key`, `--on` one
+unmerged dependency's branch, then its brain-dev session) and `POST /requirements/{repo}/{key}/sync` (`brain sync`);
+every row of `GET /overview` (and 需求详情 / 需求看板's) carries `family` (`ReqFamily`: its role, state, owner, unit,
+dependencies and what blocks it, a big one's small ones and roll-up, and what this person can do on it now). Every
 check row (`CheckRow`) is said in plain short Chinese with a 做什么 line, its fix and brain-kit's own words (`raw`,
 shown folded): `backend/core/problems.py`.
 
@@ -120,9 +126,10 @@ shown folded): `backend/core/problems.py`.
   (the spool signer, `check_answer` bound to the recorded question note, the question's commit and park hash, the
   hand-over commit rule, run reservations and pending vouchers, the agent-spec hook functions; 72b278e: the edit
   signal, `GitLab.note_edits`, `decisions.edit_state`, `DecisionLoop.reply_states`): an older checkout is refused with
-  a message saying what it lacks. Tested on `48b6b97` (`runs/<KEY>/MR.md` in the hand-over commit, the bridge's
-  变更说明 comment). Optional modules (`trace`, `evaluate`, `golden`, `intents`, `mrdesc`) are guarded: a missing one
-  turns its feature off and the page says so. Wishes for brain-kit: `BRAINKIT_REQUESTS.md`.
+  a message saying what it lacks. Tested on `0d52e97` (QA rounds 3 and 4: the bridge's outbox and notices, a reply
+  whose edits cannot be read held as `pending`, the hook adapter version 3, eval's batch and families; the split of a
+  big requirement) and on `48b6b97`. Optional modules (`trace`, `evaluate`, `golden`, `intents`, `mrdesc`, `split`) are
+  guarded: a missing one turns its feature off and the page says so. Wishes for brain-kit: `BRAINKIT_REQUESTS.md`.
 - **The 变更说明** (brain-kit's `brain mr-desc`) is always read at a commit: the row's (a worktree's or a branch's
   tip, the default branch once merged, the runner workspace's HEAD). `runs/<KEY>/MR.md` when that commit has it (a
   regular file, at most 4 MB; a symlink is not read), made inert with `mrdesc.inert` and cut to 60000 characters as
@@ -169,7 +176,24 @@ shown folded): `backend/core/problems.py`.
   `decisions.DESC_TITLE`, 48b6b97) is skipped whole, whatever the MR.md in it says. States shown: open, answered (the
   bridge has the answer but could not sign it this round: it sends it later, nobody answers again), delivered, stale
   (a new push), void (not bound to its push and park.json, or its question note was deleted), refused (the signer
-  would not sign), invalid.
+  would not sign), invalid; 0d52e97: held (GitLab cannot say yet whether a reply was edited: it waits, nobody replies
+  again), delivery_unknown. The run's own notes (they start with its run id) say why a taken hand-over or a running run
+  waits, as long as nothing was pushed after them: runnerd silent for `runnerd_wait_minutes`, runnerd retrying, 没能开始
+  (labelled rejected too: its reason is that note's), KiroCrew not opening the session, queued, the hand-over send not
+  known, sends that keep failing, the acceptance question held until the head pipeline is green (running, red,
+  canceled / manual), a question nobody may answer. A parked run whose question the bridge already answered says so
+  (brain-kit's `answered`: the run, or the bridge, has not gone on).
+- **Team mode, brain-kit 0d52e97**: the ledger's `outbox` (each message into a run's session: sending, interrupted,
+  sent, unknown, dropped) and `notices` (what the bridge told an MR once, or counts: the acceptance question waiting
+  for a green pipeline, runnerd silent, sends that keep failing, queued …) say why a run waits, on its row and under it
+  on 运行机; `failed` is also a hand-over KiroCrew never took (after `send_give_up_minutes`). 运行机 lists the
+  bridge.json and runnerd.json settings brain-kit reads (the new `send_give_up_minutes`, `runnerd_wait_minutes`,
+  `acceptance_ci_wait_minutes`, `edit_check_rounds`, `edit_check_wait_minutes`; runnerd's `kit_dir`, `agent_spec`,
+  `hook_path` …, each with its default when unset) and the runner's Lean hooks as brain-runnerd checks them
+  (`cli.runner_hook_problems`: the hook adapter of the brain-kit installed there must be version 3, brain-run's three
+  hooks must run it in runner mode). The app's KiroCrew adapter shows the bridge a slot's messages only, so the bridge
+  sees a send that landed and never decides one did not: `send_unknown` and an outbox row `unknown` say 要人看一下
+  (BRAINKIT_REQUESTS 44).
 - **Team mode states**, brain-kit's: a run reserved while its contract is signed (`signing`) shows as handed over and
   waiting for the signer; a question being posted (`posting`, or 72b278e's `asking`: one bridge process posting it
   now) shows as parked, waiting for the bridge; a run whose latest question the signer refused, that is void or could
@@ -199,6 +223,32 @@ shown folded): `backend/core/problems.py`.
   brain.user <name>` in that repo (lowercased, brain-kit's USER_RE, no shell). The same name decides which
   requirements are yours in 需求详情 and 待办. brain-kit's "who are you?" from `brain start` is said in Chinese, with the
   input as its fix.
+- **大需求拆成小需求** (`family.py`, brain-kit 0d52e97's `brain split`, phase 1: its `docs/安装和使用.md` §4.7). A big
+  requirement goes through Lean's requirements and design as usual, the design with its unit split (unit-of-work.md);
+  the person's DESIGN approval approves the split. 开需求's 「大需求：先拆成小需求」 tells the brain-dev session so
+  (brain-kit's skill brain-split). Then, on the big one's 需求看板 or 需求详情, 拆成小需求 first shows `brain split
+  --dry-run --json` (each unit, its paths, dependencies and contracts, brain-kit's warnings) and on 确定拆 runs `brain
+  split --json`, in the big one's worktree on this machine and only for its owner; brain-kit pushes the big one's
+  branch and files one small requirement per unit, 待认领. What each row is in its family comes from brain-kit's own
+  listing, `brain intent list --all --json`, run in the background (at most every 60 s per repo that has split
+  requirements, and right after an action here or 「从远端取最新」): it fetches the claims and the big one's branch from
+  origin as brain-kit does. Until it has answered, a row says what this machine's refs say (the small one's claim.json
+  as last fetched). A small one is 待认领 (`unclaimed`), claimed, in progress (its owner's run branch), 已合进大需求
+  (`merged_into_parent`: its MR merged into the big one's branch; main comes with the big one) or closed. 认领 runs
+  `brain claim <KEY>` (the first push wins; the loser is told who has it), 放弃认领 `brain claim --release <KEY>`, 开工
+  `brain start --key <KEY> --worktree <work root>/<repo>/<key>-<unit>` (a worktree where KiroCrew lets agents work; it
+  claims on the way) and opens its brain-dev session there, told the unit and runs/<KEY>/intent.md. 开工 is off while a
+  dependency has not merged into the big one's branch, naming it and who has it; 「在 <DEP> 的分支上先做」 (`--on`) is
+  offered only when brain-kit allows it (its only unmerged dependency, whose owner has a run branch). 同步 runs `brain
+  sync` in the small one's worktree (conflicts listed with what to do). The app claims or starts only a small one
+  `brain split` filed (brain-kit files a new claim for any other key), releases only the person's own, and never
+  passes AIDLC_LEAN_TEAM on. Each command runs from the configured brain-kit as `bin/brain` with no shell, stdin closed,
+  in a session of its own, git over the network without a prompt (as 导入仓库's), and a time limit that sends SIGINT
+  first (so brain-kit gives back a claim it took, a half-made worktree), then kills; its output is shown folded, its
+  words said in plain Chinese (`family.RULES`, problems.py), credentials in URLs hidden and agent text scrubbed. 待办
+  lists a small one the person claimed whose dependencies have all merged (开工 now), and a big one of theirs whose
+  small ones have all merged (review, `lean release`, RELEASE; or `brain handoff`). Without brain-kit's split (older
+  than 0d52e97) the features are off and say why.
 - **A hand-over without its label** (person mode): run.json has the hand-over, the branch tip is the hand-over commit
   (one commit on top of `handoff.local_head`), and the MR at that tip carries none of the hand-over, running or
   rejected labels. Nothing was handed over (`brain handoff` exits 1 then, 72b278e): the row says so and 待办 lists it.
@@ -226,11 +276,13 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
   signer's own token (`GitLab.note_edits`: lastEditedBy, which an award emoji leaves empty and a text edit sets, as
   measured on gitlab.aws.dev on 2026-11-09). A reply someone else edited never counts and, from an allowed person,
   holds the round (a conflict: nothing signed); one its author fixed before the signer read it counts as it reads;
-  one whose text changed after that never counts. When GraphQL does not answer, the signer answers nothing (the
-  bridge asks again) and records nothing for that reply; brain-kit's own bridge records such a reply as "cannot tell"
-  for good and tells the person once. What the signer adds: it rebuilds each voucher from those checks and compares
-  canonical bytes (brain-kit has no voucher builder, so a field brain-kit adds is refused until the signer learns
-  it); it serves only its projects, checks
+  one whose text changed after that never counts. When GraphQL does not answer, the signer answers nothing (the bridge
+  asks again) and records nothing for that reply: fail closed, but not for good. brain-kit's own bridge does the same
+  since 0d52e97 (QA round 3: the reply is `pending`, read again each round, and counts once GraphQL answers; the MR is
+  told once after `edit_check_rounds` rounds), and a check_answer verdict naming pending replies is no refusal for the
+  signer either; 48b6b97's bridge recorded such a reply as "cannot tell" for good. What the signer adds: it rebuilds
+  each voucher from those checks and compares canonical bytes (brain-kit has no voucher builder, so a field brain-kit
+  adds is refused until the signer learns it); it serves only its projects, checks
   `issued_at` and the contract's TTL, reserves a contract's run id in brain-kit's `signing` state before checking it
   (one open run per requirement; the same hand-over asked again is signed again), signs an answer only for a run whose
   contract it signed; and its own ledger keeps one answer per question and never binds a D-n to a second question or
@@ -245,7 +297,10 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
   (unless `dev_same_user`, a local trial shown as a warning) when this OS user can write the signer's `signed/` or
   `refused/`.
 - **No listening sockets**: routes only under `/api/apps/brain` on the loopback gateway; every route but `/health`
-  is the dashboard owner's only (an app token, this app's included, is refused). Outbound only: the loopback gateway,
+  is the dashboard owner's only (an app token, this app's included, is refused). The family routes (split, claim,
+  start, sync) check the repo id and key as every route does, take `on` only as a key among the small one's own
+  dependencies, act only on a small one brain split filed (or the person's own big one, for the split), and answer
+  brain-kit's output scrubbed, never a token. Outbound only: the loopback gateway,
   GitLab (`brainkit.rest`), git. 推送并开 MR pushes and opens the MR only after the person confirmed the branch, the
   remote and the target on the page (the backend refuses a request whose three do not match what it sees now).
 - **No secrets out**: the GitLab token is read like `brainkit.rest.read_token` (`$GITLAB_TOKEN`, else
@@ -328,7 +383,8 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
 | `backend/core/bk.py` | brain-kit, loaded from the configured checkout under a private name; guarded optional modules |
 | `backend/core/repo.py`, `lean_view.py` | Requirements found in a repo (claims, run branches, worktrees, main); Lean's stages, approvals, Session notes |
 | `backend/core/deliveries.py`, `detail.py`, `todo.py`, `mrinfo.py` | 交付总览 (and its eval numbers, `cto_numbers`), 需求详情, 待办, the MR on a person's machine |
-| `backend/core/board.py` | 需求看板: the actors, events, commits, check wall and acceptance of one requirement, folded from the trace and the repo |
+| `backend/core/board.py` | 需求看板: the actors, events, commits, check wall and acceptance of one requirement, folded from the trace and the repo; a family's roll-up |
+| `backend/core/family.py` | 大需求拆成小需求: the families (`brain intent list --all --json` in the background, else the claims here), each requirement's family state and what it may do, `brain split` / `claim` / `start --key [--on]` / `sync` through `bin/brain` (no shell, bounded time) with their refusals in Chinese |
 | `backend/core/problems.py` | Every check row in plain Chinese: brain-kit's crewcheck, doctor, lint and refusals mapped to a sentence, 做什么 and a fix |
 | `backend/core/mrdesc_view.py` | The 变更说明 at a commit (MR.md, else brain-kit's mrdesc), its first line, the cache and its background maker |
 | `backend/core/intake.py`, `crewcheck.py`, `brainview.py` | 开需求, the Kiro Crew checks and fixes, Brain and reflect |
@@ -363,14 +419,19 @@ python3 scripts/preview_world.py         # after changing board.py, detail.py or
 
 `BRAIN_TEST_BRAINKIT` points the backend tests at a brain-kit checkout (default `~/warren_ws/brain-kit`; a clean clone
 of a commit needs its `vendor/aidlc-lean` too: `git submodule update --init`, or with the URL set to a local copy of
-it). Every repo the tests make is a throwaway one in a temp dir, and git hooks are off in them (`core.hooksPath` at an
-empty folder, per repo and for every git the tests start, the app's clones too: a machine-wide secret scanner costs
-about 0.5 s a commit); `BRAIN_TEST_KEEP_HOOKS=1` keeps the hooks. The import tests use a bare repo as the remote, a
-fake ssh for the failures and a fake GitLab for the MR: no network. The fake GitLab (`tests/teamfix.py`) serves commits
-with their `parent_ids`, authors and committers from a bare repo, and GraphQL's edit marks as measured on
-gitlab.aws.dev (lastEditedBy for a text edit only); every hand-over in the tests is a real `brain handoff` commit, and
-the runner's commits are the bot account's. The 你是谁 tests run against the checkout as it is (48b6b97: no name
-without GitLab) and against a copy of it with brain-kit 91e2fee's login-name rule applied (`tests/test_identity.py`).
+it). The suite passes against clean clones of 0d52e97 and 48b6b97: what a version has not got is skipped (the split's
+tests, `tests/test_family.py`: a bare origin, alice's checkout in the app, bob's clone, brain-kit's own `brain split`,
+`claim`, `start --key`, `sync`; the version-3 adapter; brain-kit's pending replies), and the tests that depend on a
+version ask the checkout (the adapter version brain-kit needs, the login-name rule). Every repo the tests make is a
+throwaway one in a temp dir, and git hooks are off in them (`core.hooksPath` at an empty folder, per repo and for
+every git the tests start, the app's clones too: a machine-wide secret scanner costs about 0.5 s a commit);
+`BRAIN_TEST_KEEP_HOOKS=1` keeps the hooks. The import tests use a bare repo as the remote, a fake ssh for the failures
+and a fake GitLab for the MR: no network. The fake GitLab (`tests/teamfix.py`) serves commits with their `parent_ids`,
+authors and committers from a bare repo, and GraphQL's edit marks as measured on gitlab.aws.dev (lastEditedBy for a
+text edit only); every hand-over in the tests is a real `brain handoff` commit, and the runner's commits are the bot
+account's. The 你是谁 tests run against a brain-kit without brain-kit 91e2fee's login-name rule (48b6b97: no name without
+GitLab) and one with it (the checkout itself from 91e2fee on, else a copy of 48b6b97 with the rule applied:
+`tests/test_identity.py`).
 
 ## Not verified on a live Kiro Crew yet
 
@@ -381,4 +442,6 @@ the dashboard; the signer against a real GitLab (MR versions, note ids, GraphQL'
 token) and as another OS user behind the spool; the 变更说明 of a real run (brain-kit 48b6b97's MR.md in the hand-over
 commit) on the page; 导入仓库 against a real GitLab (a clone over SSH and its failure texts, the push, the MR opened
 with a real token, a protected default branch refusing 推送 after an install in place, 拉取 from it) and its long jobs
-behind the gateway.
+behind the gateway; 大需求拆成小需求 against a real GitLab (claims pushed to it, two people racing for one, the small
+one's MR into the big one's branch, brain-kit's pre-receive rules on `claim/*`) and its background listing over SSH;
+KiroCrew's slot read for brain-kit's resend (`running`, `queue`).
