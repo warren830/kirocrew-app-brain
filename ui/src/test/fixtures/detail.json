@@ -14,9 +14,11 @@
       "stage": "code-generation",
       "stage_label": "代码生成",
       "stage_n": 9,
+      "stage_state": "started",
       "done": 8,
       "total": 11
     },
+    "stage": "9/11 代码生成",
     "waits": {
       "who": "you",
       "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
@@ -245,8 +247,8 @@
       "stage": "requirements",
       "text": "导出只给有退款权限的运营看",
       "why": "退款单里有收款人姓名",
-      "who": "product",
-      "by": "person",
+      "who": "P-PAY-2-1",
+      "by": "brain",
       "cites": [
         "P-PAY-2-1"
       ],
@@ -274,13 +276,25 @@
       "stage": "code-generation",
       "text": "金额列带币种，单独一列 currency",
       "why": "回答了澄清问题",
-      "who": "alice",
+      "who": "P-1A2B",
       "by": "person",
       "cites": [],
       "vouchers": [
         "V-1a2b3c4d5e"
       ],
       "src": "aidlc-docs/261107-refund-export/decisions.md#L10"
+    },
+    {
+      "id": "D-4",
+      "date": "2026-11-08",
+      "stage": "code-generation",
+      "text": "时间列写成 ISO 8601，带时区",
+      "why": "对账系统按 ISO 读",
+      "who": null,
+      "by": "unclassified",
+      "cites": [],
+      "vouchers": [],
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L11"
     }
   ],
   "questions": [

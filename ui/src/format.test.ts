@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ago, fmtAgo, fmtCredits, fmtIso, fmtRate, fmtSpan, isoDay, lines } from './format'
+import { ago, fmtAgo, fmtCredits, fmtIso, fmtRate, fmtSpan, isoDay, lines, splitPaths } from './format'
 import { errorStatus, errorText } from './api'
 
 describe('format', () => {
@@ -31,6 +31,12 @@ describe('format', () => {
     expect(isoDay('2026-11-08T12:00:00+08:00')).toMatch(/^2026-11-0[78]$/)
     expect(fmtIso('garbage')).toBe('garbage')
     expect(lines(' a \n\n b\n')).toEqual(['a', 'b'])
+  })
+
+  it('splits a paths box on new lines, commas (，、 too) and whitespace', () => {
+    expect(splitPaths('calc.py, tests')).toEqual(['calc.py', 'tests'])
+    expect(splitPaths(' src/a/\nsrc/b.py，src/c、src/d\tsrc/e,,\n')).toEqual(['src/a/', 'src/b.py', 'src/c', 'src/d', 'src/e'])
+    expect(splitPaths('  \n ')).toEqual([])
   })
 })
 

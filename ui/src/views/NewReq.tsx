@@ -10,7 +10,7 @@
 import { useState } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
-import { lines } from '../format'
+import { lines, splitPaths } from '../format'
 import { KEY_RE, type NewEntry } from '../nav'
 import { CLASS_LABEL, type Classification, type CrewChecks, type IntakeBody, type IntakeCheck, type IntakeNext, type StartBody, type StartResult } from '../types'
 import { CheckRows, Icon } from '../ui'
@@ -67,7 +67,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
     if (r) setChecked({ print: at, result: r })
   }
   const runStart = async () => {
-    const r = await start.run({ ...body, paths: lines(expected), open_session: openSession, trust })
+    const r = await start.run({ ...body, paths: splitPaths(expected), open_session: openSession, trust })
     if (r) props.reloadStatus()
   }
 
@@ -158,7 +158,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
             {keyBad && <p className="br-error" role="alert">需求号的格式像 PAY-12。</p>}
           </div>
           <div className="br-field">
-            <label htmlFor="new-paths">预计会改的路径（一行一个）</label>
+            <label htmlFor="new-paths">预计会改的路径（用逗号、空格或换行分开）</label>
             <textarea id="new-paths" rows={3} value={expected} placeholder="src/refund/" onChange={(e) => setExpected(e.target.value)} />
             <p className="br-hint">用来提醒和别的需求改到同一处。</p>
           </div>

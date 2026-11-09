@@ -71,3 +71,9 @@ export function isoDay(iso: string | null | undefined): string | null {
 export function lines(text: string): string[] {
   return text.split('\n').map((l) => l.trim()).filter(Boolean)
 }
+
+/** Paths typed into one box, separated by new lines, commas (also ，、), semicolons or whitespace, as the backend splits
+ * one string of paths; empty ones dropped. */
+export function splitPaths(text: string): string[] {
+  return text.split(/[\s,，、;；]+/).filter(Boolean)
+}

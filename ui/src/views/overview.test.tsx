@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import { apiCalls, apiError } from '../test/stubs/app-sdk'
-import { OverviewView } from './Overview'
+import { OverviewView, WHO_VOCAB } from './Overview'
 import type { ViewProps } from './props'
 
 function props(over: Partial<ViewProps> = {}): ViewProps {
@@ -33,6 +33,20 @@ describe('交付总览', () => {
     expect(apiCalls[0]).toMatchObject({ method: 'GET', path: `${API}/overview?repo=all` })
     // a repo the backend could not read says why
     expect(screen.getByText(/shop-web：不是 brain-kit 仓库/)).toBeInTheDocument()
+  })
+
+  test('the Lean cell: n/total and the stage; 下一步 for the next stage to do, 做完 when Lean is finished, 0/11 还没开始', async () => {
+    installFixtureRoutes()
+    render(<OverviewView entry={{}} {...props()} />)
+    const table = await screen.findByTestId('req-table')
+    const cell = (key: string) => within(table.querySelector(`tr[data-key="${key}"]`) as HTMLElement).getByTestId('lean-cell')
+    expect(cell('PAY-3')).toHaveTextContent(/^9\/11代码生成$/) // started: no hint
+    expect(within(cell('PAY-3')).queryByTestId('lean-hint')).toBeNull()
+    expect(cell('PAY-7')).toHaveTextContent(/^10\/11构建和测试下一步$/)
+    expect(within(cell('PAY-7')).getByTestId('lean-hint')).toHaveClass('br-hint')
+    expect(cell('PAY-2')).toHaveTextContent(/^11\/11发布做完$/)
+    expect(cell('PAY-6')).toHaveTextContent(/^0\/11还没开始$/)
+    expect(within(cell('PAY-6')).queryByTestId('lean-hint')).toBeNull()
   })
 
   test('a key opens its 需求详情; the overlap block names both and what they share', async () => {
@@ -111,15 +125,34 @@ describe('交付总览', () => {
     expect(p.go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-4', from: 'overview' })
   })
 
+  test('the eval card lists the runs brain-kit could not read (not counted) and its notes; none, no lines', async () => {
+    installFixtureRoutes()
+    const { unmount } = render(<OverviewView entry={{}} {...props()} />)
+    const card = await screen.findByTestId('eval-card')
+    expect(within(card).getByTestId('eval-skipped')).toHaveTextContent('跳过 PAY-1（读不了，不算）：runs/PAY-1/run.json 不是合法的 JSON：第 3 行')
+    const notes = Array.from(within(card).getByTestId('eval-notes').querySelectorAll('p'))
+    expect(notes.map((n) => n.textContent)).toEqual(fx.overview().eval.notes)
+    expect(notes[0]).toHaveClass('br-hint')
+    unmount()
+    const ov = fx.overview()
+    ov.eval.skipped = []
+    ov.eval.notes = []
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props()} />)
+    const plain = await screen.findByTestId('eval-card')
+    expect(within(plain).queryByTestId('eval-skipped')).toBeNull()
+    expect(within(plain).queryByTestId('eval-notes')).toBeNull()
+  })
+
   test('without the evaluate module the card says so (or says its error)', async () => {
     const ov = fx.overview()
-    ov.eval = { available: false, error: '', ref: null, metrics: [], queue: [] }
+    ov.eval = { available: false, error: '', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
     const { unmount } = render(<OverviewView entry={{}} {...props()} />)
     expect(await screen.findByTestId('eval-card')).toHaveTextContent('brain-kit 还没有 evaluate 模块')
     unmount()
     const ov2 = fx.overview()
-    ov2.eval = { available: false, error: 'evaluate 读 main 失败：没有 runs/', ref: null, metrics: [], queue: [] }
+    ov2.eval = { available: false, error: 'evaluate 读 main 失败：没有 runs/', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov2 })
     render(<OverviewView entry={{}} {...props()} />)
     expect(await screen.findByTestId('eval-card')).toHaveTextContent('evaluate 读 main 失败：没有 runs/')
@@ -129,9 +162,29 @@ describe('交付总览', () => {
     installFixtureRoutes()
     render(<OverviewView entry={{}} {...props()} />)
     const card = await screen.findByTestId('funnel-card')
-    expect(card.querySelectorAll('.br-barrow')).toHaveLength(5)
+    expect(card.querySelectorAll('.br-barrow')).toHaveLength(6)
     expect(card.querySelector('[data-row="person"]')).toHaveTextContent('人4')
+    expect(card.querySelector('[data-row="unclassified"]')).toHaveTextContent('没归类（Who 不是规定的写法）1')
+    expect(card.querySelector('[data-row="unknown"]')).toHaveTextContent('看不出（Who 空着）1')
+    expect(card).toHaveTextContent('共 15 个决定')
     expect(within(card).getByTestId('funnel-questions')).toHaveTextContent('问人 4 次 · 答了 3 · 送回运行 2')
+  })
+
+  test('the funnel lists the unclassified decisions where they are, with one line on how Who is written; none, no list', async () => {
+    installFixtureRoutes()
+    const { unmount } = render(<OverviewView entry={{}} {...props()} />)
+    const list = await screen.findByTestId('funnel-unclassified')
+    expect(within(list).getByRole('listitem')).toHaveTextContent('没归类：PAY-4 D-3（aidlc-docs/261105-merchant-split/decisions.md#L11）')
+    expect(within(list).getByText(WHO_VOCAB)).toHaveClass('br-hint')
+    expect(WHO_VOCAB).toBe('Who 要写 agent、brain <条目号>、check、<化名> <凭证号> 或 owner')
+    unmount()
+    const ov = fx.overview()
+    ov.funnel.unclassified = []
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props()} />)
+    await screen.findByTestId('funnel-card')
+    expect(screen.queryByTestId('funnel-unclassified')).toBeNull()
+    expect(screen.queryByText(WHO_VOCAB)).toBeNull()
   })
 
   test('an overview that cannot be read shows errorText', async () => {

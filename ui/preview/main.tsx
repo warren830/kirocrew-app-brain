@@ -14,7 +14,7 @@ import App from '../src/main'
 import { FIXTURE_AT, clone, fx } from '../src/test/data'
 import { API, fixtureRoutes } from '../src/test/routes'
 import { StubApiError, setApiRoutes, setNavigateHook } from '../src/test/stubs/app-sdk'
-import type { CrewFixBody, IntakeBody, ReflectApplyBody, RequirementDetail, Settings, StartBody, Status } from '../src/types'
+import type { CrewFixBody, IntakeBody, ReflectApplyBody, ReflectApplyResult, RequirementDetail, Settings, StartBody, Status } from '../src/types'
 
 const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'light'] as const
 type Flag = (typeof FLAGS)[number]
@@ -76,11 +76,13 @@ function detailFor(path: string): RequirementDetail {
   const row = fx.overview().rows.find((r) => r.key === key)
   if (!row) throw new StubApiError(404, { error: `没有这个需求：${key}`, code: 'not_found' })
   const n = row.lean.stage_n ?? 0
+  const finished = row.state === 'merged' || row.lean.stage_state === 'done' || row.lean.stage_state === 'skipped'
+  const current = row.lean.stage_state === 'todo' ? 'todo' : 'started'
   d.row = row
   d.where_label = WHERE[row.where] ?? row.where
   d.claim = d.claim && { ...d.claim, owner: row.owner, title: row.title }
   d.run = row.intent && d.run ? { ...d.run, owner: row.owner, branch: row.branch, intent: row.intent, handoff: row.run_ids.length ? { requested_at: d.run.created_at, by: row.owner } : null } : null
-  d.lean.stages = d.lean.stages.map((s) => ({ ...s, state: s.n < n || row.state === 'merged' ? 'done' : s.n === n ? 'started' : 'todo', units: s.n < n ? s.units.map((u) => ({ ...u, state: 'done' as const })) : [] }))
+  d.lean.stages = d.lean.stages.map((s) => ({ ...s, state: s.n < n || finished ? 'done' : s.n === n ? current : 'todo', units: s.n < n ? s.units.map((u) => ({ ...u, state: 'done' as const })) : [] }))
   d.lean.approvals = n > 2 ? d.lean.approvals.filter((a) => a.state !== 'pending') : []
   d.lean.status = n ? d.lean.status : null
   d.lean.next = n ? d.lean.next : []
@@ -104,7 +106,7 @@ setApiRoutes({
   [`GET ${API}/todo`]: () => shift({ ...fx.todo(), team: flags.has('team') }),
   [`GET ${API}/overview*`]: () => {
     const o = shift(fx.overview())
-    if (flags.has('noeval')) o.eval = { available: false, error: '', ref: null, metrics: [], queue: [] }
+    if (flags.has('noeval')) o.eval = { available: false, error: '', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     return o
   },
   [`POST ${API}/settings`]: (body) => {
@@ -139,11 +141,12 @@ setApiRoutes({
     return { ok: true, text: `预览：${(body as CrewFixBody).what === 'agent' ? '装好了 ~/.kiro/agents/brain-dev.json' : '引擎换成了 kas'}（没有真的改）`, rows: status().crew.rows }
   },
   [`POST ${API}/brain/reflect/preview`]: (body) => ({ ...fx.reflect(), key: (body as { key: string }).key }),
-  [`POST ${API}/brain/reflect/apply`]: (body) => {
+  [`POST ${API}/brain/reflect/apply`]: (body): ReflectApplyResult => {
     const b = body as ReflectApplyBody
     return {
       ok: true,
       branch: `brain/${b.key}-reflect-1`,
+      worktree: `/Users/alice/.brain/worktrees/shop-pay/brain-${b.key}-reflect-1`,
       output: `预览：没有真的写。\n会在 main 上开分支 brain/${b.key}-reflect-1，写入 1 条新条目，1 条加来源${b.push ? '，推送并开 MR' : '（只在本机，没推送）'}`,
     }
   },

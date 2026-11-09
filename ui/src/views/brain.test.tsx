@@ -5,14 +5,17 @@ import type { BrainEntryRef } from '../nav'
 import { apiCalls } from '../test/stubs/app-sdk'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
-import type { ReflectPreview } from '../types'
+import type { ReflectApplyResult, ReflectPreview } from '../types'
 import { BrainPage } from './Brain'
+
+const WORKTREE = '/Users/alice/.brain/worktrees/shop-pay/brain-PAY-5-reflect-1'
 
 function setup(entry: BrainEntryRef = { repo: 'r1' }, routes: Parameters<typeof installFixtureRoutes>[0] = {}) {
   installFixtureRoutes({
     [`POST ${API}/brain/reflect/preview`]: () => fx.reflect(),
-    [`POST ${API}/brain/reflect/apply`]: (body) => ({
+    [`POST ${API}/brain/reflect/apply`]: (body): ReflectApplyResult => ({
       ok: true, output: `brain/PAY-5-reflect-1：写了 1 条（TECH.md）\n${(body as { push: boolean }).push ? 'MR !52 已开' : '没推'}`, branch: 'brain/PAY-5-reflect-1',
+      worktree: WORKTREE,
     }),
     ...routes,
   })
@@ -113,6 +116,9 @@ describe('Brain', () => {
     await user.click(within(preview).getByRole('button', { name: '确定写入' }))
     const applied = await within(card).findByTestId('reflect-applied')
     expect(applied).toHaveTextContent('分支 brain/PAY-5-reflect-1')
+    // the worktree brain-kit wrote the branch in
+    expect(within(applied).getByTestId('reflect-worktree')).toHaveTextContent(`工作区：${WORKTREE}`)
+    expect(within(applied).getByText(WORKTREE)).toHaveClass('br-mono')
     expect(within(applied).getByText(/没推/).textContent).toBe('brain/PAY-5-reflect-1：写了 1 条（TECH.md）\n没推')
 
     await user.click(within(preview).getByRole('button', { name: '写入并开 MR' }))

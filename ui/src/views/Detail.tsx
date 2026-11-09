@@ -22,7 +22,9 @@ const FROM_LABEL: Record<ItemFrom, string> = { overview: '交付总览', todo: '
 
 const SOURCE_LABEL: Record<Question['source'], string> = { park: '本地会话', bridge: '运行机', mr: 'MR' }
 
-const BY_LABEL: Record<NonNullable<Decision['by']>, string> = { person: '人', agent: 'agent', check: '检查', bridge: 'bridge' }
+const BY_LABEL: Record<NonNullable<Decision['by']>, string> = {
+  person: '人', agent: 'agent', check: '检查', brain: 'Brain', bridge: 'bridge', unclassified: '没归类',
+}
 
 const KIND_META: Record<TimelineKind, { icon: string; label: string }> = {
   stage: { icon: 'Layers', label: '阶段' },
@@ -62,7 +64,7 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
   mrUrl?: string | null
   onAnswered?: () => void
 }) {
-  const meta = questionMeta(q.state)
+  const meta = questionMeta(q.state, q.source)
   const open = isOpenQuestion(q)
   const formHere = q.answerable_here && !q.lean_request
   const link = mrUrl === undefined ? q.mr_url : mrUrl
@@ -339,7 +341,9 @@ function DecisionsCard({ decisions, repo, go }: { decisions: Decision[]; repo: s
                   <td className="br-dim">{dd.stage ?? '—'}</td>
                   <td className="br-pre">{dd.text}</td>
                   <td className="br-pre br-dim">{dd.why ?? '—'}</td>
-                  <td>{[dd.who, dd.by ? BY_LABEL[dd.by] : null].filter(Boolean).join(' · ') || '—'}</td>
+                  <td title={dd.by === 'unclassified' ? 'Who 不是规定的写法：没归类，也不猜是谁' : undefined}>
+                    {[dd.who, dd.by ? BY_LABEL[dd.by] : null].filter(Boolean).join(' · ') || '—'}
+                  </td>
                   <td><span className="br-row" style={{ gap: 4 }}>{dd.cites.length ? dd.cites.map((c) => <EntryChip key={c} id={c} repo={repo} go={go} />) : <span className="br-dim">—</span>}</span></td>
                   <td>{dd.vouchers.length ? dd.vouchers.map((v) => <code key={v}>{v} </code>) : <span className="br-dim">—</span>}</td>
                 </tr>

@@ -396,6 +396,7 @@ function ReflectCard({ repo, items, pick, onPick, onItem, onApplied, post }: {
           <p className={apply.result.ok ? 'br-ok-text' : 'br-error'} role="status">
             {apply.result.ok ? `写好了${apply.result.branch ? `：分支 ${apply.result.branch}` : ''}` : '没写成，看下面的输出。'}
           </p>
+          {apply.result.worktree && <p className="br-note" data-testid="reflect-worktree">工作区：<span className="br-mono">{apply.result.worktree}</span></p>}
           {apply.result.output && <pre className="br-findings">{apply.result.output}</pre>}
         </div>
       )}

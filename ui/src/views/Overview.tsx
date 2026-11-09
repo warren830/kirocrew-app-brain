@@ -189,6 +189,16 @@ function EvalCard({ ev, onKey }: { ev: EvalView; onKey: (key: string) => void })
               </li>
             ))}
           </ul>
+          {ev.skipped.length > 0 && (
+            <ul className="br-plain" data-testid="eval-skipped">
+              {ev.skipped.map((x) => <li key={x.key} className="br-warn-text br-pre">跳过 {x.key}（读不了，不算）：{x.why}</li>)}
+            </ul>
+          )}
+          {ev.notes.length > 0 && (
+            <div className="br-stack" style={{ gap: 2 }} data-testid="eval-notes">
+              {ev.notes.map((n, i) => <p key={i} className="br-hint br-pre">{n}</p>)}
+            </div>
+          )}
           <div className="br-stack" style={{ gap: 6 }}>
             <h3>复看队列</h3>
             {ev.queue.length === 0 ? <p className="br-note">没有要复看的运行。</p> : (
@@ -209,6 +219,8 @@ function EvalCard({ ev, onKey }: { ev: EvalView; onKey: (key: string) => void })
   )
 }
 
+export const WHO_VOCAB = 'Who 要写 agent、brain <条目号>、check、<化名> <凭证号> 或 owner'
+
 function FunnelCard({ f }: { f: Funnel }) {
   const max = Math.max(1, ...f.rows.map((r) => r.count))
   return (
@@ -226,6 +238,16 @@ function FunnelCard({ f }: { f: Funnel }) {
           </div>
         ))}
       </div>
+      {f.unclassified.length > 0 && (
+        <div className="br-stack" style={{ gap: 2 }} data-testid="funnel-unclassified">
+          <ul className="br-plain">
+            {f.unclassified.map((u) => (
+              <li key={`${u.key}-${u.id}-${u.src}`} className="br-warn-text">没归类：{u.key} {u.id}（<span className="br-mono">{u.src}</span>）</li>
+            ))}
+          </ul>
+          <p className="br-hint">{WHO_VOCAB}</p>
+        </div>
+      )}
       <p className="br-note" data-testid="funnel-questions">
         问人 {f.questions.asked} 次 · 答了 {f.questions.answered} · 送回运行 {f.questions.delivered}
       </p>

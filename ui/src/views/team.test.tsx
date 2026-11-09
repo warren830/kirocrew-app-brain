@@ -1,11 +1,12 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
+import { fmtIso } from '../format'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import { apiCalls, navigations } from '../test/stubs/app-sdk'
 import type { ViewProps } from './props'
-import { TeamPage } from './Team'
+import { RUN_STATE, TeamPage, runStateMeta } from './Team'
 
 function teamStatus() {
   const s = fx.status()
@@ -24,14 +25,56 @@ describe('运行机', () => {
     const runs = await screen.findByRole('region', { name: '运行' })
     expect(runs).toHaveTextContent('RUN-PAY-4-1')
     expect(within(runs).getByRole('link', { name: /!41/ })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/41')
-    expect(runs).toHaveTextContent('停下等回答')
     const ledger = screen.getByRole('region', { name: '账本' })
-    expect(ledger.querySelector('[data-ledger="handoffs"]')).toHaveTextContent('accepted 4')
+    expect(ledger.querySelector('[data-ledger="handoffs"]')).toHaveTextContent('已接手 4')
     const signer = screen.getByRole('region', { name: '签名' })
     expect(signer).toHaveTextContent('SIG-0042')
     expect(signer).toHaveTextContent('MR 的作者 dave 不在 decision_roles.owner 里')
     expect(screen.getByTestId('signer-same-user')).toHaveTextContent('签名服务和 app 是同一个系统用户')
     expect(screen.getByRole('region', { name: '运行机状态' })).toHaveTextContent('等签名 1 · 拒签 1')
+  })
+
+  test('runs and the ledger say brain-kit’s run states in words (an unknown one as it is); decision states as on the MR', async () => {
+    const tv = fx.team()
+    tv.runs[0].state = 'parked_somewhere' as never
+    installFixtureRoutes({ [`GET ${API}/team`]: () => tv })
+    render(<TeamPage {...props()} />)
+    const runs = await screen.findByRole('region', { name: '运行' })
+    const chip = (runId: string) => within(within(runs).getByText(runId).closest('tr') as HTMLElement).getByText(/./, { selector: '.br-chip' })
+    expect(chip('RUN-PAY-8-1')).toHaveTextContent('parked_somewhere')
+    expect(chip('RUN-PAY-8-1')).toHaveClass('tone-idle')
+    expect(chip('RUN-PAY-4-1')).toHaveTextContent('已派给会话')
+    expect(chip('RUN-PAY-4-1')).toHaveClass('tone-run')
+    expect(chip('RUN-PAY-2-1')).toHaveTextContent('已合并')
+    const ledger = screen.getByRole('region', { name: '账本' })
+    const line = (k: string) => Array.from(ledger.querySelectorAll(`[data-ledger="${k}"] .br-tag`)).map((t) => t.textContent)
+    expect(line('runs')).toEqual(['签名中 1', '已派给会话 2', '已合并 3'])
+    expect(line('decisions')).toEqual(['已发出，等回答 1', '已收到回答，等桥签名送回 1', '已送回 4', '签名服务拒签 1', '作废 1'])
+    expect(line('handoffs')).toEqual(['已接手 4', '拒绝接手 1'])
+    expect(ledger.querySelector('[data-ledger="runs"] .br-tag')).toHaveAttribute('title', 'signing')
+    // every run state of brain-kit has words
+    expect(Object.keys(RUN_STATE).sort()).toEqual(['closed', 'dispatched', 'failed', 'merged', 'ready', 'send_unknown', 'signing', 'spooled'])
+    expect(runStateMeta('send_unknown')).toEqual({ label: '送没送到不清楚', tone: 'warn' })
+    expect(runStateMeta('signing').label).toBe('签名中')
+  })
+
+  test('the vouchers the signer did not answer last round are listed (asked for again next round); none, no heading', async () => {
+    installFixtureRoutes()
+    const { unmount } = render(<TeamPage {...props()} />)
+    const signer = await screen.findByRole('region', { name: '签名' })
+    expect(within(signer).getByRole('heading', { name: '上一轮没等到签名（下一轮再要同一张凭证）' })).toBeInTheDocument()
+    const item = within(within(signer).getByTestId('signer-waiting')).getByRole('listitem')
+    expect(item).toHaveTextContent('answer D-2')
+    expect(within(item).getByText('answer')).toHaveClass('br-tag')
+    expect(item).toHaveTextContent('RUN-PAY-4-1')
+    expect(item).toHaveTextContent(fmtIso('2026-11-08T21:40:00+08:00'))
+    unmount()
+    const tv = fx.team()
+    tv.signer.waiting = []
+    installFixtureRoutes({ [`GET ${API}/team`]: () => tv })
+    render(<TeamPage {...props()} />)
+    await screen.findByRole('region', { name: '签名' })
+    expect(screen.queryByText(/上一轮没等到签名/)).toBeNull()
   })
 
   test('打开会话 opens the run’s session; a key opens the requirement on the runner', async () => {

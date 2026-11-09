@@ -18,6 +18,7 @@ function setup(routes: Parameters<typeof installFixtureRoutes>[0] = {}) {
   return { user: userEvent.setup(), props }
 }
 
+const PATHS = '预计会改的路径（用逗号、空格或换行分开）'
 const startBtn = () => screen.getByRole('button', { name: '开工' })
 const checkBtn = () => screen.getByRole('button', { name: '先检查（不写入）' })
 
@@ -40,7 +41,7 @@ describe('开需求', () => {
     const { user, props } = setup()
     await fillBasics(user)
     await fillGates(user)
-    await user.type(screen.getByLabelText('预计会改的路径（一行一个）'), 'src/statement/{Enter}src/report/weekly.py')
+    await user.type(screen.getByLabelText(PATHS), 'src/statement/{Enter}src/report/weekly.py')
     expect(startBtn()).toBeDisabled()
     expect(screen.getByTestId('start-why')).toHaveTextContent('有文档：先检查一遍')
 
@@ -134,6 +135,15 @@ describe('开需求', () => {
     const startCall = apiCalls.find((c) => c.method === 'POST' && c.path === `${API}/intake/start`)
     expect(startCall?.body).toMatchObject({ docs: [], paths: [], open_session: true, trust: true })
     expect(apiCalls.some((c) => c.path === `${API}/intake/check`)).toBe(false)
+  })
+
+  test('the expected paths may be separated by commas, spaces or new lines: the start sends them as a list', async () => {
+    const { user } = setup()
+    await fillBasics(user)
+    await user.type(screen.getByLabelText(PATHS), 'calc.py, tests')
+    await user.click(startBtn())
+    await screen.findByTestId('start-result')
+    expect(apiCalls.find((c) => c.method === 'POST' && c.path === `${API}/intake/start`)?.body).toMatchObject({ paths: ['calc.py', 'tests'] })
   })
 
   test('the key is prefilled from /intake/next, editable, and required when the repo uses Jira', async () => {

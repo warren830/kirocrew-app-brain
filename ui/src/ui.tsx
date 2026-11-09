@@ -51,7 +51,8 @@ export const STAGE_META: Record<StageState, { label: string; glyph: string; tone
 export const QUESTION_STATE: Record<string, { label: string; tone: Tone }> = {
   waiting: { label: '等回答', tone: 'wait' },
   open: { label: '已发出，等回答', tone: 'wait' },
-  answered: { label: '已回答', tone: 'info' },
+  // on the MR / in the ledger: the bridge has the answer but has not signed it back yet (nobody should answer again)
+  answered: { label: '已收到回答，等桥签名送回', tone: 'info' },
   delivered: { label: '已送回', tone: 'ok' },
   stale: { label: '过期', tone: 'warn' },
   invalid: { label: '无效', tone: 'bad' },
@@ -62,16 +63,26 @@ export const QUESTION_STATE: Record<string, { label: string; tone: Tone }> = {
   refused: { label: '签名服务拒签', tone: 'bad' },
 }
 
-export const questionMeta = (state: string) => QUESTION_STATE[state] ?? { label: state, tone: 'idle' as Tone }
+/** A question state's label and tone. A park.json question (*source* park) has no bridge: its 'answered' is just 已回答. */
+export const questionMeta = (state: string, source?: Question['source']) =>
+  source === 'park' && state === 'answered' ? { label: '已回答', tone: 'info' as Tone } : QUESTION_STATE[state] ?? { label: state, tone: 'idle' as Tone }
 export const isOpenQuestion = (q: Pick<Question, 'state'>) => q.state === 'waiting' || q.state === 'open'
 
-/** 3/11 需求分析, with a small bar of the stages done or skipped. */
+/** What the stage of a LeanSummary is, when it is not the one being worked on. */
+const LEAN_HINT: Partial<Record<StageState, string>> = { todo: '下一步', done: '做完', skipped: '做完' }
+
+/**
+ * 3/11 需求分析, with a small bar of the stages done or skipped; 下一步 when nothing is open and that stage is the next
+ * one to do, 做完 when it is the last stage and done (the requirement's Lean work is finished).
+ */
 export function LeanCell({ lean }: { lean: LeanSummary }) {
   const pct = lean.total > 0 ? Math.round((lean.done / lean.total) * 100) : 0
+  const hint = lean.stage_state ? LEAN_HINT[lean.stage_state] : undefined
   return (
     <span className="br-row" style={{ gap: 6 }} data-testid="lean-cell">
       <span className="br-mono">{lean.stage_n !== null ? `${lean.stage_n}/${lean.total}` : `0/${lean.total}`}</span>
       <span>{lean.stage_label ?? '还没开始'}</span>
+      {hint && <span className="br-hint" data-testid="lean-hint">{hint}</span>}
       <span className="br-prog" role="img" aria-label={`做完 ${lean.done}/${lean.total}`} title={`做完或跳过 ${lean.done}/${lean.total}`}>
         <i style={{ width: `${pct}%` }} />
       </span>
@@ -194,9 +205,16 @@ export const VIA_TEXT: Record<'session' | 'mr', string> = {
   mr: '回答会以你的 GitLab 身份发在 MR 上',
 }
 
+/** The two answers of a question without options (brain-kit answers those approve / reject). */
+const YES_NO: { value: 'approve' | 'reject'; label: string }[] = [
+  { value: 'approve', label: '同意（approve）' },
+  { value: 'reject', label: '不同意（reject）' },
+]
+
 /**
  * The answer form of a question, only when it may be answered here (`answerable_here`) and is not a Lean approval
  * request (those the person types themselves in the session; the app never offers approve / reject for them).
+ * One radio per option; a question without options gets 同意 / 不同意 (choice approve / reject).
  * Posts AnswerBody to /requirements/{repo}/{key}/answer.
  */
 export function AnswerForm({ question, repo, reqKey, onDone }: { question: Question; repo: string; reqKey: string; onDone?: (r: AnswerResult) => void }) {
@@ -233,10 +251,15 @@ export function AnswerForm({ question, repo, reqKey, onDone }: { question: Quest
           ))}
         </fieldset>
       ) : (
-        <div className="br-field">
-          <label htmlFor={`${name}-choice`}>你的回答</label>
-          <input id={`${name}-choice`} type="text" value={choice} onChange={(e) => setChoice(e.target.value)} />
-        </div>
+        <fieldset className="br-fieldset">
+          <legend>同意吗</legend>
+          {YES_NO.map((o) => (
+            <label key={o.value} className="br-check">
+              <input type="radio" name={name} value={o.value} checked={choice === o.value} onChange={() => setChoice(o.value)} />
+              <span>{o.label}</span>
+            </label>
+          ))}
+        </fieldset>
       )}
       <div className="br-field">
         <label htmlFor={`${name}-note`}>补一句（可不填）</label>

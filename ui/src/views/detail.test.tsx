@@ -112,6 +112,52 @@ describe('需求详情', () => {
     expect(post?.body).toEqual({ choice: 'A', id: 'D-7' })
   })
 
+  test('a question without options is answered 同意 / 不同意: the form posts choice approve', async () => {
+    const user = userEvent.setup()
+    const d = fx.detail()
+    d.questions[0].options = []
+    d.questions[0].recommend = null
+    installFixtureRoutes({
+      [`GET ${API}/requirements/*`]: () => d,
+      [`POST ${API}/requirements/r1/PAY-3/answer`]: () => ({ ok: true, via: 'session', text: '已送进会话' }),
+    })
+    renderDetail()
+    const [clarify] = await screen.findAllByTestId('question')
+    const form = within(clarify).getByRole('form')
+    expect(within(form).getAllByRole('radio').map((r) => (r as HTMLInputElement).value)).toEqual(['approve', 'reject'])
+    expect(within(form).queryByRole('textbox', { name: '你的回答' })).toBeNull()
+    expect(within(form).getByRole('button', { name: '回答' })).toBeDisabled()
+    await user.click(within(form).getByRole('radio', { name: '不同意（reject）' }))
+    await user.click(within(form).getByRole('radio', { name: '同意（approve）' }))
+    await user.click(within(form).getByRole('button', { name: '回答' }))
+    await within(clarify).findByText('已送进会话')
+    expect(apiCalls.find((c) => c.method === 'POST' && c.path.endsWith('/answer'))?.body).toEqual({ choice: 'approve' })
+  })
+
+  test('an answered question on the MR waits for the bridge to sign it back; an answered park.json question is just answered', async () => {
+    const d = fx.detail()
+    d.questions[2].state = 'answered'
+    d.questions[1] = { ...d.questions[2], source: 'mr', id: 'D-5', state: 'answered', answer_via: 'mr' }
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d })
+    renderDetail()
+    const [, mr, park] = await screen.findAllByTestId('question')
+    expect(mr).toHaveTextContent('已收到回答，等桥签名送回')
+    expect(park).toHaveTextContent('已回答')
+    expect(park).not.toHaveTextContent('等桥签名')
+  })
+
+  test('who decided each decision, in brain-kit’s Who vocabulary: a pseudonym, Brain entries, agent, 没归类 (never a name)', async () => {
+    renderDetail()
+    const decisions = await screen.findByRole('region', { name: '决定' })
+    const who = (id: string) => within(decisions).getByText(id).closest('tr')!.children[5] as HTMLElement
+    expect(who('D-1')).toHaveTextContent(/^P-PAY-2-1 · Brain$/)
+    expect(who('D-2')).toHaveTextContent(/^agent$/)
+    expect(who('D-3')).toHaveTextContent(/^P-1A2B · 人$/)
+    expect(who('D-4')).toHaveTextContent(/^没归类$/)
+    expect(who('D-4')).toHaveAttribute('title', 'Who 不是规定的写法：没归类，也不猜是谁')
+    expect(who('D-3')).not.toHaveAttribute('title')
+  })
+
   test('the crumb goes back; a Brain cite opens the Brain view at that entry', async () => {
     const { go, onBack } = renderDetail({ repo: 'r1', key: 'PAY-3', from: 'todo' })
     const crumb = await screen.findByRole('navigation', { name: '位置' })

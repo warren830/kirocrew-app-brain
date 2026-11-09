@@ -16,9 +16,11 @@
         "stage": "code-generation",
         "stage_label": "代码生成",
         "stage_n": 9,
+        "stage_state": "started",
         "done": 8,
         "total": 11
       },
+      "stage": "9/11 代码生成",
       "waits": {
         "who": "you",
         "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
@@ -54,9 +56,11 @@
         "stage": "application-design",
         "stage_label": "应用设计",
         "stage_n": 4,
+        "stage_state": "started",
         "done": 3,
         "total": 11
       },
+      "stage": "4/11 应用设计",
       "waits": {
         "who": "product",
         "text": "停在 D-2：等产品在 MR 上回答",
@@ -100,9 +104,11 @@
         "stage": "release",
         "stage_label": "发布",
         "stage_n": 11,
+        "stage_state": "started",
         "done": 10,
         "total": 11
       },
+      "stage": "11/11 发布",
       "waits": {
         "who": "you",
         "text": "等你验收：在 MR 上回答 D-3",
@@ -143,9 +149,11 @@
         "stage": "build-and-test",
         "stage_label": "构建和测试",
         "stage_n": 10,
+        "stage_state": "todo",
         "done": 9,
         "total": 11
       },
+      "stage": "10/11 构建和测试（下一步）",
       "waits": {
         "who": "you",
         "text": "接手被拒：run.json 的 brain_commit 不在 main 上，先 rebase 到最新的 main 再交接",
@@ -182,9 +190,11 @@
         "stage": null,
         "stage_label": null,
         "stage_n": null,
+        "stage_state": null,
         "done": 0,
         "total": 11
       },
+      "stage": null,
       "waits": {
         "who": "people",
         "text": "已认领，还没开工",
@@ -215,9 +225,11 @@
         "stage": "release",
         "stage_label": "发布",
         "stage_n": 11,
+        "stage_state": "done",
         "done": 11,
         "total": 11
       },
+      "stage": "11/11 发布（做完）",
       "waits": {
         "who": "nobody",
         "text": "已合并",
@@ -255,7 +267,7 @@
   ],
   "funnel": {
     "source": "evaluate",
-    "total": 14,
+    "total": 15,
     "rows": [
       {
         "id": "person",
@@ -278,9 +290,21 @@
         "count": 1
       },
       {
-        "id": "unknown",
-        "label": "看不出",
+        "id": "unclassified",
+        "label": "没归类（Who 不是规定的写法）",
         "count": 1
+      },
+      {
+        "id": "unknown",
+        "label": "看不出（Who 空着）",
+        "count": 1
+      }
+    ],
+    "unclassified": [
+      {
+        "key": "PAY-4",
+        "id": "D-3",
+        "src": "aidlc-docs/261105-merchant-split/decisions.md#L11"
       }
     ],
     "questions": {
@@ -361,6 +385,16 @@
           "判断点之外有人介入 2 次（push_after_handover）"
         ]
       }
+    ],
+    "skipped": [
+      {
+        "key": "PAY-1",
+        "why": "runs/PAY-1/run.json 不是合法的 JSON：第 3 行"
+      }
+    ],
+    "notes": [
+      "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
+      "PAY-2：已知交付有问题，14 天还没满，先不算"
     ]
   },
   "counts": {

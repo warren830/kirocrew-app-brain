@@ -1,19 +1,39 @@
 /**
- * 运行机 (team mode only): the bridge loop's status, the ledger's counts, the runs with their MRs, and the signer's
- * pending and refused requests. 「现在跑一轮」 runs one bridge loop now (POST /team/loop).
+ * 运行机 (team mode only): the bridge loop's status, the ledger's counts, the runs (brain-kit's run states) with their
+ * MRs, and the signer's pending and refused requests and the vouchers it has not answered yet (asked for again next
+ * round). 「现在跑一轮」 runs one bridge loop now (POST /team/loop).
  */
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
 import { ago, fmtIso } from '../format'
-import type { ReqState, TeamLoopResult, TeamStatus, TeamView } from '../types'
-import { STATE_LABEL } from '../types'
-import { ExtLink, Icon, LoadState, STATE_TONE } from '../ui'
+import type { RunState, TeamLoopResult, TeamStatus, TeamView } from '../types'
+import { ExtLink, Icon, LoadState, questionMeta } from '../ui'
+import type { Tone } from '../styles'
 import type { ViewProps } from './props'
 
 export const TEAM_POLL_MS = 10_000
 export const SIGNER_SAME_USER = '签名服务和 app 是同一个系统用户：它签不签都由 app 说了算，只适合本机试用'
 
 const LEDGER_NAME: Record<keyof TeamView['ledger'], string> = { runs: '运行', decisions: '问题', handoffs: '交接' }
+
+/** brain-kit's run states (the bridge ledger's), in words. */
+export const RUN_STATE: Record<RunState, { label: string; tone: Tone }> = {
+  signing: { label: '签名中', tone: 'hand' },
+  spooled: { label: '排队等工作区', tone: 'idle' },
+  ready: { label: '工作区好了', tone: 'info' },
+  dispatched: { label: '已派给会话', tone: 'run' },
+  send_unknown: { label: '送没送到不清楚', tone: 'warn' },
+  failed: { label: '工作区没建成', tone: 'bad' },
+  merged: { label: '已合并', tone: 'ok' },
+  closed: { label: '已关闭', tone: 'idle' },
+}
+export const runStateMeta = (state: string) => RUN_STATE[state as RunState] ?? { label: state, tone: 'idle' as Tone }
+
+const HANDOFF_STATE: Record<string, string> = { checking: '在检查', accepted: '已接手', rejected: '拒绝接手' }
+
+/** A ledger count's state in words: runs by run state, decisions by question state, hand-overs by their own. */
+const ledgerLabel = (k: keyof TeamView['ledger'], state: string) =>
+  k === 'runs' ? runStateMeta(state).label : k === 'decisions' ? questionMeta(state).label : HANDOFF_STATE[state] ?? state
 
 export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
   const api = useAppApi()
@@ -75,7 +95,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
               <div key={k} className="br-row" data-ledger={k}>
                 <span className="br-strong" style={{ minWidth: '3em' }}>{LEDGER_NAME[k]}</span>
                 {Object.entries(data.ledger[k]).length === 0 ? <span className="br-dim">—</span>
-                  : Object.entries(data.ledger[k]).map(([s, n]) => <span key={s} className="br-tag">{s} {n}</span>)}
+                  : Object.entries(data.ledger[k]).map(([s, n]) => <span key={s} className="br-tag" title={s}>{ledgerLabel(k, s)} {n}</span>)}
               </div>
             ))}
           </section>
@@ -93,7 +113,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
                           <button type="button" className="br-link br-key" onClick={() => go({ kind: 'item', repo: 'runner', key: r.req })}>{r.req}</button>
                         </td>
                         <td>{r.project}</td>
-                        <td><span className={`br-chip tone-${STATE_TONE[r.state as ReqState] ?? 'idle'}`}>{STATE_LABEL[r.state as ReqState] ?? r.state}</span></td>
+                        <td><RunChip state={r.state} /></td>
                         <td><ExtLink href={r.mr_url}>!{r.iid}</ExtLink></td>
                         <td className="br-dim">{fmtIso(r.updated)}</td>
                         <td>
@@ -134,9 +154,27 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
                 ))}
               </ul>
             )}
+            {data.signer.waiting.length > 0 && (
+              <>
+                <h3>上一轮没等到签名（下一轮再要同一张凭证）</h3>
+                <ul className="br-plain" data-testid="signer-waiting">
+                  {data.signer.waiting.map((w) => (
+                    <li key={w.ref} className="br-row">
+                      <span className="br-mono">{w.ref}</span><span className="br-tag">{w.kind}</span><span className="br-mono br-dim">{w.run_id}</span>
+                      <span className="br-dim">{fmtIso(w.since)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </section>
         </>
       )}
     </main>
   )
+}
+
+function RunChip({ state }: { state: string }) {
+  const m = runStateMeta(state)
+  return <span className={`br-chip tone-${m.tone}`} data-state={state}>{m.label}</span>
 }

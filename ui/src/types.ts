@@ -56,12 +56,16 @@ export interface Waits {
 }
 
 export interface LeanSummary {
-  /** the stage being worked on (Lean stage id) or null when nothing started */
+  /** the current Lean stage id (see stage_state); null only when Lean recorded no stage yet */
   stage: string | null
   /** its Chinese label, e.g. 需求分析 */
   stage_label: string | null
   /** 1..11, the stage's place in Lean's order */
   stage_n: number | null
+  /** the state of `stage`: started (being worked on); todo (nothing open: the next stage to do after the last one done);
+   * done or skipped (every stage up to the last is done: the requirement's Lean work is finished); null when Lean
+   * recorded no stage yet */
+  stage_state: StageState | null
   /** stages done or skipped / 11 */
   done: number
   total: number
@@ -85,6 +89,9 @@ export interface Requirement {
   branch: string | null
   intent: string | null
   lean: LeanSummary
+  /** the current Lean stage as text, as the backend writes it: 「9/11 代码生成」 (started), 「3/11 用户故事（下一步）」
+   * (todo), 「11/11 发布（做完）」 (done or skipped); null when Lean recorded no stage */
+  stage: string | null
   waits: Waits
   /** credits of the Kiro Crew sessions this app opened for it (null: none known). KiroCrew reports credits only. */
   credits: number | null
@@ -185,14 +192,26 @@ export interface EvalView {
   metrics: EvalMetric[]
   /** 复看队列 (low-score queue): runs that need a human look */
   queue: { key: string; intent: string | null; reasons: string[] }[]
+  /** runs brain-kit could not read: listed with brain-kit's reason, not counted in any metric */
+  skipped: { key: string; why: string }[]
+  /** brain-kit's notes on the numbers, verbatim (credits it could not attribute to a run, deliveries already known
+   * wrong whose 14 days are not over …) */
+  notes: string[]
 }
 
-/** 决策漏斗: who settled each decision. */
+/**
+ * 决策漏斗: who settled each decision, from the Who cell of decisions.md (brain-kit's vocabulary: agent, brain <entry
+ * id>, check, <pseudonym> <voucher id>, owner). Each decision counts once.
+ */
 export interface Funnel {
   source: 'evaluate' | 'app'
   total: number
-  /** label → count, in order: 人, 确定性检查, Brain 条目（引用）, agent 自己定（权限内）, 看不出 */
+  /** id, the backend's label, count, in the backend's order: person 人, check 确定性检查, brain Brain 条目（引用）,
+   * agent agent 自己定（权限内）, unknown 看不出（Who 空着）, unclassified 没归类（Who 不是规定的写法） */
   rows: { id: string; label: string; count: number }[]
+  /** the decisions counted as unclassified: their Who cell is outside the vocabulary. Listed where they are, never
+   * guessed (the cell may hold a real name, so it is not repeated here) */
+  unclassified: { key: string; id: string; src: string }[]
   /** questions asked of people / answered / delivered back to the run */
   questions: { asked: number; answered: number; delivered: number }
 }
@@ -233,15 +252,21 @@ export interface Approval {
   path: string | null
 }
 
+/**
+ * One row of decisions.md. Its Who cell, in brain-kit's vocabulary, gives *by* and *who*: agent or a kit bot user →
+ * agent; `brain <entry id> …` → brain (who: the entry ids); check → check; `<P-xxxx> <V-xxxxxxxxxx>` (a pseudonym and
+ * its voucher id) → person (who: the pseudonym); owner → person (who: 'owner'); bridge → the bridge's own record;
+ * anything else → unclassified (who null: the cell may hold a real name); an empty cell → null.
+ */
 export interface Decision {
   id: string
   date: string | null
   stage: string | null
   text: string
   why: string | null
-  /** what the Who cell says, shown only when it is a role, username or pseudonym */
+  /** the pseudonym, 'owner', or the Brain entry ids; null when the Who cell says nothing that may be shown */
   who: string | null
-  by: 'person' | 'agent' | 'check' | 'bridge' | null
+  by: 'person' | 'agent' | 'check' | 'brain' | 'bridge' | 'unclassified' | null
   /** Brain entry ids it cites (open them in the Brain view) */
   cites: string[]
   vouchers: string[]
@@ -339,7 +364,10 @@ export interface RequirementDetail {
 
 export interface OpenSessionBody { trust?: boolean; kickoff?: boolean }
 export interface OpenSessionResult { ok: boolean; slot: string; url: string }
-/** id: the question's D-<n> when it has one (an MR question); without it the open clarify question is meant. */
+/**
+ * choice: an option id (A–H), or 'approve' / 'reject' for a question without options. id: the question's D-<n> when it
+ * has one (an MR question); without it the open clarify question is meant.
+ */
 export interface AnswerBody { choice: string; note?: string; id?: string }
 export interface AnswerResult { ok: boolean; via: 'session' | 'mr'; text: string }
 
@@ -392,8 +420,9 @@ export interface IntakeCheck {
 }
 
 export interface StartBody extends IntakeBody {
-  /** modules expected to change (run.json expected_paths; overlap warnings) */
-  paths: string[]
+  /** modules expected to change (run.json expected_paths; overlap warnings): a list, one path per item, or one string
+   * with the paths separated by commas, spaces or new lines (the API accepts both; this page sends a list) */
+  paths: string[] | string
   open_session: boolean
   trust: boolean
 }
@@ -472,7 +501,13 @@ export interface ReflectPreview {
   error: string
 }
 export interface ReflectApplyBody { repo: string; key: string; push: boolean }
-export interface ReflectApplyResult { ok: boolean; output: string; branch: string | null }
+export interface ReflectApplyResult {
+  ok: boolean
+  output: string
+  branch: string | null
+  /** the worktree brain-kit wrote the new brain/<KEY>-reflect-<n> branch in (the person's own checkout is not touched) */
+  worktree: string | null
+}
 
 // ---------------------------------------------------------------- GET /todo
 
@@ -498,22 +533,45 @@ export interface Todo { items: TodoItem[]; team: boolean }
 
 // ---------------------------------------------------------------- team mode: GET /team, POST /team/loop
 
+/** A run's state in brain-kit's bridge ledger (not a ReqState). */
+export type RunState =
+  | 'signing' // run id reserved while the separate signer signs the contract
+  | 'spooled' // waiting for its workspace
+  | 'ready' // workspace made, not sent to a session yet
+  | 'dispatched' // sent to its brain-run session
+  | 'send_unknown' // sending it to the session failed in a way that does not say whether it arrived
+  | 'failed' // the workspace could not be made
+  | 'merged'
+  | 'closed'
+
 export interface TeamRun {
   run_id: string
   req: string
   project: string
   iid: number
-  state: string
+  /** brain-kit's run state; a state this page does not know is shown as it is */
+  state: RunState
   slot: string | null
   mr_url: string | null
   updated: string | null
 }
 export interface TeamView {
   status: TeamStatus
+  /** state → count: runs by RunState, decisions by question state (open, answered, delivered, refused, void …),
+   * hand-overs by checking / accepted / rejected */
   ledger: { runs: Record<string, number>; decisions: Record<string, number>; handoffs: Record<string, number> }
   runs: TeamRun[]
-  /** signature requests waiting for the signer, and ones it refused (with its reasons) */
-  signer: { pending: { req_id: string; kind: string; run_id: string; since: string | null }[]; refused: { req_id: string; kind: string; reasons: string[] }[] }
+  signer: {
+    /** signature requests waiting for the signer */
+    pending: { req_id: string; kind: string; run_id: string; since: string | null }[]
+    /** requests it refused, with its reasons */
+    refused: { req_id: string; kind: string; reasons: string[] }[]
+    /** vouchers asked for in an earlier round that the signer has not answered yet (brain-kit's pending_vouchers): the
+     * next round asks for the very same voucher, so a late signature is still used. ref: what it is for, as brain-kit
+     * names it: 「answer D-2」, or 「handoff shop/shop-pay!41 <head sha>#<label event id>」 (only those within brain-kit's
+     * one-hour reuse window) */
+    waiting: { ref: string; kind: string; run_id: string; since: string | null }[]
+  }
 }
 export interface TeamLoopResult { ok: boolean; summary: Record<string, number>; error: string }
 
