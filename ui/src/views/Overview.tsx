@@ -8,8 +8,9 @@
  * ledger's state filter are in the URL; a big number, a legend entry, a week, a column, a lane or 「+N 个」 filters the
  * ledger once more (a LedgerPick, with its ✕) and scrolls to it.
  *
- * Whose turn it is and the step are the backend's (waits.who / do / since), read here as they are. A repo with no
- * remote is done only on this machine: the page says so once, and the runner's parts fold to 「这次不需要」.
+ * Whose turn it is and the step are the backend's (waits.who / do / since), read here as they are. A repo that cannot
+ * hand over (no remote, or no GitLab) is done only on this machine: the backend's sentence says so, the top has the
+ * 只在本机 tag, and the runner's parts fold to 「这次不需要」.
  *
  * Without any repo it is one big way in: 导入仓库. A repo without requirements shows only its way in: 开需求.
  */
@@ -79,6 +80,7 @@ export const OV_CSS = `
 .br-ov .cto-kcard .cto-ktop { flex-wrap: wrap; }
 .br-ov .cto-kmore.cto-link { text-align: left; padding: 0 4px; font-size: 12px; color: var(--accent); }
 .br-ov .cto-stats small { font-size: 14px; font-weight: 500; color: var(--text); margin-left: 4px; }
+.br-ov .cto-stats b { font-weight: inherit; white-space: nowrap; }
 .br-ov .cto-kb-h.is-off .cto-st { color: var(--muted); }
 .br-ov .br-kcell-off { display: grid; place-items: center; writing-mode: vertical-rl; letter-spacing: .2em; color: var(--muted); font-size: 12px; background: transparent; border: 1px dashed var(--border); }
 .br-ov .br-kband { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 6px 10px; border-radius: 10px; border: 1px dashed var(--border); color: var(--muted); font-size: 13px; }
@@ -191,7 +193,8 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
   }
   const repoName = (id: string) => repos.find((x) => x.id === id)?.name
   const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
-  const localOnly = scope.length > 0 && scope.every((r) => r.remote === false)
+  // nothing here can be handed over: no origin to push to, or no GitLab for the bridge (the backend's local_only rule)
+  const localOnly = scope.length > 0 && scope.every((r) => r.remote === false || !(r.kit?.gitlab_base && r.kit?.gitlab_project))
   const manyRepos = repo === 'all' && repos.length > 1
   const team = !!status && (status.app.team || status.team.enabled)
   const newReq = () => go({ kind: 'new', ...(repo !== 'all' ? { repo } : {}) })
@@ -239,7 +242,6 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
         <section className="cto-hero" data-testid="ov-hero">
           <h2>{c.sentence}</h2>
           <p>
-            {localOnly && <><b data-testid="ov-local">{scope.length > 1 ? `这 ${scope.length} 个仓库都只在本机做` : '这个仓库只在本机做'}，不交给运行机。</b>{' '}</>}
             {c.available
               ? `数字来自 brain-kit 的评估（读的是${c.ref || '默认分支'}）和这个 app 开的会话`
               : 'brain-kit 的评估还没给出数字：下面先看 credits 和合并'}

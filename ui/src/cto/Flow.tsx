@@ -146,10 +146,10 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
         {onNew && <button type="button" className="kt-btn is-small cto-noprint" onClick={onNew}>开需求 ↗</button>}
       </div>
       <div className="cto-stats" data-testid="flow-stats">
-        进行中 {live.length} 个<span>·</span>轮到你 {yours.length}{byDo.length > 0 && <small>（{byDo.map(([w, n]) => `${w} ${n}`).join(' · ')}）</small>}
-        <span>·</span>等别人 {inLane('people').length}<span>·</span>AI 在本机做 {inLane('agent').length}
-        {!localOnly && <><span>·</span>运行机在跑 {inLane('runner').length}</>}
-        {mergedYours.length > 0 && <><span>·</span>已合并、等你{DO_NAME.write_back} {mergedYours.length}</>}
+        <b>进行中 {live.length} 个</b><span>·</span><b>轮到你 {yours.length}</b>{byDo.length > 0 && <small>（{byDo.map(([w, n]) => `${w} ${n}`).join(' · ')}）</small>}
+        <span>·</span><b>等别人 {inLane('people').length}</b><span>·</span><b>AI 在本机做 {inLane('agent').length}</b>
+        {!localOnly && <><span>·</span><b>运行机在跑 {inLane('runner').length}</b></>}
+        {mergedYours.length > 0 && <><span>·</span><b>已合并、等你{DO_NAME.write_back} {mergedYours.length}</b></>}
       </div>
       {longest !== undefined && <div className="cto-dim" data-testid="flow-longest">轮到你的事，最久的已等 {fmtWaited(at - longest)}。</div>}
       <div className="cto-kanban br-kanban" role="table" aria-label="需求流动看板" style={{ gridTemplateColumns: template }}>

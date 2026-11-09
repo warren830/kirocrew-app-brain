@@ -34,7 +34,7 @@ function localWorld(): { ov: Overview; status: Status } {
     waits: { who: 'you', text: '已认领，还没开工', line: null, raw: '', do: 'start', since: ov.at - 3 * 3600, where: 'app' } })
   ov.rows = [reply('DEMO-1', '计算器减法'), claim('DEMO-2', 'AGENTS.md 缺仓库简介'), reply('DEMO-3', '计算器乘法'), claim('DEMO-4', 'add 的测试'), claim('DEMO-5', '仓库说明')]
   ov.overlaps = [{ keys: ['DEMO-1', 'DEMO-3'], paths: ['calc.py'] }]
-  ov.cto = { ...ov.cto, unattended: [0, 0], runs: [{ key: 'DEMO-1', repo: 'r1', how: 'local', beyond: [], at_points: 1, outside: 0, credits: 49.8, merged_at: null }, { key: 'DEMO-3', repo: 'r1', how: 'local', beyond: [], at_points: 1, outside: 0, credits: 37, merged_at: null }],
+  ov.cto = { ...ov.cto, sentence: '这个仓库只在本机做，不交给运行机。人介入了 2 次（本机做的也算），2 次落在判断点上。有 credits 的 2 个需求，平均每个 43.4 credits。', unattended: [0, 0], runs: [{ key: 'DEMO-1', repo: 'r1', how: 'local', beyond: [], at_points: 1, outside: 0, credits: 49.8, merged_at: null }, { key: 'DEMO-3', repo: 'r1', how: 'local', beyond: [], at_points: 1, outside: 0, credits: 37, merged_at: null }],
     weekly: ov.cto.weekly.map((w) => ({ ...w, unattended: 0, people: 0, local: 0, pending: 0 })) }
   ov.counts = { claimed: 3, local: 2 }
   return { ov, status }
@@ -99,7 +99,8 @@ describe('交付总览', () => {
     const { ov, status } = localWorld()
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
     render(<OverviewView entry={{}} {...props({ status })} />)
-    expect(await screen.findByTestId('ov-local')).toHaveTextContent('这个仓库只在本机做，不交给运行机。')
+    const hero = await screen.findByTestId('ov-hero')
+    expect(hero.textContent!.split('只在本机做')).toHaveLength(2) // the backend's sentence says it; the page does not say it again
     expect(screen.getByTestId('ov-local-tag')).toHaveTextContent('只在本机')
     expect(screen.getByTestId('ov-unattended')).toHaveTextContent('这次不需要')
     expect(screen.getByRole('article', { name: '无人值守' })).toHaveTextContent('只在本机2')
