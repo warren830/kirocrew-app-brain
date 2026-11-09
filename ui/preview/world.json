@@ -7993,10 +7993,21 @@
       "kind": "clarify",
       "kind_label": "澄清",
       "question": "导出文件里的时间用商户所在地的时区，还是 UTC？",
-      "options": [],
-      "recommend": null,
+      "options": [
+       {
+        "id": "A",
+        "text": "商户所在地的时区（文件头写明时区）"
+       },
+       {
+        "id": "B",
+        "text": "一律 UTC"
+       }
+      ],
+      "recommend": "A",
       "lean_request": null,
-      "refs": [],
+      "refs": [
+       "D01#S004"
+      ],
       "state": "waiting",
       "answer": null,
       "answerer": null,
@@ -8097,10 +8108,21 @@
       "kind": "clarify",
       "kind_label": "澄清",
       "question": "导出文件里的时间用商户所在地的时区，还是 UTC？",
-      "options": [],
-      "recommend": null,
+      "options": [
+       {
+        "id": "A",
+        "text": "商户所在地的时区（文件头写明时区）"
+       },
+       {
+        "id": "B",
+        "text": "一律 UTC"
+       }
+      ],
+      "recommend": "A",
       "lean_request": null,
-      "refs": [],
+      "refs": [
+       "D01#S004"
+      ],
       "state": "waiting",
       "answer": null,
       "answerer": null,

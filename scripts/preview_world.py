@@ -380,7 +380,9 @@ def main() -> None:
     p3.request(T0 - 6 * M, "PLAN")
     p3.events[-1]["data"]["sha256"] = "5d1e7a90" + p3.events[-1]["data"]["sha256"][8:]
     p3.events[-1]["data"]["unit"] = "refund-api"
-    p3_park = {"status": "waiting", "kind": "clarify", "question": "导出文件里的时间用商户所在地的时区，还是 UTC？"}
+    q3 = det["questions"][0]
+    p3_park = {"status": "waiting", "kind": "clarify", "ask": "owner", "question": q3["question"], "options": q3["options"],
+               "recommend": q3["recommend"], "refs": q3["refs"]}
     row = classified(p3, rows["PAY-3"], park=p3_park, slot=det["sessions"][0])
     det["row"] = row
     det["timeline"]["missing"] = detail.missing_text(TRACE_MISSING, handed_over=False, local_only=False)
