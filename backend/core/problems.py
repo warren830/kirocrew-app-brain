@@ -91,6 +91,14 @@ def _tool(g: dict[str, str], level: str) -> str:
     return "%s %s" % (g["tool"], have)
 
 
+def _older_adapter(g: dict[str, str]) -> str:
+    """What an older hook adapter cannot do (brain-kit cli.crew_hook_problem): before version 2 the run on the team
+    runner cannot stop to ask a person; before 3 it lets tool calls on after the kit's own files were changed."""
+    if int(g.get("have") or 0) < 2:
+        return "运行机上的 run 停下来问人时写不了 park.json"
+    return "改了 kit 自己的文件（.kiro/、.brain/kit.json、gates/）以后，它不会拦下工具调用"
+
+
 def _hook_names(raw: str) -> str:
     """'agentSpawn, preToolUse' (brain-kit's trigger names) as the Chinese names."""
     names = [x.strip() for x in raw.split(",") if x.strip()]
@@ -101,8 +109,8 @@ RULES: list[Rule] = [
     # cli.runner_kit_problems / doctor_checks (d46765f): the hook adapter is too old for the team runner
     Rule(r"^(?P<path>\S+) is an older adapter \(version (?P<have>\d+), needs (?P<need>\d+)\)",
          "{path} 是旧版（第 {have} 版，要第 {need} 版）",
-         "运行机上的 run 停下来问人时写不了 park.json。" + REINSTALL, "kit", runner=True,
-         local=LOCAL_ONLY + "（运行机靠新版停下来问人）。要交的话点「%s」" % FIX_BUTTON["kit"]),
+         lambda g, lv: _older_adapter(g) + "。" + REINSTALL, "kit", runner=True,
+         local=lambda g, lv: LOCAL_ONLY + "（%s）。要交的话点「%s」" % (_older_adapter(g), FIX_BUTTON["kit"])),
     # cli.runner_kit_problems: Lean / the adapter only on this disk, not in git (worktrees are made from main)
     Rule(r"^(?P<path>\S+) is not committed: AI-DLC Lean;", "AI-DLC Lean 没提交到 git",
          "app 的工作目录从默认分支建，没提交的 Lean 不在里面。" + REINSTALL, "kit"),

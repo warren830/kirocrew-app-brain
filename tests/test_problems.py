@@ -43,6 +43,18 @@ def test_the_older_adapter_is_fail_for_a_team_repo_and_a_reminder_for_a_local_on
     assert team["raw"] == local["raw"] == OLDER                 # brain-kit's words, never dropped
 
 
+def test_an_adapter_that_can_ask_already_is_said_by_what_it_still_lacks():
+    """oms-brain's (version 2, brain-kit wants 3): the run can ask a person; what is missing is the refusal after the
+    kit's own files changed. Saying 「写不了 park.json」 there would be wrong."""
+    raw = (".kiro/brain/lean-hook.py is an older adapter (version 2, needs 3): it does not refuse tool calls after the kit's "
+           "own files (.kiro/, .brain/kit.json, gates/) were changed; run `brain install` and commit it on main through an MR")
+    team = ok_row(P.row("FAIL", raw, repo=REPO, team=True))
+    local = ok_row(P.row("FAIL", raw, repo=REPO, team=False))
+    assert team["text"] == ".kiro/brain/lean-hook.py 是旧版（第 2 版，要第 3 版）"
+    for r in (team, local):
+        assert "不会拦下工具调用" in r["todo"] and "park.json" not in r["todo"] and "点「重装 kit 文件」" in r["todo"]
+
+
 def test_the_users_example_with_the_apps_older_prefix_is_mapped_too():
     r = ok_row(P.row("FAIL", "仓库 demo：" + OLDER, repo=REPO, team=False))
     assert r["level"] == "WARN" and r["text"].endswith("是旧版（第 0 版，要第 2 版）") and r["raw"].startswith("仓库 demo：")
