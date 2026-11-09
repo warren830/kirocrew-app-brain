@@ -24,13 +24,13 @@ bridge's KiroCrew surface (`adapter_create / set_project / send / slot / stop`).
 
 | View | What it shows | Where it comes from |
 | --- | --- | --- |
-| **交付总览** | Every requirement: claimed, local, handed over, running on the runner, parked with D-n, waiting acceptance, merged; owner, the current Lean stage n/11 (`lean` and the row's `stage` text, e.g. `2/11 需求分析`, `11/11 发布（下一步）`, `11/11 发布（做完）`: the same stages the detail lists, null only before Lean recorded one), what it waits on (with the exact approval line), credits, overlap warnings; Eval numbers, the runs Eval skipped and its notes, and the low-score queue (复看队列); the decision funnel, with the decisions.md rows whose Who is not in the vocabulary (没归类) | git refs (`claim/*`, run branches, the default branch), worktree files, run.json, park.json, the Lean ledger; `brainkit.evaluate` when present; the bridge ledger in team mode; the MR via GitLab (person's token) |
-| **需求详情** | Lean's 11 stages and approvals, Session notes, decisions with their Brain citations and who settled each (brain-kit's Who vocabulary: `agent` or a bot user, `brain <entry id>`, `check`, `<P-xxxx> <V-xxxxxxxxxx>`, `owner`; anything else is 没归类 and not shown, it may be a real name), parked questions and answers (MR link), the run trace timeline, the sessions this app opened with their credits, Brain usage | `brainkit.trace.build` (else the Lean ledger, its audit files shown as `L-<6 hex>.jsonl` like brain-kit's), decisions.md, `sessions.slot_stats` |
-| **开需求** | The form: repo, title, slug, key, expected paths (separated by commas, spaces or new lines); the five gates (consent, classification incl. 不确定, business keep/mask, exclude globs); 先检查 shows brain-kit's dry-run findings verbatim; 开工 runs `brain start` and opens a `brain-dev` session in the run's own worktree | `brainkit.intake.package.build(dry_run=True)`, `bin/brain start` |
+| **交付总览** | Every requirement: claimed, local, handed over, running on the runner, parked with D-n, waiting acceptance, merged; owner, the current Lean stage n/11 (`lean` and the row's `stage` text, e.g. `2/11 需求分析`, `11/11 发布（下一步）`, `11/11 发布（做完）`: the same stages the detail lists, null only before Lean recorded one), what it waits on (with the exact approval line; a hand-over that was pushed but whose MR carries no hand-over label says that nothing was handed over), the first line of its 变更说明 (`summary`, made in the background), credits, overlap warnings; Eval numbers, the runs Eval skipped and its notes (also the runs known wrong that wait for their merge: autonomy's `wrong_open`), and the low-score queue (复看队列); the decision funnel, with the decisions.md rows whose Who is not in the vocabulary (没归类) | git refs (`claim/*`, run branches, the default branch), worktree files, run.json, park.json, the Lean ledger; `brainkit.evaluate` when present; `brainkit.mrdesc`; the bridge ledger in team mode; the MR via GitLab (person's token) |
+| **需求详情** | Lean's 11 stages and approvals, Session notes, decisions with their Brain citations and who settled each (brain-kit's Who vocabulary: `agent` or a bot user, `brain <entry id>`, `check`, `<P-xxxx> <V-xxxxxxxxxx>`, `owner`; anything else is 没归类 and not shown, it may be a real name), parked questions and answers (MR link), the MR's 变更说明 (its first line, the whole Markdown folded, 复制 for the MR description), the run trace timeline (a commit's author date, and its commit date when it differs; how it was merged, in words), the sessions this app opened with their credits, Brain usage | `brainkit.trace.build` (else the Lean ledger, its audit files shown as `L-<6 hex>.jsonl` like brain-kit's), decisions.md, `sessions.slot_stats`; the 变更说明: `runs/<KEY>/MR.md` at the commit when the branch has it, else `brainkit.mrdesc.build` / `render` at that commit |
+| **开需求** | The form: repo, title, slug, key, expected paths (separated by commas, spaces or new lines); the five gates (consent, classification incl. 不确定, business keep/mask, exclude globs); 先检查 shows brain-kit's dry-run findings verbatim, and what may be a name or a password but may as well be a word (brain-kit's review findings, not masked, stopping nothing) once more per file under 请你确认; 开工 runs `brain start` and opens a `brain-dev` session in the run's own worktree | `brainkit.intake.package.build(dry_run=True)`, `bin/brain start` |
 | **Brain** | Entries by file and section with type, sources, usage counts and withdraw candidates; lint; reflect preview, apply on a new branch (the reply names the branch and the worktree brain-kit wrote it in, `~/.brain/worktrees/<repo>/…`), apply and open the MR | `brainkit.entries`, `usage`, `brainlint`, `reflect`; `bin/brain reflect --apply [--push]` |
-| **待办** | Lean approvals pending (the line the person types in that session), D-n questions on the runner (link to the MR), runner questions stuck for good (the signer refused the answer, the question is void or could not be asked), the person's own clarify questions (answer here), acceptance, refused hand-overs, Kiro Crew problems | as above |
-| **运行机** (team mode) | The bridge ledger, runs in brain-kit's states (`signing`: the run id reserved while the signer signs the contract), signature requests waiting for the signer, the ones it refused, and vouchers it has not answered yet (asked for again, the same voucher, next round) | the hosted bridge, the signer spool |
-| **设置** | brain-kit checkout, repos, work root, team mode; Kiro Crew checks with their fixes | `settings.json` in the app's data dir |
+| **待办** | Lean approvals pending (the line the person types in that session), D-n questions on the runner (link to the MR), runner questions stuck for good (the signer refused the answer, the question is void or could not be asked), the person's own clarify questions (answer here), acceptance, refused hand-overs, hand-overs pushed without their label (没交出去的交接), Kiro Crew problems | as above |
+| **运行机** (team mode) | The bridge ledger (questions in brain-kit's states, `asking`: a bridge posting it right now), what the bridge said about each labelled MR last round (接手了, 拒绝接手, 看过了, 标签刚被拿掉 = `unlabelled`, 正在别处签名 = `waiting`, 这一轮没查成), runs in brain-kit's states (`signing`: the run id reserved while the signer signs the contract), signature requests waiting for the signer, the ones it refused, and vouchers it has not answered yet (asked for again, the same voucher, next round) | the hosted bridge, the signer spool |
+| **设置** | brain-kit checkout, repos, work root, team mode; Kiro Crew checks with their fixes (and, per repo, Lean's lean.json leaving `runs/**` out of its code fingerprint) | `settings.json` in the app's data dir |
 
 The app never sends a Lean approval line: it shows it, copies it, and opens the session; the person types it. On the
 team runner's dashboard no question is answered (answers are made on GitLab, where the person is identified). On a
@@ -46,11 +46,20 @@ the repo. `POST /brain/reflect/apply` answers `{ok, output, branch, worktree}`.
 ## How it works
 
 - **brain-kit is a library**, imported from the configured checkout under a private package name
-  (`_brainapp_brainkit`, nothing on `sys.path`); it is never edited or patched. It must be commit `9935b11` or newer
+  (`_brainapp_brainkit`, nothing on `sys.path`); it is never edited or patched. It must be commit `72b278e` or newer
   (the spool signer, `check_answer` bound to the recorded question note, the question's commit and park hash, the
-  hand-over commit rule, run reservations and pending vouchers, the agent-spec hook functions): an older checkout is
-  refused with a message saying what it lacks. Optional modules (`trace`, `evaluate`, `golden`, `intents`) are
-  guarded: a missing one turns its feature off and the page says so. Wishes for brain-kit: `BRAINKIT_REQUESTS.md`.
+  hand-over commit rule, run reservations and pending vouchers, the agent-spec hook functions; 72b278e: the edit
+  signal, `GitLab.note_edits`, `decisions.edit_state`, `DecisionLoop.reply_states`): an older checkout is refused with
+  a message saying what it lacks. Tested on `48b6b97` (`runs/<KEY>/MR.md` in the hand-over commit, the bridge's
+  变更说明 comment). Optional modules (`trace`, `evaluate`, `golden`, `intents`, `mrdesc`) are guarded: a missing one
+  turns its feature off and the page says so. Wishes for brain-kit: `BRAINKIT_REQUESTS.md`.
+- **The 变更说明** (brain-kit's `brain mr-desc`) is always read at a commit: the row's (a worktree's or a branch's
+  tip, the default branch once merged, the runner workspace's HEAD). `runs/<KEY>/MR.md` when that commit has it (a
+  regular file, at most 4 MB; a symlink is not read), made inert with `mrdesc.inert` and cut to 60000 characters as
+  the bridge does; else `mrdesc.build(ref=<commit>, credits=…)` / `render`. Never the working tree: `build` there
+  would run the project's own Lean (agent-writable) for its code fingerprint. Results are kept by (folder, commit,
+  default branch commit, credits); the overview's first lines are made in one background thread. 复制 copies the
+  inert text, for the MR description; nothing is posted by the app.
 - **Each requirement gets its own worktree** under `~/workplace/brain-app/<repo>/<slug>` (`git worktree add
   --detach`, then `brain start` in it), so several requirements can be open on one machine and each `brain-dev`
   session has its own project directory. Kiro Crew lets agents work under `~/workplace` / `~/workspace` only.
@@ -65,8 +74,10 @@ the repo. `POST /brain/reflect/apply` answers `{ok, output, branch, worktree}`.
   `crew/brain-dev.json` is installed; a file that lacks some of Lean's hooks gets only those (`cli.add_lean_hooks`, in
   the file's own format), and everything else stays (other tools' hooks such as Orca's, `kiroUpgrade`, every other
   key), with the old file kept as `brain-dev.json.bak-<time>`; a file that is not valid JSON is left for the person to
-  fix or remove. A spec that differs from brain-kit's in other ways is fine. The engine fix runs `kirocrew config set
-  agent.acp_backend kas`.
+  fix or remove. A spec that differs from brain-kit's in other ways is fine (72b278e: an OK row names the fields you set
+  yourself; `brain crew-agent --reset` takes brain-kit's, `--force` only adds what is missing). The engine fix runs
+  `kirocrew config set agent.acp_backend kas`. Per repo, the check also FAILs when Lean counts `runs/**` as code
+  (`mrdesc.write_problem`: lean.json `fingerprint_exclude`), with brain-kit's fix; lean.json is the person's to change.
 - **Team mode** hosts brain-kit's own `bridge.handoff.Bridge` (poll → dispatch → watch → collect → reconcile) and
   `bridge.runnerd.once` as a background task (`on_startup` / `on_shutdown`): bridge.json is read by brain-kit's
   `load_bridge_config`, and the bridge runs with `signer=` brain-kit's `sign.SpoolSigner` (bridge.json's `signer`
@@ -76,13 +87,20 @@ the repo. `POST /brain/reflect/apply` answers `{ok, output, branch, worktree}`.
   `set_project`, `send`, `slot`, `stop`) into the app's session runner, not brain-kit's HTTP client.
 - **The bridge's notes on a person's machine** are read back with brain-kit's `decisions.Q_HEAD_RE` (the question's
   first line names its commit and park.json hash); when the repo's kit.json names `bridge_user`, only that account's
-  notes count, so a look-alike posted by a person is not a question. States shown: open, answered (the bridge has the
-  answer but could not sign it this round: it sends it later, nobody answers again), delivered, stale (a new push),
-  void (not bound to its push and park.json, or its question note was deleted), refused (the signer would not sign),
-  invalid.
+  notes count, so a look-alike posted by a person is not a question. The bridge's 「变更说明」 comment (first line
+  `decisions.DESC_TITLE`, 48b6b97) is skipped whole, whatever the MR.md in it says. States shown: open, answered (the
+  bridge has the answer but could not sign it this round: it sends it later, nobody answers again), delivered, stale
+  (a new push), void (not bound to its push and park.json, or its question note was deleted), refused (the signer
+  would not sign), invalid.
 - **Team mode states**, brain-kit's: a run reserved while its contract is signed (`signing`) shows as handed over and
-  waiting for the signer; a run whose latest question the signer refused, that is void or could not be asked (for the
-  head the bridge last saw) shows as parked, waiting for a person, and is in 待办.
+  waiting for the signer; a question being posted (`posting`, or 72b278e's `asking`: one bridge process posting it
+  now) shows as parked, waiting for the bridge; a run whose latest question the signer refused, that is void or could
+  not be asked (for the head the bridge last saw) shows as parked, waiting for a person, and is in 待办. The app runs
+  `Bridge.poll`'s loop itself (each project, each MR with the hand-over label, `Bridge.process`) to keep each MR's
+  result for the page; brain-kit's own `poll` returns nothing.
+- **A hand-over without its label** (person mode): run.json has the hand-over, the branch tip is the hand-over commit
+  (one commit on top of `handoff.local_head`), and the MR at that tip carries none of the hand-over, running or
+  rejected labels. Nothing was handed over (`brain handoff` exits 1 then, 72b278e): the row says so and 待办 lists it.
 
 ## Security
 
@@ -92,17 +110,26 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
   process (another OS user in production, `brainbridge`), the other end of brain-kit's `sign.SpoolSigner`: the bridge
   writes `<spool>/requests/<req>.json`, the signer answers in `signed/` or `refused/`, and the SpoolSigner accepts a
   signature only if the signed voucher is exactly the one it asked for and verifies against `allowed_signers`. The
-  signer decides with brain-kit's own rules (9935b11), run with its own identities, ledger, GitLab token and the kit
+  signer decides with brain-kit's own rules (72b278e), run with its own identities, ledger, GitLab token and the kit
   config from the default branch: a hand-over must pass `Bridge.verify` (the owner's label newer than GitLab's MR
   version of the head, and the head the hand-over commit itself: one parent, run.json changed, as `brain handoff`
-  commits it; a commit pushed on top of it is not handed over, whatever the label times); an answer must pass
-  `decisions.check_answer` bound to the question note the voucher names (`question_note`, the note id brain-kit's
-  ledger recorded; a voucher without one is refused; a deleted question voids the decision): the unedited question the
-  bridge posts for park.json at that commit, by kit.json `bridge_user`, posted after the push, the D-n bound to nothing
-  else; the first valid reply by an allowed person, never a bot or the bridge account, never an edited reply; approve
-  / reject for a question without options; a batch review's item list whole; no conflict; the head unchanged). What
-  the signer adds: it rebuilds each voucher from those checks and compares canonical bytes (brain-kit has no voucher
-  builder, so a field brain-kit adds is refused until the signer learns it); it serves only its projects, checks
+  commits it, and neither authored nor committed by a bot (kit `bot_emails` / `bot_users`); a commit pushed on top of
+  it is not handed over, whatever the label times); an answer must pass `decisions.check_answer` bound to the question
+  note the voucher names (`question_note`, the note id brain-kit's ledger recorded; a voucher without one is refused; a
+  deleted question voids the decision): the question the bridge posts for park.json at that commit (ticking its review
+  checklist is fine), by kit.json `bridge_user`, posted after the push, the D-n bound to nothing else; the first valid
+  reply by an allowed person, never a bot or the bridge account, saying what its author wrote; approve / reject for a
+  question without options; a batch review's item list whole; no conflict; the head unchanged). "What its author
+  wrote" is check_answer's `edits`, made as brain-kit's own `collect` makes them: `DecisionLoop.reply_states` on the
+  signer's ledger (each reply recorded at the signer's first sight with its text's hash) and GitLab GraphQL with the
+  signer's own token (`GitLab.note_edits`: lastEditedBy, which an award emoji leaves empty and a text edit sets, as
+  measured on gitlab.aws.dev on 2026-11-09). A reply someone else edited never counts and, from an allowed person,
+  holds the round (a conflict: nothing signed); one its author fixed before the signer read it counts as it reads;
+  one whose text changed after that never counts. When GraphQL does not answer, the signer answers nothing (the
+  bridge asks again) and records nothing for that reply; brain-kit's own bridge records such a reply as "cannot tell"
+  for good and tells the person once. What the signer adds: it rebuilds each voucher from those checks and compares
+  canonical bytes (brain-kit has no voucher builder, so a field brain-kit adds is refused until the signer learns
+  it); it serves only its projects, checks
   `issued_at` and the contract's TTL, reserves a contract's run id in brain-kit's `signing` state before checking it
   (one open run per requirement; the same hand-over asked again is signed again), signs an answer only for a run whose
   contract it signed; and its own ledger keeps one answer per question and never binds a D-n to a second question or
@@ -121,14 +148,17 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
   GitLab (`brainkit.rest`), git.
 - **No secrets out**: the GitLab token is read like `brainkit.rest.read_token` (`$GITLAB_TOKEN`, else
   `~/.brain/gitlab-token`, refused when others can read it) and never logged, stored or returned; agent-written text
-  on its way to the page goes through Kiro Crew's scrubber; materials stay in the intake store (never in a repo).
+  on its way to the page goes through Kiro Crew's scrubber; materials stay in the intake store (never in a repo). The
+  变更说明 is read from commits only (an MR.md committed as a symlink is not followed): a planted link cannot bring a
+  file of this machine into the text the person copies to GitLab.
 - The brain-kit checkout and the app directory run inside the gateway: in production they must not be writable by
   the agents' OS user. Team mode refuses to start unless bridge.json, runnerd.json, allowed_signers and the
   identities file are owned by another user and read-only to the app (`dev_same_user` skips this for a local trial).
 - **What is a boundary and what is a guardrail.** On the runner the agents can do whatever the app's OS user can:
   rewrite the app's ledger, point a session at another slot, write signature requests. The app's own checks are
   guardrails. The boundaries are the signer (it trusts nothing it is sent), runnerd and CI verifying signatures with
-  keys and configs the agents cannot change, the pre-receive hook and GitLab's approvals. Give the app's GitLab
+  keys and configs the agents cannot change, the pre-receive hook (72b278e: bots may not change
+  `runs/<KEY>/run.json` either; its config's `runs_dir` must be kit.json's) and GitLab's approvals. Give the app's GitLab
   account Reporter rights only (comment, label; no push, no merge).
 - On a person's machine the `brain-dev` agent runs as that person and can read their GitLab token file anyway: the
   app's answer route adds no power it lacks, and it only answers clarify questions (never a Lean approval). The real
@@ -136,8 +166,10 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
 
 ## Install (a person's machine)
 
-1. **brain-kit** checkout (`9935b11` or newer), and in each project `brain install <repo> --prefix PAY` (commit `.kiro/`, `.brain/`,
-   `aidlc-docs/`, `brain/`, `AGENTS.md`). On this machine: `git config brain.user <gitlab user>`, the GitLab token in
+1. **brain-kit** checkout (`72b278e` or newer), and in each project `brain install <repo> --prefix PAY` (commit `.kiro/`, `.brain/`,
+   `aidlc-docs/`, `brain/`, `AGENTS.md`; since 48b6b97 it also adds `runs/**` to `aidlc-docs/lean.json`
+   `fingerprint_exclude`: review and commit that too, or `brain handoff` refuses and the Kiro Crew check lists the
+   repo). On this machine: `git config brain.user <gitlab user>`, the GitLab token in
    `~/.brain/gitlab-token` (`chmod 600`), `git config brain.intake <brain-intake clone>` (see brain-kit's
    `docs/安装和使用.md`).
 2. **Trust the app yourself**: Kiro Crew settings → trusted apps → add `brain` (`agent.apps_trusted`). Kiro Crew
@@ -162,13 +194,16 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
    `pseudonym_salt`, and the signer instead of a key:
    `"signer": {"type": "spool", "spool_dir": "/srv/brain-signer", "allowed_signers": "/etc/brain-kit/allowed_signers"}`
    (optional `timeout`, default 30 s, and `poll`; the signer's spool must not be runnerd's `spool_dir`). No
-   `signing_key`: with one, team mode does not start. `publish_vouchers` is forced off.
+   `signing_key`: with one, team mode does not start. `publish_vouchers` is forced off (so brain-kit's
+   `publish_timeout` does not matter here; the signer has its own). The token is also used on GitLab GraphQL (the edit
+   signal, 72b278e): it needs the `read_api` or `api` scope.
 3. **kit.json `bridge_user`** on the default branch of each project: the GitLab account of that token (not one of
    `bot_users`). brain-kit's bridge checks that its token is that account before it asks; the signer signs no answer
    without it (it is how a question by the bridge is told from a look-alike by a person).
 4. **runnerd.json** (brain-kit's format) with the same `spool_dir`; `allowed_signers` = the bridge's public key.
 5. **The signer**: `signer/signer.example.json` → `/etc/brain-kit/signer.json` (same `pseudonym_salt`; its own
-   identities copy, GitLab token, ledger, the signing key; `bridge_users` is optional, a pin: kit.json's `bridge_user`
+   identities copy, GitLab token (it reads GitLab GraphQL too: `read_api` or `api` scope), ledger, the signing key,
+   `publish_timeout` for its pushes to brain-intake; `bridge_users` is optional, a pin: kit.json's `bridge_user`
    must be one of them), `signer/brain-signer.service` as `brainbridge`, started before team mode is turned on.
    Spool permissions: `requests/` writable by `brainbot`, `signed/` and `refused/` by `brainbridge` only (team mode
    checks the last two). A run that will never finish is closed on the signer with `brain_signer.py --config … close
@@ -188,12 +223,13 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
 | `backend/core/bk.py` | brain-kit, loaded from the configured checkout under a private name; guarded optional modules |
 | `backend/core/repo.py`, `lean_view.py` | Requirements found in a repo (claims, run branches, worktrees, main); Lean's stages, approvals, Session notes |
 | `backend/core/deliveries.py`, `detail.py`, `todo.py`, `mrinfo.py` | 交付总览, 需求详情, 待办, the MR on a person's machine |
+| `backend/core/mrdesc_view.py` | The 变更说明 at a commit (MR.md, else brain-kit's mrdesc), its first line, the cache and its background maker |
 | `backend/core/intake.py`, `crewcheck.py`, `brainview.py` | 开需求, the Kiro Crew checks and fixes, Brain and reflect |
-| `backend/core/team/` | Team mode: the hosted bridge (`bridgehost.py`: brain-kit's Bridge and SpoolSigner, the spool view for the page), the KiroCrew adapter |
+| `backend/core/team/` | Team mode: the hosted bridge (`bridgehost.py`: brain-kit's Bridge and SpoolSigner, its poll loop with each MR's result, the spool view for the page), the KiroCrew adapter |
 | `backend/core/gateway.py`, `sessions.py`, `httpkit.py`, `store.py` | Kept from the sample (see above) |
 | `signer/` | The separate signer (brain-kit's rules, its own ledger; the service half of brain-kit's spool protocol), its example config and systemd unit |
 | `ui/src/` | The page: `main.tsx`, `AppBar.tsx`, `nav.ts`, `views/*`, the contract `types.ts`; `ui/preview/` on the fixtures |
-| `tests/` | Backend tests: real brain-kit projects in temp dirs, the fake Kiro Crew gateway, a fake GitLab (`teamfix.py`), the real signer behind brain-kit's own Bridge and SpoolSigner (`test_signer.py`: the attacks it refuses) |
+| `tests/` | Backend tests: real brain-kit projects in temp dirs, the fake Kiro Crew gateway, a fake GitLab with GraphQL's edit marks (`teamfix.py`), the real signer behind brain-kit's own Bridge and SpoolSigner (`test_signer.py`: the attacks it refuses, the edit signal) |
 
 ## Host APIs relied on (Kiro Crew 0.11.2)
 
@@ -213,13 +249,17 @@ python3 -m pytest -q                     # backend (Python 3.9+, pytest, git, ss
 (cd ui && npm run preview:build)         # ui/preview-dist/index.html: the page on the fixtures, no Kiro Crew
 ```
 
-`BRAIN_TEST_BRAINKIT` points the backend tests at a brain-kit checkout (default `~/warren_ws/brain-kit`). The fake
-GitLab (`tests/teamfix.py`) serves commits with their `parent_ids` from a bare repo, and every hand-over in the tests is
-a real `brain handoff` commit.
+`BRAIN_TEST_BRAINKIT` points the backend tests at a brain-kit checkout (default `~/warren_ws/brain-kit`; a clean clone
+of a commit needs its `vendor/aidlc-lean` too). The fake GitLab (`tests/teamfix.py`) serves commits with their
+`parent_ids`, authors and committers from a bare repo, and GraphQL's edit marks as measured on gitlab.aws.dev
+(lastEditedBy for a text edit only); every hand-over in the tests is a real `brain handoff` commit, and the runner's
+commits are the bot account's.
 
 ## Not verified on a live Kiro Crew yet
 
 Opening a `brain-dev` slot with `agent_kind: template` and a worktree under `~/workplace` as its project; that the
 template's hooks run in such a slot (also after the hook fix added them to a Kiro-upgraded spec); `trust` for it;
 credits in `turn_stats`; the bridge's runner sessions; the `kirocrew config set` fix while the gateway runs; the page in
-the dashboard; the signer against a real GitLab (MR versions, note ids) and as another OS user behind the spool.
+the dashboard; the signer against a real GitLab (MR versions, note ids, GraphQL's lastEditedBy through its own
+token) and as another OS user behind the spool; the 变更说明 of a real run (brain-kit 48b6b97's MR.md in the hand-over
+commit) on the page.
