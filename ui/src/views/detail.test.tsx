@@ -241,14 +241,14 @@ describe('需求详情', () => {
 
   test('a requirement that is not there: which repo, what to do, back to 交付总览; no HTTP code, no 需求看板', async () => {
     installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => { throw apiError(404, 'not_found', '没有这个需求') } })
-    const { onBack } = renderDetail({ repo: 'r1', key: 'PAY-99' })
+    const { go } = renderDetail({ repo: 'r1', key: 'PAY-99', from: 'todo' })
     const card = await screen.findByRole('region', { name: '没有这个需求' })
     expect(card).toHaveTextContent('shop-pay 仓库里没有 PAY-99')
     expect(card).toHaveTextContent('做什么：在上面「切换需求」里换一个，或者回交付总览找。')
     expect(document.body).not.toHaveTextContent('404')
     expect(screen.queryByRole('button', { name: '需求看板 ↗' })).toBeNull()
     fireEvent.click(within(card).getByRole('button', { name: '回交付总览' }))
-    expect(onBack).toHaveBeenCalled()
+    expect(go).toHaveBeenCalledWith({ kind: 'overview', repo: 'r1' })
     expect(apiCalls.find((c) => !c.path.startsWith(`${API}/overview`))?.path).toBe(`${API}/requirements/r1/PAY-99`)
   })
 

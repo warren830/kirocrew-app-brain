@@ -437,11 +437,16 @@ describe('需求看板', () => {
     expect(screen.queryByRole('region', { name: '验收' })).toBeNull()
   })
 
-  test('a requirement the repo does not have (404) says so', async () => {
+  test('a requirement the repo does not have (404): which repo by its name, what to do, back to 交付总览; no repo id, no HTTP code', async () => {
     installFixtureRoutes(boardRoute(() => { throw apiError(404, 'not_found', '这个仓库里没有 PAY-9') }))
-    renderBoard({ repo: 'r1', key: 'PAY-9' })
-    expect(await screen.findByRole('alert')).toHaveTextContent('没有这个需求（r1 · PAY-9）：它可能已经不在这个仓库里')
+    const p = renderBoard({ repo: 'r1', key: 'PAY-9' })
+    const card = await screen.findByRole('region', { name: '没有这个需求' })
+    expect(card).toHaveTextContent('shop-pay 仓库里没有 PAY-9')
+    expect(card).toHaveTextContent('做什么：在上面「切换需求」里换一个，或者回交付总览找。')
+    expect(screen.getByTestId('br-board')).not.toHaveTextContent(/404|r1 ·/)
     expect(screen.queryByTestId('kt-graph')).toBeNull()
+    fireEvent.click(within(card).getByRole('button', { name: '回交付总览' }))
+    expect(p.go).toHaveBeenCalledWith({ kind: 'overview', repo: 'r1' })
     expect(boardCalls({ repo: 'r1', key: 'PAY-9' })).toHaveLength(1)
   })
 
@@ -450,7 +455,7 @@ describe('需求看板', () => {
     delete routes[`GET ${API}/board/*`]
     setApiRoutes(routes)
     renderBoard()
-    expect(await screen.findByRole('alert')).toHaveTextContent('没有这个需求（r1 · PAY-3）：它可能已经不在这个仓库里')
+    expect(await screen.findByRole('region', { name: '没有这个需求' })).toHaveTextContent('shop-pay 仓库里没有 PAY-3')
   })
 
   test('the loading line while the first snapshot is on its way', async () => {

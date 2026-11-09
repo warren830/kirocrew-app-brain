@@ -16,6 +16,11 @@ export function optionText(r: Requirement): string {
   return `${r.key} ${r.title}${r.state_label ? ` · ${r.state_label}` : ''}${r.waits.who === 'you' ? ' · 等你' : ''}`
 }
 
+/** The one shown that its repo does not have (closed, or a key from elsewhere): 「PAY-1（shop-pay 里没有）」. */
+export function missingText(key: string, repoName: string): string {
+  return `${key}（${repoName}${/[\x21-\x7e]$/.test(repoName) ? ' ' : ''}里没有）`
+}
+
 export function ReqSwitch({ repo, reqKey, status, onPick, pollMs }: {
   repo: string
   reqKey: string
@@ -44,11 +49,25 @@ export function ReqSwitch({ repo, reqKey, status, onPick, pollMs }: {
           const [r, k] = e.target.value.split(SEP)
           if (r && k && (r !== repo || k !== reqKey)) onPick(r, k)
         }}>
-        {!here && <option value={idOf(repo, reqKey)}>{reqKey}</option>}
+        {!here && <option value={idOf(repo, reqKey)}>{missingText(reqKey, nameOf(repo))}</option>}
         {groups.size > 1
           ? [...groups].map(([id, list]) => <optgroup key={id} label={nameOf(id)}>{options(list)}</optgroup>)
           : options([...groups.values()][0])}
       </select>
     </label>
+  )
+}
+
+/** A requirement its repo does not have (需求详情, 需求看板): which repo, what may have happened, and what to do. */
+export function NotFound({ repoName, reqKey, onOverview, testId }: { repoName: string | null; reqKey: string; onOverview: () => void; testId: string }) {
+  return (
+    <section className="cto-card br-notfound" aria-label="没有这个需求" data-testid={testId}>
+      <h3>{repoName ? `${repoName} 仓库里没有 ${reqKey}` : `没有找到 ${reqKey}`}</h3>
+      <p className="cto-desc">它可能已经关闭，或者在别的仓库里。</p>
+      <p className="br-hint">做什么：在上面「切换需求」里换一个，或者回交付总览找。</p>
+      <div className="br-row" style={{ marginTop: 10 }}>
+        <button type="button" className="kt-btn is-primary" onClick={onOverview}>回交付总览</button>
+      </div>
+    </section>
   )
 }

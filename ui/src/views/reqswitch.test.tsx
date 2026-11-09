@@ -45,6 +45,14 @@ describe('切换需求', () => {
     render(<ReqSwitch repo="runner" reqKey="OPS-9" status={fx.status()} onPick={vi.fn()} />)
     const pick = await screen.findByRole('combobox', { name: '切换需求' })
     expect(pick).toHaveValue('runner\u0001OPS-9')
-    expect(within(pick).getAllByRole('option').map((o) => o.textContent)).toEqual(['OPS-9', optionText(one.rows[0])])
+    expect(within(pick).getAllByRole('option').map((o) => o.textContent)).toEqual(['OPS-9（运行机里没有）', optionText(one.rows[0])])
+  })
+
+  test('a key its repo does not have says so, with the repo’s name', async () => {
+    installFixtureRoutes()
+    render(<ReqSwitch repo="r1" reqKey="PAY-1" status={fx.status()} onPick={vi.fn()} />)
+    const pick = await screen.findByRole('combobox', { name: '切换需求' })
+    expect(pick).toHaveValue('r1\u0001PAY-1')
+    expect(within(pick).getAllByRole('option')[0]).toHaveTextContent(/^PAY-1（shop-pay 里没有）$/)
   })
 })

@@ -19,7 +19,7 @@ import type { ReqBoard, WaitDo } from '../types'
 import { LoadState } from '../ui'
 import { QuestionCard } from '../views/Question'
 import type { ViewProps } from '../views/props'
-import { ReqSwitch } from '../views/ReqSwitch'
+import { NotFound, ReqSwitch } from '../views/ReqSwitch'
 import { Accept } from './Accept'
 import { ActorGraph, rosterRows, type FlashMap } from './ActorGraph'
 import { CheckWall } from './CheckWall'
@@ -189,7 +189,10 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
             onPick={onSwitch ?? ((repo, key) => go({ kind: 'board', repo, key }))} />}
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{fromName}</button>}
         </div>
-        <LoadState loading={live.loading} error={live.missing ? `没有这个需求（${entry.repo} · ${entry.key}）：它可能已经不在这个仓库里` : live.error} has={!!board} />
+        {live.missing && !board
+          ? <NotFound repoName={status?.repos.find((r) => r.id === entry.repo)?.name ?? (entry.repo === 'runner' ? '运行机' : null)} reqKey={entry.key}
+              onOverview={() => go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) })} testId="br-board-missing" />
+          : <LoadState loading={live.loading} error={live.error} has={!!board} />}
         {board && lay && (
           <>
             <TopBar board={board} replaying={rp.on} follow={follow} onReplay={() => rp.start()} onFollow={() => setFollow((v) => !v)} onDetail={toDetail}

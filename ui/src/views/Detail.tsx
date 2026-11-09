@@ -30,7 +30,7 @@ import { Inline } from './Markdown'
 import type { ViewProps } from './props'
 import { EntryChip, MrDescCard, QuestionCard, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
-import { ReqSwitch } from './ReqSwitch'
+import { NotFound, ReqSwitch } from './ReqSwitch'
 
 export { EntryChip, MR_DESC_COPY_HINT, MrDescCard, QuestionCard, mrDescSource } from './Question'
 export { PART_LABEL, PART_VAR, valueStream, type Part, type StreamSeg } from './Stream'
@@ -264,7 +264,8 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
   const repoInfo = props.status?.repos.find((r) => r.id === entry.repo) ?? null
   const live = x ? x.sessions.find((s) => s.kind === 'local' && !s.error) ?? null : null
   const toBoard = (more: Partial<BoardEntry> = {}) => props.go({ kind: 'board', repo: entry.repo, key: entry.key, from: 'item', ...more })
-  const toOverview = onBack ?? (() => props.go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) }))
+  // 回交付总览: back when that is where it was opened from (its filters kept), else a move there
+  const toOverview = entry.from === 'overview' && onBack ? onBack : () => props.go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) })
   return (
     <main className="kt-root br-view cto-root cto-item br-detail" data-testid="br-detail">
       <style>{DETAIL_CSS}</style>
@@ -283,25 +284,12 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{from}</button>}
         </div>
       </div>
-      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} onOverview={toOverview} /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
+      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} onOverview={toOverview} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
       {x && (
         <Page x={x} board={board} live={live} entry={entry} props={props} opened={opened} localOnly={x.row.local_only ?? repoInfo?.remote === false}
           onOpened={(r) => { setOpened(r); after() }} after={after} toBoard={toBoard} />
       )}
     </main>
-  )
-}
-
-function NotFound({ repoName, reqKey, onOverview }: { repoName: string | null; reqKey: string; onOverview: () => void }) {
-  return (
-    <section className="cto-card" aria-label="没有这个需求" data-testid="detail-missing">
-      <h3>{repoName ? `${repoName} 仓库里没有 ${reqKey}` : `没有找到 ${reqKey}`}</h3>
-      <p className="cto-desc">它可能已经关闭，或者在别的仓库里。</p>
-      <p className="br-hint">做什么：在上面「切换需求」里换一个，或者回交付总览找。</p>
-      <div className="br-row" style={{ marginTop: 10 }}>
-        <button type="button" className="kt-btn is-primary" onClick={onOverview}>回交付总览</button>
-      </div>
-    </section>
   )
 }
 
