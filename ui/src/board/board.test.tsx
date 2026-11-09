@@ -346,7 +346,7 @@ describe('需求看板', () => {
     expect(cards).toHaveLength(1)
     // the PLAN approval is Lean's: typed in the session, not answered here
     expect(cards[0]).toHaveTextContent(lean.question)
-    expect(cards[0]).toHaveTextContent('这是 Lean 的审批请求（PLAN 5d1e7a90）')
+    expect(cards[0]).toHaveTextContent('这是 Lean 的代码生成计划审批请求：在会话里自己打批准那一行，这里不能回答。')
     expect(qs).not.toHaveTextContent(b.questions.find((q) => q.state === 'delivered')!.question)
   })
 
