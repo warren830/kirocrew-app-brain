@@ -80,6 +80,7 @@ describe('需求详情', () => {
     renderDetail()
     const head = await screen.findByRole('region', { name: '需求' })
     expect(head).toHaveTextContent('这个仓库只在本机做，没有 MR')
+    expect(within(head).getByTestId('detail-local-only')).toHaveTextContent('这个仓库只在本机做')
     const start = fx.board().events.find((e) => e.kind === 'start')!.at
     const cycle = await screen.findByRole('article', { name: '周期' })
     await waitFor(() => expect(cycle).toHaveTextContent(`${fmtTime(start)} 开工 → 进行中`))

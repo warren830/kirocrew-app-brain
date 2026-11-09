@@ -317,7 +317,7 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
   if (!started) {
     return (
       <section className="br-detail-head" aria-label="需求">
-        <Header x={x} />
+        <Header x={x} localOnly={localOnly} />
         <Claimed x={x} now={now} at={at} onStart={onStart} />
         <Facts x={x} start={null} localOnly={localOnly} />
       </section>
@@ -329,7 +329,7 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
   return (
     <>
       <section className="br-detail-head" aria-label="需求">
-        <Header x={x} />
+        <Header x={x} localOnly={localOnly} />
         <NowBar x={x} now={now} at={at} live={live} canOpen={canOpen} repo={entry.repo} reqKey={entry.key}
           onStart={onStart} onAnswer={() => scrollTo('问题和回答')} onBrain={() => props.go({ kind: 'brain', repo: entry.repo, reflect: entry.key })} />
         {(canOpen || opened) && <OpenSession repo={entry.repo} reqKey={entry.key} opened={opened} onOpened={onOpened} />}
@@ -356,13 +356,16 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
   )
 }
 
-function Header({ x }: { x: RequirementDetail }) {
+function Header({ x, localOnly }: { x: RequirementDetail; localOnly: boolean }) {
   const r = x.row
   return (
     <header className="cto-item-head">
       <h2 className="kt-run-title">{r.title}</h2>
       <span className="kt-pill tone-info kt-mono">{r.key}</span>
       <StateChip state={r.state} label={r.state_label} who={r.waits.who} />
+      {localOnly && (
+        <span className="kt-pill tone-idle" data-testid="detail-local-only" title="这个仓库没有远端：不交给运行机，没有 MR，在本机做完、在本机合并">这个仓库只在本机做</span>
+      )}
       <span className="cto-org">{r.owner ? `${r.owner} 的需求 · ` : ''}{WHERE_NAME[r.where] ?? x.where_label}</span>
     </header>
   )

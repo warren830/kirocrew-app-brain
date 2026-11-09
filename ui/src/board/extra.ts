@@ -104,6 +104,9 @@ export const BOARD_EXTRA_CSS = `
 .br-board .kt-intro-name b { white-space: nowrap; }
 /* what a step does breaks at its 、 only, never inside a word (a long one still wraps rather than overflow) */
 .br-board .kt-intro-does { word-break: keep-all; overflow-wrap: anywhere; }
+/* a requirement the repo does not have: the same card as 需求详情's */
+.br-board .br-notfound { padding: 16px 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); max-width: 720px; }
+.br-board .br-notfound h3 { margin: 0 0 6px; }
 /* a step said on two lines (what happened, then what to do) keeps its lines */
 .br-next .br-pre-line { white-space: pre-line; }
 .br-btn-big { padding: 10px 20px; font-size: 1.02em; border-radius: 12px; }

@@ -4,6 +4,7 @@
  * (the gate it waited at, the session, the AI) with how it ended, who was at it above, the moments under it; 图 or 表格.
  */
 import { useState } from 'react'
+import { clip, textWidth } from '../board/format'
 import { RoleGlyph } from '../board/RoleIcon'
 import { Hit, Tip, useWidth, type TipState } from '../cto/charts'
 import { fmtDay, fmtSpan, isoDay } from '../format'
@@ -199,7 +200,11 @@ function StreamChart({ board, segs, days, onAt }: { board: ReqBoard; segs: Strea
         <line x1={L} x2={W - R} y1={AXIS} y2={AXIS} stroke="var(--border-strong)" strokeWidth={1} />
         {segs.map((s, i) => {
           const a = x(s.from), bb = x(s.to), w = Math.max(2, bb - a - (i < segs.length - 1 ? 2 : 0))
-          const label = s.label.length * 13 > w ? `${s.label.slice(0, Math.max(1, Math.floor(w / 13) - 1))}…` : s.label
+          // both lines fit the part's own width (about 12.5 px an em): the next part's words start right after it
+          const room = (w - 4) / 12.5
+          const label = clip(s.label, room)
+          const long = `${fmtSpan(s.to - s.from)}${s.decision ? ` · ${s.decision}` : ''}`
+          const sub = clip(textWidth(long) <= room ? long : fmtSpan(s.to - s.from), room)
           return (
             <g key={`${s.from}-${s.actor}`} className="cto-vs-seg">
               <rect x={a} y={BAND} width={w} height={BH} rx={i === 0 || i === segs.length - 1 ? 4 : 1} fill={PART_VAR[s.part]} />
@@ -212,7 +217,7 @@ function StreamChart({ board, segs, days, onAt }: { board: ReqBoard; segs: Strea
               {w >= 58 && (
                 <>
                   <text x={a} y={BAND + BH + 18} className="is-strong">{label}</text>
-                  <text x={a} y={BAND + BH + 34}>{fmtSpan(s.to - s.from)}{s.decision ? ` · ${s.decision}` : ''}</text>
+                  <text x={a} y={BAND + BH + 34}>{sub}</text>
                 </>
               )}
               <Hit x={a} y={BAND - 30} w={Math.max(8, w)} h={BH + 72} onTip={setTip} tipY={BAND + BH + 40} onPick={() => onAt(s.from)}
