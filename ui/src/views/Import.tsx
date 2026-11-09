@@ -7,14 +7,16 @@
  *              /import/clone, then GET /import/jobs/{id} until it ends; its steps as pills, the time it took) and the
  *              new folder is checked next.
  *   2 检查     POST /import/inspect, read only: what needs a look as rows with their ✓ / ! / ✗ chip, why and what to
- *              do (the rows that are fine folded); 「还没装 brain-kit」 is the next step, not a fault; KiroCrew's checks
- *              with their fixes (CheckRows).
+ *              do (the rows that are fine folded); 「还没装 brain-kit」 is the next step, not a fault; 你是谁 holds its
+ *              name box; KiroCrew's checks with their fixes (CheckRows). A check the person asked for scrolls to its
+ *              card, so its answer and the next step's button are on the screen.
  *   3 安装     not installed: where it goes (ImportInspect.install: 「直接装在 <branch>」, recommended whenever it can
  *              be done, so a requirement can be opened today, or 「装到新分支，开 MR 给团队看」; one plain line each
- *              that says what it costs), the values of the repo's brain-kit settings in a field grid with a live preview,
- *              then the install (POST /import/install with the mode, a job). Done: one line at the top says where it
- *              is and what comes next, with that step's button (开需求; 推送 <default> for a repo with a remote; on a
- *              branch 推送并开 MR or 合并到 <default>), and the repo is put in the list by itself (POST /import/add).
+ *              that says what it costs), the values of the repo's brain-kit settings as chips (the fields behind
+ *              「改设置」, open when nothing could be guessed), the install's button right under them, then the install
+ *              (POST /import/install with the mode, a job). Done: one line at the top says where it is and what comes
+ *              next, with that step's button (开需求; 推送 <default> for a repo with a remote; on a branch 推送并开 MR or
+ *              合并到 <default>), and the repo is put in the list by itself (POST /import/add).
  *              The self-check (brain doctor), the files and brain-kit's own output below it, folded. A hook that says
  *              no is shown as it said it; 「再提交一次」 (POST /import/commit). An install branch that can no longer go
  *              in (the default branch moved on): 「改成直接装在 <branch>」.
@@ -22,10 +24,11 @@
  *
  * A path from the URL (?path=) only fills the box: nothing runs before 检查.
  */
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAppApi } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
 import { fmtSpan } from '../format'
+import { useReducedMotion } from '../hooks'
 import { JOB_POLL_MS, useJob } from '../jobs'
 import type { ImportEntry } from '../nav'
 import type { Tone } from '../styles'
@@ -66,11 +69,15 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
   const [path, setPath] = useState(entry.path ?? '')
   const [checked, setChecked] = useState<{ path: string; result: ImportInspect } | null>(null)
   const [added, setAdded] = useState<AddResult | null>(null)
+  // a check the person asked for (检查, a checkout found, a clone) moves the page to its answer
+  const [asked, setAsked] = useState(0)
   const inspect = useAction((p: string) => api.post<ImportInspect>(paths.importInspect(), { path: p }))
   const add = useAction((p: string) => api.post<AddResult>(paths.importAdd(), { path: p }))
-  const runInspect = useCallback(async (p: string) => {
+  const runInspect = useCallback(async (p: string, show = false) => {
     const r = await inspect.run(p)
-    if (r) setChecked({ path: p, result: r })
+    if (!r) return
+    setChecked({ path: p, result: r })
+    if (show) setAsked((n) => n + 1)
   }, [inspect])
   const runAdd = async (p: string) => {
     const r = await add.run(p)
@@ -100,7 +107,7 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
   const pick = (p: string) => {
     setSource('local')
     setPath(p)
-    void runInspect(p)
+    void runInspect(p, true)
   }
 
   // ---- the four steps, as the wizard stands
@@ -150,7 +157,7 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
           <SourceOption value="clone" on={source === 'clone'} icon="clone" title="克隆（git 地址）" text="先克隆到本机，再检查" onPick={() => setSource('clone')} />
         </div>
         {source === 'local' ? (
-          <form className="imp-local" aria-label="本机目录" onSubmit={(e) => { e.preventDefault(); void runInspect(path.trim()) }}>
+          <form className="imp-local" aria-label="本机目录" onSubmit={(e) => { e.preventDefault(); void runInspect(path.trim(), true) }}>
             {found.length > 0 && <FoundList found={found} busy={inspect.busy} onPick={pick} />}
             <div className="br-field">
               <label htmlFor="imp-path">仓库目录</label>
@@ -167,13 +174,13 @@ export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { ent
         ) : (
           <CloneForm defaults={defaults.data} ms={jobMs} onCloned={(p) => {
             setPath(p)
-            void runInspect(p)
+            void runInspect(p, true)
           }} />
         )}
         {inspect.error && <p className="br-error" role="alert">{inspect.error}</p>}
       </section>
 
-      {shown && <InspectCard c={shown} busy={inspect.busy} state={states[1]} onRecheck={recheck} onFixed={() => { reloadStatus(); recheck() }} />}
+      {shown && <InspectCard c={shown} busy={inspect.busy} state={states[1]} asked={asked} onRecheck={recheck} onFixed={() => { reloadStatus(); recheck() }} />}
       {showInstall && !again && installCard}
       {shown && !installFor && (shown.next === 'pending' || shown.next === 'listed') && shown.pending && shown.path && (
         <PendingCard key={`pending:${shown.path}`} path={shown.path} p={shown.pending} onChanged={() => { reloadStatus(); recheck() }} />
@@ -318,16 +325,18 @@ function JobBox({ job, what, readError }: { job: ImportJob<unknown>; what: strin
   )
 }
 
-function CheckList({ rows, next }: { rows: ImportCheck[]; next?: (x: ImportCheck) => boolean }) {
+/** *todo*: what stands in a row's 做什么 instead of its words (你是谁's name box: the box is the thing to do). */
+function CheckList({ rows, next, todo }: { rows: ImportCheck[]; next?: (x: ImportCheck) => boolean; todo?: (x: ImportCheck) => ReactNode }) {
   return (
     <ul className="imp-checks" data-testid="import-checks">
       {rows.map((x) => {
         const n = next?.(x) ?? false
+        const instead = todo?.(x)
         return (
           <li key={x.id} className={`imp-check is-${n ? 'next' : x.level}`} data-check={x.id} data-level={n ? 'next' : x.level}>
             <span className={`imp-glyph tone-${n ? 'info' : LEVEL_TONE[x.level]}`} role="img" aria-label={n ? '下一步' : LEVEL_LABEL[x.level]}>{n ? '→' : GLYPH[x.level]}</span>
             <span className="imp-check-main"><b>{x.label}</b><span className="br-pre">{x.why}</span></span>
-            {x.todo && <span className="imp-todo"><b>做什么</b>{x.todo}</span>}
+            {instead ? <span className="imp-todo is-box">{instead}</span> : x.todo && <span className="imp-todo"><b>做什么</b>{x.todo}</span>}
           </li>
         )
       })}
@@ -349,14 +358,23 @@ function Counts({ levels }: { levels: Level[] }) {
   )
 }
 
-function InspectCard({ c, busy, state, onRecheck, onFixed }: { c: ImportInspect; busy: boolean; state: StepState; onRecheck: () => void; onFixed: () => void }) {
+function InspectCard({ c, busy, state, asked, onRecheck, onFixed }: {
+  c: ImportInspect; busy: boolean; state: StepState; asked: number; onRecheck: () => void; onFixed: () => void
+}) {
+  const ref = useRef<HTMLElement | null>(null)
+  const reduced = useReducedMotion()
+  useEffect(() => {
+    if (asked) ref.current?.scrollIntoView?.({ block: 'start', behavior: reduced ? 'auto' : 'smooth' })
+  }, [asked]) // eslint-disable-line react-hooks/exhaustive-deps
   const next = (x: ImportCheck) => isNext(c, x)
+  const meBox = (x: ImportCheck) => (x.id === 'me' && c.me?.ask && c.path ? <MeLine key={c.path} path={c.path} me={c.me} onSaved={onFixed} /> : null)
+  const meInRow = c.checks.some((x) => x.id === 'me' && x.level !== 'OK')
   const look = c.checks.filter((x) => x.level !== 'OK' || next(x))
   const fine = c.checks.filter((x) => x.level === 'OK' && !next(x))
   const crewLook = c.crew.rows.filter((r) => r.level !== 'OK')
   const crewFine = c.crew.rows.filter((r) => r.level === 'OK')
   return (
-    <section className={`br-card imp-sec${c.next === 'fix' ? ' is-bad' : ''}`} aria-label="检查" data-testid="inspect">
+    <section ref={ref} className={`br-card imp-sec${c.next === 'fix' ? ' is-bad' : ''}`} aria-label="检查" data-testid="inspect">
       <StepHead n={2} title="检查" state={state}>
         {c.path && <code className="imp-path">{c.path}</code>}
         <Counts levels={c.checks.filter((x) => !next(x)).map((x) => x.level)} />
@@ -366,15 +384,21 @@ function InspectCard({ c, busy, state, onRecheck, onFixed }: { c: ImportInspect;
       </StepHead>
       {c.note && <p className="br-hint">{c.note}</p>}
       {c.error && <p className="br-error" role="alert">{c.error}</p>}
-      {look.length > 0 && <CheckList rows={look} next={next} />}
+      {look.length > 0 && <CheckList rows={look} next={next} todo={meBox} />}
       {fine.length > 0 && (
         <details className="imp-more" data-testid="checks-fine" open={look.length === 0 || undefined}>
           <summary>{look.length ? `另外 ${fine.length} 项正常` : `${fine.length} 项都正常`}</summary>
           <CheckList rows={fine} />
         </details>
       )}
-      {c.me?.ask && c.path && <MeLine key={c.path} path={c.path} me={c.me} onSaved={onFixed} />}
-      {c.crew.rows.length > 0 && (
+      {c.me?.ask && c.path && !meInRow && <MeLine key={c.path} path={c.path} me={c.me} onSaved={onFixed} />}
+      {c.crew.rows.length > 0 && crewLook.length === 0 && (
+        <details className="imp-more imp-block" data-testid="crew-fine">
+          <summary><span className="imp-block-head imp-sum"><RoleIcon role="settings" size={18} /><b>KiroCrew</b><Counts levels={crewFine.map((r) => r.level)} />都正常</span></summary>
+          <CheckRows rows={crewFine} />
+        </details>
+      )}
+      {crewLook.length > 0 && (
         <div className="imp-block">
           <div className="imp-block-head"><RoleIcon role="settings" size={18} /><b>KiroCrew</b><Counts levels={c.crew.rows.map((r) => r.level)} /></div>
           <CheckRows rows={crewLook} fix={c.crew.fix} onFixed={onFixed} />
@@ -431,6 +455,8 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted, added, ad
 }) {
   const api = useAppApi()
   const [form, setForm] = useState<KitForm>(() => c.form ?? EMPTY_FORM)
+  // the guessed values as chips; their fields only when asked, or when nothing could be guessed
+  const [editing, setEditing] = useState(() => !c.form?.req_prefix)
   const [branch, setBranch] = useState(c.branch)
   const choice = c.install
   // an install branch that can no longer go in: installing in place instead (the backend offers that option only)
@@ -480,8 +506,8 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted, added, ad
           ) : (
             <p className="imp-where" data-testid="install-where"><RoleIcon role="commit" size={18} /><b>{picked?.title ?? `直接装在 ${here}`}</b><span>{picked?.line ?? ''}</span></p>
           ))}
-          <form className="imp-install" aria-label="这个仓库的 brain-kit 设置" onSubmit={(e) => { e.preventDefault(); void run() }}>
-            <div className="imp-grid">
+          <form className={`imp-install${editing ? ' is-editing' : ''}`} aria-label="这个仓库的 brain-kit 设置" onSubmit={(e) => { e.preventDefault(); void run() }}>
+            {editing && <div className="imp-grid">
               <div className="br-field">
                 <label htmlFor="imp-prefix">需求号前缀</label>
                 <input id="imp-prefix" type="text" className="br-mono" value={form.req_prefix} onChange={(e) => edit({ req_prefix: e.target.value.toUpperCase() })} />
@@ -513,7 +539,7 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted, added, ad
               <div className="br-field">
                 <label htmlFor="imp-gl-project">GitLab 项目</label>
                 <input id="imp-gl-project" type="text" className="br-mono" value={form.gitlab_project} placeholder="组/仓库" onChange={(e) => edit({ gitlab_project: e.target.value })} />
-                <p className="br-hint">{fromOrigin ? '从 origin 的地址猜的：检查一下。' : '交接和开 MR 用。不用 GitLab 就两个都空着。'}</p>
+                <p className="br-hint">{fromOrigin ? '按远端的地址猜的：检查一下。' : '交接和开 MR 用。不用 GitLab 就两个都空着。'}</p>
               </div>
               <div className="br-field">
                 <label htmlFor="imp-default">默认分支</label>
@@ -529,16 +555,22 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted, added, ad
                   <input id="imp-branch" type="text" className="br-mono" value={branch} onChange={(e) => setBranch(e.target.value)} />
                 </div>
               )}
-            </div>
+            </div>}
             <aside className="imp-preview" aria-label="会写进这个仓库的 brain-kit 设置">
-              <b>会写进这个仓库的 brain-kit 设置 <small className="br-mono">.brain/kit.json</small></b>
+              <span className="imp-preview-head">
+                <b>会写进这个仓库的 brain-kit 设置 <small className="br-mono">.brain/kit.json</small></b>
+                {!editing && (
+                  <button type="button" className="br-btn is-small" onClick={() => setEditing(true)}><Icon name="Pencil" size={13} />改设置</button>
+                )}
+              </span>
               <KitChips k={form} />
+              {!editing && <p className="br-hint" data-testid="install-guess">按这个仓库{fromOrigin ? '的远端地址' : ''}猜的：对的话直接装；要改，点「改设置」。</p>}
               {mode === 'branch' ? (
                 <div className="imp-route" aria-label="新分支从哪来">
-                  <code>{c.origin ? 'origin/' : ''}{form.default_branch.trim() || 'main'}</code>
+                  <code>{form.default_branch.trim() || 'main'}</code>
                   <span className="imp-arrow" aria-hidden="true">→</span>
                   <code className="is-new">{branch.trim() || '—'}</code>
-                  <small>新分支，单独的工作目录；合并以后才能开需求</small>
+                  <small>{c.origin ? '从远端的默认分支建新分支' : '新分支'}，单独的工作目录；合并以后才能开需求</small>
                 </div>
               ) : (
                 <div className="imp-route" aria-label="提交在哪">
@@ -546,13 +578,13 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted, added, ad
                   <small>{remote ? '你现在的检出，提交在这里；推送以后就能开需求' : '你现在的检出，提交在这里，马上能开需求'}</small>
                 </div>
               )}
-              <p className="imp-safe" data-testid="install-safe"><RoleIcon role="security" size={18} /><span>{mode === 'branch' ? SAFE_BRANCH : SAFE_INPLACE}</span></p>
-              <div className="br-row">
+              <div className="imp-go">
                 <button type="submit" className="br-btn is-primary is-big"
                   disabled={start.busy || !picked?.ok && !!choice || !form.req_prefix.trim() || !form.default_branch.trim() || (mode === 'branch' && !branch.trim())}>
                   <RoleIcon role={mode === 'branch' ? 'handover' : 'commit'} size={17} />
                   {start.busy ? '正在开始…' : mode === 'branch' ? '安装到新分支' : again ? `改成直接装在 ${here}` : `直接装在 ${here}`}
                 </button>
+                <p className="imp-safe" data-testid="install-safe"><RoleIcon role="security" size={18} /><span>{mode === 'branch' ? SAFE_BRANCH : SAFE_INPLACE}</span></p>
               </div>
               {start.error && <p className="br-error" role="alert">{start.error}</p>}
             </aside>
@@ -597,7 +629,7 @@ function NextBox({ r, c, added, addBusy, addError, onAdd, onChanged, go }: {
   const head = inplace ? `装好了，提交在 ${r.branch} 上` : `装在 ${r.branch} 分支上`
   const line = ready ? '现在就能开需求了。'
     : inplace ? `推送 ${r.branch} 以后就能开需求。`
-      : `合进 ${target} 以后才能开需求。${p?.next ? `下一步：${p.next}。` : ''}`
+      : `合进 ${target} 以后才能开需求。${p?.next && !p.mr_url ? `下一步：${p.next}。` : ''}`
   return (
     <div className={`imp-done${ready ? '' : ' is-wait'}`} role="status" data-testid="install-next">
       <span className="imp-mark" aria-hidden="true">{ready ? '✓' : '✋'}</span>
@@ -660,7 +692,7 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
         {inplace ? (
           <div><dt>提交在</dt><dd><code>{r.branch}</code>（你现在的检出）</dd></div>
         ) : (
-          <div><dt>新分支</dt><dd><code>{r.branch}</code>{r.base ? `（从 ${r.base} 建）` : ''}</dd></div>
+          <div><dt>新分支</dt><dd><code>{r.branch}</code>{r.base ? `（从${r.base.startsWith('origin/') ? `远端的 ${r.base.slice('origin/'.length)}` : ` ${r.base}`} 建）` : ''}</dd></div>
         )}
         {r.worktree && <div><dt>工作目录</dt><dd><code>{r.worktree}</code></dd></div>}
         <div><dt>brain-kit 设置</dt><dd><KitChips k={r.kit} /></dd></div>
@@ -785,7 +817,7 @@ function PublishBox({ path, p, primary = false, onDone }: { path: string; p: Pen
         <div className="br-confirm imp-confirm" role="group" aria-label="确认推送" data-testid="publish-confirm">
           <span className="imp-confirm-head"><RoleIcon role="pr" size={18} /><b>推送之前确认一下</b></span>
           <p>
-            会把分支 <code>{p.branch}</code> 推到 origin（<code>{p.remote_url}</code>）
+            会把分支 <code>{p.branch}</code> 推到远端（<code>{p.remote_url}</code>）
             {p.gitlab_project ? <>，再在 GitLab 的 <code>{p.gitlab_project}</code> 上开 MR：<code>{p.branch}</code> → <code>{p.target}</code>。</> : '。这个仓库的 brain-kit 设置没写 GitLab 项目：MR 要你自己开。'}
           </p>
           {p.gitlab_project && !p.can_open_mr && <p className="br-hint">这台机器上没有 GitLab token：只推送，MR 用给出的命令或链接自己开。</p>}
@@ -965,6 +997,7 @@ const IMP_CSS = `
 .imp-check-main span { color: var(--text); word-break: break-word; }
 .imp-check.is-OK .imp-check-main span { color: var(--muted); }
 .imp-todo { grid-column: 2; font-size: .9em; color: var(--text); }
+.imp-todo.is-box { padding-top: 4px; }
 .imp-todo b { color: var(--muted); font-weight: 650; margin-right: 6px; }
 .imp-block { display: grid; gap: 8px; }
 .imp-block-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -974,8 +1007,9 @@ const IMP_CSS = `
   background: color-mix(in srgb, var(--kt-bad) 9%, var(--card)); color: var(--kt-bad); }
 
 /* 安装: the field grid and its live preview */
-.imp-install { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 18px; align-items: start; }
-@container imp (max-width: 1060px) { .imp-install { grid-template-columns: minmax(0, 1fr); } }
+.imp-install { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: start; }
+.imp-install.is-editing { grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); }
+@container imp (max-width: 1060px) { .imp-install.is-editing { grid-template-columns: minmax(0, 1fr); } }
 .imp-seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .imp-opt { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 9px; border-radius: 999px; cursor: pointer; font-size: .92em; font-weight: 650;
   border: 1px solid var(--border-strong, var(--border)); background: var(--card); color: var(--text); }
@@ -985,8 +1019,10 @@ const IMP_CSS = `
 .imp-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .imp-preview { display: grid; gap: 12px; padding: 14px 16px; border-radius: 14px; border: 1px dashed color-mix(in srgb, var(--kt-info) 55%, var(--border));
   background: color-mix(in srgb, var(--kt-info) 5%, var(--card)); }
-.imp-preview > b { color: var(--text-strong); font-weight: 750; }
-.imp-preview > b small { color: var(--muted); font-weight: 500; font-size: .8em; margin-left: 6px; }
+.imp-preview-head { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; }
+.imp-preview-head > b { color: var(--text-strong); font-weight: 750; }
+.imp-preview-head > b small { color: var(--muted); font-weight: 500; font-size: .8em; margin-left: 6px; }
+.imp-preview > .br-hint { margin: -4px 0 0; }
 .imp-kv { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .imp-kv li { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--kt-info) 50%, var(--border)); background: color-mix(in srgb, var(--kt-info) 9%, transparent); }
@@ -999,6 +1035,10 @@ const IMP_CSS = `
 .imp-route code.is-new { border-color: var(--kit-ok); color: var(--kt-ok); background: color-mix(in srgb, var(--kt-ok) 9%, transparent); }
 .imp-route small { color: var(--muted); font-size: .84em; }
 .imp-arrow { color: var(--kt-handoff); font-weight: 900; }
+.imp-go { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; }
+.imp-go > .br-btn { flex: none; }
+.imp-go > .imp-safe { flex: 1 1 22em; }
+.imp-sum { display: inline-flex; vertical-align: middle; }
 .imp-safe { margin: 0; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; font-size: .88em; color: var(--text); line-height: 1.55; }
 .imp-safe .kt-role-icon { color: var(--kt-ok); margin-top: 1px; }
 
