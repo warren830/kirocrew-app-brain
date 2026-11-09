@@ -17,7 +17,8 @@ Lean 也在里面）。安装时不用 node，也不用另外装 brain-kit。各
 1. KiroCrew 侧边栏 → **Apps** → **Discover（发现）**。
 2. 点 Discover 右上角的齿轮（Sources / 来源）→ **管理应用来源（Manage app sources）** → **添加注册表（Add Registry）**。
 3. 仓库填 `https://github.com/warren830/kirocrew-app-brain`，分支填 **`release`**（不是 main），保存。显示名称可以不填。
-4. 回到 Discover，找到 **Brain 交付** → **安装（Install）**。找不到就点 **同步应用（Sync apps）**。
+4. 回到 Discover，找到 **Brain 交付** → **安装（Install）**。找不到就点 **同步应用（Sync apps）**；
+   连 GitHub 慢的话第一次同步可能失败（KiroCrew 拉仓库只等 60 秒），再点一次。
    - 会先弹信任确认：**这个 app 和 KiroCrew 同等权限运行**（它的代码跑在 KiroCrew 里，能读写你的文件、运行命令）。
      只装你信任的。卸载会收回这个信任，再装要重新确认。
    - 安装只是从 GitHub 拷文件，不跑 npm，也不跑 pip。KiroCrew 装之前会先连它的官方应用目录（apps.crew.kiro.dev），
