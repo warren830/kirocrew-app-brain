@@ -8393,6 +8393,16 @@
        "doing": "交给你批准需求"
       },
       {
+       "at": 1793631120,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1793631180,
+       "status": "running",
+       "doing": "在做：下一个阶段"
+      },
+      {
        "at": 1793631300,
        "status": "running",
        "doing": "在做：应用设计"
@@ -8413,6 +8423,16 @@
        "doing": "交给你批准设计"
       },
       {
+       "at": 1793637960,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1793638020,
+       "status": "running",
+       "doing": "在做：下一个阶段"
+      },
+      {
        "at": 1793639340.0,
        "status": "done",
        "doing": "交给运行机了"
@@ -8430,7 +8450,7 @@
        "kind": "work"
       },
       {
-       "a": 1793631300,
+       "a": 1793631120,
        "b": 1793633760,
        "kind": "work"
       },
@@ -8438,6 +8458,11 @@
        "a": 1793635080,
        "b": 1793636580,
        "kind": "fix"
+      },
+      {
+       "a": 1793637960,
+       "b": 1793639340.0,
+       "kind": "work"
       }
      ],
      "marks": [
@@ -8449,7 +8474,7 @@
       {
        "at": 1793632200,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/refund/service.py（inception）"
+       "title": "Lean 拦下了写 src/refund/service.py：需求和设计还没批"
       },
       {
        "at": 1793636460.0,
@@ -8464,11 +8489,10 @@
       {
        "at": 1793639340.0,
        "kind": "handover",
-       "title": "交接：brain handoff（9ed34417）"
+       "title": "交给运行机（提交 9ed34417）"
       }
      ],
      "facts": [
-      "Lean 做完 8/11 个阶段",
       "提交 3 次",
       "Lean 拦下 1 次",
       "会话 1 个"
@@ -8512,7 +8536,7 @@
       {
        "at": 1793629860,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · 4b040832）"
+       "title": "请你批准需求"
       },
       {
        "at": 1793631120,
@@ -8536,6 +8560,11 @@
      "doing": "你批准了 · 设计",
      "since": 1793637960,
      "history": [
+      {
+       "at": 1793631120,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
       {
        "at": 1793633760,
        "status": "awaiting_approval",
@@ -8573,7 +8602,7 @@
       {
        "at": 1793633760,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 56cd1e0a）"
+       "title": "请你批准设计"
       },
       {
        "at": 1793635080,
@@ -8583,7 +8612,7 @@
       {
        "at": 1793636580,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 336fbcbc）"
+       "title": "请你批准设计"
       },
       {
        "at": 1793637960,
@@ -8624,7 +8653,7 @@
       {
        "at": 1793639340.0,
        "kind": "handover",
-       "title": "交接：brain handoff（9ed34417）"
+       "title": "交给运行机（提交 9ed34417）"
       }
      ],
      "facts": [
@@ -8768,7 +8797,7 @@
       {
        "at": 1793651880,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793651940,
@@ -8778,7 +8807,7 @@
       {
        "at": 1793654640,
        "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793654700,
@@ -8788,7 +8817,7 @@
       {
        "at": 1793655180,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给人批准发布"
       },
       {
        "at": 1793655240.0,
@@ -8808,7 +8837,7 @@
       {
        "at": 1793659560,
        "status": "running",
-       "doing": "做完发布"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793661540.0,
@@ -8955,7 +8984,7 @@
       {
        "at": 1793654580,
        "status": "done",
-       "doing": "verify 通过：3 项都过了"
+       "doing": "verify 通过（3 项）"
       },
       {
        "at": 1793661540.0,
@@ -8984,13 +9013,13 @@
       {
        "at": 1793654580,
        "kind": "verify-ok",
-       "title": "verify 通过：3 项都过了"
+       "title": "verify 通过（3 项）"
       }
      ],
      "facts": [
       "verify 2 次",
       "没过 1 次",
-      "verify 通过：3 项都过了"
+      "verify 通过（3 项）"
      ],
      "credits": null,
      "session": null,
@@ -9002,18 +9031,18 @@
      "sub": "RELEASE · 验收",
      "icon": "release",
      "status": "merged",
-     "doing": "你批准了 · 发布",
+     "doing": "产品在 MR 上批准了 · 发布",
      "since": 1793659500,
      "history": [
       {
        "at": 1793655180,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等人在 MR 上批准发布"
       },
       {
        "at": 1793659500,
        "status": "merged",
-       "doing": "你批准了 · 发布"
+       "doing": "产品在 MR 上批准了 · 发布"
       }
      ],
      "spans": [
@@ -9027,12 +9056,12 @@
       {
        "at": 1793655180,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · 32e925aa）"
+       "title": "请人在 MR 上批准发布"
       },
       {
        "at": 1793659500,
        "kind": "approved",
-       "title": "你批准了发布"
+       "title": "产品在 MR 上批准了发布"
       }
      ],
      "facts": [
@@ -9048,8 +9077,8 @@
      "sub": "brain reflect",
      "icon": "brain",
      "status": "done",
-     "doing": "回写分支 brain/PAY-2-reflect-1",
-     "since": 1793715540,
+     "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
+     "since": 1793715540.0,
      "history": [
       {
        "at": 1793661540.0,
@@ -9059,31 +9088,15 @@
       {
        "at": 1793715540.0,
        "status": "done",
-       "doing": "回写 Brain：成功"
-      },
-      {
-       "at": 1793715540,
-       "status": "done",
-       "doing": "回写分支 brain/PAY-2-reflect-1"
+       "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）"
       }
      ],
-     "spans": [
-      {
-       "a": 1793661540.0,
-       "b": 1793715540.0,
-       "kind": "wait"
-      }
-     ],
+     "spans": [],
      "marks": [
       {
        "at": 1793715540.0,
        "kind": "reflect",
-       "title": "回写 Brain：成功"
-      },
-      {
-       "at": 1793715540,
-       "kind": "reflect",
-       "title": "写好了回写分支 brain/PAY-2-reflect-1"
+       "title": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）"
       }
      ],
      "facts": [
@@ -9154,7 +9167,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/PAY-2/run.json"
     },
@@ -9194,7 +9207,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · 4b040832）",
+     "text": "请你批准需求",
      "detail": false,
      "src": null
     },
@@ -9244,7 +9257,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/refund/service.py（inception）",
+     "text": "Lean 拦下了写 src/refund/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -9254,7 +9267,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 56cd1e0a）",
+     "text": "请你批准设计",
      "detail": false,
      "src": null
     },
@@ -9284,7 +9297,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 336fbcbc）",
+     "text": "请你批准设计",
      "detail": false,
      "src": null
     },
@@ -9334,7 +9347,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（9ed34417）",
+     "text": "交给运行机（提交 9ed34417）",
      "detail": false,
      "src": null
     },
@@ -9514,7 +9527,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：3 项都过了",
+     "text": "verify 通过（3 项）",
      "detail": false,
      "src": null
     },
@@ -9544,7 +9557,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请你批准发布（RELEASE · 32e925aa）",
+     "text": "请人在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -9594,7 +9607,7 @@
      "kind": "approve",
      "from": "person",
      "to": "release",
-     "text": "你批准了发布",
+     "text": "产品在 MR 上批准了发布",
      "detail": false,
      "src": null
     },
@@ -9624,17 +9637,7 @@
      "kind": "reflect",
      "from": "person",
      "to": "reflect",
-     "text": "回写 Brain：成功",
-     "detail": false,
-     "src": null
-    },
-    {
-     "seq": 50,
-     "at": 1793715540,
-     "kind": "reflect",
-     "from": "person",
-     "to": "reflect",
-     "text": "写好了回写分支 brain/PAY-2-reflect-1",
+     "text": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
      "detail": false,
      "src": null
     }
@@ -9648,7 +9651,8 @@
      "text": "PAY-2：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -9658,7 +9662,8 @@
      "text": "PAY-2：按意见改设计（接口加分页）",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -9668,7 +9673,8 @@
      "text": "PAY-2：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -9678,7 +9684,8 @@
      "text": "PAY-2：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -9688,7 +9695,8 @@
      "text": "PAY-2：接口和数据结构（refund-api）",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -9698,7 +9706,8 @@
      "text": "PAY-2：主流程（refund-api）",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -9708,7 +9717,8 @@
      "text": "PAY-2：错误处理和重试（refund-api）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -9718,7 +9728,8 @@
      "text": "PAY-2：测试（refund-api）",
      "files": 6,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -9728,7 +9739,8 @@
      "text": "PAY-2：按 D-1 的回答改",
      "files": 2,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -9738,7 +9750,8 @@
      "text": "PAY-2：修好 pytest 里没过的两个用例",
      "files": 2,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "merge",
@@ -9748,7 +9761,8 @@
      "text": "合并进 main（合并提交）",
      "files": 0,
      "records_only": false,
-     "actor": "release"
+     "actor": "release",
+     "changes": []
     }
    ],
    "checks": {
@@ -9757,7 +9771,7 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1793631120,
       "detail": "你批准了",
@@ -9767,7 +9781,7 @@
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1793637960,
       "detail": "你批准了",
@@ -9777,10 +9791,10 @@
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "pass",
       "at": 1793659500,
-      "detail": "你批准了",
+      "detail": "产品在 MR 上批准了",
       "actor": "release"
      },
      {
@@ -9848,15 +9862,18 @@
       "group": "after",
       "label": "14 天",
       "name": "合并后 14 天没有回滚或热修",
-      "status": "wait",
+      "status": "watch",
       "at": null,
-      "detail": "还在观察：到 2026-11-16",
+      "detail": "观察中：到 2026-11-16",
       "actor": "release"
      }
     ],
     "passed": 9,
     "failed": 0,
-    "total": 10,
+    "total": 9,
+    "todo": [
+     "合并后 14 天"
+    ],
     "at": 1793659500,
     "history": [
      {
@@ -9892,10 +9909,10 @@
       "count": 2
      }
     ],
-    "checks": "检查 9/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "checks": "目前 9 项都过 · 还剩 合并后 14 天",
     "done": {
      "at": 1793661540.0,
-     "who": "P-9E3B",
+     "who": "产品",
      "how": "合并提交"
     }
    },
@@ -10084,7 +10101,7 @@
      "icon": "laptop",
      "status": "awaiting_approval",
      "doing": "会话里有一个工具调用等你批准",
-     "since": 1794146400,
+     "since": 1794146040.0,
      "history": [
       {
        "at": 1794045600.0,
@@ -10102,6 +10119,16 @@
        "doing": "交给你批准需求"
       },
       {
+       "at": 1794048720,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1794048780,
+       "status": "running",
+       "doing": "在做：下一个阶段"
+      },
+      {
        "at": 1794048900,
        "status": "running",
        "doing": "在做：应用设计"
@@ -10110,6 +10137,16 @@
        "at": 1794051360,
        "status": "done",
        "doing": "交给你批准设计"
+      },
+      {
+       "at": 1794052860,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1794052920,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1794053100,
@@ -10127,7 +10164,7 @@
        "doing": "交给你批准代码生成计划"
       },
       {
-       "at": 1794146400,
+       "at": 1794146040.0,
        "status": "awaiting_approval",
        "doing": "会话里有一个工具调用等你批准"
       }
@@ -10139,18 +10176,18 @@
        "kind": "work"
       },
       {
-       "a": 1794048900,
+       "a": 1794048720,
        "b": 1794051360,
        "kind": "work"
       },
       {
-       "a": 1794053100,
+       "a": 1794052860,
        "b": 1794145200.0,
        "kind": "work"
       },
       {
        "a": 1794145200.0,
-       "b": 1794146040,
+       "b": null,
        "kind": "wait"
       }
      ],
@@ -10163,7 +10200,7 @@
       {
        "at": 1794049800,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/refund/service.py（inception）"
+       "title": "Lean 拦下了写 src/refund/service.py：需求和设计还没批"
       },
       {
        "at": 1794055440.0,
@@ -10182,7 +10219,6 @@
       }
      ],
      "facts": [
-      "Lean 做完 6/11 个阶段",
       "提交 3 次",
       "Lean 拦下 1 次",
       "会话 1 个"
@@ -10226,7 +10262,7 @@
       {
        "at": 1794047460,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · c68b048b）"
+       "title": "请你批准需求"
       },
       {
        "at": 1794048720,
@@ -10248,8 +10284,13 @@
      "icon": "design",
      "status": "awaiting_approval",
      "doing": "等你批准代码生成计划",
-     "since": 1794146040,
+     "since": 1794146040.0,
      "history": [
+      {
+       "at": 1794048720,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
       {
        "at": 1794051360,
        "status": "awaiting_approval",
@@ -10266,12 +10307,12 @@
        "doing": "等你批准代码生成计划"
       },
       {
-       "at": 1794052860,
+       "at": 1794052860.0,
        "status": "merged",
        "doing": "已批准"
       },
       {
-       "at": 1794146040,
+       "at": 1794146040.0,
        "status": "awaiting_approval",
        "doing": "等你批准代码生成计划"
       }
@@ -10292,7 +10333,7 @@
       {
        "at": 1794051360,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 7e242934）"
+       "title": "请你批准设计"
       },
       {
        "at": 1794052860,
@@ -10302,12 +10343,12 @@
       {
        "at": 1794146040,
        "kind": "request",
-       "title": "请你批准代码生成计划（PLAN · 5d1e7a90）"
+       "title": "请你批准代码生成计划"
       }
      ],
      "facts": [
       "请求批准 2 次",
-      "approve 那一行在会话里自己打"
+      "批准的那一行由人在会话里自己打"
      ],
      "credits": null,
      "session": null,
@@ -10319,7 +10360,7 @@
      "sub": "brain handoff",
      "icon": "handover",
      "status": "waiting",
-     "doing": "等本机做完再 brain handoff",
+     "doing": "等本机做完再交接",
      "since": null,
      "history": [],
      "spans": [],
@@ -10374,9 +10415,7 @@
      "history": [],
      "spans": [],
      "marks": [],
-     "facts": [
-      "停下问人 0 次"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -10492,7 +10531,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/PAY-3/run.json"
     },
@@ -10532,7 +10571,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · c68b048b）",
+     "text": "请你批准需求",
      "detail": false,
      "src": null
     },
@@ -10582,7 +10621,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/refund/service.py（inception）",
+     "text": "Lean 拦下了写 src/refund/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -10592,7 +10631,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 7e242934）",
+     "text": "请你批准设计",
      "detail": false,
      "src": null
     },
@@ -10682,7 +10721,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准代码生成计划（PLAN · 5d1e7a90）",
+     "text": "请你批准代码生成计划",
      "detail": false,
      "src": null
     }
@@ -10696,7 +10735,8 @@
      "text": "PAY-3：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -10706,7 +10746,8 @@
      "text": "PAY-3：导出接口的骨架",
      "files": 4,
      "records_only": false,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -10716,7 +10757,8 @@
      "text": "PAY-3：CSV 字段和金额格式",
      "files": 3,
      "records_only": false,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     }
    ],
    "checks": {
@@ -10725,7 +10767,7 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1794048720,
       "detail": "你批准了",
@@ -10735,7 +10777,7 @@
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1794052860,
       "detail": "你批准了",
@@ -10745,17 +10787,17 @@
       "id": "gate-PLAN",
       "group": "gate",
       "label": "计划",
-      "name": "代码生成计划（PLAN）",
+      "name": "代码生成计划审批",
       "status": "wait",
       "at": null,
-      "detail": "等你批准：在会话里打 approve PLAN 5d1e7a90",
+      "detail": "等你在会话里打这一行批准：approve PLAN 5d1e7a90",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "skip",
       "at": null,
       "detail": "还没到这一步",
@@ -10805,6 +10847,10 @@
     "passed": 2,
     "failed": 1,
     "total": 4,
+    "todo": [
+     "发布审批",
+     "verify"
+    ],
     "at": 1794052860,
     "history": []
    },
@@ -10834,7 +10880,7 @@
       "count": 1
      }
     ],
-    "checks": "检查 2/4 通过；需求、设计已批准",
+    "checks": "检查 2/4 过 · 没过：引用的 Brain 条目 · 等人：代码生成计划审批 · 还剩 发布审批、verify",
     "done": null
    },
    "brain": {
@@ -11096,7 +11142,7 @@
    "ended_at": null,
    "live": false,
    "person": {
-    "status": "awaiting_approval",
+    "status": "waiting",
     "doing": "等产品在 MR 上回答 D-2（设计）",
     "owner": "carol",
     "me": false
@@ -11124,7 +11170,17 @@
       {
        "at": 1793982660,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 carol 批准需求"
+      },
+      {
+       "at": 1793983920,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1793983980,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793984100,
@@ -11134,7 +11190,17 @@
       {
        "at": 1793986560,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 carol 批准设计"
+      },
+      {
+       "at": 1793988060,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1793988120,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793990040.0,
@@ -11149,8 +11215,13 @@
        "kind": "work"
       },
       {
-       "a": 1793984100,
+       "a": 1793983920,
        "b": 1793986560,
+       "kind": "work"
+      },
+      {
+       "a": 1793988060,
+       "b": 1793990040.0,
        "kind": "work"
       }
      ],
@@ -11163,7 +11234,7 @@
       {
        "at": 1793985000,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/merchant/service.py（inception）"
+       "title": "Lean 拦下了写 src/merchant/service.py：需求和设计还没批"
       },
       {
        "at": 1793988840.0,
@@ -11173,11 +11244,10 @@
       {
        "at": 1793990040.0,
        "kind": "handover",
-       "title": "交接：brain handoff（88929a5b）"
+       "title": "交给运行机（提交 88929a5b）"
       }
      ],
      "facts": [
-      "Lean 做完 5/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次",
       "会话 0 个"
@@ -11192,18 +11262,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "carol 批准了 · 需求",
      "since": 1793983920,
      "history": [
       {
        "at": 1793982660,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 carol 批准需求"
       },
       {
        "at": 1793983920,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "carol 批准了 · 需求"
       }
      ],
      "spans": [
@@ -11217,12 +11287,12 @@
       {
        "at": 1793982660,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · 0e7a80ed）"
+       "title": "请 carol 批准需求"
       },
       {
        "at": 1793983920,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "carol 批准了需求"
       }
      ],
      "facts": [
@@ -11238,18 +11308,23 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "carol 批准了 · 设计",
      "since": 1793988060,
      "history": [
       {
+       "at": 1793983920,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1793986560,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 carol 批准设计"
       },
       {
        "at": 1793988060,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "carol 批准了 · 设计"
       }
      ],
      "spans": [
@@ -11263,12 +11338,12 @@
       {
        "at": 1793986560,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · b042fbc4）"
+       "title": "请 carol 批准设计"
       },
       {
        "at": 1793988060,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "carol 批准了设计"
       }
      ],
      "facts": [
@@ -11303,7 +11378,7 @@
       {
        "at": 1793990040.0,
        "kind": "handover",
-       "title": "交接：brain handoff（88929a5b）"
+       "title": "交给运行机（提交 88929a5b）"
       }
      ],
      "facts": [
@@ -11397,7 +11472,7 @@
      "icon": "runner",
      "status": "awaiting_approval",
      "doing": "等产品在 MR 上回答 D-2（设计）",
-     "since": 1794146400,
+     "since": 1794135600.0,
      "history": [
       {
        "at": 1793990160.0,
@@ -11420,7 +11495,7 @@
        "doing": "停下问人：设计（D-2）"
       },
       {
-       "at": 1794146400,
+       "at": 1794135600.0,
        "status": "awaiting_approval",
        "doing": "等产品在 MR 上回答 D-2（设计）"
       }
@@ -11576,7 +11651,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/PAY-4/run.json"
     },
@@ -11616,7 +11691,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · 0e7a80ed）",
+     "text": "请 carol 批准需求",
      "detail": false,
      "src": null
     },
@@ -11626,7 +11701,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "carol 批准了需求",
      "detail": false,
      "src": null
     },
@@ -11666,7 +11741,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/merchant/service.py（inception）",
+     "text": "Lean 拦下了写 src/merchant/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -11676,7 +11751,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · b042fbc4）",
+     "text": "请 carol 批准设计",
      "detail": false,
      "src": null
     },
@@ -11686,7 +11761,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "carol 批准了设计",
      "detail": false,
      "src": null
     },
@@ -11726,7 +11801,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（88929a5b）",
+     "text": "交给运行机（提交 88929a5b）",
      "detail": false,
      "src": null
     },
@@ -11800,7 +11875,8 @@
      "text": "PAY-4：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -11810,7 +11886,8 @@
      "text": "PAY-4：设计定稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -11820,7 +11897,8 @@
      "text": "PAY-4：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -11830,7 +11908,8 @@
      "text": "PAY-4：拆分任务的骨架（split-job）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     }
    ],
    "checks": {
@@ -11839,27 +11918,27 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1793983920,
-      "detail": "你批准了",
+      "detail": "carol 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1793988060,
-      "detail": "你批准了",
+      "detail": "carol 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "skip",
       "at": null,
       "detail": "还没到这一步",
@@ -11894,29 +11973,23 @@
       "at": 1793990160.0,
       "detail": "签了",
       "actor": "signer"
-     },
-     {
-      "id": "brain-cite",
-      "group": "brain",
-      "label": "引用",
-      "name": "引用的 Brain 条目",
-      "status": "pass",
-      "at": null,
-      "detail": "引用了 0 条，都在",
-      "actor": "reflect"
      }
     ],
-    "passed": 5,
+    "passed": 4,
     "failed": 0,
-    "total": 5,
+    "total": 4,
+    "todo": [
+     "发布审批",
+     "verify"
+    ],
     "at": 1793990160.0,
     "history": []
    },
    "accept": {
     "state": "not_yet",
     "step": {
-     "text": "等产品在 MR 上回答 D-2（设计）",
-     "who": "人",
+     "text": "在 MR 上回答 D-2（选一个答案）：桥会把回答带回运行机",
+     "who": "产品",
      "line": null,
      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
      "session_url": null
@@ -11933,7 +12006,7 @@
       "count": 1
      }
     ],
-    "checks": "检查 5/5 通过；需求、设计已批准",
+    "checks": "目前 4 项都过 · 还剩 发布审批、verify",
     "done": null
    },
    "brain": {
@@ -12112,7 +12185,7 @@
    "ended_at": null,
    "live": false,
    "person": {
-    "status": "awaiting_approval",
+    "status": "waiting",
     "doing": "等产品在 MR 上验收 D-3（approve / reject）",
     "owner": "alice",
     "me": true
@@ -12143,6 +12216,16 @@
        "doing": "交给你批准需求"
       },
       {
+       "at": 1793904720,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1793904780,
+       "status": "running",
+       "doing": "在做：下一个阶段"
+      },
+      {
        "at": 1793904900,
        "status": "running",
        "doing": "在做：应用设计"
@@ -12151,6 +12234,16 @@
        "at": 1793907360,
        "status": "done",
        "doing": "交给你批准设计"
+      },
+      {
+       "at": 1793908860,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1793908920,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793910540.0,
@@ -12165,8 +12258,13 @@
        "kind": "work"
       },
       {
-       "a": 1793904900,
+       "a": 1793904720,
        "b": 1793907360,
+       "kind": "work"
+      },
+      {
+       "a": 1793908860,
+       "b": 1793910540.0,
        "kind": "work"
       }
      ],
@@ -12179,7 +12277,7 @@
       {
        "at": 1793905800,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/callback/service.py（inception）"
+       "title": "Lean 拦下了写 src/callback/service.py：需求和设计还没批"
       },
       {
        "at": 1793910300.0,
@@ -12189,11 +12287,10 @@
       {
        "at": 1793910540.0,
        "kind": "handover",
-       "title": "交接：brain handoff（a594aa1d）"
+       "title": "交给运行机（提交 a594aa1d）"
       }
      ],
      "facts": [
-      "Lean 做完 7/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次",
       "会话 0 个"
@@ -12233,7 +12330,7 @@
       {
        "at": 1793903460,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · f11be07c）"
+       "title": "请你批准需求"
       },
       {
        "at": 1793904720,
@@ -12258,6 +12355,11 @@
      "since": 1793908860,
      "history": [
       {
+       "at": 1793904720,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1793907360,
        "status": "awaiting_approval",
        "doing": "等你批准设计"
@@ -12279,7 +12381,7 @@
       {
        "at": 1793907360,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 000a2a83）"
+       "title": "请你批准设计"
       },
       {
        "at": 1793908860,
@@ -12319,7 +12421,7 @@
       {
        "at": 1793910540.0,
        "kind": "handover",
-       "title": "交接：brain handoff（a594aa1d）"
+       "title": "交给运行机（提交 a594aa1d）"
       }
      ],
      "facts": [
@@ -12413,7 +12515,7 @@
      "icon": "runner",
      "status": "done",
      "doing": "交给产品验收",
-     "since": 1794146400,
+     "since": 1793920560.0,
      "history": [
       {
        "at": 1793910660.0,
@@ -12428,7 +12530,7 @@
       {
        "at": 1793919180,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793919240,
@@ -12438,7 +12540,7 @@
       {
        "at": 1793920020,
        "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793920080,
@@ -12448,7 +12550,7 @@
       {
        "at": 1793920560,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给人批准发布"
       },
       {
        "at": 1793920620.0,
@@ -12461,7 +12563,7 @@
        "doing": "停下问人：验收（D-3）"
       },
       {
-       "at": 1794146400,
+       "at": 1793920560.0,
        "status": "done",
        "doing": "交给产品验收"
       }
@@ -12471,11 +12573,6 @@
        "a": 1793910660.0,
        "b": 1793920560,
        "kind": "work"
-      },
-      {
-       "a": 1793920620.0,
-       "b": 1794146400,
-       "kind": "wait"
       }
      ],
      "marks": [
@@ -12529,7 +12626,7 @@
      "sub": "lean verify",
      "icon": "ci",
      "status": "done",
-     "doing": "verify 通过：3 项都过了",
+     "doing": "verify 通过（3 项）",
      "since": 1793919960,
      "history": [
       {
@@ -12540,7 +12637,7 @@
       {
        "at": 1793919960,
        "status": "done",
-       "doing": "verify 通过：3 项都过了"
+       "doing": "verify 通过（3 项）"
       }
      ],
      "spans": [
@@ -12554,12 +12651,12 @@
       {
        "at": 1793919960,
        "kind": "verify-ok",
-       "title": "verify 通过：3 项都过了"
+       "title": "verify 通过（3 项）"
       }
      ],
      "facts": [
       "verify 1 次",
-      "verify 通过：3 项都过了"
+      "verify 通过（3 项）"
      ],
      "credits": null,
      "session": null,
@@ -12572,15 +12669,15 @@
      "icon": "release",
      "status": "awaiting_approval",
      "doing": "等产品在 MR 上验收 D-3（approve / reject）",
-     "since": 1794146400,
+     "since": 1793920560.0,
      "history": [
       {
        "at": 1793920560,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等人在 MR 上批准发布"
       },
       {
-       "at": 1794146400,
+       "at": 1793920560.0,
        "status": "awaiting_approval",
        "doing": "等产品在 MR 上验收 D-3（approve / reject）"
       }
@@ -12596,7 +12693,7 @@
       {
        "at": 1793920560,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · 93dd644f）"
+       "title": "请人在 MR 上批准发布"
       }
      ],
      "facts": [
@@ -12683,7 +12780,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/PAY-5/run.json"
     },
@@ -12723,7 +12820,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · f11be07c）",
+     "text": "请你批准需求",
      "detail": false,
      "src": null
     },
@@ -12773,7 +12870,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/callback/service.py（inception）",
+     "text": "Lean 拦下了写 src/callback/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -12783,7 +12880,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 000a2a83）",
+     "text": "请你批准设计",
      "detail": false,
      "src": null
     },
@@ -12833,7 +12930,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（a594aa1d）",
+     "text": "交给运行机（提交 a594aa1d）",
      "detail": false,
      "src": null
     },
@@ -12933,7 +13030,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：3 项都过了",
+     "text": "verify 通过（3 项）",
      "detail": false,
      "src": null
     },
@@ -12963,7 +13060,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请你批准发布（RELEASE · 93dd644f）",
+     "text": "请人在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -12997,7 +13094,8 @@
      "text": "PAY-5：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -13007,7 +13105,8 @@
      "text": "PAY-5：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -13017,7 +13116,8 @@
      "text": "PAY-5：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -13027,7 +13127,8 @@
      "text": "PAY-5：接口和数据结构（callback-api）",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -13037,7 +13138,8 @@
      "text": "PAY-5：主流程（callback-api）",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -13047,7 +13149,8 @@
      "text": "PAY-5：错误处理和重试（callback-api）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -13057,7 +13160,8 @@
      "text": "PAY-5：测试（callback-api）",
      "files": 6,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     }
    ],
    "checks": {
@@ -13066,7 +13170,7 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1793904720,
       "detail": "你批准了",
@@ -13076,7 +13180,7 @@
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1793908860,
       "detail": "你批准了",
@@ -13086,10 +13190,10 @@
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "wait",
       "at": null,
-      "detail": "等你批准：在会话里打 approve RELEASE 93dd644f",
+      "detail": "等产品在 MR 上回答（approve 通过 / reject 退回）",
       "actor": "release"
      },
      {
@@ -13141,21 +13245,12 @@
       "at": 1793910660.0,
       "detail": "签了",
       "actor": "signer"
-     },
-     {
-      "id": "brain-cite",
-      "group": "brain",
-      "label": "引用",
-      "name": "引用的 Brain 条目",
-      "status": "pass",
-      "at": null,
-      "detail": "引用了 0 条，都在",
-      "actor": "reflect"
      }
     ],
-    "passed": 8,
+    "passed": 7,
     "failed": 0,
-    "total": 9,
+    "total": 8,
+    "todo": [],
     "at": 1793919960,
     "history": [
      {
@@ -13168,7 +13263,7 @@
    "accept": {
     "state": "waiting",
     "step": {
-     "text": "等产品在 MR 上验收 D-3（approve / reject）",
+     "text": "在 MR 上回答 D-3（approve 通过 / reject 退回）：桥会把回答带回运行机",
      "who": "产品",
      "line": null,
      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
@@ -13181,7 +13276,7 @@
       "count": 2
      }
     ],
-    "checks": "检查 8/9 通过：verify 3 项都过了；需求、设计已批准",
+    "checks": "检查 7/8 过 · 等人：发布审批",
     "done": null
    },
    "brain": {
@@ -13357,8 +13452,8 @@
      "sub": "brain-dev · AI-DLC Lean",
      "icon": "laptop",
      "status": "awaiting_approval",
-     "doing": "接手被拒：改好后重新 brain handoff",
-     "since": 1794146400,
+     "doing": "接手被拒：改好后重新交接",
+     "since": 1794146400.0,
      "history": [
       {
        "at": 1794115800.0,
@@ -13376,6 +13471,16 @@
        "doing": "交给你批准需求"
       },
       {
+       "at": 1794118920,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1794118980,
+       "status": "running",
+       "doing": "在做：下一个阶段"
+      },
+      {
        "at": 1794119100,
        "status": "running",
        "doing": "在做：应用设计"
@@ -13386,6 +13491,16 @@
        "doing": "交给你批准设计"
       },
       {
+       "at": 1794123060,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1794123120,
+       "status": "running",
+       "doing": "在做：下一个阶段"
+      },
+      {
        "at": 1794123240,
        "status": "running",
        "doing": "在做：代码生成"
@@ -13393,7 +13508,7 @@
       {
        "at": 1794126600.0,
        "status": "awaiting_approval",
-       "doing": "接手被拒：改好后重新 brain handoff"
+       "doing": "接手被拒：改好后重新交接"
       },
       {
        "at": 1794128340.0,
@@ -13401,9 +13516,9 @@
        "doing": "交给运行机了"
       },
       {
-       "at": 1794146400,
+       "at": 1794146400.0,
        "status": "awaiting_approval",
-       "doing": "接手被拒：改好后重新 brain handoff"
+       "doing": "接手被拒：改好后重新交接"
       }
      ],
      "spans": [
@@ -13413,14 +13528,24 @@
        "kind": "work"
       },
       {
-       "a": 1794119100,
+       "a": 1794118920,
        "b": 1794121560,
        "kind": "work"
       },
       {
-       "a": 1794123240,
-       "b": 1794128340.0,
+       "a": 1794123060,
+       "b": 1794126600.0,
        "kind": "work"
+      },
+      {
+       "a": 1794126600.0,
+       "b": 1794128340.0,
+       "kind": "wait"
+      },
+      {
+       "a": 1794146400.0,
+       "b": null,
+       "kind": "wait"
       }
      ],
      "marks": [
@@ -13432,7 +13557,7 @@
       {
        "at": 1794120000,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/refund/service.py（inception）"
+       "title": "Lean 拦下了写 src/refund/service.py：需求和设计还没批"
       },
       {
        "at": 1794126240.0,
@@ -13442,11 +13567,10 @@
       {
        "at": 1794128340.0,
        "kind": "handover",
-       "title": "交接：brain handoff（287f8a6a）"
+       "title": "交给运行机（提交 287f8a6a）"
       }
      ],
      "facts": [
-      "Lean 做完 7/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次",
       "会话 1 个"
@@ -13490,7 +13614,7 @@
       {
        "at": 1794117660,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · ede1b1b7）"
+       "title": "请你批准需求"
       },
       {
        "at": 1794118920,
@@ -13515,6 +13639,11 @@
      "since": 1794123060,
      "history": [
       {
+       "at": 1794118920,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1794121560,
        "status": "awaiting_approval",
        "doing": "等你批准设计"
@@ -13536,7 +13665,7 @@
       {
        "at": 1794121560,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · fbbd5d2c）"
+       "title": "请你批准设计"
       },
       {
        "at": 1794123060,
@@ -13558,7 +13687,7 @@
      "icon": "handover",
      "status": "failed",
      "doing": "接手被拒",
-     "since": 1794146400,
+     "since": 1794146400.0,
      "history": [
       {
        "at": 1794126600.0,
@@ -13571,7 +13700,7 @@
        "doing": "等桥核对交接"
       },
       {
-       "at": 1794146400,
+       "at": 1794146400.0,
        "status": "failed",
        "doing": "接手被拒"
       }
@@ -13581,7 +13710,7 @@
       {
        "at": 1794128340.0,
        "kind": "handover",
-       "title": "交接：brain handoff（287f8a6a）"
+       "title": "交给运行机（提交 287f8a6a）"
       }
      ],
      "facts": [
@@ -13599,7 +13728,7 @@
      "icon": "bridge",
      "status": "failed",
      "doing": "接手被拒：标签是 bob 打的，不是负责人 alice",
-     "since": 1794146400,
+     "since": 1794146400.0,
      "history": [
       {
        "at": 1794126600.0,
@@ -13612,18 +13741,12 @@
        "doing": "核对交接：标签、提交、材料"
       },
       {
-       "at": 1794146400,
+       "at": 1794146400.0,
        "status": "failed",
        "doing": "接手被拒：标签是 bob 打的，不是负责人 alice"
       }
      ],
-     "spans": [
-      {
-       "a": 1794128340.0,
-       "b": 1794128340.0,
-       "kind": "work"
-      }
-     ],
+     "spans": [],
      "marks": [
       {
        "at": 1794126600.0,
@@ -13663,9 +13786,7 @@
      "history": [],
      "spans": [],
      "marks": [],
-     "facts": [
-      "停下问人 0 次"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -13676,13 +13797,13 @@
      "sub": "lean verify",
      "icon": "ci",
      "status": "done",
-     "doing": "verify 通过：2 项都过了",
+     "doing": "verify 通过（2 项）",
      "since": 1794128040,
      "history": [
       {
        "at": 1794128040,
        "status": "done",
-       "doing": "verify 通过：2 项都过了"
+       "doing": "verify 通过（2 项）"
       }
      ],
      "spans": [],
@@ -13690,12 +13811,12 @@
       {
        "at": 1794128040,
        "kind": "verify-ok",
-       "title": "verify 通过：2 项都过了"
+       "title": "verify 通过（2 项）"
       }
      ],
      "facts": [
       "verify 1 次",
-      "verify 通过：2 项都过了"
+      "verify 通过（2 项）"
      ],
      "credits": null,
      "session": null,
@@ -13794,7 +13915,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/PAY-7/run.json"
     },
@@ -13834,7 +13955,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · ede1b1b7）",
+     "text": "请你批准需求",
      "detail": false,
      "src": null
     },
@@ -13884,7 +14005,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/refund/service.py（inception）",
+     "text": "Lean 拦下了写 src/refund/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -13894,7 +14015,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · fbbd5d2c）",
+     "text": "请你批准设计",
      "detail": false,
      "src": null
     },
@@ -13974,7 +14095,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：2 项都过了",
+     "text": "verify 通过（2 项）",
      "detail": false,
      "src": null
     },
@@ -13994,7 +14115,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（287f8a6a）",
+     "text": "交给运行机（提交 287f8a6a）",
      "detail": false,
      "src": null
     }
@@ -14008,7 +14129,8 @@
      "text": "PAY-7：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -14018,7 +14140,8 @@
      "text": "PAY-7：下拉框和原因列表",
      "files": 3,
      "records_only": false,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -14028,7 +14151,8 @@
      "text": "PAY-7：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     }
    ],
    "checks": {
@@ -14037,7 +14161,7 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1794118920,
       "detail": "你批准了",
@@ -14047,7 +14171,7 @@
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1794123060,
       "detail": "你批准了",
@@ -14057,7 +14181,7 @@
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "skip",
       "at": null,
       "detail": "还没到这一步",
@@ -14089,7 +14213,7 @@
       "label": "桥",
       "name": "桥核对交接",
       "status": "fail",
-      "at": 1794146400,
+      "at": 1794146400.0,
       "detail": "接手被拒：标签是 bob 打的，不是负责人 alice",
       "actor": "bridge"
      },
@@ -14102,22 +14226,15 @@
       "at": null,
       "detail": "还没签",
       "actor": "signer"
-     },
-     {
-      "id": "brain-cite",
-      "group": "brain",
-      "label": "引用",
-      "name": "引用的 Brain 条目",
-      "status": "pass",
-      "at": null,
-      "detail": "引用了 0 条，都在",
-      "actor": "reflect"
      }
     ],
-    "passed": 5,
+    "passed": 4,
     "failed": 1,
-    "total": 6,
-    "at": 1794146400,
+    "total": 5,
+    "todo": [
+     "发布审批"
+    ],
+    "at": 1794146400.0,
     "history": [
      {
       "at": 1794128040,
@@ -14129,11 +14246,11 @@
    "accept": {
     "state": "not_yet",
     "step": {
-     "text": "改好后在分支上重新 brain handoff（它提交交接、推送并打标签）",
+     "text": "接手被拒：标签是 bob 打的，不是负责人 alice\n改好后，在终端里、这个需求的分支上重新跑 brain handoff（它会提交交接、推送、打标签）",
      "who": "你",
      "line": null,
      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/46",
-     "session_url": "/chat?sid=brain-PAY-7-2b9f"
+     "session_url": null
     },
     "by": [
      {
@@ -14142,7 +14259,7 @@
       "count": 1
      }
     ],
-    "checks": "检查 5/6 通过：verify 2 项都过了；需求、设计已批准",
+    "checks": "检查 4/5 过 · 没过：桥核对交接 · 还剩 发布审批",
     "done": null
    },
    "brain": {
@@ -14266,7 +14383,7 @@
    "ended_at": null,
    "live": false,
    "person": {
-    "status": "awaiting_approval",
+    "status": "waiting",
     "doing": "等 carol 开工",
     "owner": "carol",
     "me": false
@@ -14279,13 +14396,17 @@
      "icon": "laptop",
      "status": "waiting",
      "doing": "认领了，还没开工",
-     "since": null,
-     "history": [],
+     "since": 1793973600.0,
+     "history": [
+      {
+       "at": 1793973600.0,
+       "status": "waiting",
+       "doing": "认领了，还没开工"
+      }
+     ],
      "spans": [],
      "marks": [],
-     "facts": [
-      "Lean 做完 0/11 个阶段"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -14328,7 +14449,7 @@
      "sub": "brain handoff",
      "icon": "handover",
      "status": "waiting",
-     "doing": "等本机做完再 brain handoff",
+     "doing": "等本机做完再交接",
      "since": null,
      "history": [],
      "spans": [],
@@ -14381,9 +14502,7 @@
      "history": [],
      "spans": [],
      "marks": [],
-     "facts": [
-      "停下问人 0 次"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -14499,7 +14618,7 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "skip",
       "at": null,
       "detail": "还没到这一步",
@@ -14509,7 +14628,7 @@
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "skip",
       "at": null,
       "detail": "还没到这一步",
@@ -14549,20 +14668,25 @@
     "passed": 0,
     "failed": 0,
     "total": 0,
+    "todo": [
+     "需求审批",
+     "发布审批",
+     "verify"
+    ],
     "at": null,
     "history": []
    },
    "accept": {
     "state": "not_yet",
     "step": {
-     "text": "",
-     "who": "",
+     "text": "carol 认领的，等 carol 开工",
+     "who": "carol",
      "line": null,
      "mr_url": null,
      "session_url": null
     },
     "by": [],
-    "checks": "还没有检查结果",
+    "checks": "还没有检查结果 · 还剩 需求审批、发布审批、verify",
     "done": null
    },
    "brain": {
@@ -14662,13 +14786,17 @@
      "icon": "laptop",
      "status": "waiting",
      "doing": "认领了，还没开工",
-     "since": null,
-     "history": [],
+     "since": 1794128400.0,
+     "history": [
+      {
+       "at": 1794128400.0,
+       "status": "waiting",
+       "doing": "认领了，还没开工"
+      }
+     ],
      "spans": [],
      "marks": [],
-     "facts": [
-      "Lean 做完 0/11 个阶段"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -14711,7 +14839,7 @@
      "sub": "brain handoff",
      "icon": "handover",
      "status": "waiting",
-     "doing": "等本机做完再 brain handoff",
+     "doing": "等本机做完再交接",
      "since": null,
      "history": [],
      "spans": [],
@@ -14764,9 +14892,7 @@
      "history": [],
      "spans": [],
      "marks": [],
-     "facts": [
-      "停下问人 0 次"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -14882,7 +15008,7 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "skip",
       "at": null,
       "detail": "还没到这一步",
@@ -14892,7 +15018,7 @@
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "skip",
       "at": null,
       "detail": "还没到这一步",
@@ -14932,20 +15058,25 @@
     "passed": 0,
     "failed": 0,
     "total": 0,
+    "todo": [
+     "需求审批",
+     "发布审批",
+     "verify"
+    ],
     "at": null,
     "history": []
    },
    "accept": {
     "state": "not_yet",
     "step": {
-     "text": "",
-     "who": "",
+     "text": "认领了，还没开工：在开需求里开工 PAY-8",
+     "who": "你",
      "line": null,
      "mr_url": null,
      "session_url": null
     },
     "by": [],
-    "checks": "还没有检查结果",
+    "checks": "还没有检查结果 · 还剩 需求审批、发布审批、verify",
     "done": null
    },
    "brain": {
@@ -15047,7 +15178,7 @@
      "icon": "laptop",
      "status": "awaiting_approval",
      "doing": "会话空着：轮到你回话",
-     "since": 1794146400,
+     "since": 1794133620.0,
      "history": [
       {
        "at": 1794123000.0,
@@ -15065,6 +15196,16 @@
        "doing": "交给你批准需求"
       },
       {
+       "at": 1794126120,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1794126180,
+       "status": "running",
+       "doing": "在做：下一个阶段"
+      },
+      {
        "at": 1794126300,
        "status": "running",
        "doing": "在做：应用设计"
@@ -15075,6 +15216,16 @@
        "doing": "交给你批准设计"
       },
       {
+       "at": 1794130260,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1794130320,
+       "status": "running",
+       "doing": "在做：下一个阶段"
+      },
+      {
        "at": 1794130620,
        "status": "running",
        "doing": "在做：代码生成"
@@ -15082,15 +15233,10 @@
       {
        "at": 1794132960,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
-       "at": 1794133500,
-       "status": "running",
-       "doing": "做完构建测试"
-      },
-      {
-       "at": 1794146400,
+       "at": 1794133620.0,
        "status": "awaiting_approval",
        "doing": "会话空着：轮到你回话"
       }
@@ -15102,14 +15248,19 @@
        "kind": "work"
       },
       {
-       "a": 1794126300,
+       "a": 1794126120,
        "b": 1794128760,
        "kind": "work"
       },
       {
-       "a": 1794130620,
-       "b": null,
+       "a": 1794130260,
+       "b": 1794133620.0,
        "kind": "work"
+      },
+      {
+       "a": 1794133620.0,
+       "b": null,
+       "kind": "wait"
       }
      ],
      "marks": [
@@ -15121,7 +15272,7 @@
       {
        "at": 1794127200,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/refund/service.py（inception）"
+       "title": "Lean 拦下了写 src/refund/service.py：需求和设计还没批"
       },
       {
        "at": 1794132840.0,
@@ -15130,7 +15281,6 @@
       }
      ],
      "facts": [
-      "Lean 做完 10/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次",
       "会话 1 个"
@@ -15174,7 +15324,7 @@
       {
        "at": 1794124860,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · 52d61c7a）"
+       "title": "请你批准需求"
       },
       {
        "at": 1794126120,
@@ -15199,6 +15349,11 @@
      "since": 1794130260,
      "history": [
       {
+       "at": 1794126120,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1794128760,
        "status": "awaiting_approval",
        "doing": "等你批准设计"
@@ -15220,7 +15375,7 @@
       {
        "at": 1794128760,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 23fea345）"
+       "title": "请你批准设计"
       },
       {
        "at": 1794130260,
@@ -15241,7 +15396,7 @@
      "sub": "brain handoff",
      "icon": "handover",
      "status": "waiting",
-     "doing": "等本机做完再 brain handoff",
+     "doing": "等本机做完再交接",
      "since": null,
      "history": [],
      "spans": [],
@@ -15296,9 +15451,7 @@
      "history": [],
      "spans": [],
      "marks": [],
-     "facts": [
-      "停下问人 0 次"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -15309,13 +15462,13 @@
      "sub": "lean verify",
      "icon": "ci",
      "status": "done",
-     "doing": "verify 通过：1 项都过了",
+     "doing": "verify 通过（1 项）",
      "since": 1794133440,
      "history": [
       {
        "at": 1794133440,
        "status": "done",
-       "doing": "verify 通过：1 项都过了"
+       "doing": "verify 通过（1 项）"
       }
      ],
      "spans": [],
@@ -15323,12 +15476,12 @@
       {
        "at": 1794133440,
        "kind": "verify-ok",
-       "title": "verify 通过：1 项都过了"
+       "title": "verify 通过（1 项）"
       }
      ],
      "facts": [
       "verify 1 次",
-      "verify 通过：1 项都过了"
+      "verify 通过（1 项）"
      ],
      "credits": null,
      "session": null,
@@ -15431,7 +15584,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/PAY-1/run.json"
     },
@@ -15471,7 +15624,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · 52d61c7a）",
+     "text": "请你批准需求",
      "detail": false,
      "src": null
     },
@@ -15521,7 +15674,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/refund/service.py（inception）",
+     "text": "Lean 拦下了写 src/refund/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -15531,7 +15684,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 23fea345）",
+     "text": "请你批准设计",
      "detail": false,
      "src": null
     },
@@ -15631,7 +15784,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：1 项都过了",
+     "text": "verify 通过（1 项）",
      "detail": false,
      "src": null
     },
@@ -15655,7 +15808,8 @@
      "text": "PAY-1：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -15665,7 +15819,8 @@
      "text": "PAY-1：按原因汇总的查询和接口",
      "files": 3,
      "records_only": false,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     }
    ],
    "checks": {
@@ -15674,7 +15829,7 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1794126120,
       "detail": "你批准了",
@@ -15684,7 +15839,7 @@
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1794130260,
       "detail": "你批准了",
@@ -15694,7 +15849,7 @@
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "skip",
       "at": null,
       "detail": "还没到这一步",
@@ -15729,21 +15884,14 @@
       "at": null,
       "detail": "还没签",
       "actor": "signer"
-     },
-     {
-      "id": "brain-cite",
-      "group": "brain",
-      "label": "引用",
-      "name": "引用的 Brain 条目",
-      "status": "pass",
-      "at": null,
-      "detail": "引用了 0 条，都在",
-      "actor": "reflect"
      }
     ],
-    "passed": 4,
+    "passed": 3,
     "failed": 0,
-    "total": 4,
+    "total": 3,
+    "todo": [
+     "发布审批"
+    ],
     "at": 1794133440,
     "history": [
      {
@@ -15756,14 +15904,14 @@
    "accept": {
     "state": "not_yet",
     "step": {
-     "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）",
+     "text": "会话空着，轮到你回话。Lean 做完了「构建测试」，下一步是「发布」。\n在会话里让它接着做「发布」（做完会请你批准发布）",
      "who": "你",
-     "line": null,
+     "line": "接着做下一步：发布",
      "mr_url": null,
      "session_url": "/chat?sid=brain-PAY-1-3d8e"
     },
     "by": [],
-    "checks": "检查 4/4 通过：verify 1 项都过了；需求、设计已批准",
+    "checks": "目前 3 项都过 · 还剩 发布审批",
     "done": null
    },
    "brain": {
@@ -15898,7 +16046,17 @@
       {
        "at": 1788262260,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 erin 批准需求"
+      },
+      {
+       "at": 1788263520,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1788263580,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1788263700,
@@ -15908,7 +16066,17 @@
       {
        "at": 1788266160,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 erin 批准设计"
+      },
+      {
+       "at": 1788267660,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1788267720,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1788269640.0,
@@ -15928,8 +16096,13 @@
        "kind": "work"
       },
       {
-       "a": 1788263700,
+       "a": 1788263520,
        "b": 1788266160,
+       "kind": "work"
+      },
+      {
+       "a": 1788267660,
+       "b": 1788269640.0,
        "kind": "work"
       }
      ],
@@ -15942,7 +16115,7 @@
       {
        "at": 1788264600,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/order/service.py（inception）"
+       "title": "Lean 拦下了写 src/order/service.py：需求和设计还没批"
       },
       {
        "at": 1788269400.0,
@@ -15952,11 +16125,10 @@
       {
        "at": 1788269640.0,
        "kind": "handover",
-       "title": "交接：brain handoff（8010da26）"
+       "title": "交给运行机（提交 8010da26）"
       }
      ],
      "facts": [
-      "Lean 做完 8/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次"
      ],
@@ -15970,18 +16142,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "erin 批准了 · 需求",
      "since": 1788263520,
      "history": [
       {
        "at": 1788262260,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 erin 批准需求"
       },
       {
        "at": 1788263520,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "erin 批准了 · 需求"
       }
      ],
      "spans": [
@@ -15995,12 +16167,12 @@
       {
        "at": 1788262260,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · f4f4ceca）"
+       "title": "请 erin 批准需求"
       },
       {
        "at": 1788263520,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "erin 批准了需求"
       }
      ],
      "facts": [
@@ -16016,18 +16188,23 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "erin 批准了 · 设计",
      "since": 1788267660,
      "history": [
       {
+       "at": 1788263520,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1788266160,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 erin 批准设计"
       },
       {
        "at": 1788267660,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "erin 批准了 · 设计"
       }
      ],
      "spans": [
@@ -16041,12 +16218,12 @@
       {
        "at": 1788266160,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · c4669e52）"
+       "title": "请 erin 批准设计"
       },
       {
        "at": 1788267660,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "erin 批准了设计"
       }
      ],
      "facts": [
@@ -16081,7 +16258,7 @@
       {
        "at": 1788269640.0,
        "kind": "handover",
-       "title": "交接：brain handoff（8010da26）"
+       "title": "交给运行机（提交 8010da26）"
       }
      ],
      "facts": [
@@ -16200,7 +16377,7 @@
       {
        "at": 1788278280,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1788278340,
@@ -16210,7 +16387,7 @@
       {
        "at": 1788279120,
        "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1788279180,
@@ -16220,7 +16397,7 @@
       {
        "at": 1788279660,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给人批准发布"
       },
       {
        "at": 1788279720.0,
@@ -16240,7 +16417,7 @@
       {
        "at": 1788284040,
        "status": "running",
-       "doing": "做完发布"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1788286020.0,
@@ -16333,7 +16510,7 @@
       {
        "at": 1788279060,
        "status": "done",
-       "doing": "verify 通过：3 项都过了"
+       "doing": "verify 通过（3 项）"
       },
       {
        "at": 1788286020.0,
@@ -16352,12 +16529,12 @@
       {
        "at": 1788279060,
        "kind": "verify-ok",
-       "title": "verify 通过：3 项都过了"
+       "title": "verify 通过（3 项）"
       }
      ],
      "facts": [
       "verify 1 次",
-      "verify 通过：3 项都过了"
+      "verify 通过（3 项）"
      ],
      "credits": null,
      "session": null,
@@ -16369,18 +16546,18 @@
      "sub": "RELEASE · 验收",
      "icon": "release",
      "status": "merged",
-     "doing": "你批准了 · 发布",
+     "doing": "产品在 MR 上批准了 · 发布",
      "since": 1788283980,
      "history": [
       {
        "at": 1788279660,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等人在 MR 上批准发布"
       },
       {
        "at": 1788283980,
        "status": "merged",
-       "doing": "你批准了 · 发布"
+       "doing": "产品在 MR 上批准了 · 发布"
       }
      ],
      "spans": [
@@ -16394,12 +16571,12 @@
       {
        "at": 1788279660,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · 61b4c6ef）"
+       "title": "请人在 MR 上批准发布"
       },
       {
        "at": 1788283980,
        "kind": "approved",
-       "title": "你批准了发布"
+       "title": "产品在 MR 上批准了发布"
       }
      ],
      "facts": [
@@ -16492,7 +16669,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/ORD-1/run.json"
     },
@@ -16532,7 +16709,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · f4f4ceca）",
+     "text": "请 erin 批准需求",
      "detail": false,
      "src": null
     },
@@ -16542,7 +16719,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "erin 批准了需求",
      "detail": false,
      "src": null
     },
@@ -16582,7 +16759,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/order/service.py（inception）",
+     "text": "Lean 拦下了写 src/order/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -16592,7 +16769,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · c4669e52）",
+     "text": "请 erin 批准设计",
      "detail": false,
      "src": null
     },
@@ -16602,7 +16779,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "erin 批准了设计",
      "detail": false,
      "src": null
     },
@@ -16642,7 +16819,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（8010da26）",
+     "text": "交给运行机（提交 8010da26）",
      "detail": false,
      "src": null
     },
@@ -16742,7 +16919,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：3 项都过了",
+     "text": "verify 通过（3 项）",
      "detail": false,
      "src": null
     },
@@ -16772,7 +16949,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请你批准发布（RELEASE · 61b4c6ef）",
+     "text": "请人在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -16822,7 +16999,7 @@
      "kind": "approve",
      "from": "person",
      "to": "release",
-     "text": "你批准了发布",
+     "text": "产品在 MR 上批准了发布",
      "detail": false,
      "src": null
     },
@@ -16856,7 +17033,8 @@
      "text": "ORD-1：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -16866,7 +17044,8 @@
      "text": "ORD-1：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -16876,7 +17055,8 @@
      "text": "ORD-1：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -16886,7 +17066,8 @@
      "text": "ORD-1：接口和数据结构（order-api）",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -16896,7 +17077,8 @@
      "text": "ORD-1：主流程（order-api）",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -16906,7 +17088,8 @@
      "text": "ORD-1：错误处理和重试（order-api）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -16916,7 +17099,8 @@
      "text": "ORD-1：测试（order-api）",
      "files": 6,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "merge",
@@ -16926,7 +17110,8 @@
      "text": "合并进 main（合并提交）",
      "files": 0,
      "records_only": false,
-     "actor": "release"
+     "actor": "release",
+     "changes": []
     }
    ],
    "checks": {
@@ -16935,30 +17120,30 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1788263520,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1788267660,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "pass",
       "at": 1788283980,
-      "detail": "你批准了",
+      "detail": "产品在 MR 上批准了",
       "actor": "release"
      },
      {
@@ -17035,6 +17220,7 @@
     "passed": 10,
     "failed": 0,
     "total": 10,
+    "todo": [],
     "at": 1789495620.0,
     "history": [
      {
@@ -17054,10 +17240,10 @@
      "session_url": null
     },
     "by": [],
-    "checks": "检查 10/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "checks": "全部 10 项都过",
     "done": {
      "at": 1788286020.0,
-     "who": "P-9E3B",
+     "who": "产品",
      "how": "合并提交"
     }
    },
@@ -17182,7 +17368,17 @@
       {
        "at": 1788863460,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 dave 批准需求"
+      },
+      {
+       "at": 1788864720,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1788864780,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1788864900,
@@ -17192,7 +17388,17 @@
       {
        "at": 1788867360,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 dave 批准设计"
+      },
+      {
+       "at": 1788868860,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1788868920,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1788870840.0,
@@ -17212,8 +17418,13 @@
        "kind": "work"
       },
       {
-       "a": 1788864900,
+       "a": 1788864720,
        "b": 1788867360,
+       "kind": "work"
+      },
+      {
+       "a": 1788868860,
+       "b": 1788870840.0,
        "kind": "work"
       }
      ],
@@ -17226,7 +17437,7 @@
       {
        "at": 1788865800,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/order/service.py（inception）"
+       "title": "Lean 拦下了写 src/order/service.py：需求和设计还没批"
       },
       {
        "at": 1788870600.0,
@@ -17236,11 +17447,10 @@
       {
        "at": 1788870840.0,
        "kind": "handover",
-       "title": "交接：brain handoff（5fae1418）"
+       "title": "交给运行机（提交 5fae1418）"
       }
      ],
      "facts": [
-      "Lean 做完 8/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次"
      ],
@@ -17254,18 +17464,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "dave 批准了 · 需求",
      "since": 1788864720,
      "history": [
       {
        "at": 1788863460,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 dave 批准需求"
       },
       {
        "at": 1788864720,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "dave 批准了 · 需求"
       }
      ],
      "spans": [
@@ -17279,12 +17489,12 @@
       {
        "at": 1788863460,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · 954492d5）"
+       "title": "请 dave 批准需求"
       },
       {
        "at": 1788864720,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "dave 批准了需求"
       }
      ],
      "facts": [
@@ -17300,18 +17510,23 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "dave 批准了 · 设计",
      "since": 1788868860,
      "history": [
       {
+       "at": 1788864720,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1788867360,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 dave 批准设计"
       },
       {
        "at": 1788868860,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "dave 批准了 · 设计"
       }
      ],
      "spans": [
@@ -17325,12 +17540,12 @@
       {
        "at": 1788867360,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 2039e007）"
+       "title": "请 dave 批准设计"
       },
       {
        "at": 1788868860,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "dave 批准了设计"
       }
      ],
      "facts": [
@@ -17365,7 +17580,7 @@
       {
        "at": 1788870840.0,
        "kind": "handover",
-       "title": "交接：brain handoff（5fae1418）"
+       "title": "交给运行机（提交 5fae1418）"
       }
      ],
      "facts": [
@@ -17484,7 +17699,7 @@
       {
        "at": 1788879480,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1788879540,
@@ -17494,7 +17709,7 @@
       {
        "at": 1788882240,
        "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1788882300,
@@ -17504,7 +17719,7 @@
       {
        "at": 1788882780,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给人批准发布"
       },
       {
        "at": 1788882840.0,
@@ -17524,7 +17739,7 @@
       {
        "at": 1788887160,
        "status": "running",
-       "doing": "做完发布"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1788889140.0,
@@ -17627,7 +17842,7 @@
       {
        "at": 1788882180,
        "status": "done",
-       "doing": "verify 通过：3 项都过了"
+       "doing": "verify 通过（3 项）"
       },
       {
        "at": 1788889140.0,
@@ -17656,13 +17871,13 @@
       {
        "at": 1788882180,
        "kind": "verify-ok",
-       "title": "verify 通过：3 项都过了"
+       "title": "verify 通过（3 项）"
       }
      ],
      "facts": [
       "verify 2 次",
       "没过 1 次",
-      "verify 通过：3 项都过了"
+      "verify 通过（3 项）"
      ],
      "credits": null,
      "session": null,
@@ -17674,18 +17889,18 @@
      "sub": "RELEASE · 验收",
      "icon": "release",
      "status": "merged",
-     "doing": "你批准了 · 发布",
+     "doing": "产品在 MR 上批准了 · 发布",
      "since": 1788887100,
      "history": [
       {
        "at": 1788882780,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等人在 MR 上批准发布"
       },
       {
        "at": 1788887100,
        "status": "merged",
-       "doing": "你批准了 · 发布"
+       "doing": "产品在 MR 上批准了 · 发布"
       }
      ],
      "spans": [
@@ -17699,12 +17914,12 @@
       {
        "at": 1788882780,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · 5aa92b99）"
+       "title": "请人在 MR 上批准发布"
       },
       {
        "at": 1788887100,
        "kind": "approved",
-       "title": "你批准了发布"
+       "title": "产品在 MR 上批准了发布"
       }
      ],
      "facts": [
@@ -17726,7 +17941,7 @@
       {
        "at": 1788889140.0,
        "status": "awaiting_approval",
-       "doing": "等你回写 1 条新知识"
+       "doing": "等 dave 回写 1 条新知识"
       },
       {
        "at": 1788961140,
@@ -17734,13 +17949,7 @@
        "doing": "回写分支 brain/ORD-2-reflect-1"
       }
      ],
-     "spans": [
-      {
-       "a": 1788889140.0,
-       "b": 1788961140,
-       "kind": "wait"
-      }
-     ],
+     "spans": [],
      "marks": [
       {
        "at": 1788961140,
@@ -17816,7 +18025,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/ORD-2/run.json"
     },
@@ -17856,7 +18065,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · 954492d5）",
+     "text": "请 dave 批准需求",
      "detail": false,
      "src": null
     },
@@ -17866,7 +18075,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "dave 批准了需求",
      "detail": false,
      "src": null
     },
@@ -17906,7 +18115,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/order/service.py（inception）",
+     "text": "Lean 拦下了写 src/order/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -17916,7 +18125,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 2039e007）",
+     "text": "请 dave 批准设计",
      "detail": false,
      "src": null
     },
@@ -17926,7 +18135,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "dave 批准了设计",
      "detail": false,
      "src": null
     },
@@ -17966,7 +18175,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（5fae1418）",
+     "text": "交给运行机（提交 5fae1418）",
      "detail": false,
      "src": null
     },
@@ -18086,7 +18295,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：3 项都过了",
+     "text": "verify 通过（3 项）",
      "detail": false,
      "src": null
     },
@@ -18116,7 +18325,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请你批准发布（RELEASE · 5aa92b99）",
+     "text": "请人在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -18166,7 +18375,7 @@
      "kind": "approve",
      "from": "person",
      "to": "release",
-     "text": "你批准了发布",
+     "text": "产品在 MR 上批准了发布",
      "detail": false,
      "src": null
     },
@@ -18210,7 +18419,8 @@
      "text": "ORD-2：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -18220,7 +18430,8 @@
      "text": "ORD-2：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -18230,7 +18441,8 @@
      "text": "ORD-2：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -18240,7 +18452,8 @@
      "text": "ORD-2：接口和数据结构（order-api）",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -18250,7 +18463,8 @@
      "text": "ORD-2：主流程（order-api）",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -18260,7 +18474,8 @@
      "text": "ORD-2：错误处理和重试（order-api）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -18270,7 +18485,8 @@
      "text": "ORD-2：测试（order-api）",
      "files": 6,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -18280,7 +18496,8 @@
      "text": "ORD-2：修好 pytest 里没过的两个用例",
      "files": 2,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "merge",
@@ -18290,7 +18507,8 @@
      "text": "合并进 main（合并提交）",
      "files": 0,
      "records_only": false,
-     "actor": "release"
+     "actor": "release",
+     "changes": []
     }
    ],
    "checks": {
@@ -18299,30 +18517,30 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1788864720,
-      "detail": "你批准了",
+      "detail": "dave 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1788868860,
-      "detail": "你批准了",
+      "detail": "dave 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "pass",
       "at": 1788887100,
-      "detail": "你批准了",
+      "detail": "产品在 MR 上批准了",
       "actor": "release"
      },
      {
@@ -18399,6 +18617,7 @@
     "passed": 10,
     "failed": 0,
     "total": 10,
+    "todo": [],
     "at": 1790098740.0,
     "history": [
      {
@@ -18423,10 +18642,10 @@
      "session_url": null
     },
     "by": [],
-    "checks": "检查 10/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "checks": "全部 10 项都过",
     "done": {
      "at": 1788889140.0,
-     "who": "P-9E3B",
+     "who": "产品",
      "how": "合并提交"
     }
    },
@@ -18551,7 +18770,17 @@
       {
        "at": 1789637460,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 erin 批准需求"
+      },
+      {
+       "at": 1789638720,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1789638780,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1789638900,
@@ -18561,17 +18790,27 @@
       {
        "at": 1789641360,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 erin 批准设计"
       },
       {
        "at": 1789642680,
        "status": "fixing",
-       "doing": "按你的意见重写"
+       "doing": "按 erin 的意见重写"
       },
       {
        "at": 1789644180,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 erin 批准设计"
+      },
+      {
+       "at": 1789645560,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1789645620,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1789647540.0,
@@ -18591,7 +18830,7 @@
        "kind": "work"
       },
       {
-       "a": 1789638900,
+       "a": 1789638720,
        "b": 1789641360,
        "kind": "work"
       },
@@ -18599,6 +18838,11 @@
        "a": 1789642680,
        "b": 1789644180,
        "kind": "fix"
+      },
+      {
+       "a": 1789645560,
+       "b": 1789647540.0,
+       "kind": "work"
       }
      ],
      "marks": [
@@ -18610,7 +18854,7 @@
       {
        "at": 1789639800,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/order/service.py（inception）"
+       "title": "Lean 拦下了写 src/order/service.py：需求和设计还没批"
       },
       {
        "at": 1789644060.0,
@@ -18625,11 +18869,10 @@
       {
        "at": 1789647540.0,
        "kind": "handover",
-       "title": "交接：brain handoff（be2f353e）"
+       "title": "交给运行机（提交 be2f353e）"
       }
      ],
      "facts": [
-      "Lean 做完 8/11 个阶段",
       "提交 3 次",
       "Lean 拦下 1 次"
      ],
@@ -18643,18 +18886,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "erin 批准了 · 需求",
      "since": 1789638720,
      "history": [
       {
        "at": 1789637460,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 erin 批准需求"
       },
       {
        "at": 1789638720,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "erin 批准了 · 需求"
       }
      ],
      "spans": [
@@ -18668,12 +18911,12 @@
       {
        "at": 1789637460,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · d6fdb2b0）"
+       "title": "请 erin 批准需求"
       },
       {
        "at": 1789638720,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "erin 批准了需求"
       }
      ],
      "facts": [
@@ -18689,28 +18932,33 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "erin 批准了 · 设计",
      "since": 1789645560,
      "history": [
       {
+       "at": 1789638720,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1789641360,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 erin 批准设计"
       },
       {
        "at": 1789642680,
        "status": "fixing",
-       "doing": "你退回了：等它改好再请你批"
+       "doing": "erin 退回了：等它改好再请 erin 批"
       },
       {
        "at": 1789644180,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 erin 批准设计"
       },
       {
        "at": 1789645560,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "erin 批准了 · 设计"
       }
      ],
      "spans": [
@@ -18729,22 +18977,22 @@
       {
        "at": 1789641360,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · e713a485）"
+       "title": "请 erin 批准设计"
       },
       {
        "at": 1789642680,
        "kind": "rejected",
-       "title": "你退回了设计"
+       "title": "erin 退回了设计"
       },
       {
        "at": 1789644180,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 4962453b）"
+       "title": "请 erin 批准设计"
       },
       {
        "at": 1789645560,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "erin 批准了设计"
       }
      ],
      "facts": [
@@ -18780,7 +19028,7 @@
       {
        "at": 1789647540.0,
        "kind": "handover",
-       "title": "交接：brain handoff（be2f353e）"
+       "title": "交给运行机（提交 be2f353e）"
       }
      ],
      "facts": [
@@ -18899,7 +19147,7 @@
       {
        "at": 1789656780,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1789656840,
@@ -18909,7 +19157,7 @@
       {
        "at": 1789657620,
        "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1789657680,
@@ -18919,7 +19167,7 @@
       {
        "at": 1789658160,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给人批准发布"
       },
       {
        "at": 1789658220.0,
@@ -18939,7 +19187,7 @@
       {
        "at": 1789662540,
        "status": "running",
-       "doing": "做完发布"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1789664520.0,
@@ -19037,7 +19285,7 @@
       {
        "at": 1789657560,
        "status": "done",
-       "doing": "verify 通过：3 项都过了"
+       "doing": "verify 通过（3 项）"
       },
       {
        "at": 1789664520.0,
@@ -19056,12 +19304,12 @@
       {
        "at": 1789657560,
        "kind": "verify-ok",
-       "title": "verify 通过：3 项都过了"
+       "title": "verify 通过（3 项）"
       }
      ],
      "facts": [
       "verify 1 次",
-      "verify 通过：3 项都过了"
+      "verify 通过（3 项）"
      ],
      "credits": null,
      "session": null,
@@ -19073,18 +19321,18 @@
      "sub": "RELEASE · 验收",
      "icon": "release",
      "status": "merged",
-     "doing": "你批准了 · 发布",
+     "doing": "产品在 MR 上批准了 · 发布",
      "since": 1789662480,
      "history": [
       {
        "at": 1789658160,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等人在 MR 上批准发布"
       },
       {
        "at": 1789662480,
        "status": "merged",
-       "doing": "你批准了 · 发布"
+       "doing": "产品在 MR 上批准了 · 发布"
       }
      ],
      "spans": [
@@ -19098,12 +19346,12 @@
       {
        "at": 1789658160,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · d2223484）"
+       "title": "请人在 MR 上批准发布"
       },
       {
        "at": 1789662480,
        "kind": "approved",
-       "title": "你批准了发布"
+       "title": "产品在 MR 上批准了发布"
       }
      ],
      "facts": [
@@ -19196,7 +19444,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/ORD-3/run.json"
     },
@@ -19236,7 +19484,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · d6fdb2b0）",
+     "text": "请 erin 批准需求",
      "detail": false,
      "src": null
     },
@@ -19246,7 +19494,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "erin 批准了需求",
      "detail": false,
      "src": null
     },
@@ -19286,7 +19534,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/order/service.py（inception）",
+     "text": "Lean 拦下了写 src/order/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -19296,7 +19544,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · e713a485）",
+     "text": "请 erin 批准设计",
      "detail": false,
      "src": null
     },
@@ -19306,7 +19554,7 @@
      "kind": "reject",
      "from": "person",
      "to": "design",
-     "text": "你退回了设计",
+     "text": "erin 退回了设计",
      "detail": false,
      "src": null
     },
@@ -19326,7 +19574,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 4962453b）",
+     "text": "请 erin 批准设计",
      "detail": false,
      "src": null
     },
@@ -19336,7 +19584,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "erin 批准了设计",
      "detail": false,
      "src": null
     },
@@ -19376,7 +19624,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（be2f353e）",
+     "text": "交给运行机（提交 be2f353e）",
      "detail": false,
      "src": null
     },
@@ -19486,7 +19734,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：3 项都过了",
+     "text": "verify 通过（3 项）",
      "detail": false,
      "src": null
     },
@@ -19516,7 +19764,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请你批准发布（RELEASE · d2223484）",
+     "text": "请人在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -19566,7 +19814,7 @@
      "kind": "approve",
      "from": "person",
      "to": "release",
-     "text": "你批准了发布",
+     "text": "产品在 MR 上批准了发布",
      "detail": false,
      "src": null
     },
@@ -19600,7 +19848,8 @@
      "text": "ORD-3：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -19610,7 +19859,8 @@
      "text": "ORD-3：按意见改设计（接口加分页）",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -19620,7 +19870,8 @@
      "text": "ORD-3：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -19630,7 +19881,8 @@
      "text": "ORD-3：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -19640,7 +19892,8 @@
      "text": "ORD-3：接口和数据结构（order-api）",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -19650,7 +19903,8 @@
      "text": "ORD-3：主流程（order-api）",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -19660,7 +19914,8 @@
      "text": "ORD-3：错误处理和重试（order-api）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -19670,7 +19925,8 @@
      "text": "ORD-3：测试（order-api）",
      "files": 6,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -19680,7 +19936,8 @@
      "text": "修了一个打字错误",
      "files": 1,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "merge",
@@ -19690,7 +19947,8 @@
      "text": "合并进 main（合并提交）",
      "files": 0,
      "records_only": false,
-     "actor": "release"
+     "actor": "release",
+     "changes": []
     }
    ],
    "checks": {
@@ -19699,30 +19957,30 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1789638720,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1789645560,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "pass",
       "at": 1789662480,
-      "detail": "你批准了",
+      "detail": "产品在 MR 上批准了",
       "actor": "release"
      },
      {
@@ -19799,6 +20057,7 @@
     "passed": 10,
     "failed": 0,
     "total": 10,
+    "todo": [],
     "at": 1790874120.0,
     "history": [
      {
@@ -19818,10 +20077,10 @@
      "session_url": null
     },
     "by": [],
-    "checks": "检查 10/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "checks": "全部 10 项都过",
     "done": {
      "at": 1789664520.0,
-     "who": "P-9E3B",
+     "who": "产品",
      "how": "合并提交"
     }
    },
@@ -19946,7 +20205,17 @@
       {
        "at": 1790238660,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 dave 批准需求"
+      },
+      {
+       "at": 1790239920,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1790239980,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1790240100,
@@ -19956,7 +20225,17 @@
       {
        "at": 1790242560,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 dave 批准设计"
+      },
+      {
+       "at": 1790244060,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1790244120,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1790246040.0,
@@ -19976,8 +20255,13 @@
        "kind": "work"
       },
       {
-       "a": 1790240100,
+       "a": 1790239920,
        "b": 1790242560,
+       "kind": "work"
+      },
+      {
+       "a": 1790244060,
+       "b": 1790246040.0,
        "kind": "work"
       }
      ],
@@ -19990,7 +20274,7 @@
       {
        "at": 1790241000,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/order/service.py（inception）"
+       "title": "Lean 拦下了写 src/order/service.py：需求和设计还没批"
       },
       {
        "at": 1790245800.0,
@@ -20000,11 +20284,10 @@
       {
        "at": 1790246040.0,
        "kind": "handover",
-       "title": "交接：brain handoff（28a4e027）"
+       "title": "交给运行机（提交 28a4e027）"
       }
      ],
      "facts": [
-      "Lean 做完 8/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次"
      ],
@@ -20018,18 +20301,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "dave 批准了 · 需求",
      "since": 1790239920,
      "history": [
       {
        "at": 1790238660,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 dave 批准需求"
       },
       {
        "at": 1790239920,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "dave 批准了 · 需求"
       }
      ],
      "spans": [
@@ -20043,12 +20326,12 @@
       {
        "at": 1790238660,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · a42c48de）"
+       "title": "请 dave 批准需求"
       },
       {
        "at": 1790239920,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "dave 批准了需求"
       }
      ],
      "facts": [
@@ -20064,18 +20347,23 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "dave 批准了 · 设计",
      "since": 1790244060,
      "history": [
       {
+       "at": 1790239920,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1790242560,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 dave 批准设计"
       },
       {
        "at": 1790244060,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "dave 批准了 · 设计"
       }
      ],
      "spans": [
@@ -20089,12 +20377,12 @@
       {
        "at": 1790242560,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 76737a6f）"
+       "title": "请 dave 批准设计"
       },
       {
        "at": 1790244060,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "dave 批准了设计"
       }
      ],
      "facts": [
@@ -20129,7 +20417,7 @@
       {
        "at": 1790246040.0,
        "kind": "handover",
-       "title": "交接：brain handoff（28a4e027）"
+       "title": "交给运行机（提交 28a4e027）"
       }
      ],
      "facts": [
@@ -20248,7 +20536,7 @@
       {
        "at": 1790254680,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1790254740,
@@ -20258,7 +20546,7 @@
       {
        "at": 1790255520,
        "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1790255580,
@@ -20268,7 +20556,7 @@
       {
        "at": 1790256060,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给人批准发布"
       },
       {
        "at": 1790256120.0,
@@ -20288,7 +20576,7 @@
       {
        "at": 1790260440,
        "status": "running",
-       "doing": "做完发布"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1790262420.0,
@@ -20381,7 +20669,7 @@
       {
        "at": 1790255460,
        "status": "done",
-       "doing": "verify 通过：3 项都过了"
+       "doing": "verify 通过（3 项）"
       },
       {
        "at": 1790262420.0,
@@ -20400,12 +20688,12 @@
       {
        "at": 1790255460,
        "kind": "verify-ok",
-       "title": "verify 通过：3 项都过了"
+       "title": "verify 通过（3 项）"
       }
      ],
      "facts": [
       "verify 1 次",
-      "verify 通过：3 项都过了"
+      "verify 通过（3 项）"
      ],
      "credits": null,
      "session": null,
@@ -20417,18 +20705,18 @@
      "sub": "RELEASE · 验收",
      "icon": "release",
      "status": "merged",
-     "doing": "你批准了 · 发布",
+     "doing": "产品在 MR 上批准了 · 发布",
      "since": 1790260380,
      "history": [
       {
        "at": 1790256060,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等人在 MR 上批准发布"
       },
       {
        "at": 1790260380,
        "status": "merged",
-       "doing": "你批准了 · 发布"
+       "doing": "产品在 MR 上批准了 · 发布"
       }
      ],
      "spans": [
@@ -20442,12 +20730,12 @@
       {
        "at": 1790256060,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · 0f191f4f）"
+       "title": "请人在 MR 上批准发布"
       },
       {
        "at": 1790260380,
        "kind": "approved",
-       "title": "你批准了发布"
+       "title": "产品在 MR 上批准了发布"
       }
      ],
      "facts": [
@@ -20469,7 +20757,7 @@
       {
        "at": 1790262420.0,
        "status": "awaiting_approval",
-       "doing": "等你回写 1 条新知识"
+       "doing": "等 dave 回写 1 条新知识"
       },
       {
        "at": 1790334420,
@@ -20477,13 +20765,7 @@
        "doing": "回写分支 brain/ORD-4-reflect-1"
       }
      ],
-     "spans": [
-      {
-       "a": 1790262420.0,
-       "b": 1790334420,
-       "kind": "wait"
-      }
-     ],
+     "spans": [],
      "marks": [
       {
        "at": 1790334420,
@@ -20559,7 +20841,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/ORD-4/run.json"
     },
@@ -20599,7 +20881,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · a42c48de）",
+     "text": "请 dave 批准需求",
      "detail": false,
      "src": null
     },
@@ -20609,7 +20891,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "dave 批准了需求",
      "detail": false,
      "src": null
     },
@@ -20649,7 +20931,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/order/service.py（inception）",
+     "text": "Lean 拦下了写 src/order/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -20659,7 +20941,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 76737a6f）",
+     "text": "请 dave 批准设计",
      "detail": false,
      "src": null
     },
@@ -20669,7 +20951,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "dave 批准了设计",
      "detail": false,
      "src": null
     },
@@ -20709,7 +20991,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（28a4e027）",
+     "text": "交给运行机（提交 28a4e027）",
      "detail": false,
      "src": null
     },
@@ -20809,7 +21091,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：3 项都过了",
+     "text": "verify 通过（3 项）",
      "detail": false,
      "src": null
     },
@@ -20839,7 +21121,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请你批准发布（RELEASE · 0f191f4f）",
+     "text": "请人在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -20889,7 +21171,7 @@
      "kind": "approve",
      "from": "person",
      "to": "release",
-     "text": "你批准了发布",
+     "text": "产品在 MR 上批准了发布",
      "detail": false,
      "src": null
     },
@@ -20933,7 +21215,8 @@
      "text": "ORD-4：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -20943,7 +21226,8 @@
      "text": "ORD-4：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -20953,7 +21237,8 @@
      "text": "ORD-4：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -20963,7 +21248,8 @@
      "text": "ORD-4：接口和数据结构（order-api）",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -20973,7 +21259,8 @@
      "text": "ORD-4：主流程（order-api）",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -20983,7 +21270,8 @@
      "text": "ORD-4：错误处理和重试（order-api）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -20993,7 +21281,8 @@
      "text": "ORD-4：测试（order-api）",
      "files": 6,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "merge",
@@ -21003,7 +21292,8 @@
      "text": "合并进 main（合并提交）",
      "files": 0,
      "records_only": false,
-     "actor": "release"
+     "actor": "release",
+     "changes": []
     }
    ],
    "checks": {
@@ -21012,30 +21302,30 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1790239920,
-      "detail": "你批准了",
+      "detail": "dave 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1790244060,
-      "detail": "你批准了",
+      "detail": "dave 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "pass",
       "at": 1790260380,
-      "detail": "你批准了",
+      "detail": "产品在 MR 上批准了",
       "actor": "release"
      },
      {
@@ -21112,6 +21402,7 @@
     "passed": 10,
     "failed": 0,
     "total": 10,
+    "todo": [],
     "at": 1791472020.0,
     "history": [
      {
@@ -21131,10 +21422,10 @@
      "session_url": null
     },
     "by": [],
-    "checks": "检查 10/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "checks": "全部 10 项都过",
     "done": {
      "at": 1790262420.0,
-     "who": "P-9E3B",
+     "who": "产品",
      "how": "合并提交"
     }
    },
@@ -21257,7 +21548,17 @@
       {
        "at": 1790940660,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 erin 批准需求"
+      },
+      {
+       "at": 1790941920,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1790941980,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1790942100,
@@ -21267,7 +21568,17 @@
       {
        "at": 1790944560,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 erin 批准设计"
+      },
+      {
+       "at": 1790946060,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1790946120,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1790946240,
@@ -21277,17 +21588,12 @@
       {
        "at": 1790951040,
        "status": "running",
-       "doing": "做完代码生成"
-      },
-      {
-       "at": 1790952000,
-       "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1790952240,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给 erin 批准发布"
       },
       {
        "at": 1790954640.0,
@@ -21302,12 +21608,12 @@
        "kind": "work"
       },
       {
-       "a": 1790942100,
+       "a": 1790941920,
        "b": 1790944560,
        "kind": "work"
       },
       {
-       "a": 1790946240,
+       "a": 1790946060,
        "b": 1790952240,
        "kind": "work"
       }
@@ -21321,7 +21627,7 @@
       {
        "at": 1790943000,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/order/service.py（inception）"
+       "title": "Lean 拦下了写 src/order/service.py：需求和设计还没批"
       },
       {
        "at": 1790950440.0,
@@ -21330,7 +21636,6 @@
       }
      ],
      "facts": [
-      "Lean 做完 8/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次"
      ],
@@ -21344,18 +21649,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "erin 批准了 · 需求",
      "since": 1790941920,
      "history": [
       {
        "at": 1790940660,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 erin 批准需求"
       },
       {
        "at": 1790941920,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "erin 批准了 · 需求"
       }
      ],
      "spans": [
@@ -21369,12 +21674,12 @@
       {
        "at": 1790940660,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · b3c07fc4）"
+       "title": "请 erin 批准需求"
       },
       {
        "at": 1790941920,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "erin 批准了需求"
       }
      ],
      "facts": [
@@ -21390,18 +21695,23 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "erin 批准了 · 设计",
      "since": 1790946060,
      "history": [
       {
+       "at": 1790941920,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1790944560,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 erin 批准设计"
       },
       {
        "at": 1790946060,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "erin 批准了 · 设计"
       }
      ],
      "spans": [
@@ -21415,12 +21725,12 @@
       {
        "at": 1790944560,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 773aa441）"
+       "title": "请 erin 批准设计"
       },
       {
        "at": 1790946060,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "erin 批准了设计"
       }
      ],
      "facts": [
@@ -21436,21 +21746,18 @@
      "sub": "brain handoff",
      "icon": "handover",
      "status": "skipped",
-     "doing": "这次没用上",
+     "doing": "这次不需要",
      "since": 1790954640.0,
      "history": [
       {
        "at": 1790954640.0,
        "status": "skipped",
-       "doing": "这次没用上"
+       "doing": "这次不需要"
       }
      ],
      "spans": [],
      "marks": [],
-     "facts": [
-      "MR !14",
-      "分支 ai/erin/ORD-5-order-5"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -21461,13 +21768,13 @@
      "sub": "核对交接 · 转问题",
      "icon": "bridge",
      "status": "skipped",
-     "doing": "这次没用上",
+     "doing": "这次不需要",
      "since": 1790954640.0,
      "history": [
       {
        "at": 1790954640.0,
        "status": "skipped",
-       "doing": "这次没用上"
+       "doing": "这次不需要"
       }
      ],
      "spans": [],
@@ -21483,13 +21790,13 @@
      "sub": "接手合同 · 回答凭证",
      "icon": "signer",
      "status": "skipped",
-     "doing": "这次没用上",
+     "doing": "这次不需要",
      "since": 1790954640.0,
      "history": [
       {
        "at": 1790954640.0,
        "status": "skipped",
-       "doing": "这次没用上"
+       "doing": "这次不需要"
       }
      ],
      "spans": [],
@@ -21505,20 +21812,18 @@
      "sub": "brain-run · 无人值守",
      "icon": "runner",
      "status": "skipped",
-     "doing": "这次没用上",
+     "doing": "这次不需要",
      "since": 1790954640.0,
      "history": [
       {
        "at": 1790954640.0,
        "status": "skipped",
-       "doing": "这次没用上"
+       "doing": "这次不需要"
       }
      ],
      "spans": [],
      "marks": [],
-     "facts": [
-      "停下问人 0 次"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -21535,7 +21840,7 @@
       {
        "at": 1790951940,
        "status": "done",
-       "doing": "verify 通过：2 项都过了"
+       "doing": "verify 通过（2 项）"
       },
       {
        "at": 1790954640.0,
@@ -21548,12 +21853,12 @@
       {
        "at": 1790951940,
        "kind": "verify-ok",
-       "title": "verify 通过：2 项都过了"
+       "title": "verify 通过（2 项）"
       }
      ],
      "facts": [
       "verify 1 次",
-      "verify 通过：2 项都过了"
+      "verify 通过（2 项）"
      ],
      "credits": null,
      "session": null,
@@ -21565,18 +21870,18 @@
      "sub": "RELEASE · 验收",
      "icon": "release",
      "status": "merged",
-     "doing": "你批准了 · 发布",
+     "doing": "erin 批准了 · 发布",
      "since": 1790953140,
      "history": [
       {
        "at": 1790952240,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等 erin 批准发布"
       },
       {
        "at": 1790953140,
        "status": "merged",
-       "doing": "你批准了 · 发布"
+       "doing": "erin 批准了 · 发布"
       }
      ],
      "spans": [
@@ -21590,12 +21895,12 @@
       {
        "at": 1790952240,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · 68dd7149）"
+       "title": "请 erin 批准发布"
       },
       {
        "at": 1790953140,
        "kind": "approved",
-       "title": "你批准了发布"
+       "title": "erin 批准了发布"
       }
      ],
      "facts": [
@@ -21692,7 +21997,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/ORD-5/run.json"
     },
@@ -21732,7 +22037,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · b3c07fc4）",
+     "text": "请 erin 批准需求",
      "detail": false,
      "src": null
     },
@@ -21742,7 +22047,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "erin 批准了需求",
      "detail": false,
      "src": null
     },
@@ -21782,7 +22087,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/order/service.py（inception）",
+     "text": "Lean 拦下了写 src/order/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -21792,7 +22097,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 773aa441）",
+     "text": "请 erin 批准设计",
      "detail": false,
      "src": null
     },
@@ -21802,7 +22107,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "erin 批准了设计",
      "detail": false,
      "src": null
     },
@@ -21862,7 +22167,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：2 项都过了",
+     "text": "verify 通过（2 项）",
      "detail": false,
      "src": null
     },
@@ -21882,7 +22187,7 @@
      "kind": "request",
      "from": "local",
      "to": "release",
-     "text": "请你批准发布（RELEASE · 68dd7149）",
+     "text": "请 erin 批准发布",
      "detail": false,
      "src": null
     },
@@ -21892,7 +22197,7 @@
      "kind": "approve",
      "from": "person",
      "to": "release",
-     "text": "你批准了发布",
+     "text": "erin 批准了发布",
      "detail": false,
      "src": null
     },
@@ -21926,7 +22231,8 @@
      "text": "ORD-5：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -21936,7 +22242,8 @@
      "text": "ORD-5：发票抬头表单",
      "files": 4,
      "records_only": false,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "merge",
@@ -21946,7 +22253,8 @@
      "text": "合并进 main（快进）",
      "files": 0,
      "records_only": false,
-     "actor": "release"
+     "actor": "release",
+     "changes": []
     }
    ],
    "checks": {
@@ -21955,30 +22263,30 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1790941920,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1790946060,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "pass",
       "at": 1790953140,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "release"
      },
      {
@@ -22000,26 +22308,6 @@
       "at": 1790951940,
       "detail": "通过",
       "actor": "ci"
-     },
-     {
-      "id": "bridge",
-      "group": "handover",
-      "label": "桥",
-      "name": "桥核对交接",
-      "status": "skip",
-      "at": null,
-      "detail": "还没交接",
-      "actor": "bridge"
-     },
-     {
-      "id": "signer",
-      "group": "handover",
-      "label": "签名",
-      "name": "签名服务签接手合同",
-      "status": "skip",
-      "at": null,
-      "detail": "还没签",
-      "actor": "signer"
      },
      {
       "id": "brain-cite",
@@ -22045,6 +22333,7 @@
     "passed": 7,
     "failed": 0,
     "total": 7,
+    "todo": [],
     "at": 1792164240.0,
     "history": [
      {
@@ -22064,10 +22353,10 @@
      "session_url": null
     },
     "by": [],
-    "checks": "检查 7/7 通过：verify 2 项都过了；需求、设计、发布已批准",
+    "checks": "全部 7 项都过",
     "done": {
      "at": 1790954640.0,
-     "who": "P-1A2B",
+     "who": "erin",
      "how": "快进"
     }
    },
@@ -22189,7 +22478,17 @@
       {
        "at": 1791541860,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 dave 批准需求"
+      },
+      {
+       "at": 1791543120,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1791543180,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1791543300,
@@ -22199,17 +22498,27 @@
       {
        "at": 1791545760,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 dave 批准设计"
       },
       {
        "at": 1791547080,
        "status": "fixing",
-       "doing": "按你的意见重写"
+       "doing": "按 dave 的意见重写"
       },
       {
        "at": 1791548580,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 dave 批准设计"
+      },
+      {
+       "at": 1791549960,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1791550020,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1791551940.0,
@@ -22229,7 +22538,7 @@
        "kind": "work"
       },
       {
-       "a": 1791543300,
+       "a": 1791543120,
        "b": 1791545760,
        "kind": "work"
       },
@@ -22237,6 +22546,11 @@
        "a": 1791547080,
        "b": 1791548580,
        "kind": "fix"
+      },
+      {
+       "a": 1791549960,
+       "b": 1791551940.0,
+       "kind": "work"
       }
      ],
      "marks": [
@@ -22248,7 +22562,7 @@
       {
        "at": 1791544200,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/order/service.py（inception）"
+       "title": "Lean 拦下了写 src/order/service.py：需求和设计还没批"
       },
       {
        "at": 1791548460.0,
@@ -22263,11 +22577,10 @@
       {
        "at": 1791551940.0,
        "kind": "handover",
-       "title": "交接：brain handoff（80360b04）"
+       "title": "交给运行机（提交 80360b04）"
       }
      ],
      "facts": [
-      "Lean 做完 8/11 个阶段",
       "提交 3 次",
       "Lean 拦下 1 次"
      ],
@@ -22281,18 +22594,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "dave 批准了 · 需求",
      "since": 1791543120,
      "history": [
       {
        "at": 1791541860,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 dave 批准需求"
       },
       {
        "at": 1791543120,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "dave 批准了 · 需求"
       }
      ],
      "spans": [
@@ -22306,12 +22619,12 @@
       {
        "at": 1791541860,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · aeba1b57）"
+       "title": "请 dave 批准需求"
       },
       {
        "at": 1791543120,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "dave 批准了需求"
       }
      ],
      "facts": [
@@ -22327,28 +22640,33 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "dave 批准了 · 设计",
      "since": 1791549960,
      "history": [
       {
+       "at": 1791543120,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1791545760,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 dave 批准设计"
       },
       {
        "at": 1791547080,
        "status": "fixing",
-       "doing": "你退回了：等它改好再请你批"
+       "doing": "dave 退回了：等它改好再请 dave 批"
       },
       {
        "at": 1791548580,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 dave 批准设计"
       },
       {
        "at": 1791549960,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "dave 批准了 · 设计"
       }
      ],
      "spans": [
@@ -22367,22 +22685,22 @@
       {
        "at": 1791545760,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · a77d835b）"
+       "title": "请 dave 批准设计"
       },
       {
        "at": 1791547080,
        "kind": "rejected",
-       "title": "你退回了设计"
+       "title": "dave 退回了设计"
       },
       {
        "at": 1791548580,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · f0af509b）"
+       "title": "请 dave 批准设计"
       },
       {
        "at": 1791549960,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "dave 批准了设计"
       }
      ],
      "facts": [
@@ -22418,7 +22736,7 @@
       {
        "at": 1791551940.0,
        "kind": "handover",
-       "title": "交接：brain handoff（80360b04）"
+       "title": "交给运行机（提交 80360b04）"
       }
      ],
      "facts": [
@@ -22537,7 +22855,7 @@
       {
        "at": 1791560580,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1791560640,
@@ -22547,7 +22865,7 @@
       {
        "at": 1791563340,
        "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1791563400,
@@ -22557,7 +22875,7 @@
       {
        "at": 1791563880,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给人批准发布"
       },
       {
        "at": 1791563940.0,
@@ -22577,7 +22895,7 @@
       {
        "at": 1791568260,
        "status": "running",
-       "doing": "做完发布"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1791570240.0,
@@ -22680,7 +22998,7 @@
       {
        "at": 1791563280,
        "status": "done",
-       "doing": "verify 通过：3 项都过了"
+       "doing": "verify 通过（3 项）"
       },
       {
        "at": 1791570240.0,
@@ -22709,13 +23027,13 @@
       {
        "at": 1791563280,
        "kind": "verify-ok",
-       "title": "verify 通过：3 项都过了"
+       "title": "verify 通过（3 项）"
       }
      ],
      "facts": [
       "verify 2 次",
       "没过 1 次",
-      "verify 通过：3 项都过了"
+      "verify 通过（3 项）"
      ],
      "credits": null,
      "session": null,
@@ -22727,18 +23045,18 @@
      "sub": "RELEASE · 验收",
      "icon": "release",
      "status": "merged",
-     "doing": "你批准了 · 发布",
+     "doing": "产品在 MR 上批准了 · 发布",
      "since": 1791568200,
      "history": [
       {
        "at": 1791563880,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等人在 MR 上批准发布"
       },
       {
        "at": 1791568200,
        "status": "merged",
-       "doing": "你批准了 · 发布"
+       "doing": "产品在 MR 上批准了 · 发布"
       }
      ],
      "spans": [
@@ -22752,12 +23070,12 @@
       {
        "at": 1791563880,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · 3e59d969）"
+       "title": "请人在 MR 上批准发布"
       },
       {
        "at": 1791568200,
        "kind": "approved",
-       "title": "你批准了发布"
+       "title": "产品在 MR 上批准了发布"
       }
      ],
      "facts": [
@@ -22779,7 +23097,7 @@
       {
        "at": 1791570240.0,
        "status": "awaiting_approval",
-       "doing": "等你回写 1 条新知识"
+       "doing": "等 dave 回写 1 条新知识"
       },
       {
        "at": 1791642240,
@@ -22787,13 +23105,7 @@
        "doing": "回写分支 brain/ORD-6-reflect-1"
       }
      ],
-     "spans": [
-      {
-       "a": 1791570240.0,
-       "b": 1791642240,
-       "kind": "wait"
-      }
-     ],
+     "spans": [],
      "marks": [
       {
        "at": 1791642240,
@@ -22869,7 +23181,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/ORD-6/run.json"
     },
@@ -22909,7 +23221,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · aeba1b57）",
+     "text": "请 dave 批准需求",
      "detail": false,
      "src": null
     },
@@ -22919,7 +23231,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "dave 批准了需求",
      "detail": false,
      "src": null
     },
@@ -22959,7 +23271,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/order/service.py（inception）",
+     "text": "Lean 拦下了写 src/order/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -22969,7 +23281,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · a77d835b）",
+     "text": "请 dave 批准设计",
      "detail": false,
      "src": null
     },
@@ -22979,7 +23291,7 @@
      "kind": "reject",
      "from": "person",
      "to": "design",
-     "text": "你退回了设计",
+     "text": "dave 退回了设计",
      "detail": false,
      "src": null
     },
@@ -22999,7 +23311,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · f0af509b）",
+     "text": "请 dave 批准设计",
      "detail": false,
      "src": null
     },
@@ -23009,7 +23321,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "dave 批准了设计",
      "detail": false,
      "src": null
     },
@@ -23049,7 +23361,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（80360b04）",
+     "text": "交给运行机（提交 80360b04）",
      "detail": false,
      "src": null
     },
@@ -23169,7 +23481,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：3 项都过了",
+     "text": "verify 通过（3 项）",
      "detail": false,
      "src": null
     },
@@ -23199,7 +23511,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请你批准发布（RELEASE · 3e59d969）",
+     "text": "请人在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -23249,7 +23561,7 @@
      "kind": "approve",
      "from": "person",
      "to": "release",
-     "text": "你批准了发布",
+     "text": "产品在 MR 上批准了发布",
      "detail": false,
      "src": null
     },
@@ -23293,7 +23605,8 @@
      "text": "ORD-6：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -23303,7 +23616,8 @@
      "text": "ORD-6：按意见改设计（接口加分页）",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -23313,7 +23627,8 @@
      "text": "ORD-6：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -23323,7 +23638,8 @@
      "text": "ORD-6：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -23333,7 +23649,8 @@
      "text": "ORD-6：接口和数据结构（order-api）",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -23343,7 +23660,8 @@
      "text": "ORD-6：主流程（order-api）",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -23353,7 +23671,8 @@
      "text": "ORD-6：错误处理和重试（order-api）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -23363,7 +23682,8 @@
      "text": "ORD-6：测试（order-api）",
      "files": 6,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -23373,7 +23693,8 @@
      "text": "ORD-6：修好 pytest 里没过的两个用例",
      "files": 2,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "merge",
@@ -23383,7 +23704,8 @@
      "text": "合并进 main（合并提交）",
      "files": 0,
      "records_only": false,
-     "actor": "release"
+     "actor": "release",
+     "changes": []
     }
    ],
    "checks": {
@@ -23392,30 +23714,30 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1791543120,
-      "detail": "你批准了",
+      "detail": "dave 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1791549960,
-      "detail": "你批准了",
+      "detail": "dave 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "pass",
       "at": 1791568200,
-      "detail": "你批准了",
+      "detail": "产品在 MR 上批准了",
       "actor": "release"
      },
      {
@@ -23492,6 +23814,7 @@
     "passed": 10,
     "failed": 0,
     "total": 10,
+    "todo": [],
     "at": 1792779840.0,
     "history": [
      {
@@ -23516,10 +23839,10 @@
      "session_url": null
     },
     "by": [],
-    "checks": "检查 10/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "checks": "全部 10 项都过",
     "done": {
      "at": 1791570240.0,
-     "who": "P-9E3B",
+     "who": "产品",
      "how": "合并提交"
     }
    },
@@ -23644,7 +23967,17 @@
       {
        "at": 1792229460,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 erin 批准需求"
+      },
+      {
+       "at": 1792230720,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1792230780,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1792230900,
@@ -23654,7 +23987,17 @@
       {
        "at": 1792233360,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 erin 批准设计"
+      },
+      {
+       "at": 1792234860,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1792234920,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1792236840.0,
@@ -23674,8 +24017,13 @@
        "kind": "work"
       },
       {
-       "a": 1792230900,
+       "a": 1792230720,
        "b": 1792233360,
+       "kind": "work"
+      },
+      {
+       "a": 1792234860,
+       "b": 1792236840.0,
        "kind": "work"
       }
      ],
@@ -23688,7 +24036,7 @@
       {
        "at": 1792231800,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/order/service.py（inception）"
+       "title": "Lean 拦下了写 src/order/service.py：需求和设计还没批"
       },
       {
        "at": 1792236600.0,
@@ -23698,11 +24046,10 @@
       {
        "at": 1792236840.0,
        "kind": "handover",
-       "title": "交接：brain handoff（5df2175f）"
+       "title": "交给运行机（提交 5df2175f）"
       }
      ],
      "facts": [
-      "Lean 做完 8/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次"
      ],
@@ -23716,18 +24063,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "erin 批准了 · 需求",
      "since": 1792230720,
      "history": [
       {
        "at": 1792229460,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 erin 批准需求"
       },
       {
        "at": 1792230720,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "erin 批准了 · 需求"
       }
      ],
      "spans": [
@@ -23741,12 +24088,12 @@
       {
        "at": 1792229460,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · f40f3711）"
+       "title": "请 erin 批准需求"
       },
       {
        "at": 1792230720,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "erin 批准了需求"
       }
      ],
      "facts": [
@@ -23762,18 +24109,23 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "erin 批准了 · 设计",
      "since": 1792234860,
      "history": [
       {
+       "at": 1792230720,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1792233360,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 erin 批准设计"
       },
       {
        "at": 1792234860,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "erin 批准了 · 设计"
       }
      ],
      "spans": [
@@ -23787,12 +24139,12 @@
       {
        "at": 1792233360,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 89eaca9a）"
+       "title": "请 erin 批准设计"
       },
       {
        "at": 1792234860,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "erin 批准了设计"
       }
      ],
      "facts": [
@@ -23827,7 +24179,7 @@
       {
        "at": 1792236840.0,
        "kind": "handover",
-       "title": "交接：brain handoff（5df2175f）"
+       "title": "交给运行机（提交 5df2175f）"
       }
      ],
      "facts": [
@@ -23946,7 +24298,7 @@
       {
        "at": 1792245480,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1792245540,
@@ -23956,7 +24308,7 @@
       {
        "at": 1792246320,
        "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1792246380,
@@ -23966,7 +24318,7 @@
       {
        "at": 1792246860,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给人批准发布"
       },
       {
        "at": 1792246920.0,
@@ -23986,7 +24338,7 @@
       {
        "at": 1792251240,
        "status": "running",
-       "doing": "做完发布"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1792253220.0,
@@ -24079,7 +24431,7 @@
       {
        "at": 1792246260,
        "status": "done",
-       "doing": "verify 通过：3 项都过了"
+       "doing": "verify 通过（3 项）"
       },
       {
        "at": 1792253220.0,
@@ -24098,12 +24450,12 @@
       {
        "at": 1792246260,
        "kind": "verify-ok",
-       "title": "verify 通过：3 项都过了"
+       "title": "verify 通过（3 项）"
       }
      ],
      "facts": [
       "verify 1 次",
-      "verify 通过：3 项都过了"
+      "verify 通过（3 项）"
      ],
      "credits": null,
      "session": null,
@@ -24115,18 +24467,18 @@
      "sub": "RELEASE · 验收",
      "icon": "release",
      "status": "merged",
-     "doing": "你批准了 · 发布",
+     "doing": "产品在 MR 上批准了 · 发布",
      "since": 1792251180,
      "history": [
       {
        "at": 1792246860,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等人在 MR 上批准发布"
       },
       {
        "at": 1792251180,
        "status": "merged",
-       "doing": "你批准了 · 发布"
+       "doing": "产品在 MR 上批准了 · 发布"
       }
      ],
      "spans": [
@@ -24140,12 +24492,12 @@
       {
        "at": 1792246860,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · 28c25339）"
+       "title": "请人在 MR 上批准发布"
       },
       {
        "at": 1792251180,
        "kind": "approved",
-       "title": "你批准了发布"
+       "title": "产品在 MR 上批准了发布"
       }
      ],
      "facts": [
@@ -24238,7 +24590,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/ORD-7/run.json"
     },
@@ -24278,7 +24630,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · f40f3711）",
+     "text": "请 erin 批准需求",
      "detail": false,
      "src": null
     },
@@ -24288,7 +24640,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "erin 批准了需求",
      "detail": false,
      "src": null
     },
@@ -24328,7 +24680,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/order/service.py（inception）",
+     "text": "Lean 拦下了写 src/order/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -24338,7 +24690,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 89eaca9a）",
+     "text": "请 erin 批准设计",
      "detail": false,
      "src": null
     },
@@ -24348,7 +24700,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "erin 批准了设计",
      "detail": false,
      "src": null
     },
@@ -24388,7 +24740,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（5df2175f）",
+     "text": "交给运行机（提交 5df2175f）",
      "detail": false,
      "src": null
     },
@@ -24488,7 +24840,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：3 项都过了",
+     "text": "verify 通过（3 项）",
      "detail": false,
      "src": null
     },
@@ -24518,7 +24870,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请你批准发布（RELEASE · 28c25339）",
+     "text": "请人在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -24568,7 +24920,7 @@
      "kind": "approve",
      "from": "person",
      "to": "release",
-     "text": "你批准了发布",
+     "text": "产品在 MR 上批准了发布",
      "detail": false,
      "src": null
     },
@@ -24602,7 +24954,8 @@
      "text": "ORD-7：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -24612,7 +24965,8 @@
      "text": "ORD-7：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -24622,7 +24976,8 @@
      "text": "ORD-7：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -24632,7 +24987,8 @@
      "text": "ORD-7：接口和数据结构（order-api）",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -24642,7 +24998,8 @@
      "text": "ORD-7：主流程（order-api）",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -24652,7 +25009,8 @@
      "text": "ORD-7：错误处理和重试（order-api）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -24662,7 +25020,8 @@
      "text": "ORD-7：测试（order-api）",
      "files": 6,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "merge",
@@ -24672,7 +25031,8 @@
      "text": "合并进 main（合并提交）",
      "files": 0,
      "records_only": false,
-     "actor": "release"
+     "actor": "release",
+     "changes": []
     }
    ],
    "checks": {
@@ -24681,30 +25041,30 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1792230720,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1792234860,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "pass",
       "at": 1792251180,
-      "detail": "你批准了",
+      "detail": "产品在 MR 上批准了",
       "actor": "release"
      },
      {
@@ -24781,6 +25141,7 @@
     "passed": 10,
     "failed": 0,
     "total": 10,
+    "todo": [],
     "at": 1793462820.0,
     "history": [
      {
@@ -24800,10 +25161,10 @@
      "session_url": null
     },
     "by": [],
-    "checks": "检查 10/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "checks": "全部 10 项都过",
     "done": {
      "at": 1792253220.0,
-     "who": "P-9E3B",
+     "who": "产品",
      "how": "合并提交"
     }
    },
@@ -24928,7 +25289,17 @@
       {
        "at": 1793089860,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 dave 批准需求"
+      },
+      {
+       "at": 1793091120,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1793091180,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793091300,
@@ -24938,7 +25309,17 @@
       {
        "at": 1793093760,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 dave 批准设计"
+      },
+      {
+       "at": 1793095260,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1793095320,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793097240.0,
@@ -24958,8 +25339,13 @@
        "kind": "work"
       },
       {
-       "a": 1793091300,
+       "a": 1793091120,
        "b": 1793093760,
+       "kind": "work"
+      },
+      {
+       "a": 1793095260,
+       "b": 1793097240.0,
        "kind": "work"
       }
      ],
@@ -24972,7 +25358,7 @@
       {
        "at": 1793092200,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/order/service.py（inception）"
+       "title": "Lean 拦下了写 src/order/service.py：需求和设计还没批"
       },
       {
        "at": 1793097000.0,
@@ -24982,11 +25368,10 @@
       {
        "at": 1793097240.0,
        "kind": "handover",
-       "title": "交接：brain handoff（5c30af80）"
+       "title": "交给运行机（提交 5c30af80）"
       }
      ],
      "facts": [
-      "Lean 做完 8/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次"
      ],
@@ -25000,18 +25385,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "dave 批准了 · 需求",
      "since": 1793091120,
      "history": [
       {
        "at": 1793089860,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 dave 批准需求"
       },
       {
        "at": 1793091120,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "dave 批准了 · 需求"
       }
      ],
      "spans": [
@@ -25025,12 +25410,12 @@
       {
        "at": 1793089860,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · e68987ed）"
+       "title": "请 dave 批准需求"
       },
       {
        "at": 1793091120,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "dave 批准了需求"
       }
      ],
      "facts": [
@@ -25046,18 +25431,23 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "dave 批准了 · 设计",
      "since": 1793095260,
      "history": [
       {
+       "at": 1793091120,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1793093760,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 dave 批准设计"
       },
       {
        "at": 1793095260,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "dave 批准了 · 设计"
       }
      ],
      "spans": [
@@ -25071,12 +25461,12 @@
       {
        "at": 1793093760,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 4d98467d）"
+       "title": "请 dave 批准设计"
       },
       {
        "at": 1793095260,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "dave 批准了设计"
       }
      ],
      "facts": [
@@ -25111,7 +25501,7 @@
       {
        "at": 1793097240.0,
        "kind": "handover",
-       "title": "交接：brain handoff（5c30af80）"
+       "title": "交给运行机（提交 5c30af80）"
       }
      ],
      "facts": [
@@ -25255,7 +25645,7 @@
       {
        "at": 1793109420,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793109480,
@@ -25265,7 +25655,7 @@
       {
        "at": 1793110260,
        "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793110320,
@@ -25275,7 +25665,7 @@
       {
        "at": 1793110800,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给人批准发布"
       },
       {
        "at": 1793110860.0,
@@ -25295,7 +25685,7 @@
       {
        "at": 1793115180,
        "status": "running",
-       "doing": "做完发布"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793117160.0,
@@ -25428,7 +25818,7 @@
       {
        "at": 1793110200,
        "status": "done",
-       "doing": "verify 通过：3 项都过了"
+       "doing": "verify 通过（3 项）"
       },
       {
        "at": 1793117160.0,
@@ -25447,12 +25837,12 @@
       {
        "at": 1793110200,
        "kind": "verify-ok",
-       "title": "verify 通过：3 项都过了"
+       "title": "verify 通过（3 项）"
       }
      ],
      "facts": [
       "verify 1 次",
-      "verify 通过：3 项都过了"
+      "verify 通过（3 项）"
      ],
      "credits": null,
      "session": null,
@@ -25464,18 +25854,18 @@
      "sub": "RELEASE · 验收",
      "icon": "release",
      "status": "merged",
-     "doing": "你批准了 · 发布",
+     "doing": "产品在 MR 上批准了 · 发布",
      "since": 1793115120,
      "history": [
       {
        "at": 1793110800,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等人在 MR 上批准发布"
       },
       {
        "at": 1793115120,
        "status": "merged",
-       "doing": "你批准了 · 发布"
+       "doing": "产品在 MR 上批准了 · 发布"
       }
      ],
      "spans": [
@@ -25489,12 +25879,12 @@
       {
        "at": 1793110800,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · bbca6324）"
+       "title": "请人在 MR 上批准发布"
       },
       {
        "at": 1793115120,
        "kind": "approved",
-       "title": "你批准了发布"
+       "title": "产品在 MR 上批准了发布"
       }
      ],
      "facts": [
@@ -25516,7 +25906,7 @@
       {
        "at": 1793117160.0,
        "status": "awaiting_approval",
-       "doing": "等你回写 1 条新知识"
+       "doing": "等 dave 回写 1 条新知识"
       },
       {
        "at": 1793189160,
@@ -25524,13 +25914,7 @@
        "doing": "回写分支 brain/ORD-8-reflect-1"
       }
      ],
-     "spans": [
-      {
-       "a": 1793117160.0,
-       "b": 1793189160,
-       "kind": "wait"
-      }
-     ],
+     "spans": [],
      "marks": [
       {
        "at": 1793189160,
@@ -25606,7 +25990,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/ORD-8/run.json"
     },
@@ -25646,7 +26030,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · e68987ed）",
+     "text": "请 dave 批准需求",
      "detail": false,
      "src": null
     },
@@ -25656,7 +26040,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "dave 批准了需求",
      "detail": false,
      "src": null
     },
@@ -25696,7 +26080,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/order/service.py（inception）",
+     "text": "Lean 拦下了写 src/order/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -25706,7 +26090,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 4d98467d）",
+     "text": "请 dave 批准设计",
      "detail": false,
      "src": null
     },
@@ -25716,7 +26100,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "dave 批准了设计",
      "detail": false,
      "src": null
     },
@@ -25756,7 +26140,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（5c30af80）",
+     "text": "交给运行机（提交 5c30af80）",
      "detail": false,
      "src": null
     },
@@ -25916,7 +26300,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：3 项都过了",
+     "text": "verify 通过（3 项）",
      "detail": false,
      "src": null
     },
@@ -25946,7 +26330,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请你批准发布（RELEASE · bbca6324）",
+     "text": "请人在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -25996,7 +26380,7 @@
      "kind": "approve",
      "from": "person",
      "to": "release",
-     "text": "你批准了发布",
+     "text": "产品在 MR 上批准了发布",
      "detail": false,
      "src": null
     },
@@ -26040,7 +26424,8 @@
      "text": "ORD-8：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -26050,7 +26435,8 @@
      "text": "ORD-8：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -26060,7 +26446,8 @@
      "text": "ORD-8：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -26070,7 +26457,8 @@
      "text": "ORD-8：接口和数据结构（order-api）",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -26080,7 +26468,8 @@
      "text": "ORD-8：主流程（order-api）",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -26090,7 +26479,8 @@
      "text": "ORD-8：错误处理和重试（order-api）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -26100,7 +26490,8 @@
      "text": "ORD-8：测试（order-api）",
      "files": 6,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -26110,7 +26501,8 @@
      "text": "ORD-8：按 D-1 的回答改",
      "files": 2,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "merge",
@@ -26120,7 +26512,8 @@
      "text": "合并进 main（合并提交）",
      "files": 0,
      "records_only": false,
-     "actor": "release"
+     "actor": "release",
+     "changes": []
     }
    ],
    "checks": {
@@ -26129,30 +26522,30 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1793091120,
-      "detail": "你批准了",
+      "detail": "dave 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1793095260,
-      "detail": "你批准了",
+      "detail": "dave 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "pass",
       "at": 1793115120,
-      "detail": "你批准了",
+      "detail": "产品在 MR 上批准了",
       "actor": "release"
      },
      {
@@ -26220,15 +26613,18 @@
       "group": "after",
       "label": "14 天",
       "name": "合并后 14 天没有回滚或热修",
-      "status": "wait",
+      "status": "watch",
       "at": null,
-      "detail": "还在观察：到 2026-11-10",
+      "detail": "观察中：到 2026-11-10",
       "actor": "release"
      }
     ],
     "passed": 9,
     "failed": 0,
-    "total": 10,
+    "total": 9,
+    "todo": [
+     "合并后 14 天"
+    ],
     "at": 1793115120,
     "history": [
      {
@@ -26248,10 +26644,10 @@
      "session_url": null
     },
     "by": [],
-    "checks": "检查 9/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "checks": "目前 9 项都过 · 还剩 合并后 14 天",
     "done": {
      "at": 1793117160.0,
-     "who": "P-9E3B",
+     "who": "产品",
      "how": "合并提交"
     }
    },
@@ -26349,7 +26745,7 @@
    "live": false,
    "person": {
     "status": "merged",
-    "doing": "已合并",
+    "doing": "已合并，有 1 条新知识等你回写 Brain",
     "owner": "erin",
     "me": false
    },
@@ -26376,7 +26772,17 @@
       {
        "at": 1793878260,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 erin 批准需求"
+      },
+      {
+       "at": 1793879520,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1793879580,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793879700,
@@ -26386,17 +26792,27 @@
       {
        "at": 1793882160,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 erin 批准设计"
       },
       {
        "at": 1793883480,
        "status": "fixing",
-       "doing": "按你的意见重写"
+       "doing": "按 erin 的意见重写"
       },
       {
        "at": 1793884980,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 erin 批准设计"
+      },
+      {
+       "at": 1793886360,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1793886420,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793888340.0,
@@ -26416,7 +26832,7 @@
        "kind": "work"
       },
       {
-       "a": 1793879700,
+       "a": 1793879520,
        "b": 1793882160,
        "kind": "work"
       },
@@ -26424,6 +26840,11 @@
        "a": 1793883480,
        "b": 1793884980,
        "kind": "fix"
+      },
+      {
+       "a": 1793886360,
+       "b": 1793888340.0,
+       "kind": "work"
       }
      ],
      "marks": [
@@ -26435,7 +26856,7 @@
       {
        "at": 1793880600,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/order/service.py（inception）"
+       "title": "Lean 拦下了写 src/order/service.py：需求和设计还没批"
       },
       {
        "at": 1793884860.0,
@@ -26450,11 +26871,10 @@
       {
        "at": 1793888340.0,
        "kind": "handover",
-       "title": "交接：brain handoff（4231b5af）"
+       "title": "交给运行机（提交 4231b5af）"
       }
      ],
      "facts": [
-      "Lean 做完 8/11 个阶段",
       "提交 3 次",
       "Lean 拦下 1 次"
      ],
@@ -26468,18 +26888,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "erin 批准了 · 需求",
      "since": 1793879520,
      "history": [
       {
        "at": 1793878260,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 erin 批准需求"
       },
       {
        "at": 1793879520,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "erin 批准了 · 需求"
       }
      ],
      "spans": [
@@ -26493,12 +26913,12 @@
       {
        "at": 1793878260,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · 48149f14）"
+       "title": "请 erin 批准需求"
       },
       {
        "at": 1793879520,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "erin 批准了需求"
       }
      ],
      "facts": [
@@ -26514,28 +26934,33 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "erin 批准了 · 设计",
      "since": 1793886360,
      "history": [
       {
+       "at": 1793879520,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1793882160,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 erin 批准设计"
       },
       {
        "at": 1793883480,
        "status": "fixing",
-       "doing": "你退回了：等它改好再请你批"
+       "doing": "erin 退回了：等它改好再请 erin 批"
       },
       {
        "at": 1793884980,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 erin 批准设计"
       },
       {
        "at": 1793886360,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "erin 批准了 · 设计"
       }
      ],
      "spans": [
@@ -26554,22 +26979,22 @@
       {
        "at": 1793882160,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · c1ab32ff）"
+       "title": "请 erin 批准设计"
       },
       {
        "at": 1793883480,
        "kind": "rejected",
-       "title": "你退回了设计"
+       "title": "erin 退回了设计"
       },
       {
        "at": 1793884980,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · 6c087e93）"
+       "title": "请 erin 批准设计"
       },
       {
        "at": 1793886360,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "erin 批准了设计"
       }
      ],
      "facts": [
@@ -26605,7 +27030,7 @@
       {
        "at": 1793888340.0,
        "kind": "handover",
-       "title": "交接：brain handoff（4231b5af）"
+       "title": "交给运行机（提交 4231b5af）"
       }
      ],
      "facts": [
@@ -26724,7 +27149,7 @@
       {
        "at": 1793896980,
        "status": "running",
-       "doing": "做完代码生成"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793897040,
@@ -26734,7 +27159,7 @@
       {
        "at": 1793897820,
        "status": "running",
-       "doing": "做完构建测试"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793897880,
@@ -26744,7 +27169,7 @@
       {
        "at": 1793898360,
        "status": "done",
-       "doing": "交给你批准发布"
+       "doing": "交给人批准发布"
       },
       {
        "at": 1793898420.0,
@@ -26764,7 +27189,7 @@
       {
        "at": 1793902740,
        "status": "running",
-       "doing": "做完发布"
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1793904720.0,
@@ -26857,7 +27282,7 @@
       {
        "at": 1793897760,
        "status": "done",
-       "doing": "verify 通过：3 项都过了"
+       "doing": "verify 通过（3 项）"
       },
       {
        "at": 1793904720.0,
@@ -26876,12 +27301,12 @@
       {
        "at": 1793897760,
        "kind": "verify-ok",
-       "title": "verify 通过：3 项都过了"
+       "title": "verify 通过（3 项）"
       }
      ],
      "facts": [
       "verify 1 次",
-      "verify 通过：3 项都过了"
+      "verify 通过（3 项）"
      ],
      "credits": null,
      "session": null,
@@ -26893,18 +27318,18 @@
      "sub": "RELEASE · 验收",
      "icon": "release",
      "status": "merged",
-     "doing": "你批准了 · 发布",
+     "doing": "产品在 MR 上批准了 · 发布",
      "since": 1793902680,
      "history": [
       {
        "at": 1793898360,
        "status": "awaiting_approval",
-       "doing": "等你批准发布"
+       "doing": "等人在 MR 上批准发布"
       },
       {
        "at": 1793902680,
        "status": "merged",
-       "doing": "你批准了 · 发布"
+       "doing": "产品在 MR 上批准了 · 发布"
       }
      ],
      "spans": [
@@ -26918,12 +27343,12 @@
       {
        "at": 1793898360,
        "kind": "request",
-       "title": "请你批准发布（RELEASE · 029f0c7d）"
+       "title": "请人在 MR 上批准发布"
       },
       {
        "at": 1793902680,
        "kind": "approved",
-       "title": "你批准了发布"
+       "title": "产品在 MR 上批准了发布"
       }
      ],
      "facts": [
@@ -26939,22 +27364,16 @@
      "sub": "brain reflect",
      "icon": "brain",
      "status": "awaiting_approval",
-     "doing": "等你回写 1 条新知识",
+     "doing": "等 erin 回写 1 条新知识",
      "since": 1793904720.0,
      "history": [
       {
        "at": 1793904720.0,
        "status": "awaiting_approval",
-       "doing": "等你回写 1 条新知识"
+       "doing": "等 erin 回写 1 条新知识"
       }
      ],
-     "spans": [
-      {
-       "a": 1793904720.0,
-       "b": null,
-       "kind": "wait"
-      }
-     ],
+     "spans": [],
      "marks": [],
      "facts": [
       "提议 1 条新知识"
@@ -27024,7 +27443,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/ORD-9/run.json"
     },
@@ -27064,7 +27483,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · 48149f14）",
+     "text": "请 erin 批准需求",
      "detail": false,
      "src": null
     },
@@ -27074,7 +27493,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "erin 批准了需求",
      "detail": false,
      "src": null
     },
@@ -27114,7 +27533,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/order/service.py（inception）",
+     "text": "Lean 拦下了写 src/order/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -27124,7 +27543,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · c1ab32ff）",
+     "text": "请 erin 批准设计",
      "detail": false,
      "src": null
     },
@@ -27134,7 +27553,7 @@
      "kind": "reject",
      "from": "person",
      "to": "design",
-     "text": "你退回了设计",
+     "text": "erin 退回了设计",
      "detail": false,
      "src": null
     },
@@ -27154,7 +27573,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · 6c087e93）",
+     "text": "请 erin 批准设计",
      "detail": false,
      "src": null
     },
@@ -27164,7 +27583,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "erin 批准了设计",
      "detail": false,
      "src": null
     },
@@ -27204,7 +27623,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（4231b5af）",
+     "text": "交给运行机（提交 4231b5af）",
      "detail": false,
      "src": null
     },
@@ -27304,7 +27723,7 @@
      "kind": "verify",
      "from": "branch",
      "to": "checks",
-     "text": "verify 通过：3 项都过了",
+     "text": "verify 通过（3 项）",
      "detail": false,
      "src": null
     },
@@ -27334,7 +27753,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请你批准发布（RELEASE · 029f0c7d）",
+     "text": "请人在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -27384,7 +27803,7 @@
      "kind": "approve",
      "from": "person",
      "to": "release",
-     "text": "你批准了发布",
+     "text": "产品在 MR 上批准了发布",
      "detail": false,
      "src": null
     },
@@ -27418,7 +27837,8 @@
      "text": "ORD-9：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -27428,7 +27848,8 @@
      "text": "ORD-9：按意见改设计（接口加分页）",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -27438,7 +27859,8 @@
      "text": "ORD-9：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -27448,7 +27870,8 @@
      "text": "ORD-9：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -27458,7 +27881,8 @@
      "text": "ORD-9：接口和数据结构（order-api）",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -27468,7 +27892,8 @@
      "text": "ORD-9：主流程（order-api）",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -27478,7 +27903,8 @@
      "text": "ORD-9：错误处理和重试（order-api）",
      "files": 5,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -27488,7 +27914,8 @@
      "text": "ORD-9：测试（order-api）",
      "files": 6,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "merge",
@@ -27498,7 +27925,8 @@
      "text": "合并进 main（合并提交）",
      "files": 0,
      "records_only": false,
-     "actor": "release"
+     "actor": "release",
+     "changes": []
     }
    ],
    "checks": {
@@ -27507,30 +27935,30 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1793879520,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1793886360,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "pass",
       "at": 1793902680,
-      "detail": "你批准了",
+      "detail": "产品在 MR 上批准了",
       "actor": "release"
      },
      {
@@ -27598,15 +28026,18 @@
       "group": "after",
       "label": "14 天",
       "name": "合并后 14 天没有回滚或热修",
-      "status": "wait",
+      "status": "watch",
       "at": null,
-      "detail": "还在观察：到 2026-11-19",
+      "detail": "观察中：到 2026-11-19",
       "actor": "release"
      }
     ],
     "passed": 9,
     "failed": 0,
-    "total": 10,
+    "total": 9,
+    "todo": [
+     "合并后 14 天"
+    ],
     "at": 1793902680,
     "history": [
      {
@@ -27619,17 +28050,17 @@
    "accept": {
     "state": "merged",
     "step": {
-     "text": "在 Brain 里回写这次的 1 条新知识（brain reflect：先预览，再写到新分支）",
-     "who": "你",
+     "text": "去 Brain 页回写这次的 1 条新知识：先预览，再写到新分支",
+     "who": "erin",
      "line": null,
      "mr_url": null,
      "session_url": null
     },
     "by": [],
-    "checks": "检查 9/10 通过：verify 3 项都过了；需求、设计、发布已批准",
+    "checks": "目前 9 项都过 · 还剩 合并后 14 天",
     "done": {
      "at": 1793904720.0,
-     "who": "P-9E3B",
+     "who": "产品",
      "how": "合并提交"
     }
    },
@@ -27758,7 +28189,17 @@
       {
        "at": 1794119460,
        "status": "done",
-       "doing": "交给你批准需求"
+       "doing": "交给 erin 批准需求"
+      },
+      {
+       "at": 1794120720,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1794120780,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1794120900,
@@ -27768,7 +28209,17 @@
       {
        "at": 1794123360,
        "status": "done",
-       "doing": "交给你批准设计"
+       "doing": "交给 erin 批准设计"
+      },
+      {
+       "at": 1794124860,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1794124920,
+       "status": "running",
+       "doing": "在做：下一个阶段"
       },
       {
        "at": 1794125580.0,
@@ -27783,8 +28234,13 @@
        "kind": "work"
       },
       {
-       "a": 1794120900,
+       "a": 1794120720,
        "b": 1794123360,
+       "kind": "work"
+      },
+      {
+       "a": 1794124860,
+       "b": 1794125580.0,
        "kind": "work"
       }
      ],
@@ -27797,7 +28253,7 @@
       {
        "at": 1794121800,
        "kind": "blocked",
-       "title": "Lean 拦下了写 src/wecom/service.py（inception）"
+       "title": "Lean 拦下了写 src/wecom/service.py：需求和设计还没批"
       },
       {
        "at": 1794125340.0,
@@ -27807,11 +28263,10 @@
       {
        "at": 1794125580.0,
        "kind": "handover",
-       "title": "交接：brain handoff（24700b6e）"
+       "title": "交给运行机（提交 24700b6e）"
       }
      ],
      "facts": [
-      "Lean 做完 5/11 个阶段",
       "提交 2 次",
       "Lean 拦下 1 次",
       "会话 0 个"
@@ -27826,18 +28281,18 @@
      "sub": "REQUIREMENTS",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "erin 批准了 · 需求",
      "since": 1794120720,
      "history": [
       {
        "at": 1794119460,
        "status": "awaiting_approval",
-       "doing": "等你批准需求"
+       "doing": "等 erin 批准需求"
       },
       {
        "at": 1794120720,
        "status": "merged",
-       "doing": "你批准了 · 需求"
+       "doing": "erin 批准了 · 需求"
       }
      ],
      "spans": [
@@ -27851,12 +28306,12 @@
       {
        "at": 1794119460,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · d648949f）"
+       "title": "请 erin 批准需求"
       },
       {
        "at": 1794120720,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "erin 批准了需求"
       }
      ],
      "facts": [
@@ -27872,18 +28327,23 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "erin 批准了 · 设计",
      "since": 1794124860,
      "history": [
       {
+       "at": 1794120720,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      },
+      {
        "at": 1794123360,
        "status": "awaiting_approval",
-       "doing": "等你批准设计"
+       "doing": "等 erin 批准设计"
       },
       {
        "at": 1794124860,
        "status": "merged",
-       "doing": "你批准了 · 设计"
+       "doing": "erin 批准了 · 设计"
       }
      ],
      "spans": [
@@ -27897,12 +28357,12 @@
       {
        "at": 1794123360,
        "kind": "request",
-       "title": "请你批准设计（DESIGN · d626aa3e）"
+       "title": "请 erin 批准设计"
       },
       {
        "at": 1794124860,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "erin 批准了设计"
       }
      ],
      "facts": [
@@ -27937,7 +28397,7 @@
       {
        "at": 1794125580.0,
        "kind": "handover",
-       "title": "交接：brain handoff（24700b6e）"
+       "title": "交给运行机（提交 24700b6e）"
       }
      ],
      "facts": [
@@ -28063,7 +28523,6 @@
      ],
      "facts": [
       "提交 3 次",
-      "停下问人 0 次",
       "RUN-ORD-10-1"
      ],
      "credits": 7.4,
@@ -28183,7 +28642,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/ORD-10/run.json"
     },
@@ -28223,7 +28682,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · d648949f）",
+     "text": "请 erin 批准需求",
      "detail": false,
      "src": null
     },
@@ -28233,7 +28692,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "erin 批准了需求",
      "detail": false,
      "src": null
     },
@@ -28273,7 +28732,7 @@
      "kind": "blocked",
      "from": "local",
      "to": "local",
-     "text": "Lean 拦下了写 src/wecom/service.py（inception）",
+     "text": "Lean 拦下了写 src/wecom/service.py：需求和设计还没批",
      "detail": true,
      "src": null
     },
@@ -28283,7 +28742,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计（DESIGN · d626aa3e）",
+     "text": "请 erin 批准设计",
      "detail": false,
      "src": null
     },
@@ -28293,7 +28752,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "erin 批准了设计",
      "detail": false,
      "src": null
     },
@@ -28333,7 +28792,7 @@
      "kind": "handover",
      "from": "local",
      "to": "handover",
-     "text": "交接：brain handoff（24700b6e）",
+     "text": "交给运行机（提交 24700b6e）",
      "detail": false,
      "src": null
     },
@@ -28407,7 +28866,8 @@
      "text": "ORD-10：需求初稿",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -28417,7 +28877,8 @@
      "text": "ORD-10：交接说明",
      "files": 1,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     },
     {
      "kind": "handover",
@@ -28427,7 +28888,8 @@
      "text": "ORD-10：交接（brain handoff）",
      "files": 2,
      "records_only": true,
-     "actor": "handover"
+     "actor": "handover",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -28437,7 +28899,8 @@
      "text": "ORD-10：推送服务的骨架",
      "files": 4,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -28447,7 +28910,8 @@
      "text": "ORD-10：模板消息和重试",
      "files": 3,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     },
     {
      "kind": "commit",
@@ -28457,7 +28921,8 @@
      "text": "ORD-10：订单状态变化的订阅",
      "files": 2,
      "records_only": false,
-     "actor": "runner"
+     "actor": "runner",
+     "changes": []
     }
    ],
    "checks": {
@@ -28466,27 +28931,27 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1794120720,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "req"
      },
      {
       "id": "gate-DESIGN",
       "group": "gate",
       "label": "设计",
-      "name": "设计审批（DESIGN）",
+      "name": "设计审批",
       "status": "pass",
       "at": 1794124860,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "design"
      },
      {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "skip",
       "at": null,
       "detail": "还没到这一步",
@@ -28521,21 +28986,15 @@
       "at": 1794125700.0,
       "detail": "签了",
       "actor": "signer"
-     },
-     {
-      "id": "brain-cite",
-      "group": "brain",
-      "label": "引用",
-      "name": "引用的 Brain 条目",
-      "status": "pass",
-      "at": null,
-      "detail": "引用了 0 条，都在",
-      "actor": "reflect"
      }
     ],
-    "passed": 5,
+    "passed": 4,
     "failed": 0,
-    "total": 5,
+    "total": 4,
+    "todo": [
+     "发布审批",
+     "verify"
+    ],
     "at": 1794125700.0,
     "history": []
    },
@@ -28549,7 +29008,7 @@
      "session_url": null
     },
     "by": [],
-    "checks": "检查 5/5 通过；需求、设计已批准",
+    "checks": "目前 4 项都过 · 还剩 发布审批、verify",
     "done": null
    },
    "brain": {
@@ -28671,8 +29130,8 @@
      "sub": "brain-dev · AI-DLC Lean",
      "icon": "laptop",
      "status": "running",
-     "doing": "agent 在做",
-     "since": 1794146400,
+     "doing": "在做：应用设计",
+     "since": 1794139380,
      "history": [
       {
        "at": 1794136800.0,
@@ -28690,14 +29149,19 @@
        "doing": "交给你批准需求"
       },
       {
+       "at": 1794139260,
+       "status": "running",
+       "doing": "批准了，接着做"
+      },
+      {
+       "at": 1794139320,
+       "status": "running",
+       "doing": "在做：下一个阶段"
+      },
+      {
        "at": 1794139380,
        "status": "running",
        "doing": "在做：应用设计"
-      },
-      {
-       "at": 1794146400,
-       "status": "running",
-       "doing": "agent 在做"
       }
      ],
      "spans": [
@@ -28707,7 +29171,7 @@
        "kind": "work"
       },
       {
-       "a": 1794139380,
+       "a": 1794139260,
        "b": null,
        "kind": "work"
       }
@@ -28720,7 +29184,6 @@
       }
      ],
      "facts": [
-      "Lean 做完 2/11 个阶段",
       "提交 1 次",
       "会话 1 个"
      ],
@@ -28763,7 +29226,7 @@
       {
        "at": 1794138600,
        "kind": "request",
-       "title": "请你批准需求（REQUIREMENTS · 4e0cbd16）"
+       "title": "请你批准需求"
       },
       {
        "at": 1794139260,
@@ -28784,9 +29247,15 @@
      "sub": "DESIGN · PLAN",
      "icon": "design",
      "status": "waiting",
-     "doing": "等需求批准以后的设计",
-     "since": null,
-     "history": [],
+     "doing": "等 Lean 做完设计再请人批（小需求它会跳过）",
+     "since": 1794139260,
+     "history": [
+      {
+       "at": 1794139260,
+       "status": "waiting",
+       "doing": "等 Lean 做完设计再请人批（小需求它会跳过）"
+      }
+     ],
      "spans": [],
      "marks": [],
      "facts": [],
@@ -28800,20 +29269,18 @@
      "sub": "brain handoff",
      "icon": "handover",
      "status": "skipped",
-     "doing": "这个仓库只在本机做：不交给运行机",
+     "doing": "这次不需要：这个仓库只在本机做",
      "since": 1794135600.0,
      "history": [
       {
        "at": 1794135600.0,
        "status": "skipped",
-       "doing": "这个仓库只在本机做：不交给运行机"
+       "doing": "这次不需要：这个仓库只在本机做"
       }
      ],
      "spans": [],
      "marks": [],
-     "facts": [
-      "分支 ai/alice/TOOL-1-price-import"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -28824,13 +29291,13 @@
      "sub": "核对交接 · 转问题",
      "icon": "bridge",
      "status": "skipped",
-     "doing": "这个仓库只在本机做：不交给运行机",
+     "doing": "这次不需要：这个仓库只在本机做",
      "since": 1794135600.0,
      "history": [
       {
        "at": 1794135600.0,
        "status": "skipped",
-       "doing": "这个仓库只在本机做：不交给运行机"
+       "doing": "这次不需要：这个仓库只在本机做"
       }
      ],
      "spans": [],
@@ -28846,13 +29313,13 @@
      "sub": "接手合同 · 回答凭证",
      "icon": "signer",
      "status": "skipped",
-     "doing": "这个仓库只在本机做：不交给运行机",
+     "doing": "这次不需要：这个仓库只在本机做",
      "since": 1794135600.0,
      "history": [
       {
        "at": 1794135600.0,
        "status": "skipped",
-       "doing": "这个仓库只在本机做：不交给运行机"
+       "doing": "这次不需要：这个仓库只在本机做"
       }
      ],
      "spans": [],
@@ -28868,20 +29335,18 @@
      "sub": "brain-run · 无人值守",
      "icon": "runner",
      "status": "skipped",
-     "doing": "这个仓库只在本机做：不交给运行机",
+     "doing": "这次不需要：这个仓库只在本机做",
      "since": 1794135600.0,
      "history": [
       {
        "at": 1794135600.0,
        "status": "skipped",
-       "doing": "这个仓库只在本机做：不交给运行机"
+       "doing": "这次不需要：这个仓库只在本机做"
       }
      ],
      "spans": [],
      "marks": [],
-     "facts": [
-      "停下问人 0 次"
-     ],
+     "facts": [],
      "credits": null,
      "session": null,
      "line": null
@@ -28999,7 +29464,7 @@
      "kind": "start",
      "from": "person",
      "to": "local",
-     "text": "开工：brain start，在它自己的工作目录里",
+     "text": "开工：在它自己的工作目录里",
      "detail": false,
      "src": "runs/TOOL-1/run.json"
     },
@@ -29029,7 +29494,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求（REQUIREMENTS · 4e0cbd16）",
+     "text": "请你批准需求",
      "detail": false,
      "src": null
     },
@@ -29083,7 +29548,8 @@
      "text": "TOOL-1：导入格式和校验规则",
      "files": 2,
      "records_only": true,
-     "actor": "local"
+     "actor": "local",
+     "changes": []
     }
    ],
    "checks": {
@@ -29092,7 +29558,7 @@
       "id": "gate-REQUIREMENTS",
       "group": "gate",
       "label": "需求",
-      "name": "需求审批（REQUIREMENTS）",
+      "name": "需求审批",
       "status": "pass",
       "at": 1794139260,
       "detail": "你批准了",
@@ -29102,7 +29568,7 @@
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
-      "name": "发布审批（RELEASE）",
+      "name": "发布审批",
       "status": "skip",
       "at": null,
       "detail": "还没到这一步",
@@ -29123,25 +29589,19 @@
       "group": "brain",
       "label": "kit",
       "name": ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）",
-      "status": "skip",
+      "status": "not_needed",
       "at": null,
-      "detail": "只在本机做，现在不碍事；只有把需求交给运行机时才要紧（运行机靠新版停下来问人）。要交的话点「修复」：重装 brain-kit",
+      "detail": "只在本机做，用不上：交给运行机时才要紧",
       "actor": null
-     },
-     {
-      "id": "brain-cite",
-      "group": "brain",
-      "label": "引用",
-      "name": "引用的 Brain 条目",
-      "status": "pass",
-      "at": null,
-      "detail": "引用了 0 条，都在",
-      "actor": "reflect"
      }
     ],
-    "passed": 2,
+    "passed": 1,
     "failed": 0,
-    "total": 2,
+    "total": 1,
+    "todo": [
+     "发布审批",
+     "verify"
+    ],
     "at": 1794139260,
     "history": []
    },
@@ -29155,7 +29615,7 @@
      "session_url": null
     },
     "by": [],
-    "checks": "检查 2/2 通过；需求已批准",
+    "checks": "目前 1 项都过 · 还剩 发布审批、verify",
     "done": null
    },
    "brain": {
