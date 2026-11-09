@@ -8,8 +8,8 @@ import { useState } from 'react'
 import { useNavigate } from '@kirocrew/app-sdk'
 import type { ReqBoard } from '../types'
 import { ExtLink, Icon, TYPE_IT_YOURSELF } from '../ui'
-import { ACT } from '../vocab'
-import { QuestionCard } from '../views/Question'
+import { ACT, DO_NAME } from '../vocab'
+import { QuestionCard, ReviewButton } from '../views/Question'
 import { fmtSpan } from './format'
 import { useServerNow } from './hooks'
 import { nextOf, type Step } from './next'
@@ -49,7 +49,7 @@ export function NextStep({ board, repo, reqKey, onAnswered, onBrain, onDetail }:
           <li key={s.id} className={`br-next-item is-${s.do}`} data-testid="br-next-step" data-do={s.do}>
             {s.question
               ? <AskRow s={s} open={n.steps.length === 1} repo={repo} reqKey={reqKey} onAnswered={onAnswered} />
-              : <StepRow s={s} onBrain={onBrain} onDetail={onDetail} />}
+              : <StepRow s={s} onBrain={onBrain} onDetail={onDetail} repo={repo} reqKey={reqKey} board={board} />}
           </li>
         ))}
       </ol>
@@ -103,19 +103,20 @@ function LineRow({ line, session }: { line: string; session: string | null }) {
   )
 }
 
-function StepRow({ s, onBrain, onDetail }: { s: Step; onBrain?: () => void; onDetail?: () => void }) {
+function StepRow({ s, onBrain, onDetail, repo, reqKey, board }: { s: Step; onBrain?: () => void; onDetail?: () => void; repo: string; reqKey: string; board: ReqBoard }) {
   const navigate = useNavigate()
   const session = s.session && !s.line ? s.session : null
+  const slot = board.actors.find((a) => a.key === 'local')?.session?.slot ?? null
   return (
     <div className="br-next-row">
       <div className="br-next-text">
         {s.why ? (
           <>
             <p><span className="br-next-k">为什么被拒</span><b className="br-strong">{s.why}</b></p>
-            <p><span className="br-next-k">怎么办</span>{s.text}</p>
+            <p className="br-pre-line"><span className="br-next-k">怎么办</span>{s.text}</p>
           </>
         ) : (
-          <p className="br-strong">{s.text}</p>
+          <p className="br-strong br-pre-line">{s.text}</p>
         )}
         {s.hint && <p className="br-next-hint">{s.hint}</p>}
         {s.command && <Command cmd={s.command} />}
@@ -128,12 +129,13 @@ function StepRow({ s, onBrain, onDetail }: { s: Step; onBrain?: () => void; onDe
         )}
       </div>
       <div className="br-next-acts">
-        {session && <button type="button" className="kt-btn is-primary" onClick={() => navigate(session)}>{ACT.openSession}</button>}
+        {s.review && <ReviewButton repo={repo} reqKey={reqKey} liveSlot={slot} worktree={board.row.worktree} />}
+        {session && <button type="button" className={`kt-btn${s.review ? '' : ' is-primary'}`} onClick={() => navigate(session)}>{ACT.openSession}</button>}
         {!s.session && !s.line && (s.do === 'reply' || s.do === 'tool') && onDetail && (
           <button type="button" className="kt-btn" onClick={onDetail} title="需求详情里能开一个新会话">去需求详情开会话</button>
         )}
         {s.mr && <ExtLink href={s.mr} className={`kt-btn br-extbtn${s.do === 'accept' || s.do === 'answer' || s.do === 'label_handoff' ? ' is-primary' : ''}`}>{s.do === 'answer' ? `${ACT.answerOnMr} ↗` : s.do === 'redo_handoff' ? '在 MR 上看桥说的 ↗' : '去 MR ↗'}</ExtLink>}
-        {s.do === 'write_back' && onBrain && <button type="button" className="kt-btn is-primary" onClick={onBrain}>去 Brain 回写 ↗</button>}
+        {s.do === 'write_back' && onBrain && <button type="button" className="kt-btn is-primary" onClick={onBrain}>{DO_NAME.write_back} ↗</button>}
       </div>
     </div>
   )
@@ -154,10 +156,10 @@ function Command({ cmd }: { cmd: { text: string; cwd: string | null } }) {
   return (
     <div className="br-next-cmd">
       <span className="br-next-k">在哪做</span>
-      <span>{cmd.cwd ? '在这个需求的工作区里开一个终端，敲：' : '在本机这个需求的分支上开一个终端，敲：'}</span>
+      <span>{cmd.cwd ? '在这个需求的工作目录里开一个终端，敲：' : '在本机这个需求的分支上开一个终端，敲：'}</span>
       <code className="br-mono" title={full}>{cmd.text}</code>
       <button type="button" className="br-btn is-small" onClick={() => void copy()}><Icon name="Copy" size={13} />复制命令</button>
-      {copied && <span className="br-small br-ok-text" role="status">已复制（含 cd 到工作区）</span>}
+      {copied && <span className="br-small br-ok-text" role="status">已复制（含 cd 到工作目录）</span>}
       {cmd.cwd && <span className="kt-dim kt-mono br-next-cwd" title={cmd.cwd}>{cmd.cwd}</span>}
     </div>
   )

@@ -30,7 +30,8 @@ export interface ReplayHandle {
   finished: boolean
   speed: number
   playing: boolean
-  start: () => void
+  /** from the start, playing; or stopped at the moment *at* (epoch s: a decision, a part of 价值流) */
+  start: (at?: number) => void
   exit: () => void
   toggle: () => void
   pause: () => void
@@ -50,10 +51,11 @@ export function useReplay(board: ReqBoard | null, onDiff: (d: BoardDiff) => void
   const total = clk?.total ?? 0
   const t = clk ? clk.toReal(st.p) : 0
 
-  const start = useCallback(() => {
+  const start = useCallback((at?: number) => {
     frozen.current = board
     prev.current = null
-    setSt({ on: true, p: 0, speed: 1, playing: true })
+    const p = at !== undefined && board ? replayClock(board).toPlay(at) : 0
+    setSt({ on: true, p, speed: 1, playing: at === undefined })
   }, [board])
   const exit = useCallback(() => {
     prev.current = null
@@ -122,7 +124,7 @@ export function ReplayBar({ rp }: { rp: ReplayHandle }) {
           </button>
         ))}
       </span>
-      <span className="kt-dim kt-replay-note">{ended ? (rp.finished ? '放完了：下面是这个需求最后的样子' : '放到现在了：它还在进行') : '按记录重放：安静的时段缩短了，不调用 agent'}</span>
+      <span className="kt-dim kt-replay-note">{ended ? (rp.finished ? '放完了：下面是这个需求最后的样子' : '放到现在了：它还在进行') : !rp.playing && rp.p > 0 ? '停在这一刻：按 ▶ 接着放' : '按记录重放：安静的时段缩短了，不调用 agent'}</span>
       <button type="button" className="kt-btn" onClick={rp.exit}>退出回放</button>
     </div>
   )

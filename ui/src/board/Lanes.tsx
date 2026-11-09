@@ -45,10 +45,14 @@ export function Lanes({ board, focus, bumps, onActor, quiet = false }: LanesProp
   )
 }
 
-/** The actors this requirement skips, the ones skipped for one reason together: 「交接、桥、签名（只在本机做）」. */
+/** The actors this requirement skips, the ones skipped for one reason together: 「交接、桥、签名（这个仓库只在本机做）」.
+ * The strip already says 这次不需要, so only the reason after an actor's own 「这次不需要：」 is repeated. */
 export function offLine(off: Actor[]): string {
   const by = new Map<string, string[]>()
-  for (const a of off) by.set(a.doing, [...(by.get(a.doing) ?? []), a.title])
+  for (const a of off) {
+    const why = a.doing.replace(/^这次不需要[：:]?\s*/, '')
+    by.set(why, [...(by.get(why) ?? []), a.title])
+  }
   return [...by].map(([why, names]) => `${names.join('、')}${why ? `（${why}）` : ''}`).join('；')
 }
 
@@ -61,11 +65,14 @@ export function axisTicks(dur: number): number[] {
   return out
 }
 
-/** 0, 15 分, 3 小时, 1 天, 1 天 6 时 */
+/** 0, 15 分, 3 小时, 1 小时 30 分, 1 天, 1 天 6 时 */
 export function tickLabel(s: number): string {
   if (s <= 0) return '0'
   if (s < 3600) return `${Math.round(s / 60)} 分`
-  if (s < 86400) return `${Math.round(s / 3600)} 小时`
+  if (s < 86400) {
+    const m = Math.round(s / 60)
+    return m % 60 ? `${Math.floor(m / 60)} 小时 ${m % 60} 分` : `${m / 60} 小时`
+  }
   const d = Math.floor(s / 86400)
   const h = Math.round((s % 86400) / 3600)
   return h ? `${d} 天 ${h} 时` : `${d} 天`

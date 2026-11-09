@@ -4,12 +4,14 @@
  * (the gate it waited at, the session, the AI) with how it ended, who was at it above, the moments under it; 图 or 表格.
  */
 import { useState } from 'react'
+import { clip, textWidth } from '../board/format'
 import { RoleGlyph } from '../board/RoleIcon'
 import { Hit, Tip, useWidth, type TipState } from '../cto/charts'
 import { fmtDay, fmtSpan, isoDay } from '../format'
 import type { Actor, BoardEvent, ReqBoard } from '../types'
 
 const RUNNERS = new Set(['runner', 'bridge', 'signer'])
+const GATES = new Set(['req', 'design', 'release', 'reflect'])
 
 /** Where the time went, from the board's actors: AI on this machine, the runner, waiting for a person, done again. */
 export type Part = 'agent' | 'runner' | 'person' | 'rework'
@@ -40,7 +42,8 @@ function partOf(a: Actor, kind: 'work' | 'wait' | 'fix'): Part {
 
 function labelOf(a: Actor, part: Part): string {
   if (part === 'rework') return PART_LABEL.rework
-  if (part === 'person') return a.key === 'local' ? '会话等人' : a.title
+  // a gate's wait is the gate (需求审批); the session or the runner waiting on a person says so (运行机等人)
+  if (part === 'person') return GATES.has(a.key) ? a.title : a.key === 'local' ? '会话等人' : `${a.title}等人`
   return a.key === 'local' ? PART_LABEL.agent : a.title
 }
 
@@ -61,7 +64,8 @@ export function valueStream(b: ReqBoard, now: number): StreamSeg[] {
     const t0 = pts[i], t1 = pts[i + 1]
     const on = ivs.filter((x) => x.a <= t0 && x.b >= t1)
     if (!on.length) continue
-    const top = on.sort((x, y) => RANK[y.part] - RANK[x.part])[0]
+    // a gate's wait names what is waited for; the session's own wait going on meanwhile says less
+    const top = on.sort((x, y) => RANK[y.part] - RANK[x.part] || Number(x.actor.key === 'local') - Number(y.actor.key === 'local'))[0]
     const last = out[out.length - 1]
     if (last && last.part === top.part && last.actor === top.actor.key && Math.abs(last.to - t0) < 1) last.to = t1
     else out.push({ from: t0, to: t1, part: top.part, actor: top.actor.key, label: labelOf(top.actor, top.part), icon: top.part === 'person' ? 'wait' : top.actor.icon, decision: null })
@@ -110,6 +114,9 @@ export function StreamCard({ board, at, onAt }: { board: ReqBoard | null; at: nu
   const segs = board ? valueStream(board, at) : []
   if (!board || !segs.length) return null
   const t0 = segs[0].from, t1 = segs[segs.length - 1].to
+  // the whole time is 周期's (brain start → the merge or now); a quiet end with nothing recorded is said, not drawn
+  const begin = board.events.find((e) => e.kind === 'start')?.at ?? t0
+  const end = Math.max(t1, board.ended_at ?? at)
   const parts = PARTS.filter((p) => segs.some((s) => s.part === p))
   const who = (s: StreamSeg) => (s.part === 'person' ? '人' : s.part === 'runner' ? s.label : s.part === 'rework' ? 'AI' : 'AI（本机会话）')
   const days = isoDay(new Date(t0 * 1000).toISOString()) !== isoDay(new Date(t1 * 1000).toISOString())
@@ -117,7 +124,7 @@ export function StreamCard({ board, at, onAt }: { board: ReqBoard | null; at: nu
     <section className="cto-card" aria-label="价值流" data-testid="item-stream">
       <div className="cto-chart-head">
         <h3>价值流</h3>
-        <span className="cto-dim">从开工到{board.ended_at ? '合并' : '此刻'}，共 {fmtSpan(t1 - t0)} · 点任一段或任一时刻，到需求看板的那一刻</span>
+        <span className="cto-dim">从开工到{board.ended_at ? '合并' : '此刻'}，共 {fmtSpan(end - begin)}{end - t1 >= 600 ? `（最后 ${fmtSpan(end - t1)} 没有动静）` : ''} · 点任一段或任一时刻，到需求看板的那一刻</span>
         <span className="cto-grow" />
         <div className="cto-seg" role="group" aria-label="图或表格">
           <button type="button" aria-pressed={!asTable} onClick={() => setAsTable(false)}>图</button>
@@ -193,7 +200,11 @@ function StreamChart({ board, segs, days, onAt }: { board: ReqBoard; segs: Strea
         <line x1={L} x2={W - R} y1={AXIS} y2={AXIS} stroke="var(--border-strong)" strokeWidth={1} />
         {segs.map((s, i) => {
           const a = x(s.from), bb = x(s.to), w = Math.max(2, bb - a - (i < segs.length - 1 ? 2 : 0))
-          const label = s.label.length * 13 > w ? `${s.label.slice(0, Math.max(1, Math.floor(w / 13) - 1))}…` : s.label
+          // both lines fit the part's own width (about 12.5 px an em): the next part's words start right after it
+          const room = (w - 4) / 12.5
+          const label = clip(s.label, room)
+          const long = `${fmtSpan(s.to - s.from)}${s.decision ? ` · ${s.decision}` : ''}`
+          const sub = clip(textWidth(long) <= room ? long : fmtSpan(s.to - s.from), room)
           return (
             <g key={`${s.from}-${s.actor}`} className="cto-vs-seg">
               <rect x={a} y={BAND} width={w} height={BH} rx={i === 0 || i === segs.length - 1 ? 4 : 1} fill={PART_VAR[s.part]} />
@@ -206,7 +217,7 @@ function StreamChart({ board, segs, days, onAt }: { board: ReqBoard; segs: Strea
               {w >= 58 && (
                 <>
                   <text x={a} y={BAND + BH + 18} className="is-strong">{label}</text>
-                  <text x={a} y={BAND + BH + 34}>{fmtSpan(s.to - s.from)}{s.decision ? ` · ${s.decision}` : ''}</text>
+                  <text x={a} y={BAND + BH + 34}>{sub}</text>
                 </>
               )}
               <Hit x={a} y={BAND - 30} w={Math.max(8, w)} h={BH + 72} onTip={setTip} tipY={BAND + BH + 40} onPick={() => onAt(s.from)}

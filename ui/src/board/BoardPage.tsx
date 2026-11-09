@@ -14,12 +14,12 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
-import type { BoardEntry } from '../nav'
+import { VIEW_NAME, type BoardEntry } from '../nav'
 import type { ReqBoard, WaitDo } from '../types'
 import { LoadState } from '../ui'
 import { QuestionCard } from '../views/Question'
 import type { ViewProps } from '../views/props'
-import { ReqSwitch } from '../views/ReqSwitch'
+import { NotFound, ReqSwitch } from '../views/ReqSwitch'
 import { Accept } from './Accept'
 import { ActorGraph, rosterRows, type FlashMap } from './ActorGraph'
 import { CheckWall } from './CheckWall'
@@ -104,23 +104,26 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
   replaying.current = rp.on
   const board = rp.board ?? live.board
   useEffect(() => setFx(NO_EFFECTS), [rp.on])
-  // the address says whether it replays (a reload, a copied link open the same): rewritten, not a new entry
-  const said = useRef(!!entry.replay)
+  // the address says whether it replays (a reload, a copied link open the same): rewritten, not a new entry; the
+  // moment it was opened at goes with the replay
+  const said = useRef(!!entry.replay || !!entry.at)
+  const entered = useRef(false)
   useEffect(() => {
-    if (rp.on === said.current) return
+    if (!entered.current || rp.on === said.current) return
     said.current = rp.on
-    const { replay: _r, ...rest } = entry
+    const { replay: _r, at: _a, ...rest } = entry
     replace({ kind: 'board', ...rest, ...(rp.on ? { replay: true } : {}) })
   }, [rp.on]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // the way in: ?replay=1 starts the replay once the board is here; ?focus= scrolls to that part
-  const entered = useRef(false)
+  // the way in: ?replay=1 starts the replay once the board is here, ?at= stops it at that moment; ?focus= scrolls to
+  // that part
   useEffect(() => {
     if (entered.current || !live.board) return
     entered.current = true
-    if (entry.replay) rp.start()
+    if (entry.at) rp.start(entry.at)
+    else if (entry.replay) rp.start()
     const where = entry.focus === 'accept' ? '#br-accept' : entry.focus === 'checks' ? '[data-testid="kt-wall"]' : entry.focus === 'lanes' ? '[data-testid="kt-lanes"]'
-      : entry.focus === 'feed' ? '[data-testid="kt-feed"]' : entry.replay ? '[data-testid="kt-graph"]' : ''
+      : entry.focus === 'feed' ? '[data-testid="kt-feed"]' : entry.replay || entry.at ? '[data-testid="kt-graph"]' : ''
     if (where) setTimeout(() => rootRef.current?.querySelector(where)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 80)
   }, [live.board]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -148,6 +151,8 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const toDetail = () => go({ kind: 'item', repo: entry.repo, key: entry.key, from: 'board' })
+  // the crumb's first step and ← 返回 name the view it was opened from (the way back)
+  const fromName = VIEW_NAME[entry.from ?? 'overview']
   const toBrain = () => go({ kind: 'brain', repo: entry.repo, reflect: entry.key })
   // 开工 the requirement claimed already: 开需求 with its key (fixed there) and title; only its owner starts it
   const me = status?.repos.find((r) => r.id === entry.repo)?.me?.name ?? null
@@ -173,7 +178,7 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
       <ClockContext.Provider value={clock}>
         <div className="cto-top br-where-row">
           <nav className="kit-crumb kt-where" aria-label="位置" data-testid="kt-where">
-            <button type="button" onClick={() => go({ kind: 'overview' })}>交付总览</button>
+            <button type="button" onClick={onBack ?? (() => go({ kind: 'overview' }))}>{fromName}</button>
             <span aria-hidden="true">›</span>
             <button type="button" onClick={toDetail} title="需求详情">{entry.key}</button>
             <span aria-hidden="true">›</span>
@@ -182,12 +187,15 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
           <span className="cto-grow" />
           {!rp.on && <ReqSwitch repo={entry.repo} reqKey={entry.key} status={status} pollMs={pollMs}
             onPick={onSwitch ?? ((repo, key) => go({ kind: 'board', repo, key }))} />}
-          {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{entry.from === 'item' ? '需求详情' : entry.from === 'todo' ? '待办' : '交付总览'}</button>}
+          {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{fromName}</button>}
         </div>
-        <LoadState loading={live.loading} error={live.missing ? `没有这个需求（${entry.repo} · ${entry.key}）：它可能已经不在这个仓库里` : live.error} has={!!board} />
+        {live.missing && !board
+          ? <NotFound repoName={status?.repos.find((r) => r.id === entry.repo)?.name ?? (entry.repo === 'runner' ? '运行机' : null)} reqKey={entry.key}
+              onOverview={() => go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) })} testId="br-board-missing" />
+          : <LoadState loading={live.loading} error={live.error} has={!!board} />}
         {board && lay && (
           <>
-            <TopBar board={board} replaying={rp.on} follow={follow} onReplay={rp.start} onFollow={() => setFollow((v) => !v)} onDetail={toDetail}
+            <TopBar board={board} replaying={rp.on} follow={follow} onReplay={() => rp.start()} onFollow={() => setFollow((v) => !v)} onDetail={toDetail}
               onSession={(url) => navigate(url)} onStart={startable ? toStart : undefined} />
             <ReplayBar rp={rp} />
             {problem && (

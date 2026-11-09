@@ -235,14 +235,21 @@ export interface ChecksSay {
   green: boolean
 }
 
+/** The checks not reached yet, by name: the backend's todo (without the 14 days it watches: those are 在观察, nobody's
+ * turn, not something left to do), else an older backend's approvals and verify not run yet. */
+export function todoLeft(w: CheckWall): string[] {
+  const watched = w.cells.filter((c) => c.status === 'watch').map((c) => c.name)
+  if (w.todo) return w.todo.filter((t) => !watched.some((n) => n.startsWith(t)))
+  return w.cells.filter((c) => c.status === 'skip' && (c.group === 'gate' || c.group === 'verify')).map((c) => (c.group === 'gate' ? c.name.replace(/（[^）]*）$/, '') : c.label))
+}
+
 /** What the checks say, the one way (the KPI, the wall, 验收): 「目前 3 项都过 · 还剩 发布审批」. A check that waits for
  * a person names whom; the 14 days after the merge are 「在观察」, nobody's turn. */
 export function checksSay(w: CheckWall, who: WaitWho, owner: string | null): ChecksSay {
   const n = (s: string) => w.cells.filter((c) => c.status === s).length
   const wait = n('wait')
   const watch = n('watch')
-  const todo = w.todo ?? w.cells.filter((c) => c.status === 'skip' && (c.group === 'gate' || c.group === 'verify'))
-    .map((c) => (c.group === 'gate' ? `${c.label}审批` : c.label))
+  const todo = todoLeft(w)
   const left = todo.length ? ` · 还剩 ${todo.join('、')}` : ''
   const watching = watch ? ` · ${watch} 项在观察` : ''
   if (!w.total && !watch) return { text: '还没有检查结果', tone: 'idle', green: false }

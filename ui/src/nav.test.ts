@@ -23,6 +23,9 @@ describe('nav: the URL of every view', () => {
       { kind: 'import' },
       { kind: 'import', path: '/Users/alice/workplace/shop pay' },
       { kind: 'import', path: '~/workplace/refund' },
+      { kind: 'item', repo: 'runner', key: 'PAY-8', from: 'team' },
+      { kind: 'item', repo: 'r1', key: 'PAY-4', from: 'overview', decision: 'D-3' },
+      { kind: 'board', repo: 'r1', key: 'PAY-2', from: 'item', at: 1793631120 },
     ]
     for (const v of views) expect(parseView(searchOf(v))).toEqual(v)
   })
@@ -48,6 +51,8 @@ describe('nav: the URL of every view', () => {
     expect(parseView('?view=overview&repo=all&state=nope')).toEqual({ kind: 'overview' })
     expect(parseView('?view=brain&repo=r1&file=SECRETS&id=<b>&reflect=pay-3')).toEqual({ kind: 'brain', repo: 'r1' })
     expect(parseView('?view=nothing')).toEqual({ kind: 'overview' })
+    expect(parseView('?view=item&repo=r1&key=PAY-4&decision=D-3%22%3E')).toEqual({ kind: 'item', repo: 'r1', key: 'PAY-4' })
+    expect(searchOf({ kind: 'item', repo: 'r1', key: 'PAY-4', decision: 'x' })).toBe('?view=item&repo=r1&key=PAY-4')
   })
 
   test('需求看板: repo and key or nothing; replay only as 1; a focus and a from of its own, else left out', () => {

@@ -127,7 +127,7 @@ describe('运行机', () => {
     await user.click(within(runs).getByRole('button', { name: '打开会话' }))
     expect(navigations).toEqual(['/chat?sid=brain-run-PAY-4-1'])
     await user.click(within(runs).getByRole('button', { name: 'PAY-5' }))
-    expect(p.go).toHaveBeenCalledWith({ kind: 'item', repo: 'runner', key: 'PAY-5' })
+    expect(p.go).toHaveBeenCalledWith({ kind: 'item', repo: 'runner', key: 'PAY-5', from: 'team' })
   })
 
   test('现在跑一轮 posts /team/loop and says what the round did, step by step in words', async () => {

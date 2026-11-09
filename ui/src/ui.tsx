@@ -19,9 +19,10 @@ import type { Tone } from './styles'
 import type {
   AnswerBody, AnswerResult, ApprovalState, CheckRow, CommitResult, CrewFixBody, CrewFixResult, FileChange, ImportJob, ImportPurpose,
   InstallChoices, InstallMode, JobStart, JobStepState, LeanSummary, Level, MeNameResult, MergeResult, MrRef, PendingInstall, PublishResult,
-  PullResult, PushResult, Question, ReqState, RepoInfo, RepoMe, StageState,
+  PullResult, PushResult, Question, ReqState, RepoInfo, RepoMe, StageState, WaitWho,
 } from './types'
 import { STATE_LABEL } from './types'
+import { ACT } from './vocab'
 
 export { RoleIcon }
 
@@ -40,9 +41,14 @@ const STATE_DOT: Record<ReqState, string> = {
 }
 const LIVE_STATES: ReadonlySet<ReqState> = new Set<ReqState>(['local', 'running', 'parked', 'acceptance'])
 
-export function StateChip({ state, label }: { state: ReqState; label?: string }) {
+/** A requirement's state. With *who* (its waits.who), the one judgment of whose turn it is: 停下等回答 / 等验收 are
+ * magenta (等人) only when they wait on you, calm when they wait on someone else (the product, a colleague); a state
+ * whose AI is not at work right now (an idle session waiting for you) does not blink. */
+export function StateChip({ state, label, who }: { state: ReqState; label?: string; who?: WaitWho }) {
+  const tone = STATE_TONE[state] ?? 'idle'
+  const calm = who !== undefined && (tone === 'wait' ? who !== 'you' : tone === 'run' ? who !== 'agent' && who !== 'runner' : false)
   return (
-    <span className={`br-chip tone-${STATE_TONE[state] ?? 'idle'} kt-pill${LIVE_STATES.has(state) ? ' is-live' : ''}`} data-state={state}>
+    <span className={`br-chip tone-${calm && tone === 'wait' ? 'info' : tone} kt-pill${LIVE_STATES.has(state) && !calm ? ' is-live' : ''}`} data-state={state}>
       <i aria-hidden="true">{STATE_DOT[state] ?? '•'}</i>
       {label || STATE_LABEL[state] || state}
     </span>
@@ -147,7 +153,7 @@ export function Rate({ value }: { value: [number, number] | number | null }) {
 export const TYPE_IT_YOURSELF = '在会话里自己打这一行。app 不会替你发。'
 
 /**
- * The Lean approval line the person types themselves in the session: shown, 复制 (the clipboard), 打开会话 (opens
+ * The Lean approval line the person types themselves in the session: shown, 复制那一行 (the clipboard), 打开会话 (opens
  * the session; nothing is typed or sent there). *sessionUrl* null: no session to open.
  */
 export function TypeLine({ line, sessionUrl }: { line: string; sessionUrl?: string | null }) {
@@ -166,11 +172,11 @@ export function TypeLine({ line, sessionUrl }: { line: string; sessionUrl?: stri
       <code className="br-mono">{line}</code>
       <div className="br-row">
         <button type="button" className="br-btn is-small" onClick={() => void copy()}>
-          <Icon name="Copy" size={13} />复制
+          <Icon name="Copy" size={13} />{ACT.copyLine}
         </button>
         {sessionUrl && (
           <button type="button" className="br-btn is-small" onClick={() => navigate(sessionUrl)}>
-            <Icon name="MessageSquare" size={13} />打开会话
+            <Icon name="MessageSquare" size={13} />{ACT.openSession}
           </button>
         )}
         {copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}

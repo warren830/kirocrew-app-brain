@@ -5,11 +5,13 @@
  *   /apps/brain                                   交付总览 (the default)
  *     ?view=overview&repo=<id>&state=<ReqState>   …filtered to one repo / one state
  *   ?view=item&repo=<id>&key=<KEY>                需求详情
- *     &from=overview|todo|brain|board             …opened from that view: the crumb says the way back
+ *     &from=overview|todo|brain|board|team        …opened from that view: the crumb says the way back
+ *     &decision=D-<n>                             …scrolled to that decision, picked out
  *   ?view=board&repo=<id>&key=<KEY>               需求看板 (the requirement's team-board view, polled every 2 s)
  *     &replay=1                                   …its 回放 starts (a finished requirement)
  *     &focus=accept|checks|lanes|feed             …scrolled to 验收, the check wall, the lanes or the events
  *     &from=overview|item|todo                    …opened from that view: the crumb says the way back
+ *     &at=<epoch s>                               …its 回放 stands at that moment (a decision, a part of 价值流)
  *   ?view=new&repo=<id>                           开需求
  *     &key=<KEY>&title=<title>                    …开工 of a requirement claimed already: its key fixed, its title filled
  *   ?view=brain&repo=<id>&file=<FILE>&id=<entry>&reflect=<KEY>   Brain: that file, that entry picked out, that
@@ -24,14 +26,16 @@
 import { STATE_LABEL, type ReqState } from './types'
 
 export type ViewKind = 'overview' | 'item' | 'board' | 'new' | 'brain' | 'todo' | 'team' | 'settings' | 'import'
-export type ItemFrom = 'overview' | 'todo' | 'brain' | 'board'
+export type ItemFrom = 'overview' | 'todo' | 'brain' | 'board' | 'team'
 export type BoardFrom = 'overview' | 'item' | 'todo'
 export type BoardFocus = 'accept' | 'checks' | 'lanes' | 'feed'
 export type BrainFile = 'PRODUCT' | 'TECH' | 'IMPROVEMENT' | 'PROJECT'
 export const BRAIN_FILES: readonly BrainFile[] = ['PRODUCT', 'TECH', 'IMPROVEMENT', 'PROJECT']
 
 export type OverviewEntry = { repo?: string; state?: ReqState }
-export type ItemEntry = { repo: string; key: string; from?: ItemFrom }
+export type ItemEntry = { repo: string; key: string; from?: ItemFrom
+  /** one of its decisions (decisions.md's D-<n>): 需求详情 scrolls to its row and picks it out (?decision=) */
+  decision?: string }
 export type BoardEntry = { repo: string; key: string; replay?: boolean; focus?: BoardFocus; from?: BoardFrom
   /** a moment of it (epoch s): 需求详情's 价值流 and 决定 open the board there (?at=) */
   at?: number }
@@ -57,8 +61,10 @@ export const KEY_RE = /^[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}$/
 export const ENTRY_RE = /^[A-Z]-(?:[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,3}|[0-9]{1,5})$/
 /** an absolute path (or ~/…) without control characters: what 导入仓库 may be opened with */
 export const PATH_RE = /^(?:\/|~\/)[^\u0000-\u001f\u007f]{0,1023}$/
+/** a decision of decisions.md: D-<n> */
+export const DECISION_RE = /^D-[0-9]{1,4}$/
 const STATES = Object.keys(STATE_LABEL) as ReqState[]
-const FROM: readonly string[] = ['overview', 'todo', 'brain', 'board']
+const FROM: readonly string[] = ['overview', 'todo', 'brain', 'board', 'team']
 const BOARD_FROM: readonly string[] = ['overview', 'item', 'todo']
 const FOCUS: readonly string[] = ['accept', 'checks', 'lanes', 'feed']
 
@@ -78,7 +84,8 @@ export function parseView(search: string): View {
     const key = q.get('key') ?? ''
     if (!REPO_RE.test(repo) || !KEY_RE.test(key)) return { kind: 'overview' }
     const from = q.get('from') ?? ''
-    return { kind: 'item', repo, key, ...(FROM.includes(from) ? { from: from as ItemFrom } : {}) }
+    const decision = q.get('decision') ?? ''
+    return { kind: 'item', repo, key, ...(FROM.includes(from) ? { from: from as ItemFrom } : {}), ...(DECISION_RE.test(decision) ? { decision } : {}) }
   }
   if (view === 'board') {
     const repo = q.get('repo') ?? ''
@@ -139,6 +146,7 @@ export function searchOf(v: View): string {
       put('repo', v.repo)
       put('key', v.key)
       put('from', v.from)
+      put('decision', v.decision && DECISION_RE.test(v.decision) ? v.decision : undefined)
       break
     case 'board':
       q.set('view', 'board')

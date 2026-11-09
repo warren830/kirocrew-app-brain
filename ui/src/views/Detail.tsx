@@ -11,13 +11,15 @@
  * Polls GET /requirements/{repo}/{key} every 5 s, and the board's snapshot (GET /board/{repo}/{key}) for the value
  * stream (its actors' spans), the checks and the step; without a board the cards that need it say so.
  */
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, usePoll, useAction } from '../api'
+import { PERSON, todoLeft, whoWord } from '../board/format'
+import { isReview } from '../board/next'
 import { RoleIcon } from '../board/RoleIcon'
 import { Hit, Mini } from '../cto/charts'
 import { ago, fmtCredits, fmtIso, fmtSpan, fmtTime, isoDay } from '../format'
-import type { BoardEntry, ItemEntry, ItemFrom } from '../nav'
+import { VIEW_NAME, type BoardEntry, type ItemEntry } from '../nav'
 import type {
   CheckCell, Decision, LeanSummary, OpenSessionBody, OpenSessionResult, ReqBoard, RequirementDetail, SessionRow, Stage,
   TimelineItem, TimelineKind, WaitDo, WaitWho, Waits,
@@ -28,14 +30,12 @@ import {
 } from '../vocab'
 import { Inline } from './Markdown'
 import type { ViewProps } from './props'
-import { EntryChip, MrDescCard, QuestionCard, useCopy } from './Question'
+import { EntryChip, MrDescCard, QuestionCard, ReviewButton, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
-import { ReqSwitch } from './ReqSwitch'
+import { NotFound, ReqSwitch } from './ReqSwitch'
 
 export { EntryChip, MR_DESC_COPY_HINT, MrDescCard, QuestionCard, mrDescSource } from './Question'
 export { PART_LABEL, PART_VAR, valueStream, type Part, type StreamSeg } from './Stream'
-
-const FROM_LABEL: Record<ItemFrom, string> = { overview: '交付总览', todo: '待办', brain: 'Brain', board: '需求看板' }
 
 const KIND_META: Record<TimelineKind, { icon: string; label: string }> = {
   stage: { icon: 'design', label: '阶段' },
@@ -107,8 +107,10 @@ export const DETAIL_CSS = `
 .br-detail .br-stagecell.is-started { box-shadow: 0 0 0 2px color-mix(in srgb, var(--kt-run) 25%, transparent), 0 0 18px -6px var(--kt-run); }
 .br-detail .br-stage-n { font-size: .74em; font-weight: 800; color: var(--muted); }
 .br-detail .br-stage-label { font-size: .86em; font-weight: 750; color: var(--text-strong); line-height: 1.25; }
-.br-detail .br-stage-units { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
-.br-detail .br-stage-units .br-chip { font-size: .7em; padding: 0 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a unit's chip stays inside its tile (its state as a glyph, the words in its title): 11 tiles fit 1280 */
+.br-detail .br-stagecell { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.br-detail .br-stage-units { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; min-width: 0; }
+.br-detail .br-stage-units .br-chip { display: block; font-size: .7em; padding: 0 6px; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .br-detail .br-lean-sub { margin: 14px 0 6px; }
 .br-detail .br-approvals { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .br-detail .br-approval { display: grid; gap: 6px; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--kt-glass); }
@@ -151,6 +153,7 @@ export const DETAIL_CSS = `
 .br-detail .br-tl details summary { cursor: pointer; color: var(--muted); }
 .br-detail .br-tlmissing { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 .br-detail .br-dec td:is(.br-key, [data-label="阶段"], [data-label="谁定的"]) { white-space: nowrap; }
+.br-detail .br-dec tr.is-picked { background: color-mix(in srgb, var(--kt-info) 12%, var(--card)); outline: 2px solid var(--kt-info); outline-offset: -2px; scroll-margin: 80px; }
 `
 
 // ------------------------------------------------------------------ what the page reads off the records
@@ -204,6 +207,8 @@ interface Now {
   /** the open MR question (D-n) it waits on, and how it is answered: its options (A / B …), else approve / reject */
   question: string | null
   choices: string
+  /** a refused hand-over: how to hand it over again, as the board's step says it (its reason line is the text already) */
+  how: string | null
 }
 
 /** 此刻: one judgment (the backend's waits) with where to take the step. */
@@ -221,6 +226,7 @@ function nowOf(x: RequirementDetail, board: ReqBoard | null, live: SessionRow | 
     mrUrl: board?.accept.step.mr_url ?? open?.mr_url ?? x.row.mr?.url ?? null,
     question: open?.id ?? null,
     choices: open?.options.length ? `选 ${open.options.map((o) => o.id).join(' / ')}` : 'approve / reject',
+    how: step === 'redo_handoff' && board?.row.waits.do === 'redo_handoff' ? board.accept.step.text.split('\n').filter((l) => l && !l.startsWith('接手被拒')).join(' ') || null : null,
   }
 }
 
@@ -228,7 +234,7 @@ function nowOf(x: RequirementDetail, board: ReqBoard | null, live: SessionRow | 
  * the line Lean wrote to say to that session. */
 function reviewOf(next: string[]): { say: string | null } | null {
   const n = next[0] ?? ''
-  if (!/审查/.test(n) || !/新会话/.test(n)) return null
+  if (!isReview(n)) return null
   const m = /说[:：]\s*「([^」]+)」/.exec(n)
   return { say: m ? m[1] : null }
 }
@@ -254,7 +260,7 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
   const d = usePoll<RequirementDetail>(paths.requirement(entry.repo, entry.key), props.pollMs ?? POLL_MS)
   const b = usePoll<ReqBoard>(d.data ? paths.board(entry.repo, entry.key) : null, props.pollMs ?? POLL_MS)
   const [opened, setOpened] = useState<OpenSessionResult | null>(null)
-  const from = FROM_LABEL[entry.from ?? 'overview']
+  const from = VIEW_NAME[entry.from ?? 'overview']
   const after = () => {
     d.reload()
     props.reloadStatus()
@@ -265,7 +271,8 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
   const repoInfo = props.status?.repos.find((r) => r.id === entry.repo) ?? null
   const live = x ? x.sessions.find((s) => s.kind === 'local' && !s.error) ?? null : null
   const toBoard = (more: Partial<BoardEntry> = {}) => props.go({ kind: 'board', repo: entry.repo, key: entry.key, from: 'item', ...more })
-  const toOverview = onBack ?? (() => props.go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) }))
+  // 回交付总览: back when that is where it was opened from (its filters kept), else a move there
+  const toOverview = entry.from === 'overview' && onBack ? onBack : () => props.go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) })
   return (
     <main className="kt-root br-view cto-root cto-item br-detail" data-testid="br-detail">
       <style>{DETAIL_CSS}</style>
@@ -284,25 +291,12 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{from}</button>}
         </div>
       </div>
-      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} onOverview={toOverview} /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
+      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} onOverview={toOverview} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
       {x && (
         <Page x={x} board={board} live={live} entry={entry} props={props} opened={opened} localOnly={x.row.local_only ?? repoInfo?.remote === false}
           onOpened={(r) => { setOpened(r); after() }} after={after} toBoard={toBoard} />
       )}
     </main>
-  )
-}
-
-function NotFound({ repoName, reqKey, onOverview }: { repoName: string | null; reqKey: string; onOverview: () => void }) {
-  return (
-    <section className="cto-card" aria-label="没有这个需求" data-testid="detail-missing">
-      <h3>{repoName ? `${repoName} 仓库里没有 ${reqKey}` : `没有找到 ${reqKey}`}</h3>
-      <p className="cto-desc">它可能已经关闭，或者在别的仓库里。</p>
-      <p className="br-hint">做什么：在上面「切换需求」里换一个，或者回交付总览找。</p>
-      <div className="br-row" style={{ marginTop: 10 }}>
-        <button type="button" className="kt-btn is-primary" onClick={onOverview}>回交付总览</button>
-      </div>
-    </section>
   )
 }
 
@@ -325,7 +319,7 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
   if (!started) {
     return (
       <section className="br-detail-head" aria-label="需求">
-        <Header x={x} />
+        <Header x={x} localOnly={localOnly} />
         <Claimed x={x} now={now} at={at} onStart={onStart} />
         <Facts x={x} start={null} localOnly={localOnly} />
       </section>
@@ -337,7 +331,7 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
   return (
     <>
       <section className="br-detail-head" aria-label="需求">
-        <Header x={x} />
+        <Header x={x} localOnly={localOnly} />
         <NowBar x={x} now={now} at={at} live={live} canOpen={canOpen} repo={entry.repo} reqKey={entry.key}
           onStart={onStart} onAnswer={() => scrollTo('问题和回答')} onBrain={() => props.go({ kind: 'brain', repo: entry.repo, reflect: entry.key })} />
         {(canOpen || opened) && <OpenSession repo={entry.repo} reqKey={entry.key} opened={opened} onOpened={onOpened} />}
@@ -346,7 +340,8 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
       <Cards x={x} board={board} at={at} localOnly={localOnly} replying={now.do === 'reply'} onBoard={toBoard} onSessions={() => scrollTo('会话')} />
       <StreamCard board={board} at={at} onAt={toAt} />
       <LeanCard x={x} sessionUrl={now.sessionUrl} mrUrl={now.mrUrl} />
-      <DecisionsCard decisions={x.decisions} stages={x.lean.stages} repo={entry.repo} owner={x.row.owner} me={board?.person.me ?? false} go={props.go} onAt={toAt} />
+      <DecisionsCard decisions={x.decisions} stages={x.lean.stages} repo={entry.repo} owner={x.row.owner} me={board?.person.me ?? false} go={props.go} onAt={toAt}
+        picked={entry.decision ?? null} />
       <div className="br-twocol">
         <div className="br-col">
           <QuestionsCard x={x} repo={entry.repo} reqKey={entry.key} onAnswered={after} />
@@ -363,13 +358,16 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
   )
 }
 
-function Header({ x }: { x: RequirementDetail }) {
+function Header({ x, localOnly }: { x: RequirementDetail; localOnly: boolean }) {
   const r = x.row
   return (
     <header className="cto-item-head">
       <h2 className="kt-run-title">{r.title}</h2>
       <span className="kt-pill tone-info kt-mono">{r.key}</span>
-      <StateChip state={r.state} label={r.state_label} />
+      <StateChip state={r.state} label={r.state_label} who={r.waits.who} />
+      {localOnly && (
+        <span className="kt-pill tone-idle" data-testid="detail-local-only" title="这个仓库没有远端：不交给运行机，没有 MR，在本机做完、在本机合并">这个仓库只在本机做</span>
+      )}
       <span className="cto-org">{r.owner ? `${r.owner} 的需求 · ` : ''}{WHERE_NAME[r.where] ?? x.where_label}</span>
     </header>
   )
@@ -491,7 +489,8 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
 }) {
   const navigate = useNavigate()
   const line = useCopy(now.line ?? '')
-  const review = now.do === 'reply' ? reviewOf(x.lean.next) : null
+  // Lean's next note says the line to say; without it, the waits' words still tell a review is next
+  const review = now.do === 'reply' ? reviewOf(x.lean.next) ?? (isReview(now.text) ? { say: null } : null) : null
   const say = useCopy(review?.say ?? '')
   const mine = now.who === 'you'
   const person = !['agent', 'runner', 'bridge', 'nobody'].includes(now.who)
@@ -557,7 +556,7 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
     case 'redo_handoff':
       body = (
         <div>
-          <p>做什么：{now.do === 'tool' ? '在会话里批准这个工具调用' : `${DO_NAME.redo_handoff}（在会话里改，再交接一次）`}。</p>
+          <p>做什么：{now.do === 'tool' ? '在会话里批准这个工具调用。' : now.how ?? `${DO_NAME.redo_handoff}（在会话里改，再交接一次）。`}</p>
           {x.row.waits.raw && <details className="br-raw"><summary>细节</summary><pre>{x.row.waits.raw}</pre></details>}
         </div>
       )
@@ -586,33 +585,6 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
       {body}
       {acts && <div className="br-row br-now-act">{acts}</div>}
     </section>
-  )
-}
-
-/** 开审查会话: a new brain-dev session in the worktree that reviews the code (POST …/session {review}). */
-function ReviewButton({ repo, reqKey, liveSlot, worktree }: { repo: string; reqKey: string; liveSlot: string | null; worktree: string | null }) {
-  const api = useAppApi()
-  const navigate = useNavigate()
-  const [same, setSame] = useState(false)
-  const act = useAction((body: OpenSessionBody) => api.post<OpenSessionResult>(paths.session(repo, reqKey), body))
-  const open = async () => {
-    const r = await act.run({ trust: true, kickoff: true, review: true })
-    if (!r) return
-    if (liveSlot && r.slot === liveSlot) setSame(true)
-    else navigate(r.url)
-  }
-  return (
-    <>
-      <button type="button" className="kt-btn is-primary" disabled={act.busy} onClick={() => void open()}>
-        <Icon name="MessageSquare" size={13} />{act.busy ? '正在开…' : ACT.review}
-      </button>
-      {same && (
-        <p className="br-note" role="status">
-          没开成新的审查会话：app 只找到了原来那个会话。在 KiroCrew 里新开一个 brain-dev 会话{worktree ? `（工作目录 ${worktree}）` : ''}，把上面那句贴给它。
-        </p>
-      )}
-      {act.error && <p className="br-error" role="alert">{act.error}</p>}
-    </>
   )
 }
 
@@ -661,7 +633,7 @@ function OpenSession({ repo, reqKey, opened, onOpened }: { repo: string; reqKey:
 
 /** The checks not reached yet, by name: the backend's list, else the approvals still ahead. */
 function todoOf(w: ReqBoard['checks']): string[] {
-  return w.todo ?? w.cells.filter((c) => c.status === 'skip' && c.group === 'gate').map((c) => c.name.replace(/（[^）]*）$/, ''))
+  return w.todo ? todoLeft(w) : w.cells.filter((c) => c.status === 'skip' && c.group === 'gate').map((c) => c.name.replace(/（[^）]*）$/, ''))
 }
 
 const cellName = (c: CheckCell) => c.name.replace(/（[^）]*）$/, '')
@@ -779,7 +751,7 @@ function ChecksCard({ board, localOnly, sent, blocked, onBoard }: {
   const ok = !!w && w.total > 0 && w.passed === w.total && !todo.length && !waiting.length
   const say = !w ? '看板的数据还没来'
     : w.total === 0 && !todo.length ? '还没有检查结果'
-      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed} 项都过`, waiting.length ? `等人：${waiting.join('、')}` : '',
+      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed} 项都过`, waiting.length ? `${board && PERSON.has(board.row.waits.who) ? whoWord(board.row.waits.who, board.person.owner) : '等人'}：${waiting.join('、')}` : '',
         watching.length ? `观察中：${watching.join('、')}` : '', todo.length ? `还剩 ${todo.join('、')}` : '']
         .filter(Boolean).join(' · ')
   return (
@@ -906,7 +878,7 @@ function StageCell({ s, next }: { s: Stage; next: boolean }) {
         <span className="br-stage-units">
           {s.units.map((u) => {
             const um = STAGE_META[u.state] ?? STAGE_META.todo
-            return <span key={u.unit} className={`br-chip tone-${um.tone}`} title={um.label}>{u.unit} · {um.label}</span>
+            return <span key={u.unit} className={`br-chip tone-${um.tone}`} title={`${u.unit} · ${um.label}`}><span aria-hidden="true">{um.glyph}</span> {u.unit}<span className="br-sr"> · {um.label}</span></span>
           })}
         </span>
       )}
@@ -919,13 +891,14 @@ function StageCell({ s, next }: { s: Stage; next: boolean }) {
 /** Who settled a decision, in words: the owner (you, when it is you), a person by their pseudonym, the Brain entries,
  * the AI itself, a check, the bridge; a Who cell outside brain-kit's vocabulary stays 没归类 (never a guessed name). */
 function decidedBy(d: Decision, owner: string | null, me: boolean): string {
-  if (d.by === 'person') return d.who === 'owner' ? (me ? '你（负责人）' : `负责人${owner ? ` ${owner}` : ''}`) : `人${d.who ? `（化名 ${d.who}）` : ''}`
+  // a person other than the owner is a pseudonym (brain-kit never writes a real name): 一位组员, as 需求看板 says it
+  if (d.by === 'person') return d.who === 'owner' ? (me ? '你（负责人）' : `负责人${owner ? ` ${owner}` : ''}`) : d.who ? '一位组员' : '人'
   if (d.by === 'brain') return `${DECIDED_BY.brain}${d.who ? ` ${d.who}` : ''}`
   if (d.by) return DECIDED_BY[d.by] ?? d.by
   return d.who ?? '—'
 }
 
-function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt }: {
+function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt, picked }: {
   decisions: Decision[]
   stages: Stage[]
   repo: string
@@ -933,15 +906,23 @@ function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt }: {
   me: boolean
   go: ViewProps['go']
   onAt: (t: number | null) => void
+  /** the decision the page was opened at (?decision=): scrolled to and picked out */
+  picked: string | null
 }) {
   const people = decisions.filter((d) => d.by === 'person').length
   const atOf = (d: Decision) => stages.find((s) => s.id === d.stage)?.at ?? null
+  const pickedRow = useRef<HTMLTableRowElement | null>(null)
+  const found = !!picked && decisions.some((d) => d.id === picked)
+  useEffect(() => {
+    if (found) pickedRow.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  }, [found])
   return (
     <section className="cto-card" aria-label="决定">
       <div className="cto-chart-head">
         <h3>决定</h3>
         <span className="cto-dim">{decisions.length} 条 · 人定了 {people} 条 · 每一条都能在需求看板上看它那个阶段 · 引用的 Brain 条目点开看</span>
       </div>
+      {picked && !found && decisions.length > 0 && <p className="br-note br-small" role="status">这个需求的决定里没有 {picked}：决定记录可能改过了，下面是现在的样子。</p>}
       {decisions.length === 0 ? <p className="br-empty">还没有记下决定。</p> : (
         <table className="cto-table br-dec">
           <thead>
@@ -951,12 +932,13 @@ function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt }: {
             {decisions.map((dd) => {
               const t = atOf(dd)
               const tip = [
-                dd.by === 'unclassified' ? 'Who 不是规定的写法：没归类，也不猜是谁' : '',
-                dd.by === 'person' && dd.who && dd.who !== 'owner' ? '化名：brain-kit 不写真名' : '',
+                dd.by === 'unclassified' ? '「谁定的」那一格不是规定的写法：没归类，也不猜是谁' : '',
+                dd.by === 'person' && dd.who && dd.who !== 'owner' ? `化名 ${dd.who}：brain-kit 不写真名` : '',
                 dd.vouchers.length ? `凭证 ${dd.vouchers.join('、')}` : '',
               ].filter(Boolean).join('；')
               return (
-                <tr key={dd.id} data-testid="decision">
+                <tr key={dd.id} data-testid="decision" data-decision={dd.id} ref={dd.id === picked ? pickedRow : undefined}
+                  className={dd.id === picked ? 'is-picked' : undefined} aria-current={dd.id === picked ? 'true' : undefined}>
                   <td className="br-key" data-label="编号" title={[dd.date, dd.src].filter(Boolean).join(' · ')}>{dd.id}</td>
                   <td className="br-dim" data-label="阶段">{stageName(dd.stage) || '—'}</td>
                   <td data-label="决定"><Inline text={dd.text} /></td>
@@ -1133,7 +1115,9 @@ function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: b
     const day = isoDay(it.at) ?? '没有时间'
     days.set(day, [...(days.get(day) ?? []), it])
   }
-  const missing = [...new Set(t.missing.map(missingSourceName))]
+  // the backend says each source in Chinese, with why; an older one sent brain-kit's English (named here, kept under 细节)
+  const english = t.missing.filter((m) => !/[\u4e00-\u9fff]/.test(m))
+  const missing = [...new Set(t.missing.map((m) => (english.includes(m) ? missingSourceName(m) : m)))]
   return (
     <section className="cto-card" aria-label="时间线">
       <div className="cto-chart-head">
@@ -1176,8 +1160,8 @@ function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: b
       </div>
       {showMissing && missing.length > 0 && (
         <div className="br-note br-small br-tlmissing">
-          这里读不到：{missing.join('、')}。时间线里没有这些事。
-          <details className="br-raw"><summary>细节</summary><pre>{t.missing.join('\n')}</pre></details>
+          时间线里缺这些记录：{missing.join('；')}
+          {english.length > 0 && <details className="br-raw"><summary>细节</summary><pre>{english.join('\n')}</pre></details>}
         </div>
       )}
     </section>

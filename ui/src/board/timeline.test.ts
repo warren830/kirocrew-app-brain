@@ -188,7 +188,7 @@ describe('replayAt', () => {
       prev = now
     }
     expect(prev).toEqual(counts(b))
-    expect(prev).toMatchObject({ events: 50, belt: 11, passed: 9, rounds: 2 })
+    expect(prev).toMatchObject({ events: 49, belt: 11, passed: 9, rounds: 2 })
   })
 
   it('shows a check cell only once it is decided, with its final status', () => {
@@ -225,8 +225,8 @@ describe('replayAt', () => {
 
   it('while 发布 waits for its approval, the person waits with its words and 验收 waits too', () => {
     const r = replayAt(fx.boardMerged(), RELEASE_ASKED + 20)
-    expect(r.actors.find((a) => a.key === 'release')).toMatchObject({ status: 'awaiting_approval', doing: '等你批准发布', since: RELEASE_ASKED })
-    expect(r.person).toMatchObject({ status: 'awaiting_approval', doing: '等你批准发布' })
+    expect(r.actors.find((a) => a.key === 'release')).toMatchObject({ status: 'awaiting_approval', doing: '等人在 MR 上批准发布', since: RELEASE_ASKED })
+    expect(r.person).toMatchObject({ status: 'awaiting_approval', doing: '等人在 MR 上批准发布' })
     expect(r.accept.state).toBe('waiting')
   })
 

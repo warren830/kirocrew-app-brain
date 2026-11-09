@@ -30,12 +30,12 @@ export function CheckWall({ board, focus, onActor, flips, onSettings }: {
       <header className="kt-card-head">
         <h2>检查墙</h2>
         <span className={`kt-wall-score${green ? ' tone-ok' : failing.length ? ' tone-bad' : ''}`}>{w.passed}/{w.total}</span>
-        <span className="kt-wall-src">Lean 审批 · verify · 交接 · Brain</span>
+        <span className="kt-wall-src">{CELL_GROUPS.filter((g) => w.cells.some((c) => c.group === g.key)).map((g) => g.label).join(' · ')}</span>
         <TestedAt at={w.at} />
       </header>
       {w.history.length > 1 && (
         <div className="kt-spark-row">
-          <span title="每次 lean verify 记一个点">verify 通过数</span>
+          <span title="每跑一次 verify 记一个点">verify 通过数</span>
           <Sparkline history={w.history} />
         </div>
       )}
@@ -84,9 +84,9 @@ export function CheckWall({ board, focus, onActor, flips, onSettings }: {
               <span>{current.detail}</span>
             </>
           ) : failing.length ? (
-            <span><strong className="tone-bad">{say.text}</strong> {failing.map((c) => c.label).join('、')}<span className="kt-dim"> · 悬停或聚焦格子看原因</span></span>
+            <span><strong className="tone-bad">{say.text}</strong> · 没过的是 {failing.map((c) => c.label).join('、')}<span className="kt-dim"> · 悬停或聚焦格子看原因</span></span>
           ) : waiting.length ? (
-            <span><strong className={`tone-${say.tone}`}>{say.text}</strong> {waiting.map((c) => c.label).join('、')}<span className="kt-dim"> · 悬停看要做什么</span></span>
+            <span><strong className={`tone-${say.tone}`}>{say.text}</strong> · 等的是 {waiting.map((c) => c.label).join('、')}<span className="kt-dim"> · 悬停看要做什么</span></span>
           ) : (
             <span><strong className={`tone-${say.tone}`}>{say.text}{green ? ' ✓' : ''}</strong>{!green && <span className="kt-dim"> · 悬停看每一格</span>}</span>
           )}

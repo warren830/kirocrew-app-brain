@@ -18,6 +18,8 @@ export interface Step {
   hint?: string
   /** the line the person types themselves in the session */
   line?: string | null
+  /** Lean's next step is a review in a new session (the session that wrote the code may not review it): 开审查会话 */
+  review?: boolean
   /** a command typed in a terminal, in this directory */
   command?: { text: string; cwd: string | null } | null
   session?: string | null
@@ -41,6 +43,9 @@ export interface Next {
 }
 
 export const openHere = (q: Question) => isOpenQuestion(q) && q.answerable_here && !q.lean_request
+
+/** What a requirement waits for is Lean's review, in a new session (Lean's next note, the rows' waits.text). */
+export const isReview = (text: string) => /审查/.test(text) && /新会话/.test(text)
 
 /** The step an older backend did not name, from the requirement's state. */
 function guessDo(b: ReqBoard): WaitDo {
@@ -80,7 +85,8 @@ export function nextOf(b: ReqBoard): Next {
   const mine = w.who === 'you'
   const mr = b.accept.step.mr_url ?? b.row.mr?.url ?? null
   const waiting = b.actors.filter((a) => a.status === 'awaiting_approval')
-  const since = w.since ?? waiting.map((a) => a.since).filter((x): x is number => x !== null).sort((x, y) => x - y)[0] ?? null
+  // the backend's since (null: it does not know); an older backend's, from the actors that wait
+  const since = w.since !== undefined ? w.since : waiting.map((a) => a.since).filter((x): x is number => x !== null).sort((x, y) => x - y)[0] ?? null
   if (!mine) return { who: w.who, mine, since, steps: [], text: w.text, mr }
   const steps: Step[] = []
   b.questions.forEach((q, i) => {
@@ -95,11 +101,14 @@ export function nextOf(b: ReqBoard): Next {
     if (d === 'reply') {
       const next = leanOf(b.row.lean).next
       main.session = st.session_url ?? session
-      if (next && !text.includes(next.label)) main.hint = `Lean 的下一步是「${next.label}」：在会话里让它接着做`
+      if (isReview(w.text)) Object.assign(main, { text: w.text, line: null, review: true })
+      else if (next && !text.includes(next.label)) main.hint = `Lean 的下一步是「${next.label}」：在会话里让它接着做`
     }
     if (d === 'tool') main.session = st.session_url ?? session
     if (d === 'redo_handoff') {
       main.why = w.text.replace(/^接手被拒[：:]\s*/, '')
+      // the step's own first line says the refusal again: the why above says it
+      main.text = text.split('\n').filter((l) => !l.startsWith('接手被拒')).join('\n') || text
       main.command = { text: 'brain handoff', cwd: b.row.worktree }
       main.raw = w.raw || undefined
       main.session = st.session_url ?? session

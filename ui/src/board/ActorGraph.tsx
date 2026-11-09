@@ -239,7 +239,6 @@ function Phases({ board, lay, byKey, reducedMotion }: { board: ReqBoard; lay: Gr
             <rect className="kt-phase-band" x={p.x1} y={8} width={p.x2 - p.x1} height={lay.rail.y - 34} rx={18} />
             <text className="kt-phase-title" x={cx} y={30} textAnchor="middle">
               {p.n} {p.title}
-              {p.x2 - p.x1 > 230 && <tspan className="kt-phase-en" dx={6}>{p.en}</tspan>}
             </text>
             <text className="kt-phase-stages" x={cx} y={48} textAnchor="middle">{clip(p.sub, Math.max(6, (p.x2 - p.x1) / 13))}</text>
             {off && <text className="kt-phase-note" x={cx} y={lay.rail.y / 2 + 10} textAnchor="middle">这次不需要</text>}
