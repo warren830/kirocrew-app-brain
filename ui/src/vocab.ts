@@ -63,9 +63,10 @@ export const CLASS_NAME: Record<string, string> = {
 
 /** 4 done · 6 skipped · next: 发布 — the one way the whole app says Lean's progress (#8) */
 export function leanProgress(lean: Pick<LeanSummary, 'done_n' | 'skipped_n' | 'next'>): string {
+  if (!lean.next) return lean.skipped_n ? `全部做完（跳过 ${lean.skipped_n}）` : '全部做完'
   const parts = [`做完 ${lean.done_n}`]
   if (lean.skipped_n) parts.push(`跳过 ${lean.skipped_n}`)
-  parts.push(lean.next ? `下一步：${lean.next.label}` : '全部做完')
+  parts.push(`下一步：${lean.next.label}`)
   return parts.join(' · ')
 }
 

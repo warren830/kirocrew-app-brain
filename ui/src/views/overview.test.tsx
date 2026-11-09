@@ -286,7 +286,7 @@ describe('交付总览', () => {
     expect(cell('PAY-3')).toHaveTextContent(/^做完 8 · 下一步：代码生成$/)
     expect(within(cell('PAY-3')).getByRole('img')).toHaveAccessibleName('做完 8 · 下一步：代码生成')
     expect(cell('PAY-7')).toHaveTextContent(/^做完 9 · 下一步：构建和测试$/)
-    expect(cell('PAY-2')).toHaveTextContent(/^做完 11 · 全部做完$/)
+    expect(cell('PAY-2')).toHaveTextContent(/^全部做完$/)
     expect(cell('PAY-6')).toHaveTextContent(/^还没开工$/)
   })
 
