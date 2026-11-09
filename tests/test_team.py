@@ -79,7 +79,8 @@ def test_hand_over_dispatch_question_and_answer_through_the_separate_signer(worl
     # the run's 变更说明 on the runner: runs/PAY-1/MR.md of the hand-over commit (brain-kit 48b6b97), else its records
     m = seen["detail"]["mr_desc"]
     assert m["source"] in ("file", "records") and m["text"].startswith("## PAY-1 · ") and m["first"], m
-    assert seen["summary"] == m["first"]
+    # the overview row says its first line the way a person's row does: without the 「现在：…」 tail
+    assert seen["summary"] == mod("mrdesc_view").plain_line(m["first"]) and "现在：" not in seen["summary"]
     # while the contract was being signed: the run id reserved (brain-kit's `signing`), the voucher waiting
     rows, waiting = during[0]
     (row, _, _), = rows
