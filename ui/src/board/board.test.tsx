@@ -9,7 +9,7 @@ import type { ReqBoard } from '../types'
 import { TYPE_IT_YOURSELF } from '../ui'
 import type { ViewProps } from '../views/props'
 import { BoardPage } from './BoardPage'
-import { CELL_GROUPS, actorMeta, fmtCredits } from './format'
+import { CELL_GROUPS, actorMeta, fmtCredits, fmtWhen } from './format'
 
 const PAY3: BoardEntry = { repo: 'r1', key: 'PAY-3' }
 const PAY2: BoardEntry = { repo: 'r1', key: 'PAY-2' }
@@ -390,11 +390,30 @@ describe('需求看板', () => {
     fireEvent.click(crumb().getByRole('button', { name: 'PAY-3' }))
     expect(p.go).toHaveBeenLastCalledWith(item)
     expect(p.go).toHaveBeenCalledTimes(3)
+    // the crumb's first step is the way back, named as ← 返回 names it
+    fireEvent.click(crumb().getByRole('button', { name: '需求详情' }))
+    expect(onBack).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: '← 返回需求详情' }))
+    expect(onBack).toHaveBeenCalledTimes(2)
+    expect(p.go).toHaveBeenCalledTimes(3)
+    expect(p.replace).not.toHaveBeenCalled()
+  })
+
+  test('opened from 待办: the crumb and ← 返回 both say 待办; opened from nowhere, the crumb starts at 交付总览', async () => {
+    installFixtureRoutes()
+    const onBack = vi.fn()
+    renderBoard({ ...PAY3, from: 'todo' }, {}, onBack)
+    await loaded()
+    expect(screen.getByRole('navigation', { name: '位置' })).toHaveTextContent(/^待办›PAY-3›需求看板$/)
+    fireEvent.click(crumb().getByRole('button', { name: '待办' }))
+    fireEvent.click(screen.getByRole('button', { name: '← 返回待办' }))
+    expect(onBack).toHaveBeenCalledTimes(2)
+    cleanup()
+    const p = renderBoard()
+    await loaded()
     fireEvent.click(crumb().getByRole('button', { name: '交付总览' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'overview' })
-    fireEvent.click(screen.getByRole('button', { name: '← 返回需求详情' }))
-    expect(onBack).toHaveBeenCalledTimes(1)
-    expect(p.replace).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /^← 返回/ })).toBeNull()
   })
 
   test('跟随 scrolls to the actor that moved last', async () => {
@@ -863,6 +882,24 @@ describe('需求看板 · 回放', () => {
     expect(screen.queryByRole('button', { name: '▶ 回放' })).toBeNull()
     const scroll = vi.mocked(HTMLElement.prototype.scrollIntoView)
     await waitFor(() => expect(scroll.mock.contexts).toContain(screen.getByTestId('kt-graph')))
+  })
+
+  test('?at= opens the replay stopped at that moment (a decision, a part of 价值流); 退出回放 drops the moment from the URL', async () => {
+    merged()
+    const b = fx.boardMerged()
+    const at = b.events.find((e) => e.kind === 'approve' && e.to === 'design')!.at
+    const p = renderBoard({ ...PAY2, from: 'item', at })
+    await loaded()
+    const rp = within(await screen.findByRole('group', { name: '回放' }))
+    expect(rp.getByRole('button', { name: '播放' })).toBeInTheDocument()
+    expect(bar()).toHaveTextContent(`${fmtWhen(at)} · 第`)
+    expect(bar()).toHaveTextContent('停在这一刻：按 ▶ 接着放')
+    expect(feedSeqs()).toBe(b.events.filter((e) => e.at <= at).length)
+    expect(screen.getAllByTestId('kt-lane').find((l) => l.dataset.role === 'design')).toHaveAttribute('data-status', 'merged')
+    expect(p.replace).not.toHaveBeenCalled()
+    fireEvent.click(rp.getByRole('button', { name: '退出回放' }))
+    expect(p.replace).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-2', from: 'item' })
+    expect(feedSeqs()).toBe(b.events.length)
   })
 
   test('a merged requirement’s 验收: signed, who merged it, and 需求详情 from the card', async () => {

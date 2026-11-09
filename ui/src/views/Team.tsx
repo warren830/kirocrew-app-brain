@@ -191,7 +191,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
                       <tr key={r.run_id} data-state={r.state}>
                         <td className="br-mono">{r.run_id}</td>
                         <td>
-                          <button type="button" className="br-link br-key" onClick={() => go({ kind: 'item', repo: 'runner', key: r.req })}>{r.req}</button>
+                          <button type="button" className="br-link br-key" onClick={() => go({ kind: 'item', repo: 'runner', key: r.req, from: 'team' })}>{r.req}</button>
                         </td>
                         <td className="br-dim">{r.project}</td>
                         <td><RunChip state={r.state} /></td>

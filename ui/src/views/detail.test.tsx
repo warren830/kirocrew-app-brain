@@ -497,6 +497,32 @@ describe('需求详情', () => {
     expect(within(brain).queryByRole('button', { name: 'T-PAY-9-1' })).toBeNull() // not in the Brain: plain text
   })
 
+  test('opened from 运行机: the crumb and ← 返回 say 运行机', async () => {
+    const { onBack } = renderDetail({ repo: 'r1', key: 'PAY-3', from: 'team' })
+    const crumb = await screen.findByRole('navigation', { name: '位置' })
+    expect(crumb).toHaveTextContent('运行机›PAY-3')
+    fireEvent.click(screen.getByRole('button', { name: '← 返回运行机' }))
+    expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  test('opened at a decision (?decision=D-3): its row is scrolled to and picked out; one it does not have is said', async () => {
+    const scroll = vi.mocked(HTMLElement.prototype.scrollIntoView)
+    renderDetail({ repo: 'r1', key: 'PAY-3', from: 'overview', decision: 'D-3' })
+    const card = await screen.findByRole('region', { name: '决定' })
+    const row = within(card).getByText('D-3').closest('tr') as HTMLElement
+    expect(row).toHaveAttribute('aria-current', 'true')
+    expect(row).toHaveClass('is-picked')
+    expect(within(card).getAllByTestId('decision').filter((r) => r.getAttribute('aria-current'))).toHaveLength(1)
+    await waitFor(() => expect(scroll.mock.contexts).toContain(row))
+  })
+
+  test('opened at a decision it does not have: it says so over the decisions', async () => {
+    renderDetail({ repo: 'r1', key: 'PAY-3', decision: 'D-9' })
+    const card = await screen.findByRole('region', { name: '决定' })
+    expect(within(card).getByRole('status')).toHaveTextContent('这个需求的决定里没有 D-9')
+    expect(within(card).getAllByTestId('decision').filter((r) => r.getAttribute('aria-current'))).toHaveLength(0)
+  })
+
   test('用到的 Brain: a proposal already written to its write-back branch says so and opens that write-back', async () => {
     withDetail((x) => {
       x.row.state = 'merged'

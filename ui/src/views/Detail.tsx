@@ -11,13 +11,13 @@
  * Polls GET /requirements/{repo}/{key} every 5 s, and the board's snapshot (GET /board/{repo}/{key}) for the value
  * stream (its actors' spans), the checks and the step; without a board the cards that need it say so.
  */
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, usePoll, useAction } from '../api'
 import { RoleIcon } from '../board/RoleIcon'
 import { Hit, Mini } from '../cto/charts'
 import { ago, fmtCredits, fmtIso, fmtSpan, fmtTime, isoDay } from '../format'
-import type { BoardEntry, ItemEntry, ItemFrom } from '../nav'
+import { VIEW_NAME, type BoardEntry, type ItemEntry } from '../nav'
 import type {
   CheckCell, Decision, LeanSummary, OpenSessionBody, OpenSessionResult, ReqBoard, RequirementDetail, SessionRow, Stage,
   TimelineItem, TimelineKind, WaitDo, WaitWho, Waits,
@@ -34,8 +34,6 @@ import { ReqSwitch } from './ReqSwitch'
 
 export { EntryChip, MR_DESC_COPY_HINT, MrDescCard, QuestionCard, mrDescSource } from './Question'
 export { PART_LABEL, PART_VAR, valueStream, type Part, type StreamSeg } from './Stream'
-
-const FROM_LABEL: Record<ItemFrom, string> = { overview: '交付总览', todo: '待办', brain: 'Brain', board: '需求看板' }
 
 const KIND_META: Record<TimelineKind, { icon: string; label: string }> = {
   stage: { icon: 'design', label: '阶段' },
@@ -151,6 +149,7 @@ export const DETAIL_CSS = `
 .br-detail .br-tl details summary { cursor: pointer; color: var(--muted); }
 .br-detail .br-tlmissing { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 .br-detail .br-dec td:is(.br-key, [data-label="阶段"], [data-label="谁定的"]) { white-space: nowrap; }
+.br-detail .br-dec tr.is-picked { background: color-mix(in srgb, var(--kt-info) 12%, var(--card)); outline: 2px solid var(--kt-info); outline-offset: -2px; scroll-margin: 80px; }
 `
 
 // ------------------------------------------------------------------ what the page reads off the records
@@ -254,7 +253,7 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
   const d = usePoll<RequirementDetail>(paths.requirement(entry.repo, entry.key), props.pollMs ?? POLL_MS)
   const b = usePoll<ReqBoard>(d.data ? paths.board(entry.repo, entry.key) : null, props.pollMs ?? POLL_MS)
   const [opened, setOpened] = useState<OpenSessionResult | null>(null)
-  const from = FROM_LABEL[entry.from ?? 'overview']
+  const from = VIEW_NAME[entry.from ?? 'overview']
   const after = () => {
     d.reload()
     props.reloadStatus()
@@ -346,7 +345,8 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
       <Cards x={x} board={board} at={at} localOnly={localOnly} replying={now.do === 'reply'} onBoard={toBoard} onSessions={() => scrollTo('会话')} />
       <StreamCard board={board} at={at} onAt={toAt} />
       <LeanCard x={x} sessionUrl={now.sessionUrl} mrUrl={now.mrUrl} />
-      <DecisionsCard decisions={x.decisions} stages={x.lean.stages} repo={entry.repo} owner={x.row.owner} me={board?.person.me ?? false} go={props.go} onAt={toAt} />
+      <DecisionsCard decisions={x.decisions} stages={x.lean.stages} repo={entry.repo} owner={x.row.owner} me={board?.person.me ?? false} go={props.go} onAt={toAt}
+        picked={entry.decision ?? null} />
       <div className="br-twocol">
         <div className="br-col">
           <QuestionsCard x={x} repo={entry.repo} reqKey={entry.key} onAnswered={after} />
@@ -925,7 +925,7 @@ function decidedBy(d: Decision, owner: string | null, me: boolean): string {
   return d.who ?? '—'
 }
 
-function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt }: {
+function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt, picked }: {
   decisions: Decision[]
   stages: Stage[]
   repo: string
@@ -933,15 +933,23 @@ function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt }: {
   me: boolean
   go: ViewProps['go']
   onAt: (t: number | null) => void
+  /** the decision the page was opened at (?decision=): scrolled to and picked out */
+  picked: string | null
 }) {
   const people = decisions.filter((d) => d.by === 'person').length
   const atOf = (d: Decision) => stages.find((s) => s.id === d.stage)?.at ?? null
+  const pickedRow = useRef<HTMLTableRowElement | null>(null)
+  const found = !!picked && decisions.some((d) => d.id === picked)
+  useEffect(() => {
+    if (found) pickedRow.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  }, [found])
   return (
     <section className="cto-card" aria-label="决定">
       <div className="cto-chart-head">
         <h3>决定</h3>
         <span className="cto-dim">{decisions.length} 条 · 人定了 {people} 条 · 每一条都能在需求看板上看它那个阶段 · 引用的 Brain 条目点开看</span>
       </div>
+      {picked && !found && decisions.length > 0 && <p className="br-note br-small" role="status">这个需求的决定里没有 {picked}：决定记录可能改过了，下面是现在的样子。</p>}
       {decisions.length === 0 ? <p className="br-empty">还没有记下决定。</p> : (
         <table className="cto-table br-dec">
           <thead>
@@ -956,7 +964,8 @@ function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt }: {
                 dd.vouchers.length ? `凭证 ${dd.vouchers.join('、')}` : '',
               ].filter(Boolean).join('；')
               return (
-                <tr key={dd.id} data-testid="decision">
+                <tr key={dd.id} data-testid="decision" data-decision={dd.id} ref={dd.id === picked ? pickedRow : undefined}
+                  className={dd.id === picked ? 'is-picked' : undefined} aria-current={dd.id === picked ? 'true' : undefined}>
                   <td className="br-key" data-label="编号" title={[dd.date, dd.src].filter(Boolean).join(' · ')}>{dd.id}</td>
                   <td className="br-dim" data-label="阶段">{stageName(dd.stage) || '—'}</td>
                   <td data-label="决定"><Inline text={dd.text} /></td>

@@ -142,7 +142,7 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
   // 需求详情 and 需求看板 say which view they were opened from (their crumb and ← 返回)
   const goView = useCallback((v: View) => {
     const from = current.current.kind
-    if (v.kind === 'item' && !v.from && (from === 'overview' || from === 'todo' || from === 'brain' || from === 'board')) return go({ ...v, from })
+    if (v.kind === 'item' && !v.from && (from === 'overview' || from === 'todo' || from === 'brain' || from === 'board' || from === 'team')) return go({ ...v, from })
     if (v.kind === 'board' && !v.from && (from === 'overview' || from === 'item' || from === 'todo')) return go({ ...v, from })
     go(v)
   }, [go])
@@ -153,8 +153,9 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
   if (v.kind === 'item') {
     const { kind: _k, ...entry } = v
     const fallback: View = entry.from === 'todo' ? { kind: 'todo' } : entry.from === 'brain' ? { kind: 'brain', repo: entry.repo }
-      : entry.from === 'board' ? { kind: 'board', repo: entry.repo, key: entry.key } : overviewFilters.current
-    body = <DetailView key={n} entry={entry} onBack={() => back(fallback)} onSwitch={(repo, key) => swap({ kind: 'item', ...entry, repo, key })} {...props} />
+      : entry.from === 'board' ? { kind: 'board', repo: entry.repo, key: entry.key } : entry.from === 'team' ? { kind: 'team' } : overviewFilters.current
+    const { decision: _d, ...keep } = entry
+    body = <DetailView key={n} entry={entry} onBack={() => back(fallback)} onSwitch={(repo, key) => swap({ kind: 'item', ...keep, repo, key })} {...props} />
   } else if (v.kind === 'board') {
     const { kind: _k, ...entry } = v
     const fallback: View = entry.from === 'todo' ? { kind: 'todo' } : entry.from === 'item' ? { kind: 'item', repo: entry.repo, key: entry.key } : overviewFilters.current
