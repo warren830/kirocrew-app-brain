@@ -4,10 +4,10 @@ hooks), 加入列表 (installed, or pending on the install branch, then merged),
 fake GitLab, the person's token never shown), and the paths the routes refuse. Throwaway repos in temp dirs only; no
 network (a bare repo is the remote, a fake ssh plays the failures)."""
 
+import asyncio
 import json
 import os
 import secrets
-import stat
 from pathlib import Path
 from urllib.parse import parse_qsl, unquote, urlsplit
 
@@ -20,6 +20,7 @@ from http_fakes import AppRoute, FakeWeb, call
 
 pytestmark = needs_brainkit
 importer = mod("importer")
+installer = mod("installer")
 AppError = mod("httpkit").AppError
 
 KIT = {"req_prefix": "PAY", "tracker": "none", "jira_base": "", "gitlab_base": "https://gitlab.example.com",
@@ -69,7 +70,7 @@ async def install(svc, path, kit=None, branch=None):
     if branch:
         body["branch"] = branch
     job = (await svc.import_install(body))["job"]
-    assert job["state"] == "running" and [s["id"] for s in job["steps"]] == [s for s, _ in importer.INSTALL_STEPS]
+    assert job["state"] == "running" and [s["id"] for s in job["steps"]] == [s for s, _ in installer.INSTALL_STEPS]
     return await svc.wait_job(job["id"])
 
 
@@ -226,7 +227,7 @@ def test_clone_failures_are_said_in_plain_chinese(tmp_path, home, monkeypatch):
 
     def ssh_says(text, sleep=0):
         p = tmp_path / ("ssh-%s" % secrets.token_hex(3))
-        p.write_text("#!/bin/sh\n%secho '%s' >&2\nexit 255\n" % ("sleep %d\n" % sleep if sleep else "", text))
+        p.write_text("#!/bin/sh\n%scat >&2 <<'EOF'\n%s\nEOF\nexit 255\n" % ("sleep %d\n" % sleep if sleep else "", text))
         p.chmod(0o755)
         monkeypatch.setenv("GIT_SSH_COMMAND", str(p))
 
@@ -379,6 +380,7 @@ def test_a_hook_that_says_no_is_shown_as_it_said_it_and_nothing_is_bypassed(tmp_
 
     async def go():
         done = await install(svc, repo)
+        done["tip"] = sh("git", "-C", repo, "rev-parse", "brain/install").stdout
         pending = await svc.import_inspect({"path": str(repo)})
         status = await svc.status()
         with pytest.raises(AppError) as e:
@@ -394,7 +396,7 @@ def test_a_hook_that_says_no_is_shown_as_it_said_it_and_nothing_is_bypassed(tmp_
     assert done["state"] == "done" and not c["ok"] and c["blocked"]
     assert "密钥扫描：AGENTS.md 里像是有一个 token，先别提交" in c["text"] and "再提交一次" in c["text"]
     assert {s["id"]: s["state"] for s in done["steps"]}["commit"] == "fail"
-    assert sh("git", "-C", repo, "rev-parse", "brain/install").stdout == sh("git", "-C", repo, "rev-parse", "origin/main").stdout
+    assert done["tip"] == sh("git", "-C", repo, "rev-parse", "origin/main").stdout     # nothing was committed
     assert pending["kit"]["state"] == "uncommitted" and "还没提交" in pending["pending"]["text"]
     assert status["repos"][0]["pending"]["state"] == "uncommitted" and status["repos"][0]["error"] == ""
     assert refused.code == "not_committed"
@@ -421,9 +423,12 @@ def test_add_installed_and_pending_repos_then_merge_and_pull(tmp_path, home):
         # merged on the remote (as GitLab would after the MR), fetched here, the checkout not pulled yet
         sh("git", "-C", repo, "push", "-q", "origin", "brain/install:main")
         sh("git", "-C", repo, "fetch", "-q", "origin")
+        out["changed"] = await asyncio.to_thread(svc._pending_changed)   # what the background loop asks every 30 s
         out["merged"] = (await svc.save_settings({}))["status"]
         sh("git", "-C", repo, "pull", "-q", "--ff-only")
-        out["pulled"] = (await svc.save_settings({}))["status"]
+        out["pulled_seen"] = await asyncio.to_thread(svc._pending_changed)
+        await asyncio.to_thread(svc.reload_sync)                           # ... and then it reads the list again
+        out["pulled"] = await svc.status()
         return out
 
     got = started(svc, go)
@@ -435,6 +440,7 @@ def test_add_installed_and_pending_repos_then_merge_and_pull(tmp_path, home):
     assert r2["pending"]["state"] == "branch" and r2["pending"]["text"] == "安装在 brain/install 分支上，合并后生效"
     assert "推送并开 MR" in r2["pending"]["next"]
     assert got["overview"]["errors"] == []                                      # pending is no error
+    assert got["changed"] is True and got["pulled_seen"] is True
     m = got["merged"]["repos"][1]
     assert m["pending"]["state"] == "merged" and "已经合并到 origin/main" in m["pending"]["text"] and "git pull" in m["pending"]["next"]
     assert got["pulled"]["repos"][1]["ok"] is True and got["pulled"]["repos"][1]["pending"] is None
@@ -530,6 +536,32 @@ def test_a_push_that_fails_says_why_and_shows_the_commands(tmp_path, home, monke
     got = started(svc, go)
     assert got["ok"] is False and got["pushed"] is False and "远端已经有这个分支" in got["text"]
     assert got["commands"] and got["output"]
+
+
+def test_a_tampered_install_record_is_not_trusted(tmp_path, home):
+    """imports.json is in the app's data dir (the agents' OS user can write it): a record that names the default branch
+    or a folder that is no worktree of the repo is refused before anything is committed or pushed."""
+    repo, bare = plain_repo(tmp_path)
+    other = git_repo(tmp_path / "elsewhere")
+    commit_file(other, "x.txt", "x", "x")
+    svc = make_service(tmp_path, [])
+
+    async def go():
+        await install(svc, repo)
+        p = (await svc.import_inspect({"path": str(repo)}))["pending"]
+        top = str(repo.resolve())
+        svc.imports.update(top, branch="main")
+        with pytest.raises(AppError) as push:
+            await svc.import_publish({"path": str(repo), "branch": "main", "target": "main", "remote_url": p["remote_url"]})
+        svc.imports.update(top, branch="brain/install", worktree=str(other))
+        with pytest.raises(AppError) as again:
+            await svc.import_commit({"path": str(repo)})
+        return push.value, again.value
+
+    push, again = started(svc, go)
+    assert push.code == "bad_record" and again.code == "bad_record"
+    assert sh("git", "-C", bare, "log", "--format=%s", "main").stdout.split() == ["code", "init"]   # main untouched
+    assert sh("git", "-C", tmp_path / "elsewhere", "log", "--format=%s").stdout.split() == ["x"]
 
 
 # ---- the routes ---------------------------------------------------------------------------------------------------- #

@@ -35,7 +35,7 @@ describe('交付总览', () => {
     expect(mr).toHaveAttribute('target', '_blank')
     expect(apiCalls[0]).toMatchObject({ method: 'GET', path: `${API}/overview?repo=all` })
     // a repo the backend could not read says why
-    expect(screen.getByText(/shop-web：不是 brain-kit 仓库/)).toBeInTheDocument()
+    expect(screen.getByText(/shop-web：还没装 brain-kit/)).toBeInTheDocument()
   })
 
   test('the Lean cell: n/total and the stage; 下一步 for the next stage to do, 做完 when Lean is finished, 0/11 还没开始', async () => {

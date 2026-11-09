@@ -1,0 +1,125 @@
+{
+  "input": "/Users/alice/workplace/refund",
+  "path": "/Users/alice/workplace/refund",
+  "note": "",
+  "checks": [
+    {
+      "id": "path",
+      "level": "OK",
+      "label": "仓库目录",
+      "why": "/Users/alice/workplace/refund",
+      "todo": ""
+    },
+    {
+      "id": "git",
+      "level": "OK",
+      "label": "git 仓库",
+      "why": "是 git 仓库",
+      "todo": ""
+    },
+    {
+      "id": "branch",
+      "level": "OK",
+      "label": "当前分支",
+      "why": "在 main 上",
+      "todo": ""
+    },
+    {
+      "id": "default",
+      "level": "OK",
+      "label": "默认分支",
+      "why": "main（origin/HEAD）",
+      "todo": ""
+    },
+    {
+      "id": "origin",
+      "level": "OK",
+      "label": "origin",
+      "why": "git@gitlab.example.com:shop/refund.git（GitLab https://gitlab.example.com，项目 shop/refund）",
+      "todo": ""
+    },
+    {
+      "id": "clean",
+      "level": "WARN",
+      "label": "工作区",
+      "why": "有 1 个改动没提交：README.md",
+      "todo": "不影响：安装在单独的工作目录里做，你的检出不会动"
+    },
+    {
+      "id": "kit",
+      "level": "FAIL",
+      "label": "brain-kit",
+      "why": "没装（没有 .brain/kit.json）",
+      "todo": "下面可以装到一个新分支上"
+    },
+    {
+      "id": "lean",
+      "level": "FAIL",
+      "label": "AI-DLC Lean",
+      "why": "没装",
+      "todo": "装 brain-kit 时一起装上"
+    },
+    {
+      "id": "brain",
+      "level": "FAIL",
+      "label": "Brain 文件",
+      "why": "缺 brain/PRODUCT.md、brain/TECH.md、brain/IMPROVEMENT.md、brain/PROJECT.md",
+      "todo": "装 brain-kit 时一起装上"
+    },
+    {
+      "id": "agents",
+      "level": "FAIL",
+      "label": "AGENTS.md",
+      "why": "没有",
+      "todo": "装 brain-kit 时一起装上"
+    },
+    {
+      "id": "listed",
+      "level": "OK",
+      "label": "列表",
+      "why": "还不在列表里",
+      "todo": ""
+    }
+  ],
+  "crew": {
+    "rows": [
+      {
+        "level": "FAIL",
+        "text": "没有 ~/.kiro/agents/brain-dev.json：Lean 的 hook 在 KiroCrew 里不会跑"
+      },
+      {
+        "level": "OK",
+        "text": "KiroCrew 引擎：kas"
+      }
+    ],
+    "fix": {
+      "agent": true,
+      "engine": false
+    }
+  },
+  "next": "install",
+  "listed": null,
+  "kit": {
+    "state": "none",
+    "values": null
+  },
+  "form": {
+    "req_prefix": "REFUND",
+    "tracker": "none",
+    "jira_base": "",
+    "gitlab_base": "https://gitlab.example.com",
+    "gitlab_project": "shop/refund",
+    "default_branch": "main",
+    "team": ""
+  },
+  "branch": "brain/install",
+  "pending": null,
+  "origin": {
+    "url": "git@gitlab.example.com:shop/refund.git",
+    "base": "https://gitlab.example.com",
+    "project": "shop/refund"
+  },
+  "default_branch": "main",
+  "current_branch": "main",
+  "error": ""
+}

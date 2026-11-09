@@ -116,13 +116,19 @@ export interface Requirement {
 
 // ---------------------------------------------------------------- GET /status
 
+export interface KitView { tracker: string; req_prefix: string; default_branch: string; gitlab_base: string; gitlab_project: string }
+
 export interface RepoInfo {
   id: string
   path: string
   name: string
+  /** its kit.json loaded: the views use it */
   ok: boolean
+  /** why it cannot be used ('' when ok, and when it is pending) */
   error: string
-  kit: { tracker: string; req_prefix: string; default_branch: string; gitlab_base: string; gitlab_project: string } | null
+  kit: KitView | null
+  /** not usable yet, but brain-kit is on its way (导入仓库): the install branch, or merged and not pulled */
+  pending: PendingInstall | null
 }
 
 export interface Status {
@@ -155,12 +161,169 @@ export interface TeamStatus {
   signer: { pending: number; refused: number }
 }
 
+// ---------------------------------------------------------------- 导入仓库: /import/*, POST /repos/remove
+
+/**
+ * A listed (or inspected) repo whose checkout has no .brain/kit.json yet, but brain-kit is on its way: on the install
+ * branch the app made (branch), installed in that branch's worktree and not committed yet (uncommitted: a hook said
+ * no), or already on the default branch and not pulled into this checkout (merged).
+ */
+export interface PendingInstall {
+  state: 'branch' | 'uncommitted' | 'merged'
+  /** the install branch (brain/install); for merged, where it is (origin/main) */
+  branch: string
+  /** the install branch's worktree under work_root (null when it is gone) */
+  worktree: string | null
+  /** the install branch's commit (12 hex) */
+  commit: string | null
+  pushed: boolean
+  mr_url: string | null
+  /** e.g. 「安装在 brain/install 分支上，合并后生效」 */
+  text: string
+  /** what to do next, one sentence */
+  next: string
+  /** 推送并开 MR: the MR's target (the default branch), origin's URL (never a password), the GitLab project */
+  target: string
+  remote_url: string
+  gitlab_base: string
+  gitlab_project: string
+  /** a GitLab token is on this machine and the project is known: the app opens the MR itself */
+  can_open_mr: boolean
+}
+
+/** GET /import/defaults */
+export interface ImportDefaults {
+  /** where a clone goes by default (the folder that holds work_root, else ~/workplace) */
+  clone_parent: string
+  work_root: string
+  /** the install branch's default name */
+  branch: string
+  /** a GitLab token is on this machine (never the token) */
+  token: boolean
+  brainkit_ok: boolean
+}
+
+/** One row of 检查: ✓ OK, ! WARN (worth knowing, stops nothing), ✗ FAIL; why, and what to do. */
+export interface ImportCheck { id: string; level: Level; label: string; why: string; todo: string }
+
+/** The kit.json values the install form asks for (what `brain install` asks you to check). */
+export interface KitForm {
+  req_prefix: string
+  tracker: string
+  /** tracker jira only */
+  jira_base: string
+  gitlab_base: string
+  gitlab_project: string
+  default_branch: string
+  team: string
+}
+
+/** What the wizard offers after 检查: fix (something is wrong), listed (already in the list), add (installed),
+ * pending (on the install branch, or merged), install (not installed: the install form). */
+export type ImportNext = 'fix' | 'listed' | 'add' | 'pending' | 'install'
+export type KitState = 'none' | 'checkout' | 'invalid' | 'blocked' | 'branch' | 'uncommitted' | 'merged'
+
+/** POST /import/inspect {path}: read only. */
+export interface ImportInspect {
+  /** what was asked */
+  input: string
+  /** the repo's top level the app uses (a subfolder → its top level, a linked worktree → its main checkout) */
+  path: string | null
+  /** why path differs from what was asked ('' when it does not) */
+  note: string
+  checks: ImportCheck[]
+  /** KiroCrew's checks for it (brain-dev's Lean hooks, the engine, this repo's committed kit), with their fixes */
+  crew: { rows: CheckRow[]; fix: { agent: boolean; engine: boolean } }
+  next: ImportNext
+  /** its id when it is already in the list */
+  listed: string | null
+  kit: { state: KitState; values: KitView | null }
+  /** the install form, prefilled (key prefix from the folder name, GitLab from origin, the default branch) */
+  form: KitForm | null
+  /** the install branch's default name */
+  branch: string
+  pending: PendingInstall | null
+  origin: { url: string; base: string; project: string } | null
+  default_branch: string | null
+  current_branch: string | null
+  /** the path itself was refused ('' otherwise; the rows say the rest) */
+  error: string
+}
+
+export type JobStepState = 'todo' | 'running' | 'ok' | 'warn' | 'fail'
+export interface JobStep { id: string; label: string; state: JobStepState; detail: string }
+
+/** A clone or an install, run in the background (POST /import/clone, /import/install answer {job}); GET
+ * /import/jobs/{id} until it is not running. */
+export interface ImportJob<R = CloneResult | InstallResult> {
+  id: string
+  kind: 'clone' | 'install'
+  /** the clone's target folder, the install's repo */
+  target: string
+  state: 'running' | 'done' | 'failed'
+  steps: JobStep[]
+  started_at: number
+  ended_at: number | null
+  /** failed: why, in plain Chinese */
+  error: string
+  /** done: the result; failed: what was done before (or null) */
+  result: R | null
+}
+export interface JobStart { job: ImportJob }
+
+export interface CloneBody { url: string; parent: string; name: string }
+export interface CloneResult { path: string | null; output: string; kind: string }
+
+export interface InstallBody { path: string; branch: string; kit: KitForm }
+export interface FileChange { change: 'added' | 'modified' | 'deleted' | 'other'; path: string }
+/** The install's commit (git add -A, git commit with the person's identity; their hooks run). blocked: a hook said
+ * no (text has what it said); POST /import/commit {path} tries again. */
+export interface CommitResult { ok: boolean; sha: string | null; blocked: boolean; text: string; output: string }
+export interface InstallResult {
+  path: string
+  branch: string
+  /** what the branch was made from (origin/main) and its commit */
+  base: string | null
+  base_sha: string | null
+  worktree: string | null
+  /** `brain install`'s output */
+  output: string
+  kit: KitForm
+  doctor: { ran: boolean; rows: CheckRow[]; output: string }
+  files: FileChange[]
+  commit: CommitResult
+}
+
+/** POST /import/publish: only with confirm true and what the person saw (the branch, the remote, the target). */
+export interface PublishBody { path: string; branch: string; target: string; remote_url: string; confirm: true }
+export interface PublishResult {
+  /** pushed (and the MR opened, or the way to open it) */
+  ok: boolean
+  pushed: boolean
+  branch: string
+  target: string
+  remote_url: string
+  mr: { iid: number; url: string; existing: boolean } | null
+  text: string
+  /** git push's output */
+  output: string
+  /** the exact commands, when the app could not do it all (push, glab mr create) */
+  commands: string[]
+  /** GitLab's new-MR page for the branch */
+  new_mr_url: string | null
+}
+
+export interface AddResult { ok: boolean; id: string; text: string; status: Status }
+export interface RemoveResult { ok: boolean; text: string; status: Status }
+
 // ---------------------------------------------------------------- GET/POST /settings
 
+/** POST /settings takes any part of it: a key left out keeps its value (the 设置 form sends no repos: 导入仓库 adds
+ * them, 移出列表 removes them). */
 export interface Settings {
   /** brain-kit checkout this app imports (read-only to the app) */
   brainkit: string
-  /** project repos (brain-kit installed) shown on this machine */
+  /** project repos (brain-kit installed, or on its way) shown on this machine */
   repos: string[]
   /** where the app puts each requirement's worktree (under ~/workplace or ~/workspace) */
   work_root: string

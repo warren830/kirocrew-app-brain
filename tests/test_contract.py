@@ -84,3 +84,38 @@ def test_the_backend_answers_with_the_fixtures_keys(tmp_path, home):
     assert not problems, "\n".join(problems)
     assert got["detail.json"]["sessions"] and got["detail.json"]["decisions"] and got["todo.json"]["items"]
     assert got["overview.json"]["counts"].keys() == fixture("overview.json")["counts"].keys()
+
+
+def test_the_import_routes_answer_with_the_fixtures_keys(tmp_path, home, monkeypatch):
+    """导入仓库's answers (ui/src/test/fixtures/import-*.json): defaults, a 检查 before and after the install (pending),
+    the clone and install jobs as the page polls them, the push and MR (a fake GitLab, a token made at run time)."""
+    import secrets
+
+    from test_import import KIT, FakeGitLab, plain_repo
+    repo, bare = plain_repo(tmp_path, "refund")
+    svc = make_service(tmp_path, [], transport=FakeGitLab())
+
+    async def go():
+        await svc.start()
+        try:
+            out = {"import-defaults.json": await svc.import_defaults(),
+                   "import-inspect.json": await svc.import_inspect({"path": str(repo)})}
+            job = (await svc.import_clone({"url": str(bare), "parent": str(home / "workplace"), "name": "copy"}))["job"]
+            out["import-clone-job.json"] = await svc.wait_job(job["id"])
+            job = (await svc.import_install({"path": str(repo), "kit": dict(KIT, gitlab_project="grp/pay")}))["job"]
+            out["import-job.json"] = await svc.wait_job(job["id"])
+            out["import-inspect-pending.json"] = await svc.import_inspect({"path": str(repo)})
+            p = out["import-inspect-pending.json"]["pending"]
+            monkeypatch.setenv("GITLAB_TOKEN", "fake-" + secrets.token_hex(8))
+            out["import-publish.json"] = await svc.import_publish({"path": str(repo), "branch": p["branch"],
+                                                                   "target": p["target"], "remote_url": p["remote_url"]})
+            return out
+        finally:
+            await svc.stop()
+
+    got = run(go())
+    assert got["import-job.json"]["state"] == "done" and got["import-publish.json"]["mr"]
+    problems = []
+    for name, real in got.items():
+        problems += ["%s %s" % (name, p) for p in diff_keys(fixture(name), json.loads(json.dumps(real)))]
+    assert not problems, "\n".join(problems)

@@ -417,7 +417,7 @@
   "errors": [
     {
       "repo": "r2",
-      "error": "不是 brain-kit 仓库：没有 .brain/kit.json（在仓库里跑 brain install）"
+      "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装到一个新分支上"
     }
   ]
 }

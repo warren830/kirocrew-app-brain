@@ -1,0 +1,22 @@
+{
+  "id": "a03c4d5e6f71",
+  "kind": "clone",
+  "target": "/Users/alice/workplace/refund",
+  "state": "done",
+  "steps": [
+    {
+      "id": "clone",
+      "label": "克隆",
+      "state": "ok",
+      "detail": "/Users/alice/workplace/refund"
+    }
+  ],
+  "started_at": 1794146330,
+  "ended_at": 1794146348,
+  "error": "",
+  "result": {
+    "path": "/Users/alice/workplace/refund",
+    "output": "Cloning into '/Users/alice/workplace/refund'...\ndone.",
+    "kind": "ok"
+  }
+}

@@ -1,0 +1,139 @@
+{
+  "input": "/Users/alice/workplace/refund",
+  "path": "/Users/alice/workplace/refund",
+  "note": "",
+  "checks": [
+    {
+      "id": "path",
+      "level": "OK",
+      "label": "仓库目录",
+      "why": "/Users/alice/workplace/refund",
+      "todo": ""
+    },
+    {
+      "id": "git",
+      "level": "OK",
+      "label": "git 仓库",
+      "why": "是 git 仓库",
+      "todo": ""
+    },
+    {
+      "id": "branch",
+      "level": "OK",
+      "label": "当前分支",
+      "why": "在 main 上",
+      "todo": ""
+    },
+    {
+      "id": "default",
+      "level": "OK",
+      "label": "默认分支",
+      "why": "main（origin/HEAD）",
+      "todo": ""
+    },
+    {
+      "id": "origin",
+      "level": "OK",
+      "label": "origin",
+      "why": "git@gitlab.example.com:shop/refund.git（GitLab https://gitlab.example.com，项目 shop/refund）",
+      "todo": ""
+    },
+    {
+      "id": "clean",
+      "level": "OK",
+      "label": "工作区",
+      "why": "没有没提交的改动",
+      "todo": ""
+    },
+    {
+      "id": "kit",
+      "level": "WARN",
+      "label": "brain-kit",
+      "why": "安装在 brain/install 分支上，合并后生效",
+      "todo": "推送并开 MR（在「导入仓库」里），合并以后就能用了"
+    },
+    {
+      "id": "lean",
+      "level": "FAIL",
+      "label": "AI-DLC Lean",
+      "why": "没装",
+      "todo": "装 brain-kit 时一起装上"
+    },
+    {
+      "id": "brain",
+      "level": "FAIL",
+      "label": "Brain 文件",
+      "why": "缺 brain/PRODUCT.md、brain/TECH.md、brain/IMPROVEMENT.md、brain/PROJECT.md",
+      "todo": "装 brain-kit 时一起装上"
+    },
+    {
+      "id": "agents",
+      "level": "FAIL",
+      "label": "AGENTS.md",
+      "why": "没有",
+      "todo": "装 brain-kit 时一起装上"
+    },
+    {
+      "id": "listed",
+      "level": "OK",
+      "label": "列表",
+      "why": "还不在列表里",
+      "todo": ""
+    }
+  ],
+  "crew": {
+    "rows": [
+      {
+        "level": "FAIL",
+        "text": "没有 ~/.kiro/agents/brain-dev.json：Lean 的 hook 在 KiroCrew 里不会跑"
+      },
+      {
+        "level": "OK",
+        "text": "KiroCrew 引擎：kas"
+      }
+    ],
+    "fix": {
+      "agent": true,
+      "engine": false
+    }
+  },
+  "next": "pending",
+  "listed": null,
+  "kit": {
+    "state": "branch",
+    "values": null
+  },
+  "form": {
+    "req_prefix": "REFUND",
+    "tracker": "none",
+    "jira_base": "",
+    "gitlab_base": "https://gitlab.example.com",
+    "gitlab_project": "shop/refund",
+    "default_branch": "main",
+    "team": ""
+  },
+  "branch": "brain/install",
+  "pending": {
+    "state": "branch",
+    "branch": "brain/install",
+    "worktree": "/Users/alice/workplace/brain-app/refund/_brain-install",
+    "commit": "eb43199fe3ac",
+    "pushed": false,
+    "mr_url": null,
+    "text": "安装在 brain/install 分支上，合并后生效",
+    "next": "推送并开 MR（在「导入仓库」里），合并以后就能用了",
+    "target": "main",
+    "remote_url": "git@gitlab.example.com:shop/refund.git",
+    "gitlab_base": "https://gitlab.example.com",
+    "gitlab_project": "shop/refund",
+    "can_open_mr": true
+  },
+  "origin": {
+    "url": "git@gitlab.example.com:shop/refund.git",
+    "base": "https://gitlab.example.com",
+    "project": "shop/refund"
+  },
+  "default_branch": "main",
+  "current_branch": "main",
+  "error": ""
+}

@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from . import bk, brainview, crewcheck, deliveries, detail, importer, intake, lean_view, mrdesc_view, mrinfo
+from . import bk, brainview, crewcheck, deliveries, detail, importer, installer, intake, lean_view, mrdesc_view, mrinfo
 from . import settings as settings_mod
 from . import todo as todo_mod
 from .constants import APP_NAME, APP_ROOT, KEY_RE, LOCAL_AGENT, LOCAL_FOLDER, REPO_ID_RE, TICK_S, VERSION
@@ -204,12 +204,15 @@ class Service:
                                         bridge_user=bridge_user or None)
 
     async def _slow(self) -> None:
-        """MRs of handed-over runs (person mode), and the KiroCrew checks now and then."""
+        """MRs of handed-over runs (person mode), the listed repos whose brain-kit is on its way, and the KiroCrew
+        checks now and then."""
         last_crew = time.monotonic()
         while True:
             try:
                 await asyncio.sleep(MR_EVERY_S)
                 await self.refresh_mrs()
+                if self.repo_pending and await asyncio.to_thread(self._pending_changed):
+                    await asyncio.to_thread(self.reload_sync)
                 if time.monotonic() - last_crew > CREW_EVERY_S:
                     last_crew = time.monotonic()
                     self.crew = await asyncio.to_thread(crewcheck.checks, [r.path for r in self.repos.values()])
@@ -217,6 +220,20 @@ class Service:
                 raise
             except Exception:  # noqa: BLE001
                 self.log.exception("brain: background refresh failed")
+
+    def _pending_changed(self) -> bool:
+        """A pending repo's checkout has kit.json now (pulled after the merge), or its state moved (merged, pushed, an
+        MR, a commit): the list is read again. A few local git calls per pending repo; no network."""
+        records = self.imports.all()
+        token = self._token_present()
+        for path, pend in list(self.repo_pending.values()):
+            if os.path.isfile(os.path.join(path, importer.KIT)):
+                return True
+            now = importer.pending_state(path, records.get(path), token=token)
+            keys = ("state", "branch", "commit", "pushed", "mr_url", "can_open_mr")
+            if now is None or any(now.get(k) != pend.get(k) for k in keys):
+                return True
+        return False
 
     async def _team_forever(self) -> None:
         while True:
@@ -984,11 +1001,11 @@ class Service:
             raise self._fail(exc)
 
     async def import_install(self, body: dict[str, Any]) -> dict[str, Any]:
-        """安装到新分支 (see importer.install), in the background; the page follows the job."""
+        """安装到新分支 (see installer.install), in the background; the page follows the job."""
         top = await self._import_top(body.get("path"))
         try:
-            kit = importer.check_kit(body.get("kit"))
-            branch = await asyncio.to_thread(importer.check_branch, body.get("branch"))
+            kit = installer.check_kit(body.get("kit"))
+            branch = await asyncio.to_thread(installer.check_branch, body.get("branch"))
         except importer.ImportFail as exc:
             raise self._fail(exc)
         work_root = self.settings["work_root"]
@@ -997,15 +1014,15 @@ class Service:
             if top in self.settings["repos"]:   # a listed repo that was not installed: now it is pending
                 await asyncio.to_thread(self.reload_sync)
 
-        jid = self._start_job("install", top, importer.INSTALL_STEPS,
-                              lambda step: importer.install(top, kit, branch, work_root, self.imports, step), after)
+        jid = self._start_job("install", top, installer.INSTALL_STEPS,
+                              lambda step: installer.install(top, kit, branch, work_root, self.imports, step), after)
         return {"job": self.import_job(jid)}
 
     async def import_commit(self, body: dict[str, Any]) -> dict[str, Any]:
         """再提交一次: the install's commit after a hook said no (the hooks run again)."""
         top = await self._import_top(body.get("path"))
         try:
-            got = await asyncio.to_thread(importer.commit, top, self.imports)
+            got = await asyncio.to_thread(installer.commit, top, self.imports)
         except importer.ImportFail as exc:
             raise self._fail(exc)
         if got["ok"] and top in self.settings["repos"]:
@@ -1017,7 +1034,7 @@ class Service:
         top = await self._import_top(body.get("path"))
         confirm = {k: body.get(k) for k in ("branch", "target", "remote_url")}
         try:
-            got = await asyncio.to_thread(importer.publish, top, self.imports, confirm, transport=self.transport)
+            got = await asyncio.to_thread(installer.publish, top, self.imports, confirm, transport=self.transport)
         except importer.ImportFail as exc:
             raise self._fail(exc)
         if top in self.settings["repos"]:

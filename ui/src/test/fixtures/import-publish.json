@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "pushed": true,
+  "branch": "brain/install",
+  "target": "main",
+  "remote_url": "git@gitlab.example.com:shop/refund.git",
+  "mr": {
+    "iid": 7,
+    "url": "https://gitlab.example.com/shop/refund/-/merge_requests/7",
+    "existing": false
+  },
+  "text": "推上去了，开了 MR !7",
+  "output": "To gitlab.example.com:shop/refund.git\n * [new branch]      brain/install -> brain/install",
+  "commands": [
+    "git -C /Users/alice/workplace/refund push origin brain/install",
+    "glab mr create -R https://gitlab.example.com/shop/refund --source-branch brain/install --target-branch main --title '装上 brain-kit（brain install）' --description '用 brain-kit 0.1.0 的 `brain install` 装进这个仓库。在单独的工作目录里做的，原来的检出没动。\n\n**装了什么**\n\n- `.brain/`：brain-kit 的配置 kit.json（1 个文件）\n- `.gitignore`：.gitignore（.brain-materials/ 不进 git）（1 个文件）\n- `.kiro/agents/`：brain-dev agent（1 个文件）\n- `.kiro/aidlc-lean/`：AI-DLC Lean 本体（14 个文件）\n- `.kiro/brain/`：KiroCrew 的 Lean hook 适配（1 个文件）\n- `.kiro/hooks/`：Lean 的 hook（3 个文件）\n- `.kiro/skills/`：skills（Lean 的和 brain 的）（8 个文件）\n- `.kiro/steering/`：steering（2 个文件）\n- `AGENTS.md`：AGENTS.md（1 个文件）\n- `aidlc-docs/`：Lean 的配置和记录（lean.json 的 fingerprint_exclude 加了 runs/**）（2 个文件）\n- `brain/`：Brain：PRODUCT、TECH、IMPROVEMENT、PROJECT（4 个文件）\n\n**.brain/kit.json**\n\n- 需求号：PAY-1、PAY-2 …（跟踪：none）\n- 默认分支：main\n- GitLab：shop/refund（https://gitlab.example.com）\n- 团队：退款组\n\n`brain doctor`：10 项通过，3 项注意，0 项没过\n\n合并以后在各自的检出里 git pull，Brain app 里这个仓库就能用了（app 给每个需求建的工作目录从默认分支来）。' --yes"
+  ],
+  "new_mr_url": "https://gitlab.example.com/shop/refund/-/merge_requests/new?merge_request%5Bsource_branch%5D=brain%2Finstall&merge_request%5Btarget_branch%5D=main"
+}
