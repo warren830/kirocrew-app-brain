@@ -701,7 +701,8 @@ describe('需求详情', () => {
   test('检查: names what did not pass, what waits and what is still ahead; only the kinds this requirement has', async () => {
     renderDetail()
     const card = await screen.findByRole('article', { name: '检查' })
-    await waitFor(() => expect(within(card).getByTestId('checks-say')).toHaveTextContent('没过：引用的 Brain 条目 · 等人：代码生成计划'))
+    // it waits on the person looking: 等你, as everywhere
+    await waitFor(() => expect(within(card).getByTestId('checks-say')).toHaveTextContent('没过：引用的 Brain 条目 · 等你：代码生成计划审批 · 还剩 发布审批、verify'))
     expect(card).toHaveTextContent('查的是：Lean 审批 · Brain')
     expect(card).toHaveClass('is-bad')
   })
@@ -725,7 +726,8 @@ describe('需求详情', () => {
     renderDetail()
     const card = await screen.findByRole('article', { name: '检查' })
     const after = fx.boardMerged().checks.cells.find((c) => c.group === 'after')!
-    await waitFor(() => expect(within(card).getByTestId('checks-say')).toHaveTextContent(`观察中：${after.name}`))
+    // the backend's todo names the 14 days too: said once, as 观察中, not as something left
+    await waitFor(() => expect(within(card).getByTestId('checks-say')).toHaveTextContent(/^目前 9 项都过 · 观察中：合并后 14 天没有回滚或热修$/))
     expect(within(card).getByTestId('checks-say')).not.toHaveTextContent('等人')
   })
 

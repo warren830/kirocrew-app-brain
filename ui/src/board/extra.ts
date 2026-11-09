@@ -135,7 +135,7 @@ export const BOARD_EXTRA_CSS = `
 .br-spark-one { margin: -2px 0 8px; }
 
 /* the lanes: the quiet tail drawn short, the change block */
-.br-board .kt-axis .kt-axis-tick { transform: translateX(-50%); }
+.br-board .kt-axis .kt-axis-tick { transform: translateX(-50%); white-space: nowrap; }
 .br-board .kt-axis .kt-axis-tick.is-first { transform: none; }
 .br-board .kt-axis .kt-axis-tick.is-last { transform: translateX(-100%); }
 .kt-axis-tail { position: absolute; top: 0; padding-left: 6px; border-left: 2px dotted color-mix(in srgb, var(--muted) 55%, transparent); font-size: .76em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

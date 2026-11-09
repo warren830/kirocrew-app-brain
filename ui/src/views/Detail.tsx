@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, usePoll, useAction } from '../api'
+import { PERSON, todoLeft, whoWord } from '../board/format'
 import { isReview } from '../board/next'
 import { RoleIcon } from '../board/RoleIcon'
 import { Hit, Mini } from '../cto/charts'
@@ -623,7 +624,7 @@ function OpenSession({ repo, reqKey, opened, onOpened }: { repo: string; reqKey:
 
 /** The checks not reached yet, by name: the backend's list, else the approvals still ahead. */
 function todoOf(w: ReqBoard['checks']): string[] {
-  return w.todo ?? w.cells.filter((c) => c.status === 'skip' && c.group === 'gate').map((c) => c.name.replace(/（[^）]*）$/, ''))
+  return w.todo ? todoLeft(w) : w.cells.filter((c) => c.status === 'skip' && c.group === 'gate').map((c) => c.name.replace(/（[^）]*）$/, ''))
 }
 
 const cellName = (c: CheckCell) => c.name.replace(/（[^）]*）$/, '')
@@ -741,7 +742,7 @@ function ChecksCard({ board, localOnly, sent, blocked, onBoard }: {
   const ok = !!w && w.total > 0 && w.passed === w.total && !todo.length && !waiting.length
   const say = !w ? '看板的数据还没来'
     : w.total === 0 && !todo.length ? '还没有检查结果'
-      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed} 项都过`, waiting.length ? `等人：${waiting.join('、')}` : '',
+      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed} 项都过`, waiting.length ? `${board && PERSON.has(board.row.waits.who) ? whoWord(board.row.waits.who, board.person.owner) : '等人'}：${waiting.join('、')}` : '',
         watching.length ? `观察中：${watching.join('、')}` : '', todo.length ? `还剩 ${todo.join('、')}` : '']
         .filter(Boolean).join(' · ')
   return (

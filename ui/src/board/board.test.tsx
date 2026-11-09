@@ -688,8 +688,8 @@ describe('需求看板 · 轮到谁、做什么', () => {
     installFixtureRoutes(boardRoute(() => structuredClone(m)))
     renderBoard(PAY2)
     await loaded()
-    // the backend's todo names the 14 days it watches: said once, not 「还剩 合并后 14 天 · 1 项在观察」
-    expect(screen.getByTestId('br-checks-say')).toHaveTextContent(/^目前 9 项都过 · 还剩 合并后 14 天$/)
+    // the backend's todo names the 14 days too: they are said once, as 在观察, not as something left to do
+    expect(screen.getByTestId('br-checks-say')).toHaveTextContent(/^9 项全过 · 1 项在观察$/)
     expect(screen.getByRole('group', { name: '指标' })).not.toHaveTextContent('等人')
     expect(within(region('检查墙')).getByRole('button', { name: /^合并后 14 天没有回滚或热修：观察中，/ })).toHaveAttribute('data-status', 'watch')
   })
