@@ -1,0 +1,42 @@
+{
+  "name": "brain",
+  "version": "0.1.0",
+  "displayName": "Brain 交付",
+  "description": "brain-kit on Kiro Crew: claim a requirement, take its documents through the five gates, develop it with AI-DLC Lean in a brain-dev session, hand it to the team runner, follow its questions and the shared in-repo Brain.",
+  "author": "warren830",
+  "minKiroCrewVersion": "0.11.0",
+  "backend": {
+    "hooks": {
+      "routes": "backend.routes:register_routes",
+      "on_startup": "backend.hooks:on_startup",
+      "on_shutdown": "backend.hooks:on_shutdown"
+    }
+  },
+  "ui": {
+    "entry": "dist/index.mjs",
+    "pages": [
+      {
+        "route": "/apps/brain",
+        "label": "Brain 交付",
+        "icon": "Brain"
+      }
+    ],
+    "sidebar": {
+      "section": "Apps"
+    }
+  },
+  "permissions": {
+    "api": [
+      "/api/apps/brain",
+      "/api/chat"
+    ],
+    "storage": true,
+    "sessionApproval": true
+  },
+  "platform": {
+    "os": [
+      "macos",
+      "linux"
+    ]
+  }
+}

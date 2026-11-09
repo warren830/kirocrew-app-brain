@@ -1,0 +1,4 @@
+brain (Brain 交付) 0.1.0
+app         8e82e32f4c423c48facb67a3d94f4d028f2c508b  https://github.com/warren830/kirocrew-app-brain  (main; backend/, ui/dist/ built from ui/)
+brain-kit   91e2feea5a9780fcba51663cf7c41f38dd20c32b  https://github.com/warren830/brain-kit  (vendor/brain-kit, git archive, tests/ left out)
+aidlc-lean  705c0dceeaec9b7dc9d15f8eb5a3fb24dccd6496  https://github.com/warren830/aidlc-lean  (vendor/brain-kit/vendor/aidlc-lean, git archive, tests/ left out)
