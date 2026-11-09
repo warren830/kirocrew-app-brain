@@ -78,8 +78,11 @@ const waiting = (a: ReqBoard['actors'][number]) => ({ status: 'waiting' as Actor
 export function replayAt(b: ReqBoard, t: number): ReqBoard {
   const span = replaySpan(b)
   if (t >= span.end) return b
+  // whom each actor's wait was on then (an older backend did not say: the owner looking, else someone)
+  const waitOn = new Map<string, WaitWho>()
   const actors = b.actors.map((a) => {
     const h = [...a.history].reverse().find((x) => x.at <= t)
+    if (h?.status === 'awaiting_approval') waitOn.set(a.key, h.who ?? (b.person.me ? 'you' : 'people'))
     // not on this requirement's way, and never was: it stays so through the replay
     const off = a.status === 'skipped' && !a.history.length
     const now = h ? { status: h.status, doing: h.doing, since: h.at } : off ? { status: a.status, doing: a.doing, since: null } : waiting(a)
@@ -99,14 +102,15 @@ export function replayAt(b: ReqBoard, t: number): ReqBoard {
   })
   const passed = cells.filter((c) => c.status === 'pass').length
   const failed = cells.filter((c) => c.status === 'fail').length
-  const awaiting = actors.find((a) => a.status === 'awaiting_approval')
+  const asking = actors.filter((a) => a.status === 'awaiting_approval')
+  const awaiting = asking.find((a) => waitOn.get(a.key) === 'you') ?? asking[0]
   const working = actors.some((a) => a.status === 'running' || a.status === 'fixing')
   const rel = statusOf.get('release')
   const merged = b.ended_at !== null && b.ended_at <= t
   const state = stateAt(b, t, statusOf, merged)
   const ln = leanFromEvents(b.events, t, b.row.lean.total)
   const through = ln.done_n + ln.skipped_n
-  const who: WaitWho = awaiting ? (b.person.me ? 'you' : 'people') : working ? (statusOf.get('runner') === 'running' ? 'runner' : 'agent') : 'nobody'
+  const who: WaitWho = awaiting ? waitOn.get(awaiting.key) ?? 'people' : working ? (statusOf.get('runner') === 'running' ? 'runner' : 'agent') : 'nobody'
   return {
     ...b,
     row: {
@@ -117,7 +121,8 @@ export function replayAt(b: ReqBoard, t: number): ReqBoard {
     },
     ended_at: merged ? b.ended_at : null,
     live: working,
-    person: { ...b.person, status: awaiting ? 'awaiting_approval' : working ? 'running' : 'waiting', doing: awaiting ? awaiting.doing : working ? 'AI 在做' : '没有等你的事' },
+    // the owner's node asks only when the wait is on them; one on the product or someone else is said (as the live board)
+    person: { ...b.person, status: who === 'you' ? 'awaiting_approval' : working && !awaiting ? 'running' : 'waiting', doing: awaiting ? awaiting.doing : working ? 'AI 在做' : '没有等你的事' },
     actors,
     events: b.events.filter((e) => e.at <= t),
     belt: b.belt.filter((x) => x.at <= t),

@@ -223,11 +223,19 @@ describe('replayAt', () => {
     expect(r.person).toMatchObject({ status: 'running', doing: 'AI 在做' })
   })
 
-  it('while 发布 waits for its approval, the person waits with its words and 验收 waits too', () => {
+  it('while 发布 waits for the product’s approval, it waits on the product (not 等你), the person is told, and 验收 waits too', () => {
     const r = replayAt(fx.boardMerged(), RELEASE_ASKED + 20)
     expect(r.actors.find((a) => a.key === 'release')).toMatchObject({ status: 'awaiting_approval', doing: '等人在 MR 上批准发布', since: RELEASE_ASKED })
-    expect(r.person).toMatchObject({ status: 'awaiting_approval', doing: '等人在 MR 上批准发布' })
+    expect(r.row.waits).toMatchObject({ who: 'product', text: '等人在 MR 上批准发布' })
+    expect(r.person).toMatchObject({ status: 'waiting', doing: '等人在 MR 上批准发布' })
     expect(r.accept.state).toBe('waiting')
+  })
+
+  it('a wait on the person looking is theirs: 等你, and their node asks', () => {
+    const r = replayAt(fx.boardMerged(), 1793629860 + 20)
+    expect(r.actors.find((a) => a.key === 'req')).toMatchObject({ status: 'awaiting_approval', doing: '等你批准需求' })
+    expect(r.row.waits.who).toBe('you')
+    expect(r.person).toMatchObject({ status: 'awaiting_approval', doing: '等你批准需求' })
   })
 
   it('验收 is accepted once 发布 is approved', () => {
