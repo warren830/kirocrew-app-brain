@@ -102,6 +102,10 @@ export const BOARD_EXTRA_CSS = `
 .br-way.kt-team-intro.is-phased.is-local { grid-template-columns: .8fr 1.4fr 1.2fr .8fr; }
 @container kt-root (max-width: 1180px) { .br-way.kt-team-intro.is-phased, .br-way.kt-team-intro.is-phased.is-local { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .br-board .kt-intro-name b { white-space: nowrap; }
+/* what a step does breaks at its 、 only, never inside a word (a long one still wraps rather than overflow) */
+.br-board .kt-intro-does { word-break: keep-all; overflow-wrap: anywhere; }
+/* a step said on two lines (what happened, then what to do) keeps its lines */
+.br-next .br-pre-line { white-space: pre-line; }
 .br-btn-big { padding: 10px 20px; font-size: 1.02em; border-radius: 12px; }
 
 /* whom it waits for: magenta is the person looking only; anyone else is a calm blue, no blinking */

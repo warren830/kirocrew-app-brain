@@ -65,11 +65,14 @@ export function axisTicks(dur: number): number[] {
   return out
 }
 
-/** 0, 15 分, 3 小时, 1 天, 1 天 6 时 */
+/** 0, 15 分, 3 小时, 1 小时 30 分, 1 天, 1 天 6 时 */
 export function tickLabel(s: number): string {
   if (s <= 0) return '0'
   if (s < 3600) return `${Math.round(s / 60)} 分`
-  if (s < 86400) return `${Math.round(s / 3600)} 小时`
+  if (s < 86400) {
+    const m = Math.round(s / 60)
+    return m % 60 ? `${Math.floor(m / 60)} 小时 ${m % 60} 分` : `${m / 60} 小时`
+  }
   const d = Math.floor(s / 86400)
   const h = Math.round((s % 86400) / 3600)
   return h ? `${d} 天 ${h} 时` : `${d} 天`

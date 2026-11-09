@@ -1,11 +1,13 @@
 /**
- * Pieces 需求详情, 需求看板 and 待办 share: a question with its answer form, a Brain entry chip, and the MR's 变更说明
- * with 复制. Text is never rendered as HTML: Markdown is built into elements (Markdown.tsx).
+ * Pieces 需求详情, 需求看板 and 待办 share: a question with its answer form, a Brain entry chip, the MR's 变更说明
+ * with 复制, and 开审查会话. Text is never rendered as HTML: Markdown is built into elements (Markdown.tsx).
  */
 import { useState } from 'react'
+import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
+import { paths, useAction } from '../api'
 import { fmtTime } from '../format'
 import { ENTRY_RE, fileOfEntry } from '../nav'
-import type { MrDesc, Question } from '../types'
+import type { MrDesc, OpenSessionBody, OpenSessionResult, Question } from '../types'
 import { AnswerForm, ExtLink, Icon, isOpenQuestion, questionMeta } from '../ui'
 import { ACT, approvalName } from '../vocab'
 import { Inline, Markdown, takeRefs } from './Markdown'
@@ -153,4 +155,31 @@ export function MrDescCard({ m, bare = false }: { m: MrDesc; bare?: boolean }) {
   )
   if (bare) return <div className="br-stack" style={{ gap: 8 }} aria-label="变更说明" data-testid="mr-desc">{body}</div>
   return <section className="br-card" aria-label="变更说明" data-testid="mr-desc">{body}</section>
+}
+
+/** 开审查会话: a new brain-dev session in the worktree that reviews the code (POST …/session {review}). */
+export function ReviewButton({ repo, reqKey, liveSlot, worktree }: { repo: string; reqKey: string; liveSlot: string | null; worktree: string | null }) {
+  const api = useAppApi()
+  const navigate = useNavigate()
+  const [same, setSame] = useState(false)
+  const act = useAction((body: OpenSessionBody) => api.post<OpenSessionResult>(paths.session(repo, reqKey), body))
+  const open = async () => {
+    const r = await act.run({ trust: true, kickoff: true, review: true })
+    if (!r) return
+    if (liveSlot && r.slot === liveSlot) setSame(true)
+    else navigate(r.url)
+  }
+  return (
+    <>
+      <button type="button" className="kt-btn is-primary" disabled={act.busy} onClick={() => void open()}>
+        <Icon name="MessageSquare" size={13} />{act.busy ? '正在开…' : ACT.review}
+      </button>
+      {same && (
+        <p className="br-note" role="status">
+          没开成新的审查会话：app 只找到了原来那个会话。在 KiroCrew 里新开一个 brain-dev 会话{worktree ? `（工作目录 ${worktree}）` : ''}，让它审查这个需求的代码。
+        </p>
+      )}
+      {act.error && <p className="br-error" role="alert">{act.error}</p>}
+    </>
+  )
 }

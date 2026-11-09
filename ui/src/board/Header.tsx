@@ -218,12 +218,12 @@ const WAY: Way = [
   { phase: '0 认领', title: '一个需求号，文档过五关', steps: [[{ icon: 'person', title: '你', does: '认领、交文档、开工' }]] },
   { phase: '1 本机 · Lean', title: 'brain-dev 会话带着 Lean 推进', steps: [
     [{ icon: 'laptop', title: '本机会话', does: '读需求、读 Brain、写文档' }],
-    [{ icon: 'req', title: '需求审批', does: '你在会话里打一行' }, { icon: 'design', title: '设计审批', does: '你在会话里打一行' }],
+    [{ icon: 'req', title: '需求审批', does: '会话里打一行' }, { icon: 'design', title: '设计审批', does: '会话里打一行' }],
   ] },
   { phase: '2 交给运行机', title: '桥核对，签名服务签合同', steps: [
-    [{ icon: 'handover', title: '交接', does: '在分支上交出去' }],
+    [{ icon: 'handover', title: '交接', does: '把分支交出去' }],
     [{ icon: 'bridge', title: '桥', does: '核对、转问题' }, { icon: 'signer', title: '签名', does: '接手合同' }],
-    [{ icon: 'runner', title: '运行机', does: '无人值守地做' }],
+    [{ icon: 'runner', title: '运行机', does: '无人值守' }],
   ] },
   { phase: '3 检查 · 验收', title: '机器检查，产品验收', steps: [[{ icon: 'ci', title: 'CI 检查', does: '跑 verify' }, { icon: 'release', title: '发布验收', does: '在 MR 上验收' }]] },
   { phase: '4 回写', title: '学到的写回 Brain', steps: [[{ icon: 'brain', title: '回写 Brain', does: '学到的写回去' }]] },
@@ -233,7 +233,7 @@ const WAY: Way = [
 const LOCAL_WAY: Way = [
   WAY[0],
   WAY[1],
-  { phase: '2 检查 · 发布', title: '机器检查，你批准发布', steps: [[{ icon: 'ci', title: 'CI 检查', does: '跑 verify' }, { icon: 'release', title: '发布审批', does: '你在会话里打一行' }]] },
+  { phase: '2 检查 · 发布', title: '机器检查，你批准发布', steps: [[{ icon: 'ci', title: 'CI 检查', does: '跑 verify' }, { icon: 'release', title: '发布审批', does: '会话里打一行' }]] },
   { phase: '3 回写', title: '学到的写回 Brain', steps: [[{ icon: 'brain', title: '回写 Brain', does: '学到的写回去' }]] },
 ]
 

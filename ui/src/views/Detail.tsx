@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, usePoll, useAction } from '../api'
+import { isReview } from '../board/next'
 import { RoleIcon } from '../board/RoleIcon'
 import { Hit, Mini } from '../cto/charts'
 import { ago, fmtCredits, fmtIso, fmtSpan, fmtTime, isoDay } from '../format'
@@ -28,7 +29,7 @@ import {
 } from '../vocab'
 import { Inline } from './Markdown'
 import type { ViewProps } from './props'
-import { EntryChip, MrDescCard, QuestionCard, useCopy } from './Question'
+import { EntryChip, MrDescCard, QuestionCard, ReviewButton, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
 import { NotFound, ReqSwitch } from './ReqSwitch'
 
@@ -227,7 +228,7 @@ function nowOf(x: RequirementDetail, board: ReqBoard | null, live: SessionRow | 
  * the line Lean wrote to say to that session. */
 function reviewOf(next: string[]): { say: string | null } | null {
   const n = next[0] ?? ''
-  if (!/审查/.test(n) || !/新会话/.test(n)) return null
+  if (!isReview(n)) return null
   const m = /说[:：]\s*「([^」]+)」/.exec(n)
   return { say: m ? m[1] : null }
 }
@@ -574,33 +575,6 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
       {body}
       {acts && <div className="br-row br-now-act">{acts}</div>}
     </section>
-  )
-}
-
-/** 开审查会话: a new brain-dev session in the worktree that reviews the code (POST …/session {review}). */
-function ReviewButton({ repo, reqKey, liveSlot, worktree }: { repo: string; reqKey: string; liveSlot: string | null; worktree: string | null }) {
-  const api = useAppApi()
-  const navigate = useNavigate()
-  const [same, setSame] = useState(false)
-  const act = useAction((body: OpenSessionBody) => api.post<OpenSessionResult>(paths.session(repo, reqKey), body))
-  const open = async () => {
-    const r = await act.run({ trust: true, kickoff: true, review: true })
-    if (!r) return
-    if (liveSlot && r.slot === liveSlot) setSame(true)
-    else navigate(r.url)
-  }
-  return (
-    <>
-      <button type="button" className="kt-btn is-primary" disabled={act.busy} onClick={() => void open()}>
-        <Icon name="MessageSquare" size={13} />{act.busy ? '正在开…' : ACT.review}
-      </button>
-      {same && (
-        <p className="br-note" role="status">
-          没开成新的审查会话：app 只找到了原来那个会话。在 KiroCrew 里新开一个 brain-dev 会话{worktree ? `（工作目录 ${worktree}）` : ''}，把上面那句贴给它。
-        </p>
-      )}
-      {act.error && <p className="br-error" role="alert">{act.error}</p>}
-    </>
   )
 }
 

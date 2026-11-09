@@ -9,6 +9,7 @@ import type { ReqBoard } from '../types'
 import { TYPE_IT_YOURSELF } from '../ui'
 import type { ViewProps } from '../views/props'
 import { BoardPage } from './BoardPage'
+import { tickLabel } from './Lanes'
 import { CELL_GROUPS, actorMeta, fmtCredits, fmtWhen } from './format'
 
 const PAY3: BoardEntry = { repo: 'r1', key: 'PAY-3' }
@@ -616,6 +617,37 @@ describe('需求看板 · 轮到谁、做什么', () => {
     expect(within(strip).getByRole('link', { name: '在 MR 上看桥说的 ↗' })).toHaveAttribute('href', b.accept.step.mr_url)
   })
 
+  test('a refused hand-over as the backend says it (the reason, then what to do): the reason once; no wait time it does not know', async () => {
+    const b = fx.board()
+    Object.assign(b.row, { state: 'rejected', state_label: '接手被拒' })
+    b.row.waits = { who: 'you', text: '接手被拒：标签是 bob 打的，不是负责人 alice', line: null, raw: '', do: 'redo_handoff', since: null, where: 'session' }
+    b.accept.step = { text: '接手被拒：标签是 bob 打的，不是负责人 alice\n改好后，在终端里、这个需求的分支上重新跑 brain handoff', who: '你', line: null, mr_url: null, session_url: null }
+    b.questions = []
+    for (const a of b.actors) if (a.key === 'design') Object.assign(a, { status: 'merged', line: null })
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    await loaded()
+    const strip = region('你要做的一步')
+    expect(strip.textContent!.match(/标签是 bob 打的/g)).toHaveLength(1)
+    expect(strip).toHaveTextContent('怎么办改好后，在终端里、这个需求的分支上重新跑 brain handoff')
+    expect(strip).not.toHaveTextContent('已经等了')
+  })
+
+  test('an idle session whose Lean says a review in a new session comes next: that step, 开审查会话 right there', async () => {
+    const b = idle()
+    b.row.waits = { ...b.row.waits, text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）' }
+    b.accept.step = { ...b.accept.step, line: '接着做下一步：发布' }
+    installFixtureRoutes({ ...boardRoute(() => structuredClone(b)), [`POST ${API}/requirements/r1/PAY-3/session`]: () => ({ ok: true, slot: 'brain-PAY-3-r2', url: '/chat?sid=brain-PAY-3-r2' }) })
+    renderBoard()
+    await loaded()
+    const strip = region('你要做的一步')
+    expect(strip).toHaveTextContent('先开一个新会话做审查（这个会话写了代码，不能自己审）')
+    expect(within(strip).queryByTestId('type-line')).toBeNull()
+    fireEvent.click(within(strip).getByRole('button', { name: '开审查会话' }))
+    await waitFor(() => expect(apiCalls.find((c) => c.method === 'POST')).toMatchObject({ body: { trust: true, kickoff: true, review: true } }))
+    await waitFor(() => expect(navigations).toEqual(['/chat?sid=brain-PAY-3-r2']))
+  })
+
   test('a repo done only here: its runner part is one narrow 「这次不需要」 band, no node of it; the top says so', async () => {
     installFixtureRoutes(boardRoute(() => structuredClone(localOnly())))
     renderBoard()
@@ -760,6 +792,10 @@ describe('需求看板 · 轮到谁、做什么', () => {
     expect(within(screen.getByTestId('br-board').querySelector('.kt-top') as HTMLElement).getByRole('button', { name: '打开会话' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '本机会话' })).toBeNull()
   })
+})
+
+test('the time axis names each tick once: half hours are said, not rounded onto the next hour', () => {
+  expect([0, 1800, 3600, 5400, 7200, 3 * 3600, 86400 + 6 * 3600].map(tickLabel)).toEqual(['0', '30 分', '1 小时', '1 小时 30 分', '2 小时', '3 小时', '1 天 6 时'])
 })
 
 describe('需求看板 · 回放', () => {
