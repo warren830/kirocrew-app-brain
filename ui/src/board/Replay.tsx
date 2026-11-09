@@ -26,6 +26,8 @@ export interface ReplayHandle {
   total: number
   /** the real time the replay stands at */
   t: number
+  /** the requirement had ended (merged or closed) when the replay started */
+  finished: boolean
   speed: number
   playing: boolean
   start: () => void
@@ -94,7 +96,8 @@ export function useReplay(board: ReqBoard | null, onDiff: (d: BoardDiff) => void
   }, [shown]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const clock = useMemo(() => (shown ? { at: t, receivedAt: Number.POSITIVE_INFINITY } : null), [shown, t])
-  return { on: st.on, board: shown, clock, span, p: st.p, total, t, speed: st.speed, playing: st.playing, start, exit, toggle, pause, seek, setSpeed }
+  const finished = !!src && (src.ended_at !== null || src.row.state === 'merged' || src.row.state === 'closed')
+  return { on: st.on, board: shown, clock, span, p: st.p, total, t, finished, speed: st.speed, playing: st.playing, start, exit, toggle, pause, seek, setSpeed }
 }
 
 /** The replay's controls, under the top bar: what is playing, how far, how fast. */
@@ -119,7 +122,7 @@ export function ReplayBar({ rp }: { rp: ReplayHandle }) {
           </button>
         ))}
       </span>
-      <span className="kt-dim kt-replay-note">{ended ? '放完了：下面是这个需求最后的样子' : '按记录重放：安静的时段缩短了，不调用 agent'}</span>
+      <span className="kt-dim kt-replay-note">{ended ? (rp.finished ? '放完了：下面是这个需求最后的样子' : '放到现在了：它还在进行') : '按记录重放：安静的时段缩短了，不调用 agent'}</span>
       <button type="button" className="kt-btn" onClick={rp.exit}>退出回放</button>
     </div>
   )
