@@ -98,7 +98,7 @@ def test_checks_and_fixes(tmp_path, home):
     assert fe["ok"] and (tmp_path / "engine").read_text().strip() == "kas"
     assert all(r["level"] == "OK" for r in fe["rows"])
     agent = next(r for r in first["rows"] if r["fix"] == "agent")
-    assert agent["text"] == "没有 ~/.kiro/agents/brain-dev.json" and "修复" in agent["todo"] and agent["repo"] is None
+    assert agent["text"] == "没有 ~/.kiro/agents/brain-dev.json" and "点「装上 brain-dev」" in agent["todo"] and agent["repo"] is None
     engine = next(r for r in first["rows"] if r["fix"] == "engine")
     assert engine["level"] == "WARN" and engine["text"] == "KiroCrew 引擎是 kiro，不是 kas" and "kas" in engine["todo"]
 
@@ -140,7 +140,7 @@ def test_a_repo_without_the_hook_adapter_in_git_fails(tmp_path, home):
     row = next(r for r in rows if r["repo"] == str(repo))
     assert (row["level"], row["text"], row["fix"], row["raw"]) == ("FAIL", ".kiro/brain/lean-hook.py 没提交到 git", "kit",
                                                                    probs[0])
-    assert "修复" in row["todo"] and "新分支" in row["todo"]
+    assert "点「重装 kit 文件」" in row["todo"] and "新分支" in row["todo"]
     # not committed matters to every repo (the app's worktrees are made from main): FAIL for a local-only one too
     local = cc.checks([str(repo)], team_paths=[])["rows"]
     assert [r["level"] for r in local if r["repo"] == str(repo)] == ["FAIL"]

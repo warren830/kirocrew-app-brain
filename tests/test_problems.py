@@ -38,8 +38,8 @@ def test_the_older_adapter_is_fail_for_a_team_repo_and_a_reminder_for_a_local_on
     assert team["text"] == local["text"] == ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）"
     assert (team["level"], local["level"], unknown["level"]) == ("FAIL", "WARN", "FAIL")
     assert team["fix"] == local["fix"] == "kit" and team["repo"] == REPO
-    assert "park.json" in team["todo"] and "修复" in team["todo"]
-    assert local["todo"].startswith("只有把需求交给运行机时才要紧") and "修复" in local["todo"]
+    assert "park.json" in team["todo"] and "点「重装 kit 文件」" in team["todo"]
+    assert local["todo"].startswith("只有把需求交给运行机时才要紧") and "点「重装 kit 文件」" in local["todo"]
     assert team["raw"] == local["raw"] == OLDER                 # brain-kit's words, never dropped
 
 
@@ -59,7 +59,7 @@ def test_not_committed_is_fail_everywhere_with_the_kit_fix(raw, text):
     for team in (True, False, None):
         r = ok_row(P.row("FAIL", raw, repo=REPO, team=team))
         assert (r["level"], r["text"], r["fix"], r["raw"]) == ("FAIL", text, "kit", raw)
-        assert "默认分支" in r["todo"] and "修复" in r["todo"]
+        assert "默认分支" in r["todo"] and "点「重装 kit 文件」" in r["todo"]
 
 
 def test_lean_counting_the_run_records_as_code():
@@ -86,10 +86,9 @@ def test_the_handoff_refusals_brain_prints():
 # ---- brain doctor's lines (doctor_checks, crew_checks) --------------------------------------------------------------- #
 
 DOCTOR = [
-    ("OK", "kit config valid (.brain/kit.json), tracker none, keys PAY-<n>", "kit.json 没问题（需求号 PAY-n，跟踪 none）", None),
+    ("OK", "kit config valid (.brain/kit.json), tracker none, keys PAY-<n>", "这个仓库的 brain-kit 设置没问题（需求号 PAY-n，不用 Jira）",
+     None),
     ("OK", "AI-DLC Lean doctor: ok", "AI-DLC Lean 自检通过", None),
-    ("WARN", "AI-DLC Lean doctor: hooks have never run here: start `kiro-cli --v3` in this folder and trust the workspace",
-     "Lean 的 hook 在这里还没跑过", None),
     ("WARN", "AI-DLC Lean doctor: something else Lean says", "AI-DLC Lean 自检有提醒", None),
     ("OK", "Lean does not count runs/ as code (aidlc-docs/lean.json fingerprint_exclude)", "Lean 不把 runs/ 下的记录算成代码",
      None),
@@ -138,6 +137,28 @@ DOCTOR = [
 ]
 
 
+def test_hooks_that_never_ran_right_after_an_install_are_a_note_not_a_warning():
+    """SETUP-28: brain doctor warns about it, there is nothing to do: an OK row, not counted as 注意."""
+    r = ok_row(P.row("WARN", "AI-DLC Lean doctor: hooks have never run here: start `kiro-cli --v3` in this folder and trust "
+                             "the workspace"))
+    assert (r["level"], r["todo"]) == ("OK", "") and r["text"].startswith("Lean 的 hook 在这里还没跑过：")
+
+
+def test_every_fix_row_names_the_button_the_page_shows():
+    """UI问题清单 #12: 做什么 says 点「<the button's name>」, never a 「修复」 no button is called; no brain-dev.json at all is
+    「装上 brain-dev」."""
+    raws = [r for _, r, _, f in DOCTOR if f] + [OLDER, WRITE_PROBLEM,
+                                              ".kiro/aidlc-lean/aidlc_lean.py is not committed: AI-DLC Lean; commit it on main"
+                                              " through an MR"]
+    rows = [P.agent_missing(), P.agent_lacks([("preToolUse", "PreToolUse")]), P.engine("kiro")] + \
+        [P.row("FAIL", raw, repo=REPO, team=team) for raw in raws for team in (True, False)]
+    names = set(P.FIX_BUTTON.values()) | {P.AGENT_NEW}
+    for r in (x for x in rows if x["fix"]):
+        assert "「修复」" not in r["todo"], r
+        named = [n for n in names if "点「%s」" % n in r["todo"]]
+        assert named == [P.AGENT_NEW if r["text"] == "没有 ~/.kiro/agents/brain-dev.json" else P.FIX_BUTTON[r["fix"]]], r
+
+
 @pytest.mark.parametrize("level, raw, text, fix", DOCTOR)
 def test_brain_doctors_lines(level, raw, text, fix):
     r = ok_row(P.row(level, raw, repo=REPO))
@@ -167,7 +188,8 @@ def test_the_apps_own_rows():
     assert P.agent_unreadable("的 hooks 格式认不出")["text"] == "brain-dev.json的 hooks 格式认不出"
     lacks = ok_row(P.agent_lacks([("userPromptSubmit", "UserPromptSubmit"), ("preToolUse", "PreToolUse")]))
     assert lacks["text"] == "brain-dev.json 缺 Lean 的 hook：发消息、调用工具前" and lacks["fix"] == "agent"
-    assert "userPromptSubmit、preToolUse" in lacks["todo"] and "别的 hook 和设置都不动" in lacks["todo"]
+    assert lacks["todo"] == "点「补上 Lean 的 hook」：只补上缺的（发消息、调用工具前），别的 hook 和设置都不动"
+    assert lacks["raw"] == "缺的 hook：userPromptSubmit、preToolUse"          # the trigger names only under 细节
     assert ok_row(P.agent_ok(0))["text"] == P.AGENT_OK
     assert P.agent_ok(2)["text"] == P.AGENT_OK + "（另有 2 个别的 hook，留着不动）"
     custom = ok_row(P.agent_custom(["model"]))

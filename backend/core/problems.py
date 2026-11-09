@@ -28,13 +28,19 @@ from typing import Any, Iterable
 
 LEVELS = ("OK", "WARN", "FAIL")
 FIXES = ("agent", "engine", "kit", "me")
-ME_TODO = "在下面填上，存进这个仓库的 git config brain.user"
-ME_GITLAB = "要你在 GitLab 上的用户名：认领的分支 ai/<名字>/… 和交接都按它认人。" + ME_TODO + "（或者设好 GITLAB_TOKEN）"
+ME_TODO = "在下面填上，点「保存」（记在这个仓库的 git 设置里）"
+ME_GITLAB = "要你在 GitLab 上的用户名：认领和交接都按它认人。" + ME_TODO
 AGENT_OK = "brain-dev 带着 Lean 的三个 hook"   # crewcheck.agent_ok accepts the OK row whose text starts with it
 TRIGGER_NAMES = {"agentSpawn": "会话开始", "userPromptSubmit": "发消息", "preToolUse": "调用工具前"}
+TRACKER_NAME = {"none": "不用 Jira", "jira": "用 Jira"}
 EVENT_TRIGGER = {"SessionStart": "agentSpawn", "UserPromptSubmit": "userPromptSubmit", "PreToolUse": "preToolUse"}
 
-REINSTALL = "点「修复」：重装 brain-kit 并提交（默认直接在当前分支上，团队仓库可以选新分支开 MR）"
+# the fix buttons' names (ui.tsx CheckRows shows the name a row's 做什么 gives in 点「…」, these): every text that
+# points at a button says its name
+FIX_BUTTON = {"agent": "补上 Lean 的 hook", "engine": "把引擎换成 kas", "kit": "重装 kit 文件"}
+AGENT_NEW = "装上 brain-dev"      # the agent fix when ~/.kiro/agents/brain-dev.json is not there at all
+REINSTALL = "点「%s」：重装 brain-kit 并提交（默认直接在当前分支上，团队仓库可以选新分支开 MR）" % FIX_BUTTON["kit"]
+AGENT_NEW_TODO = "点「%s」：装上 brain-kit 带的那一份；没有它，Lean 的 hook 在 KiroCrew 里不会跑" % AGENT_NEW
 LOCAL_ONLY = "只有把需求交给运行机时才要紧"
 GENERIC_TEXT = {"FAIL": "brain-kit 报了一个问题", "WARN": "brain-kit 提醒了一件事", "OK": "brain-kit：这项通过"}
 GENERIC_TODO = {"FAIL": "看下面 brain-kit 的原话；看不懂就问维护 brain-kit 的人",
@@ -59,13 +65,14 @@ class Rule:
     """One of brain-kit's sayings. *text* / *todo*: format strings over the regex's named groups, or callables of
     (groups, level) when the words depend on the level (brain doctor says some lines at OK or FAIL); *runner*: it
     matters only to a repo handed to the team runner (*local*: the todo for a local-only one); *search*: found
-    anywhere in the line, not only at its start."""
+    anywhere in the line, not only at its start; *level*: the level the app says it at, whatever brain-kit said (a
+    note brain-kit warns about that needs nothing done)."""
 
     def __init__(self, rx: str, text: Any, todo: Any = "", fix: str | None = None, *, runner: bool = False,
-                 local: Any = "", search: bool = False) -> None:
+                 local: Any = "", search: bool = False, level: str | None = None) -> None:
         self.rx = re.compile(rx, re.S)
         self.text, self.todo, self.fix = text, todo, fix
-        self.runner, self.local, self.search = runner, local, search
+        self.runner, self.local, self.search, self.level = runner, local, search, level
 
     def match(self, s: str) -> "re.Match | None":
         return self.rx.search(s) if self.search else self.rx.match(s)
@@ -95,7 +102,7 @@ RULES: list[Rule] = [
     Rule(r"^(?P<path>\S+) is an older adapter \(version (?P<have>\d+), needs (?P<need>\d+)\)",
          "{path} 是旧版（第 {have} 版，要第 {need} 版）",
          "运行机上的 run 停下来问人时写不了 park.json。" + REINSTALL, "kit", runner=True,
-         local=LOCAL_ONLY + "（运行机靠新版停下来问人）。要交的话点「修复」：重装 brain-kit"),
+         local=LOCAL_ONLY + "（运行机靠新版停下来问人）。要交的话点「%s」" % FIX_BUTTON["kit"]),
     # cli.runner_kit_problems: Lean / the adapter only on this disk, not in git (worktrees are made from main)
     Rule(r"^(?P<path>\S+) is not committed: AI-DLC Lean;", "AI-DLC Lean 没提交到 git",
          "app 的工作目录从默认分支建，没提交的 Lean 不在里面。" + REINSTALL, "kit"),
@@ -106,14 +113,16 @@ RULES: list[Rule] = [
     # mrdesc.write_problem (+ exclude_fix), in crewcheck's row and in brain doctor's
     Rule(r"(?P<runs>[^\s/：:]+)/ 下的文件（MR\.md、park\.json）算在 Lean 的代码指纹里",
          "Lean 把 {runs}/ 下的记录算成代码",
-         "交接会被拒。点「修复」：重装会把 {runs}/** 加进 aidlc-docs/lean.json（由人看过再合并）", "kit", runner=True,
-         local=LOCAL_ONLY + "（那时交接会被拒）。要交的话点「修复」：重装会把 {runs}/** 加进 lean.json", search=True),
+         "交接会被拒。点「%s」：重装会把 {runs}/** 加进 aidlc-docs/lean.json（由人看过再合并）" % FIX_BUTTON["kit"], "kit",
+         runner=True, local=LOCAL_ONLY + "（那时交接会被拒）。要交的话点「%s」：重装会把 {runs}/** 加进 lean.json"
+         % FIX_BUTTON["kit"], search=True),
     # cli.doctor_checks
     Rule(r"^kit config valid \((?P<path>[^)]+)\), tracker (?P<tracker>\S+), keys (?P<prefix>\S+)-<n>$",
-         "kit.json 没问题（需求号 {prefix}-n，跟踪 {tracker}）"),
+         lambda g, lv: "这个仓库的 brain-kit 设置没问题（需求号 %s-n，%s）" % (
+             g["prefix"], TRACKER_NAME.get(g["tracker"], g["tracker"]))),
     Rule(r"^AI-DLC Lean doctor: ok$", "AI-DLC Lean 自检通过"),
-    Rule(r"^AI-DLC Lean doctor: .*hooks have never run here", "Lean 的 hook 在这里还没跑过",
-         "不用管：在这个仓库里开过 brain-dev 会话（信任工作区）以后就有了"),
+    Rule(r"^AI-DLC Lean doctor: .*hooks have never run here", "Lean 的 hook 在这里还没跑过：开过 brain-dev 会话以后就有了",
+         level="OK"),
     Rule(r"^AI-DLC Lean doctor: (?P<last>.+)$", "AI-DLC Lean 自检有提醒",
          "看下面 Lean 的原话（它只提醒，不拦东西）"),
     Rule(r"^Lean does not count (?P<runs>\S+?)/ as code", "Lean 不把 {runs}/ 下的记录算成代码"),
@@ -132,11 +141,11 @@ RULES: list[Rule] = [
     Rule(r"^missing \.kiro/agents/brain-dev\.md", "没有 .kiro/agents/brain-dev.md", REINSTALL, "kit"),
     Rule(r"^Brain files in (?P<dir>[^:]+?)/: all present$", "Brain 文件都在（{dir}/）"),
     Rule(r"^Brain files in (?P<dir>[^:]+?)/: missing (?P<names>.+)$", "缺 Brain 文件：{names}",
-         "重装 brain-kit 会补上缺的（已有的不动）", "kit"),
+         "点「%s」：会补上缺的（已有的不动）" % FIX_BUTTON["kit"], "kit"),
     Rule(r"^AGENTS\.md at repo root$", lambda g, lv: "有 AGENTS.md" if lv == "OK" else "仓库根目录没有 AGENTS.md",
-         "重装 brain-kit 会补上它", "kit"),
+         "点「%s」：会补上它" % FIX_BUTTON["kit"], "kit"),
     Rule(r"^(?P<dir>\S+?)/ is git-ignored", lambda g, lv: ("%s/ 不进 git" % g["dir"]) if lv == "OK" else
-         ("%s/ 没被 git 忽略" % g["dir"]), "需求材料不能进 git：重装 brain-kit 会把它加进 .gitignore", "kit"),
+         ("%s/ 没被 git 忽略" % g["dir"]), "需求材料不能进 git：点「%s」，会把它加进 .gitignore" % FIX_BUTTON["kit"], "kit"),
     Rule(r"^cannot fetch origin/(?P<b>\S+): Brain freshness unknown$", "取不到 origin/{b}：不知道 Brain 是不是最新",
          "检查网络或登录（比如 mwinit），再检查一次"),
     Rule(r"^Brain vs origin/(?P<b>\S+): same$", "Brain 和 origin/{b} 一样"),
@@ -150,12 +159,13 @@ RULES: list[Rule] = [
          "换成 kit.json pins 里写的版本，或者改 pins"),
     Rule(r"^(?P<tool>kiro-cli|kirocrew) (?P<have>.+?)(?: \(not pinned\))?$", _tool),
     # cli.crew_checks (brain doctor's KiroCrew lines)
-    Rule(r"^KiroCrew: ~/\.kiro/agents/brain-dev\.json missing", "没有 ~/.kiro/agents/brain-dev.json",
-         "点「修复」装上 brain-kit 带的版本：没有它，Lean 的 hook 在 KiroCrew 里不会跑", "agent"),
+    Rule(r"^KiroCrew: ~/\.kiro/agents/brain-dev\.json missing", "没有 ~/.kiro/agents/brain-dev.json", AGENT_NEW_TODO,
+         "agent"),
     Rule(r"^KiroCrew brain-dev carries Lean's 3 hooks$", "KiroCrew 的 brain-dev 带着 Lean 的三个 hook"),
     Rule(r"^KiroCrew brain-dev\.json lacks Lean's (?P<t>.+?) hook\(s\)",
          lambda g, lv: "brain-dev.json 缺 Lean 的 hook：%s" % _hook_names(g["t"]),
-         "点「修复」：只补上缺的，别的 hook 和设置都不动", "agent"),
+         lambda g, lv: "点「%s」：只补上缺的（%s），别的 hook 和设置都不动" % (FIX_BUTTON["agent"], _hook_names(g["t"])),
+         "agent"),
     Rule(r"^KiroCrew brain-dev\.json has no (?P<f>.+?) \(", "brain-dev.json 没有 {f}",
          "在终端里跑 brain crew-agent --force 补上（你自己的设置都留着）"),
     Rule(r"^KiroCrew brain-dev uses your own (?P<f>.+?) \(", "brain-dev 用的是你自己的 {f}"),
@@ -164,7 +174,7 @@ RULES: list[Rule] = [
     Rule(r"^KiroCrew engine: (?P<be>default \(KAS\)|kas)$",
          lambda g, lv: "KiroCrew 引擎：%s" % ("默认（kas）" if g["be"].startswith("default") else "kas")),
     Rule(r"^KiroCrew engine: (?P<be>\S+)", "KiroCrew 引擎是 {be}，不是 kas",
-         "点「修复」设成 kas：Lean 的 hook 只在 kas（v3）上测过", "engine"),
+         "点「%s」：Lean 的 hook 只在 kas（v3）上测过" % FIX_BUTTON["engine"], "engine"),
     # cli._me: brain-kit does not know who the person is (48b6b97's words, and the ones after it)
     Rule(r"^who are you\? this repo uses GitLab \((?P<base>[^)]*)\)", "brain-kit 不知道你是谁：这个仓库用 GitLab（{base}）",
          ME_GITLAB, "me"),
@@ -172,11 +182,11 @@ RULES: list[Rule] = [
          "写一个名字（小写字母、数字、. _ -）。" + ME_TODO, "me"),
     Rule(r"^who are you\?", "brain-kit 不知道你是谁",
          "填上你的名字（用 GitLab 的仓库填 GitLab 用户名）。" + ME_TODO, "me"),
-    Rule(r"^brain\.user '?(?P<u>.*?)'? is not a GitLab username", "git config brain.user（{u}）不能当名字用",
+    Rule(r"^brain\.user '?(?P<u>.*?)'? is not a GitLab username", "这个仓库记下的名字（{u}）不能用",
          "改成你在 GitLab 上的用户名（小写字母、数字、. _ -）。" + ME_TODO, "me"),
     # brain: BrainError as `brain` prints it for a refused hand-over (cmd_handoff)
     Rule(r"^not handed over: Lean would refuse this run's RELEASE approval later", "没交出去：Lean 把 runs/ 下的记录算成代码",
-         "点「修复」：重装会把 runs/** 加进 aidlc-docs/lean.json（由人看过再合并），再交接", "kit"),
+         "点「%s」：重装会把 runs/** 加进 aidlc-docs/lean.json（由人看过再合并），再交接" % FIX_BUTTON["kit"], "kit"),
     Rule(r"^the team runner could not run this branch: ", "没交出去：运行机跑不了这个分支", REINSTALL, "kit"),
 ]
 
@@ -200,7 +210,7 @@ def row(level: Any, raw: Any, *, repo: str | None = None, team: bool | None = No
         if not hit:
             continue
         g = {k: (v or "") for k, v in hit.groupdict().items()}
-        level_now = lv
+        level_now = r.level or lv
         text, todo = _f(r.text, g, level_now), _f(r.todo, g, level_now)
         if r.runner and team is not None:
             if not team and level_now == "FAIL":
@@ -223,6 +233,38 @@ def who_row(output: Any, *, repo: str | None = None) -> dict[str, Any] | None:
         r = row("FAIL", line, repo=repo)
         if r["fix"] == "me":
             return r
+    return None
+
+
+# why `brain start` stopped (cmd_start, claims.claim), said as what to do on the page
+START_RULES: list[tuple[re.Pattern, str, str]] = [(re.compile(rx), t, d) for rx, t, d in (
+    (r"^(?P<k>\S+) is (?:already )?claimed by (?P<o>\S+)$", "{k} 是 {o} 认领的", "只有 {o} 能开工：问问 {o}，或者开一个新需求"),
+    (r"^(?P<k>\S+) is closed \((?P<why>.*)\)$", "{k} 已经关了（{why}）", "开一个新需求"),
+    (r"^(?P<p>\S+) already exists on (?P<b>\S+): this requirement already has a run$", "这个需求已经开过工了",
+     "{b} 上已经有它的记录（{p}）：去需求看板看它"),
+    (r"^branch (?P<b>\S+) already exists(?: on origin)?$", "分支 {b} 已经有了", "换一个英文短名再开工"),
+    (r"^\.brain/kit\.json is missing", "开工的地方没有 brain-kit",
+     "开工从远端（origin）的默认分支建分支，那里还没有 brain-kit：先推送默认分支（导入仓库里「推送」），或者等 MR 合并"),
+    (r"^AI-DLC Lean is not installed", "开工的地方没有 AI-DLC Lean",
+     "默认分支上要有 Lean：在「设置」的 KiroCrew 里点「%s」，提交并推送" % FIX_BUTTON["kit"]),
+    (r"^could not push claim (?P<k>\S+): ", "认领 {k} 没推上去", "看下面 brain start 的输出：多半是网络或权限"),
+)]
+
+
+def start_row(output: Any, *, repo: str | None = None) -> dict[str, Any] | None:
+    """Why `brain start` stopped, from its *output*: not knowing who the person is (the 'me' fix, who_row), or one of
+    START_RULES, as a FAIL row with the line kept in raw; None when no line is known."""
+    who = who_row(output, repo=repo)
+    if who:
+        return who
+    for line in str(output or "").splitlines():
+        s = " ".join(line.split())
+        body = s[len("brain: "):] if s.startswith("brain: ") else s
+        for rx, text, todo in START_RULES:
+            hit = rx.match(body)
+            if hit:
+                g = {k: (v or "") for k, v in hit.groupdict().items()}
+                return mk("FAIL", text.format(**g), todo.format(**g), None, repo, s)
     return None
 
 
@@ -265,8 +307,7 @@ def brainkit_old(lacking: list[str]) -> dict[str, Any]:
 
 
 def agent_missing() -> dict[str, Any]:
-    return mk("FAIL", "没有 ~/.kiro/agents/brain-dev.json",
-              "点「修复」装上 brain-kit 带的版本：没有它，Lean 的 hook 在 KiroCrew 里不会跑", "agent")
+    return mk("FAIL", "没有 ~/.kiro/agents/brain-dev.json", AGENT_NEW_TODO, "agent")
 
 
 def agent_unreadable(why: str, detail: str = "") -> dict[str, Any]:
@@ -283,7 +324,8 @@ def trigger_names(missing: list[tuple[str, str]], *, english: bool = False) -> s
 
 def agent_lacks(missing: list[tuple[str, str]]) -> dict[str, Any]:
     return mk("FAIL", "brain-dev.json 缺 Lean 的 hook：%s" % trigger_names(missing),
-              "点「修复」：只补上缺的（%s），别的 hook 和设置都不动" % "、".join(t for t, _ in missing), "agent")
+              "点「%s」：只补上缺的（%s），别的 hook 和设置都不动" % (FIX_BUTTON["agent"], trigger_names(missing)), "agent",
+              raw="缺的 hook：%s" % "、".join(t for t, _ in missing))
 
 
 def agent_ok(others: int) -> dict[str, Any]:
@@ -305,8 +347,8 @@ def engine(be: str | None, why: str = "", detail: str = "") -> dict[str, Any]:
                   raw=detail)
     if be in ("kas", ""):
         return mk("OK", "KiroCrew 引擎：%s" % (be or "默认（kas）"))
-    return mk("WARN", "KiroCrew 引擎是 %s，不是 kas" % be, "点「修复」设成 kas：Lean 的 hook 只在 kas（v3）上测过。KiroCrew "
-              "可能要重开才生效", "engine")
+    return mk("WARN", "KiroCrew 引擎是 %s，不是 kas" % be, "点「%s」：Lean 的 hook 只在 kas（v3）上测过。KiroCrew "
+              "可能要重开才生效" % FIX_BUTTON["engine"], "engine")
 
 
 def repo_unreadable(repo: str, detail: str) -> dict[str, Any]:

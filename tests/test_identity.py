@@ -106,7 +106,7 @@ def test_without_gitlab_the_old_brainkit_asks_for_a_name_and_the_start_says_why(
     assert first["ok"] is False and "who are you?" in first["output"]
     p = first["problem"]
     assert p["fix"] == "me" and p["text"] == "brain-kit 不知道你是谁" and p["repo"] == str(repo)
-    assert "git config brain.user" in p["todo"] and first["me"]["ask"]
+    assert "点「保存」" in p["todo"] and first["me"]["ask"]
     assert saved.status == 200 and saved.body["me"]["name"] == login and saved.body["me"]["source"] == "git"
     assert sh("git", "-C", repo, "config", "--local", "brain.user").stdout.strip() == login
     assert next(r for r in saved.body["status"]["repos"] if r["id"] == "r1")["me"]["ask"] is False
@@ -159,7 +159,7 @@ def test_with_gitlab_and_no_token_both_brainkits_ask_for_the_gitlab_username(tmp
         assert me["ask"] and me["label"] == "你的 GitLab 用户名" and me["suggest"] == login
         assert me["why"] == identity.WHY_GITLAB and me["gitlab"] == "https://gitlab.example.com"
         row = next(c for c in got["checks"] if c["id"] == "me")
-        assert row["level"] == "WARN" and row["todo"] == "在下面填你的 GitLab 用户名，存进这个仓库的 git config brain.user"
+        assert row["level"] == "WARN" and row["todo"] == "在下面填上你的 GitLab 用户名，点「保存」"
         assert out["ok"] is False and out["problem"]["fix"] == "me" and out["me"]["label"] == "你的 GitLab 用户名"
         if kit_path == "fallback":
             assert out["problem"]["text"] == "brain-kit 不知道你是谁：这个仓库用 GitLab（https://gitlab.example.com）"
@@ -227,10 +227,10 @@ def test_who_are_you_in_plain_chinese_with_the_input_as_the_fix():
     assert {k: r["fix"] for k, r in rows.items()} == {"old": "me", "new": "me", "login": "me", "bad": "me"}
     assert rows["old"]["text"] == "brain-kit 不知道你是谁"
     assert rows["new"]["text"] == "brain-kit 不知道你是谁：这个仓库用 GitLab（https://gitlab.example.com）"
-    assert rows["new"]["todo"].startswith("要你在 GitLab 上的用户名：认领的分支 ai/<名字>/… 和交接都按它认人")
+    assert rows["new"]["todo"].startswith("要你在 GitLab 上的用户名：认领和交接都按它认人")
     assert rows["login"]["text"] == "brain-kit 不知道你是谁：这台机器的登录名不能当名字"
-    assert rows["bad"]["text"] == "git config brain.user（Bad Name）不能当名字用"
-    assert all(r["raw"] and "git config brain.user" in r["todo"] for r in rows.values())
+    assert rows["bad"]["text"] == "这个仓库记下的名字（Bad Name）不能用"
+    assert all(r["raw"] and "点「保存」" in r["todo"] for r in rows.values())        # the command only under 细节 (raw)
     assert problems.row("FAIL", old)["fix"] is None                    # no repo: nothing to set it in
     assert problems.who_row("Started nothing\n" + new + "\n", repo="/r")["text"] == rows["new"]["text"]
     assert problems.who_row("brain: no such requirement", repo="/r") is None
