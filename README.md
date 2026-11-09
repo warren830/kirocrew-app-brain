@@ -16,12 +16,13 @@ Lean 也在里面）。安装时不用 node，也不用另外装 brain-kit。各
 
 1. KiroCrew 侧边栏 → **Apps** → **Discover（发现）**。
 2. 点 Discover 右上角的齿轮（Sources / 来源）→ **管理应用来源（Manage app sources）** → **添加注册表（Add Registry）**。
-3. 仓库填 `https://github.com/warren830/kirocrew-app-brain`，分支用默认的 `main`，保存。显示名称可以不填。
+3. 仓库填 `https://github.com/warren830/kirocrew-app-brain`，分支填 **`release`**（不是 main），保存。显示名称可以不填。
 4. 回到 Discover，找到 **Brain 交付** → **安装（Install）**。找不到就点 **同步应用（Sync apps）**。
-   安装只是从 GitHub 拷文件，不跑 npm，也不跑 pip。KiroCrew 装之前会先连它的官方应用目录（apps.crew.kiro.dev），
-   确认没有同名的官方 app；连不上就拒绝安装，过一会儿再试。
-5. 点 **启用（Enable）**。会弹信任确认：**这个 app 和 KiroCrew 同等权限运行**（它的代码跑在 KiroCrew 里，能读写你的文件、
-   运行命令）。只装你信任的。它还会请你同意 sessionApproval：app 可以让它自己开的会话不用逐个批准工具调用。
+   - 会先弹信任确认：**这个 app 和 KiroCrew 同等权限运行**（它的代码跑在 KiroCrew 里，能读写你的文件、运行命令）。
+     只装你信任的。卸载会收回这个信任，再装要重新确认。
+   - 安装只是从 GitHub 拷文件，不跑 npm，也不跑 pip。KiroCrew 装之前会先连它的官方应用目录（apps.crew.kiro.dev），
+     确认没有同名的官方 app；连不上就拒绝安装，过一会儿再试。
+5. 点 **启用（Enable）**。会请你同意 sessionApproval：app 可以让它自己开的会话不用逐个批准工具调用。
 
 ## 3. 第一次打开
 
