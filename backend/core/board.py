@@ -1116,6 +1116,12 @@ def changes_from_log(text: str) -> dict[str, list[dict[str, Any]]]:
                 nums.append((int(a) if a.isdigit() else 0, int(r) if r.isdigit() else 0))
         out[sha] = [{"path": path[:300], "added": n[0], "removed": n[1], "status": st}
                     for (st, path), n in zip(raw, nums + [(0, 0)] * (len(raw) - len(nums)))][:MAX_CHANGES]
+    # Lean names its audit file after the clone (the host): shown by its label, as everywhere else
+    audit = lean_view.audit_labels(sorted({c["path"] for cs in out.values() for c in cs
+                                           if re.match(r"^aidlc-docs/audit/[^/]+\.jsonl$", c["path"])}))
+    for cs in out.values():
+        for c in cs:
+            c["path"] = audit.get(c["path"], c["path"])
     return out
 
 
