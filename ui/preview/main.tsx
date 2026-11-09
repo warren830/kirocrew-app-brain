@@ -179,9 +179,11 @@ function boardFor(path: string): ReqBoard {
 
 function overview(path: string): Overview {
   const repo = new URL(path, location.origin).searchParams.get('repo') ?? 'all'
-  const own = W.overviews?.[flags.has('noeval') ? 'noeval' : 'eval']?.[repo]
-  const o = clone(own ?? W.overview)
   const usable = new Set(listedRepos().filter((r) => r.ok).map((r) => r.id))
+  const byRepo = W.overviews?.[flags.has('noeval') ? 'noeval' : 'eval']
+  // nothing readable (no brain-kit): the backend's answer for a repo it has no rows of, shop-web's (not installed)
+  const own = usable.size === 0 && repos.some((r) => r.ok) ? byRepo?.r2 : byRepo?.[repo]
+  const o = clone(own ?? W.overview)
   if ((repo !== 'all' && !own) || usable.size < repos.filter((r) => r.ok).length) {
     o.rows = o.rows.filter((r) => (repo === 'all' || r.repo === repo) && usable.has(r.repo))
     o.cto.runs = o.cto.runs.filter((r) => (repo === 'all' || r.repo === repo) && usable.has(r.repo))
