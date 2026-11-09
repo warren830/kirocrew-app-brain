@@ -106,7 +106,8 @@ class _Fold:
                            "since": None, "history": [], "spans": [], "marks": [], "facts": [], "credits": None,
                            "session": None, "line": None}
 
-    def put(self, key: str, status: str, doing: str, at: float | None) -> None:
+    def put(self, key: str, status: str, doing: str, at: float | None, who: str | None = None) -> None:
+        """*who*: whom a wait for a person is on (Waits.who: you, product, people …), so the replay says it."""
         x = self.a[key]
         doing = " ".join(doing.split())
         if x["status"] == status and x["doing"] == doing:
@@ -114,7 +115,7 @@ class _Fold:
         x["status"], x["doing"] = status, doing
         if at is not None:
             x["since"] = at
-            x["history"].append({"at": at, "status": status, "doing": doing})
+            x["history"].append({"at": at, "status": status, "doing": doing, "who": who})
 
     def open(self, key: str, kind: str, at: float | None) -> None:
         if at is None:
@@ -148,6 +149,11 @@ class _Fold:
             spans[-1]["b"] = max(at, spans[-1]["a"])
             at = spans[-1]["b"]
         spans.append({"a": at, "b": None, "kind": "wait"})
+
+
+def _who(you: str) -> str:
+    """The requirement's person as Waits.who: you, or someone else (people)."""
+    return "you" if you == "你" else "people"
 
 
 def _you(me: str | None, owner: str | None) -> str:
@@ -443,7 +449,8 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
                 past_design(at)
             for g in e.get("gates") or []:
                 fo.put(g, "awaiting_approval", "等%s批准%s" % (you if e["from"] == "local" else "人在 MR 上",
-                                                          GATE_KIND_LABEL.get(e.get("lean") or "", "")), at)
+                                                          GATE_KIND_LABEL.get(e.get("lean") or "", "")), at,
+                       _who(you) if e["from"] == "local" else "product" if e.get("lean") == "RELEASE" else "people")
                 fo.open(g, "wait", at)
                 fo.mark(g, at, "request", e["text"])
             s = e["from"]
@@ -506,7 +513,7 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
             fo.put("bridge", "failed", e["text"].replace("桥拒绝接手：", "拒绝接手："), at)
             fo.close("bridge", at)
             fo.mark("bridge", at, "rejected", e["text"])
-            fo.put("local", "awaiting_approval", "接手被拒：改好后重新交接", at)
+            fo.put("local", "awaiting_approval", "接手被拒：改好后重新交接", at, _who(you))
             fo.open("local", "wait", at)
         elif kind == "signed":
             fo.put("signer", "merged", "签了接手合同", at)
@@ -519,7 +526,8 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
             label = KIND_LABEL.get(str(e.get("qkind") or ""), "问题")
             if A[s]["status"] not in FINAL:
                 fo.put(s, "awaiting_approval", "停下问%s：%s%s" % (you if s == "local" else "人", label,
-                                                                  "（%s）" % e["did"] if e.get("did") else ""), at)
+                                                                  "（%s）" % e["did"] if e.get("did") else ""), at,
+                       _who(you) if s == "local" else "product" if e.get("qkind") == "acceptance" else "people")
                 fo.open(s, "wait", at)
             fo.mark(s, at, "question", e["text"])
             if e["from"] == "bridge":
@@ -609,7 +617,7 @@ def _merged(fo: _Fold, at: float, hand_at: float | None, proposals: int, again: 
     if again and A["reflect"]["status"] != "waiting":
         return
     if proposals:
-        fo.put("reflect", "awaiting_approval", "等%s回写 %d 条新知识" % (you, proposals), at)
+        fo.put("reflect", "awaiting_approval", "等%s回写 %d 条新知识" % (you, proposals), at, _who(you))
         fo.open("reflect", "wait", at)
     else:
         fo.put("reflect", "skipped", "这次没有要回写的知识", at)
@@ -661,7 +669,8 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
                 A[g]["line"] = a.get("line") if hand_at is None else None
                 if A[g]["status"] != "awaiting_approval":
                     fo.put(g, "awaiting_approval", "等%s批准%s" % (you if hand_at is None else "人在 MR 上",
-                                                              GATE_KIND_LABEL.get(a["kind"], "")), _first(a.get("at"), now))
+                                                              GATE_KIND_LABEL.get(a["kind"], "")), _first(a.get("at"), now),
+                           _who(you) if hand_at is None else "product" if a.get("kind") == "RELEASE" else "people")
             elif a.get("state") == "stale" and A[g]["status"] != "merged":
                 fo.put(g, "stalled", "文件改过了：要重新请求批准", _first(a.get("at"), now))
             elif a.get("state") == "approved" and A[g]["status"] in ("waiting", "awaiting_approval"):
@@ -680,19 +689,19 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
 
         if s and s.get("awaiting"):   # busy too: a turn that waits for a tool call's approval
             quiet_down()
-            fo.put("local", "awaiting_approval", "会话里有一个工具调用等%s批准" % you, quiet)
+            fo.put("local", "awaiting_approval", "会话里有一个工具调用等%s批准" % you, quiet, _who(you))
         elif s and s.get("busy"):
             if A["local"]["status"] not in ("running", "fixing"):
                 fo.put("local", "running", "AI 在做", _first(s.get("last_activity"), now))
                 fo.open("local", "work", _first(s.get("last_activity"), now))
         elif s and not pend and A["local"]["status"] in ("running", "fixing", "waiting", "done"):
             quiet_down()
-            fo.put("local", "awaiting_approval", "会话空着：轮到%s回话" % you, quiet)
+            fo.put("local", "awaiting_approval", "会话空着：轮到%s回话" % you, quiet, _who(you))
         elif not s and A["local"]["status"] == "running" and not pend:
             fo.put("local", "stalled", "这台机器上还没有它的会话：开一个", _first(since, last_local, now))
     elif state == "parked" and not hand_at and park_waiting(f.get("park")):
         at = held("local", _first(since, last_of("question", side="local"), now))
-        fo.put("local", "awaiting_approval", waits.get("text") or "停下等%s回答" % you, at)
+        fo.put("local", "awaiting_approval", waits.get("text") or "停下等%s回答" % you, at, waits.get("who") or _who(you))
         fo.rest("local", at)
     elif state == "claimed":
         fo.put("local", "waiting", "认领了，还没开工", _first(since, (f.get("claim") or {}).get("created_at")))
@@ -710,7 +719,7 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
         at = _first(A["bridge"]["since"] if A["bridge"]["status"] == "failed" else None, since, now)
         fo.put("handover", "failed", "接手被拒", at)
         fo.put("bridge", "failed", _clip(waits.get("text") or "接手被拒", 80), at)
-        fo.put("local", "awaiting_approval", "接手被拒：改好后重新交接", at)
+        fo.put("local", "awaiting_approval", "接手被拒：改好后重新交接", at, _who(you))
         fo.rest("local", at)
     elif state in ("running", "parked", "acceptance"):
         # the bridge had taken it by the runner's first step at the latest
@@ -726,11 +735,11 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
             fo.open("runner", "work", took)
         if state == "parked":
             at = held("runner", _first(since, last_of("question", side="runner"), now))
-            fo.put("runner", "awaiting_approval", _clip(waits.get("text") or "停下等人回答", 80), at)
+            fo.put("runner", "awaiting_approval", _clip(waits.get("text") or "停下等人回答", 80), at, waits.get("who") or "people")
             fo.open("runner", "wait", at)
         if state == "acceptance":
             at = held("release", _first(since, last_of("request", side="runner"), last_of("question", side="runner"), now))
-            fo.put("release", "awaiting_approval", _clip(waits.get("text") or "等产品验收", 80), at)
+            fo.put("release", "awaiting_approval", _clip(waits.get("text") or "等产品验收", 80), at, waits.get("who") or "product")
             fo.open("release", "wait", at)
             if A["runner"]["status"] not in FINAL:
                 fo.put("runner", "done", "交给产品验收", at)
@@ -852,8 +861,6 @@ def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str,
              _epoch(r14.get("window_end")) if v is not None else None,
              "有回滚或热修" if v is True else "14 天里没有回滚、热修或缺陷" if v is False else "观察中：到 %s" % str(r14["window_end"])[:10],
              "release")
-        if v is None:
-            todo.append("合并后 14 天")
     passed = sum(1 for c in cells if c["status"] == "pass")
     failed = sum(1 for c in cells if c["status"] == "fail")
     total = sum(1 for c in cells if c["status"] in ("pass", "fail", "wait"))
@@ -980,8 +987,10 @@ def _reply_step(row: dict[str, Any], f: dict[str, Any], you: str) -> tuple[str, 
     head += "下一步是「%s」。" % nxt["label"] if nxt else "Lean 的阶段都做完了。"
     # before the release, the review in a new session: the line to say is Lean's own (the one 开审查会话 sends), never
     # one the session that wrote the code worded for its reviewer
-    review = lean_view.review_line(run_of(f).get("intent")) if nxt and nxt.get("id") == "release" and not \
-        lean_view.review_current((f.get("review") or {}).get("at"), bool(f.get("review")), f.get("events") or []) else None
+    w = row.get("waits") or {}
+    needed = w["review"] if "review" in w else bool(nxt and nxt.get("id") == "release" and not lean_view.review_current(
+        (f.get("review") or {}).get("at"), bool(f.get("review")), f.get("events") or []))
+    review = lean_view.review_line(run_of(f).get("intent")) if needed else None
     # an English note (Lean's notes are the agent's words) is not shown: the stage names say it in Chinese
     notes = [x for x in lean_view.notes(f.get("state_text")).get("next") or [] if re.search(r"[\u4e00-\u9fff]", x)]
     if notes:
@@ -1073,11 +1082,12 @@ def checks_line(checks: dict[str, Any]) -> str:
     cells, todo = checks["cells"], checks.get("todo") or []
     bad = [c["name"] for c in cells if c["status"] == "fail"]
     wait = [c["name"] for c in cells if c["status"] == "wait"]
-    later = " · 还剩 %s" % "、".join(todo) if todo else ""
+    watched = sum(1 for c in cells if c["status"] == "watch")
+    later = (" · 还剩 %s" % "、".join(todo) if todo else "") + (" · %d 项在观察" % watched if watched else "")
     if not checks["total"]:
         return "还没有检查结果" + later
     if not bad and not wait:
-        return ("目前 %d 项都过" % checks["passed"] + later) if todo else "全部 %d 项都过" % checks["passed"]
+        return ("目前 %d 项都过" % checks["passed"] + later) if later else "全部 %d 项都过" % checks["passed"]
     return "检查 %d/%d 过%s%s%s" % (checks["passed"], checks["total"], " · 没过：%s" % "、".join(bad[:3]) if bad else "",
                                   " · 等人：%s" % "、".join(wait[:3]) if wait else "", later)
 

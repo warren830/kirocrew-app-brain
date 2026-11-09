@@ -1063,7 +1063,8 @@ export interface Actor {
   /** when its status began */
   since: number | null
   /** its status over time, oldest first: what 回放 shows at a moment */
-  history: { at: number; status: ActorStatus; doing: string }[]
+  /** who: whom a wait for a person was on (Waits.who), so the replay says 等你 only for you; null otherwise */
+  history: { at: number; status: ActorStatus; doing: string; who?: WaitWho | null }[]
   /** its lane's time track */
   spans: ActorSpan[]
   marks: ActorMark[]

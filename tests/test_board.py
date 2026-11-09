@@ -165,6 +165,7 @@ def test_an_idle_session_waits_since_one_moment_and_a_claim_has_nothing_to_trace
     assert w["since"] > time.time() - 600          # the Lean step just now, not the transcript's 2026-11-08 stamp
     local = actors(b)["local"]
     assert local["status"] == "awaiting_approval" and local["since"] == w["since"] == b["row"]["waits"]["since"]
+    assert local["history"][-1]["who"] == "you"            # the replay says whose turn each wait was
     assert claimed["row"]["state"] == "claimed" and claimed["error"] == "" and claimed["source"] == "app"
 
 
@@ -376,11 +377,26 @@ def test_the_merge_ends_the_requirements_time_and_its_14_days_are_watched_not_wa
     assert all(s["b"] is not None and s["b"] <= merged_at for a in b["actors"] for s in a["spans"])
     cells = {c["id"]: c for c in b["checks"]["cells"]}
     assert cells["after-14d"]["status"] == "watch" and cells["after-14d"]["detail"].startswith("观察中")
-    assert b["checks"]["todo"] == ["合并后 14 天"] and b["checks"]["passed"] == b["checks"]["total"]
+    # watched is not still to come: nothing is left, one cell is watched
+    assert b["checks"]["todo"] == [] and b["checks"]["passed"] == b["checks"]["total"]
+    assert b["accept"]["checks"] == "目前 %d 项都过 · 1 项在观察" % b["checks"]["passed"]
     # one write-back, one event
     assert [e["text"] for e in b["events"] if e["kind"] == "reflect"] == ["回写 Brain：成功（回写分支 brain/DEMO-3-reflect-1）"]
     # the owner approved the release in their own session: they are named, never a pseudonym
     assert b["accept"]["done"]["who"] == "ychchen"
+
+
+def test_the_replay_knows_whose_turn_each_wait_was():
+    """A release asked on the MR after the hand-over waits for the product, not for you: each history entry of a wait
+    says whom it is on, as Waits.who does."""
+    hand = T + 16 * M
+    evs = demo3_events() + [ev(T + 40 * M, "APPROVAL_REQUESTED", kind="RELEASE", sha256="cd" * 32)]
+    b = snapshot(facts(evs, handoff={"requested_at": iso(hand), "by": "ychchen"}),
+                 row_of("acceptance", "product", "等产品在 MR 上验收 D-3（approve / reject）", do="accept"),
+                 local_only=False, now=T + 2 * H)
+    waits = [(h["status"], h["who"]) for h in actor(b, "release")["history"] if h["status"] == "awaiting_approval"]
+    assert waits and all(who == "product" for _, who in waits)
+    assert [h["who"] for h in actor(b, "req")["history"] if h["status"] == "awaiting_approval"] == ["you"]
 
 
 def test_a_repo_done_only_here_has_no_runner_half_and_reads_no_runner_sources():
