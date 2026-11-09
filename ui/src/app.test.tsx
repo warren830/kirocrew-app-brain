@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test } from 'vitest'
-import BrainApp, { pickRequirement } from './main'
+import BrainApp, { brainkitProblem, pickRequirement, statusProblem } from './main'
 import { AppBar } from './AppBar'
 import { parseView, type View } from './nav'
 import { fx } from './test/data'
@@ -27,8 +27,8 @@ describe('the app: one bar over the views', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Brain')
     expect(bar().getByRole('tab', { name: '交付总览' })).toHaveAttribute('aria-selected', 'true')
     expect(bar().getAllByRole('tab').map((t) => t.textContent)).toEqual(['交付总览', '需求详情', '需求看板', '开需求', 'Brain', '待办6'])
-    expect(bar().getByRole('tab', { name: '需求详情' })).toBeEnabled() // nothing in hand yet: they still open one
-    expect(bar().getByRole('tab', { name: '需求看板' })).toBeEnabled()
+    expect(bar().getByRole('tab', { name: /^需求详情/ })).toBeEnabled() // nothing in hand yet: they still open one
+    expect(bar().getByRole('tab', { name: /^需求看板/ })).toBeEnabled()
     expect(await bar().findByRole('tab', { name: '待办 6' })).toBeInTheDocument()
     expect(badges).toContain(6) // the sidebar badge
     expect(bar().getByRole('button', { name: '设置' })).toBeInTheDocument()
@@ -41,13 +41,13 @@ describe('the app: one bar over the views', () => {
     expect(want?.waits.who).toBe('you')
     const { unmount } = render(<BrainApp pollMs={60_000} />)
     await screen.findByTestId('req-table')
-    await user.click(bar().getByRole('tab', { name: '需求看板' }))
+    await user.click(bar().getByRole('tab', { name: /^需求看板/ }))
     await waitFor(() => expect(parseView(window.location.search)).toMatchObject({ kind: 'board', repo: want!.repo, key: want!.key }))
     unmount()
     window.history.replaceState(null, '', '/apps/brain?view=overview')
     render(<BrainApp pollMs={60_000} />)
     await screen.findByTestId('req-table')
-    await user.click(bar().getByRole('tab', { name: '需求详情' }))
+    await user.click(bar().getByRole('tab', { name: /^需求详情/ }))
     expect(parseView(window.location.search)).toMatchObject({ kind: 'item', repo: want!.repo, key: want!.key })
   })
 
@@ -72,11 +72,21 @@ describe('the app: one bar over the views', () => {
     render(<AppBar view="todo" onView={(v) => views.push(v)} item="PAY-3" todo={3} team={false} />)
     expect(screen.getByRole('tab', { name: '待办 3' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('tab', { name: '运行机' })).toBeNull()
-    expect(screen.getByRole('tab', { name: '需求详情' })).toBeEnabled()
-    expect(screen.getByRole('tab', { name: '需求看板' })).toBeEnabled()
+    // the requirement in hand is on both of its tabs, from any view: what they open is said before the click
+    expect(screen.getByRole('tab', { name: '需求详情 PAY-3' })).toBeEnabled()
+    expect(screen.getByRole('tab', { name: '需求看板 PAY-3' })).toBeEnabled()
     screen.getByRole('tab', { name: 'Brain' }).click()
     screen.getByRole('tab', { name: '待办 3' }).click() // the view it is on: nothing
     expect(views).toEqual(['brain'])
+    expect(screen.getByRole('button', { name: '导入仓库' })).toHaveAttribute('title', '本机目录或克隆：先检查它，没装 brain-kit 的直接装上')
+  })
+
+  test('运行机 opened outside team mode is still the selected tab, greyed, so a person sees where they are', () => {
+    render(<AppBar view="team" onView={() => {}} todo={0} team={false} />)
+    const tab = screen.getByRole('tab', { name: '运行机' })
+    expect(tab).toHaveAttribute('aria-selected', 'true')
+    expect(tab).toHaveClass('is-off')
+    expect(tab).toHaveAttribute('title', '这台机器不是团队运行机')
   })
 
   test('a move to another view is a navigation (history entry); a filter inside a view rewrites the entry', async () => {
@@ -117,11 +127,11 @@ describe('the app: one bar over the views', () => {
     expect(parseView(window.location.search)).toEqual({ kind: 'overview' })
     expect(bar().getByRole('tab', { name: '交付总览' })).toHaveAttribute('aria-selected', 'true')
     // 需求详情 and 需求看板 hold it from now on
-    await user.click(bar().getByRole('tab', { name: '需求详情' }))
+    await user.click(bar().getByRole('tab', { name: /^需求详情/ }))
     expect(parseView(window.location.search)).toEqual({ kind: 'item', repo: 'r1', key: 'PAY-3' })
     await user.click(bar().getByRole('tab', { name: '开需求' }))
     expect(parseView(window.location.search)).toEqual({ kind: 'new', repo: 'r1' })
-    await user.click(bar().getByRole('tab', { name: '需求看板' }))
+    await user.click(bar().getByRole('tab', { name: /^需求看板/ }))
     expect(parseView(window.location.search)).toEqual({ kind: 'board', repo: 'r1', key: 'PAY-3' })
     expect(await screen.findByTestId('br-board')).toBeInTheDocument()
   })
@@ -134,7 +144,7 @@ describe('the app: one bar over the views', () => {
     expect(parseView(window.location.search)).toEqual({ kind: 'board', repo: 'r1', key: 'PAY-5', from: 'overview' })
     expect(await screen.findByTestId('br-board')).toBeInTheDocument()
     expect(bar().getByRole('tab', { name: /^需求看板/ })).toHaveAttribute('aria-selected', 'true')
-    await user.click(bar().getByRole('tab', { name: '需求详情' }))
+    await user.click(bar().getByRole('tab', { name: /^需求详情/ }))
     expect(parseView(window.location.search)).toEqual({ kind: 'item', repo: 'r1', key: 'PAY-5' })
   })
 
@@ -158,7 +168,7 @@ describe('the app: one bar over the views', () => {
     await user.selectOptions(onBoard, `r1\u0001PAY-3`)
     expect(parseView(window.location.search)).toEqual({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'item' })
     await waitFor(() => expect(apiCalls.some((c) => c.path === `${API}/board/r1/PAY-3`)).toBe(true))
-    expect(bar().getByRole('tab', { name: '需求详情' })).toHaveAttribute('title', expect.stringContaining('PAY-3'))
+    expect(bar().getByRole('tab', { name: /^需求详情/ })).toHaveAttribute('title', expect.stringContaining('PAY-3'))
   })
 
   test('back and forward show the view the entry says', async () => {
@@ -173,12 +183,12 @@ describe('the app: one bar over the views', () => {
     expect(bar().getByRole('tab', { name: '交付总览' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  test('banner on every view: brain-kit not found → 去设置; KiroCrew FAIL rows with their fix button, but not on 开需求 and 设置, which list them', async () => {
+  test('banner on every view: brain-kit not found → 去设置; KiroCrew FAIL rows with their fix button, but not on 开需求, 设置 and 待办, which list them', async () => {
     const user = userEvent.setup()
     const s = fx.status()
     s.app.team = true
     s.brainkit.ok = false
-    s.brainkit.error = '/Users/alice/src/brain-kit 里没有 brainkit/'
+    s.brainkit.error = '这里没有 brain-kit（找不到 /Users/alice/src/brain-kit/brainkit/__init__.py）'
     s.crew.rows = [{ level: 'FAIL', text: '找不到 brain-dev agent：~/.kiro/agents/brain-dev.json 不存在' }, { level: 'OK', text: 'KiroCrew 在跑' }]
     installFixtureRoutes({
       [`GET ${API}/status`]: () => s,
@@ -187,7 +197,9 @@ describe('the app: one bar over the views', () => {
     })
     render(<BrainApp pollMs={60_000} />)
     const nokit = await screen.findByTestId('br-no-brainkit')
-    expect(nokit).toHaveTextContent('找不到 brain-kit（/Users/alice/src/brain-kit 里没有 brainkit/）在设置里写对它的位置。')
+    expect(nokit).toHaveTextContent('找不到 brain-kit做什么在设置里写对 brain-kit 的位置，点「保存」')
+    expect(within(nokit).getByText('细节').closest('details')).not.toHaveAttribute('open')
+    expect(within(nokit).getByText(s.brainkit.error)).toBeInTheDocument()
     const crew = screen.getByTestId('br-crew-fail')
     expect(crew).toHaveTextContent('KiroCrew 这边有 1 件要先处理')
     expect(crew).toHaveTextContent('找不到 brain-dev agent')
@@ -210,15 +222,18 @@ describe('the app: one bar over the views', () => {
     expect(within(checks).getByRole('button', { name: FIX })).toBeInTheDocument()
     expect(screen.queryByTestId('br-crew-fail')).toBeNull()
     expect(within(screen.getByTestId('br-no-brainkit')).getByRole('button', { name: '去设置' })).toBeInTheDocument()
+    // 待办 lists them in its KiroCrew group, once
+    await user.click(bar().getByRole('tab', { name: '待办 6' }))
+    expect(within(await screen.findByRole('region', { name: 'KiroCrew 的问题' })).getByRole('button', { name: FIX })).toBeInTheDocument()
+    expect(screen.queryByTestId('br-crew-fail')).toBeNull()
     // every other view has the banner
     const others: [View['kind'], () => Promise<void>][] = [
-      ['todo', () => user.click(bar().getByRole('tab', { name: '待办 6' }))],
       ['brain', () => user.click(bar().getByRole('tab', { name: 'Brain' }))],
       ['team', () => user.click(bar().getByRole('tab', { name: '运行机' }))],
       ['import', () => user.click(bar().getByRole('button', { name: '导入仓库' }))],
       ['overview', () => user.click(bar().getByRole('tab', { name: '交付总览' }))],
       ['item', async () => user.click(within(await ledgerRow('PAY-3')).getByRole('button', { name: '详情' }))],
-      ['board', () => user.click(bar().getByRole('tab', { name: '需求看板' }))],
+      ['board', () => user.click(bar().getByRole('tab', { name: /^需求看板/ }))],
     ]
     for (const [kind, open] of others) {
       await open()
@@ -272,9 +287,25 @@ describe('the app: one bar over the views', () => {
     expect(await screen.findByLabelText('仓库目录')).toHaveValue('/Users/alice/workplace/shop-web')
   })
 
-  test('a status that cannot be read is a banner with errorText', async () => {
-    installFixtureRoutes({ [`GET ${API}/status`]: () => { throw apiError(403, 'forbidden', '只接受 dashboard 主人本人的请求') } })
+  test('a status that cannot be read says why in words and what to do; the backend’s own words are folded', async () => {
+    const user = userEvent.setup()
+    let fail = true
+    installFixtureRoutes({ [`GET ${API}/status`]: () => { if (fail) throw apiError(403, 'forbidden', 'Token required'); return fx.status() } })
     render(<BrainApp pollMs={60_000} />)
-    expect(await screen.findByText('读不到 app 的状态：只接受 dashboard 主人本人的请求（403）')).toBeInTheDocument()
+    const b = await screen.findByTestId('br-status-error')
+    expect(b).toHaveTextContent('登录过期了做什么重新打开 KiroCrew 仪表盘，登录以后再回来')
+    expect(within(b).getByText('细节').closest('details')).not.toHaveAttribute('open')
+    expect(within(b).getByText('Token required（403）')).toBeInTheDocument()
+    fail = false
+    await user.click(within(b).getByRole('button', { name: '再试一次' }))
+    await waitFor(() => expect(screen.queryByTestId('br-status-error')).toBeNull())
+  })
+
+  test('brain-kit that cannot be used says its own cause: not found → its place; too old → update it; broken → install it again', () => {
+    expect(brainkitProblem('brain-kit 太旧（没有 trace.build）：要 0.4 或更新的版本')).toEqual({ text: 'brain-kit 太旧了：位置是对的', todo: '把 brain-kit 更新到 0.4 或更新的版本（在它的目录里拉取最新的），再到设置里点「保存」重新读它' })
+    expect(brainkitProblem('brain-kit 导入失败：ModuleNotFoundError: No module named \'yaml\'')).toMatchObject({ text: 'brain-kit 装得不完整：位置是对的，读它的时候出错了' })
+    expect(brainkitProblem('这里没有 brain-kit（找不到 /x/brainkit/__init__.py）')).toEqual({ text: '找不到 brain-kit', todo: '在设置里写对 brain-kit 的位置，点「保存」' })
+    expect(statusProblem(0, true).text).toBe('状态刷新没成：连不上 app 的后端')
+    expect(statusProblem(401, false).text).toBe('登录过期了')
   })
 })

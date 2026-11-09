@@ -1,50 +1,74 @@
 /**
  * 待办: what waits on the person, in the sample board's look: the count as a counter card (one cell per item, coloured
  * by what it is, each kind a jump to its group), then a section per kind with its line icon and count, each item a
- * card whose border says its state (magenta: it waits for you; red: refused; yellow: worth a look) with the action
- * right there. A Lean approval shows its line to type in the session (the app never sends it); a question on the team
- * runner is answered on its MR; a local clarify question may be answered here (`answerable_here`); a hand-over that was
- * pushed but carries no label on its MR (nothing handed over) says what to do. A key opens 需求详情, 看板 opens 需求看板.
- * Polls GET /todo every 10 s. The sidebar badge and the tab's count come from /status (the app shell).
+ * card whose border says its state (magenta: it waits for you; red: refused or stuck; yellow: worth a look) with the
+ * step to take right there, under the one name the app gives it (vocab.ts). The list is the backend's one judgment of
+ * who a requirement waits on (`waits.who`), so it holds what the rows, the tab's count and the sidebar badge say:
+ *
+ *   reply               the local session is idle: your turn to talk               打开会话
+ *   lean_approval       Lean asks for an approval: the line to type in the session  复制那一行 · 打开会话
+ *   clarify             the local session asks you: answered here
+ *   question            a question on the MR (the team runner's)                    去 MR 上回答
+ *   acceptance          the product accepts on the MR                               去 MR 上验收
+ *   start               claimed by you, not started                                 去开工 (开需求 with its key)
+ *   write_back          merged, its new knowledge not written back yet               回写 Brain (Brain's 回写, on it)
+ *   handoff_rejected    the hand-over was refused: why, and what to say to the AI   打开会话 · 看 MR
+ *   handoff_unlabelled  pushed, but the MR has no hand-over label                   补上交接标签 · 看 MR
+ *   stuck               a run on the runner that no answer can move any more        看 MR
+ *   crew                KiroCrew's failing checks, with their fix buttons
+ *
+ * A key opens 需求详情, 需求看板 opens the board. Polls GET /todo every 10 s; the tab's count and the sidebar badge come
+ * from /status (the app shell), read again when they disagree with this list.
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@kirocrew/app-sdk'
 import { paths, usePoll } from '../api'
 import { ago } from '../format'
-import type { Todo, TodoItem, TodoKind } from '../types'
-import { CheckRows, EmptyHero, ExtLink, Icon, LoadState, RoleIcon, TypeLine, type FlowStep } from '../ui'
+import type { Todo, TodoItem } from '../types'
+import { CheckRows, EmptyHero, ExtLink, Icon, LoadState, RoleIcon, TYPE_IT_YOURSELF, TypeLine, type FlowStep } from '../ui'
+import { ACT, DO_NAME, approvalName } from '../vocab'
 import { QuestionCard } from './Question'
 import type { ViewProps } from './props'
 
 export const TODO_POLL_MS = 10_000
 
 type GroupTone = 'wait' | 'bad' | 'warn'
-interface Group { kind: TodoKind; heading: string; icon: string; tone: GroupTone; hint: string }
+/** what an item is on this page: its kind, except a runner question no answer can move any more */
+type GroupKey = TodoItem['kind'] | 'stuck' | 'write_back'
+interface Group { key: GroupKey; heading: string; icon: string; tone: GroupTone; hint: string }
 
 const GROUPS: Group[] = [
-  { kind: 'lean_approval', heading: 'Lean 审批', icon: 'req', tone: 'wait', hint: '在会话里自己打一行批准' },
-  { kind: 'question', heading: '运行机上的问题', icon: 'question', tone: 'wait', hint: '在 MR 上回答' },
-  { kind: 'clarify', heading: '本地澄清', icon: 'question', tone: 'wait', hint: '在这里回答' },
-  { kind: 'acceptance', heading: '等验收', icon: 'release', tone: 'wait', hint: '在 MR 上验收' },
-  { kind: 'handoff_rejected', heading: '接手被拒', icon: 'handover', tone: 'bad', hint: '改好再交接' },
-  { kind: 'handoff_unlabelled', heading: '没交出去的交接', icon: 'handover', tone: 'warn', hint: 'MR 上没有交接标签' },
-  { kind: 'crew', heading: 'KiroCrew 的问题', icon: 'settings', tone: 'bad', hint: '修好了才能开工' },
+  { key: 'reply', heading: '会话在等你回话', icon: 'laptop', tone: 'wait', hint: '本机会话空着：轮到你说' },
+  { key: 'lean_approval', heading: 'Lean 审批', icon: 'req', tone: 'wait', hint: '读完在会话里自己打一行批准' },
+  { key: 'clarify', heading: '本地澄清', icon: 'question', tone: 'wait', hint: '在这里回答' },
+  { key: 'question', heading: '运行机上的问题', icon: 'question', tone: 'wait', hint: '在 MR 上回答' },
+  { key: 'acceptance', heading: '等验收', icon: 'release', tone: 'wait', hint: '在 MR 上验收' },
+  { key: 'start', heading: '认领了还没开工', icon: 'new', tone: 'wait', hint: '去开需求开工' },
+  { key: 'write_back', heading: '等回写 Brain', icon: 'brain', tone: 'wait', hint: '合并了：把学到的写回 Brain' },
+  { key: 'handoff_rejected', heading: '接手被拒', icon: 'handover', tone: 'bad', hint: '改好再交接' },
+  { key: 'handoff_unlabelled', heading: '没交出去的交接', icon: 'handover', tone: 'warn', hint: 'MR 上没有交接标签' },
+  { key: 'stuck', heading: '卡住了的运行', icon: 'blocked', tone: 'bad', hint: '这一步答不了了：找负责人' },
+  { key: 'crew', heading: 'KiroCrew 的问题', icon: 'settings', tone: 'bad', hint: '修好了才能开工' },
 ]
-const TONE_WORD: Record<GroupTone, string> = { wait: '等你', bad: '被拒或坏了', warn: '看一眼' }
+const TONE_WORD: Record<GroupTone, string> = { wait: '等你', bad: '被拒或卡住', warn: '看一眼' }
+
+/** A runner question without its question (team mode): the run is left waiting for good (refused, void, not asked). */
+const groupOf = (it: TodoItem): GroupKey => (it.kind === 'question' && !it.question ? 'stuck' : it.kind)
 
 /** The Lean approval's own drawing: the requirements, else the design. */
 const approvalIcon = (approval: string | null) => (approval && /DESIGN|PLAN|INCEPTION/i.test(approval) ? 'design' : 'req')
 
 /** Where a requirement waits for the person, in the order it gets there (the empty state shows it). */
 const WAITS_FLOW: FlowStep[] = [
+  { icon: 'laptop', title: '会话等你', text: '本机会话空着，轮到你说' },
   { icon: 'req', title: 'Lean 审批', text: '在会话里自己打一行' },
   { icon: 'question', title: '澄清', text: '本地会话问你，在这里答' },
+  { icon: 'new', title: '开工', text: '认领了还没开工' },
   { icon: 'handover', title: '交接', text: '被拒或没交出去' },
-  { icon: 'question', title: '运行机的问题', text: '在 MR 上回答' },
-  { icon: 'release', title: '验收', text: '在 MR 上验收' },
+  { icon: 'release', title: 'MR 上', text: '运行机的问题、验收' },
 ]
 
-export const TEAM_SENTENCE = '运行机的面板不收回答：回答在 GitLab 上，那里认得出是谁。'
+export const TEAM_SENTENCE = '运行机的面板不收这些回答：在 GitLab 的 MR 上回答，那里认得出是谁。'
 
 export function TodoView(props: ViewProps) {
   const t = usePoll<Todo>(paths.todo(), props.pollMs ?? TODO_POLL_MS)
@@ -56,9 +80,15 @@ export function TodoView(props: ViewProps) {
   const now = Date.now() / 1000
   const rootRef = useRef<HTMLElement | null>(null)
   const [holding, setHolding] = useState(false)   // a kit fix runs or waits for the person: its group stays
-  const groups = x ? GROUPS.map((g) => ({ ...g, items: x.items.filter((i) => i.kind === g.kind) }))
-    .filter((g) => g.items.length > 0 || (g.kind === 'crew' && holding)) : []
-  const jump = (kind: TodoKind) => rootRef.current?.querySelector(`[data-testid="todo-${kind}"]`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
+  const groups = x ? GROUPS.map((g) => ({ ...g, items: x.items.filter((i) => groupOf(i) === g.key) }))
+    .filter((g) => g.items.length > 0 || (g.key === 'crew' && holding)) : []
+  const jump = (key: GroupKey) => rootRef.current?.querySelector(`[data-testid="todo-${key}"]`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
+  // the tab's count and the sidebar badge are /status's count of this very list: read it again when they differ
+  const listed = x?.items.length
+  const counted = props.status?.counts.todo
+  useEffect(() => {
+    if (listed !== undefined && counted !== undefined && listed !== counted) props.reloadStatus()
+  }, [listed, counted]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <main className="kt-root br-view td-root" data-testid="br-todo" ref={rootRef}>
       <style>{TD_CSS}</style>
@@ -69,13 +99,12 @@ export function TodoView(props: ViewProps) {
           <p>等你做的事：做完一件，这里就少一件</p>
         </div>
       </header>
-      {x?.team && <p className="br-banner" data-testid="todo-team">{TEAM_SENTENCE}</p>}
       <LoadState loading={t.loading} error={t.error} has={!!x} />
       {x && x.items.length === 0 && !holding && (
         <EmptyHero
           testid="todo-empty"
           title="现在没有等你做的事"
-          text={['需求走到要你动手的地方，就会出现在这里，按种类分好：Lean 的审批、会话问你的澄清、交接被拒、运行机上的问题、验收，还有 KiroCrew 这边要修的。']}
+          text={['需求走到要你动手的地方，就会出现在这里，按种类分好：会话等你回话、Lean 的审批、会话问你的澄清、认领了还没开工、交接被拒、MR 上的问题和验收，还有 KiroCrew 这边要修的。']}
           punch="这一页空着，就是没有谁在等你。"
           flow={WAITS_FLOW}
         >
@@ -90,12 +119,12 @@ export function TodoView(props: ViewProps) {
           <div className="td-kpi-row">
             <div><span className="br-kpi-big">{x.items.length}</span><span className="br-kpi-of">件</span></div>
             <div className="td-cells" role="img" aria-label={groups.map((g) => `${g.heading} ${g.items.length}`).join('，')}>
-              {groups.flatMap((g) => g.items.map((it, i) => <i key={`${g.kind}-${i}`} className={`is-${g.tone}`} title={`${g.heading}：${it.key || it.title}`} />))}
+              {groups.flatMap((g) => g.items.map((it, i) => <i key={`${g.key}-${i}`} className={`is-${g.tone}`} title={`${g.heading}：${it.key || it.title}`} />))}
             </div>
           </div>
           <nav className="td-jumps" aria-label="待办的种类">
             {groups.map((g) => (
-              <button key={g.kind} type="button" className={`td-jump is-${g.tone}`} onClick={() => jump(g.kind)} title={g.hint}>
+              <button key={g.key} type="button" className={`td-jump is-${g.tone}`} onClick={() => jump(g.key)} title={g.hint}>
                 <RoleIcon role={g.icon} size={15} />{g.heading} <b>{g.items.length}</b>
               </button>
             ))}
@@ -103,16 +132,17 @@ export function TodoView(props: ViewProps) {
         </div>
       )}
       {groups.length > 0 && <div className="td-groups">{groups.map((g) => (
-        <section key={g.kind} className={`td-group is-${g.tone}`} aria-label={g.heading} data-testid={`todo-${g.kind}`}>
+        <section key={g.key} className={`td-group is-${g.tone}`} aria-label={g.heading} data-testid={`todo-${g.key}`}>
           <header className="td-group-head">
             <span className="td-group-icon"><RoleIcon role={g.icon} size={20} /></span>
             <h3>{g.heading}</h3>
             <span className={`kt-badge td-badge is-${g.tone}`}>{g.items.length}</span>
             <span className="br-dim br-small">{g.hint}</span>
           </header>
-          {g.kind === 'crew' && props.status ? (
+          {x?.team && g.key === 'question' && <p className="br-note" data-testid="todo-team">{TEAM_SENTENCE}</p>}
+          {g.key === 'crew' && props.status ? (
             <article className="td-item is-bad td-crew" data-kind="crew">
-              <CheckRows rows={props.status.crew.rows} only={['FAIL', 'WARN']} fix={props.status.crew.fix} onFixed={after} onHold={setHolding} />
+              <CheckRows rows={props.status.crew.rows} only={['FAIL']} fix={props.status.crew.fix} onFixed={after} onHold={setHolding} />
             </article>
           ) : (
             <div className="td-items">
@@ -125,45 +155,62 @@ export function TodoView(props: ViewProps) {
   )
 }
 
+/** What a refused hand-over asks the person to say to the AI in their session (they type it themselves). */
+const redoLine = (why: string) => `交接被拒了：${why.replace(/^(接手被拒|交接被拒)[：:]\s*/, '')}。请按这个原因改好，再交接一次。`
+
 function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; now: number; onAnswered: () => void } & ViewProps) {
   const navigate = useNavigate()
   const icon = it.kind === 'lean_approval' ? approvalIcon(it.approval) : group.icon
-  const mrLabel = it.kind === 'acceptance' ? '去 MR 上验收' : it.kind === 'question' ? '去 MR 上回答' : '看 MR'
+  const session = it.session?.url ?? null
+  // the line box below says 「在会话里自己打这一行」 itself
+  const text = it.kind === 'lean_approval' && it.line ? it.text.replace(TYPE_IT_YOURSELF, '').replace(/[：:，,。\s]+$/, '') : it.text
+  const line = it.kind === 'handoff_rejected' && session ? redoLine(it.text) : it.line
+  const asked = it.question && (it.kind === 'question' || it.kind === 'clarify' || it.kind === 'acceptance')
+  const mr = it.mr_url ?? it.question?.mr_url ?? null
+  const mrAct = group.key === 'question' ? ACT.answerOnMr : group.key === 'acceptance' ? ACT.acceptOnMr
+    : group.key === 'handoff_unlabelled' ? DO_NAME.label_handoff : ACT.viewMr
+  const mrFirst = group.key === 'question' || group.key === 'acceptance' || group.key === 'handoff_unlabelled' || group.key === 'stuck'
   return (
     <article className={`td-item is-${group.tone}`} data-testid="todo-item" data-kind={it.kind} aria-label={`${group.heading} ${it.key || it.title}`}>
       <div className="td-item-top">
         <span className="td-item-icon" title={TONE_WORD[group.tone]}><RoleIcon role={icon} size={18} /></span>
         {it.key ? (
-          <button type="button" className="br-link br-key" title="看需求详情" onClick={() => go({ kind: 'item', repo: it.repo, key: it.key, from: 'todo' })}>{it.key}</button>
+          <button type="button" className="br-link br-key" title={`打开${ACT.openDetail}`} onClick={() => go({ kind: 'item', repo: it.repo, key: it.key, from: 'todo' })}>{it.key}</button>
         ) : null}
         <b className="td-title">{it.title}</b>
         <span className="br-grow" />
-        {it.approval && <span className="br-chip tone-wait">{it.approval}</span>}
+        {it.approval && <span className="br-chip tone-wait">{approvalName(it.approval)}</span>}
         {it.since !== null && <span className="br-dim br-small">{ago(it.since, now)}</span>}
       </div>
-      <p className="td-text">{it.text}</p>
-      {it.kind === 'lean_approval' && it.line && <TypeLine line={it.line} sessionUrl={it.session?.url ?? null} />}
-      {it.question && (it.kind === 'question' || it.kind === 'clarify' || it.kind === 'acceptance') && (
-        <QuestionCard q={it.question} repo={it.repo} reqKey={it.key} mrUrl={it.mr_url ?? it.question.mr_url} onAnswered={onAnswered} />
-      )}
-      {(it.key || (it.session && it.kind !== 'lean_approval') || (!it.question && it.mr_url)) && (
-        <div className="td-acts">
-          {!it.question && it.mr_url && (
-            <ExtLink href={it.mr_url} className={`br-btn is-small${group.tone === 'wait' ? ' is-primary' : ''}`}>{mrLabel}</ExtLink>
-          )}
-          {it.session && it.kind !== 'lean_approval' && (
-            <button type="button" className="br-btn is-small" onClick={() => navigate(it.session!.url)}>
-              <Icon name="MessageSquare" size={13} />打开会话
-            </button>
-          )}
-          <span className="br-grow" />
-          {it.key && (
-            <button type="button" className="br-btn is-small" title="在需求看板上看它走到哪了" onClick={() => go({ kind: 'board', repo: it.repo, key: it.key, from: 'todo' })}>
-              <RoleIcon role="runner" size={14} />看板
-            </button>
-          )}
-        </div>
-      )}
+      {text && <p className="td-text">{text}</p>}
+      {group.key === 'stuck' && <p className="td-do"><b>做什么</b>找这个需求的负责人，在 MR 上决定重开还是关掉它。</p>}
+      {line && (it.kind === 'lean_approval' || it.kind === 'reply' || it.kind === 'handoff_rejected') && <TypeLine line={line} sessionUrl={session} />}
+      {asked && <QuestionCard q={it.question!} repo={it.repo} reqKey={it.key} mrUrl={null} onAnswered={onAnswered} />}
+      <div className="td-acts">
+        {it.kind === 'start' && it.key && (
+          <button type="button" className="br-btn is-small is-primary" onClick={() => go({ kind: 'new', repo: it.repo, key: it.key, title: it.title })}>
+            <RoleIcon role="new" size={14} />{DO_NAME.start}
+          </button>
+        )}
+        {group.key === 'write_back' && it.key && (
+          <button type="button" className="br-btn is-small is-primary" onClick={() => go({ kind: 'brain', repo: it.repo, reflect: it.key })}>
+            <RoleIcon role="brain" size={14} />{DO_NAME.write_back}
+          </button>
+        )}
+        {mr && mrFirst && <ExtLink href={mr} className={`br-btn is-small${group.tone !== 'bad' || group.key === 'stuck' ? ' is-primary' : ''}`}>{mrAct}</ExtLink>}
+        {session && !line && it.kind !== 'start' && (
+          <button type="button" className={`br-btn is-small${it.kind === 'reply' ? ' is-primary' : ''}`} onClick={() => navigate(session)}>
+            <Icon name="MessageSquare" size={13} />{ACT.openSession}
+          </button>
+        )}
+        {mr && !mrFirst && <ExtLink href={mr} className="br-btn is-small">{ACT.viewMr}</ExtLink>}
+        <span className="br-grow" />
+        {it.key && (
+          <button type="button" className="br-btn is-small" title="在需求看板上看它走到哪了" onClick={() => go({ kind: 'board', repo: it.repo, key: it.key, from: 'todo' })}>
+            <Icon name="LayoutDashboard" size={13} />{ACT.openBoard}
+          </button>
+        )}
+      </div>
     </article>
   )
 }
@@ -188,6 +235,8 @@ const TD_CSS = `
 .td-jump b { color: var(--text-strong); }
 .td-jump:hover { border-color: var(--td-c); }
 .td-groups { columns: 3 30em; column-gap: var(--kit-gap-block, 16px); }
+@container br-app (max-width: 1100px) { .td-groups { columns: 2 22em; } }
+@container br-app (max-width: 720px) { .td-groups { columns: 1; } }
 .td-group { display: grid; gap: .7em; break-inside: avoid; margin-bottom: 1.4em; }
 .td-group-head { display: flex; align-items: center; gap: .4em .7em; flex-wrap: wrap; }
 .td-group-head h3 { font-size: 1.1em; }
@@ -201,6 +250,8 @@ const TD_CSS = `
 .td-item-icon { display: inline-grid; place-items: center; color: var(--td-c); }
 .td-title { color: var(--text-strong); font-weight: 700; }
 .td-text { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+.td-do { margin: 0; font-size: .93em; color: var(--text); }
+.td-do b { color: var(--muted); font-weight: 650; margin-right: .5em; }
 .td-acts { display: flex; align-items: center; gap: .5em; flex-wrap: wrap; }
 .td-acts a.br-btn { text-decoration: none; }
 .td-acts a.br-btn.is-primary { color: var(--accent-fg, #fff); }

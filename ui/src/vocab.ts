@@ -51,6 +51,8 @@ export const ACT = {
   review: '开审查会话',
   writeBack: '回写 Brain',
   onBoard: '在看板上看 ↗',
+  acceptOnMr: '去 MR 上验收',
+  viewMr: '看 MR',
 } as const
 
 /** where a requirement came from (Requirement.source, brainkit.intents) */
@@ -108,3 +110,6 @@ export const MODULE_NAME: Record<string, string> = {
 
 /** kit.json tracker → one word (设置, 导入仓库) */
 export const TRACKER_NAME: Record<string, string> = { none: '不用 Jira', jira: '用 Jira' }
+
+/** what kind of gap a run found missing (brain-gap blocks, brainkit.intents GAP_KINDS) */
+export const GAP_KIND_NAME: Record<string, string> = { knowledge: '缺知识', test: '缺测试', other: '其他' }
