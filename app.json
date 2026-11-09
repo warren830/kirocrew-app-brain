@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "displayName": "Brain 交付",
   "description": "brain-kit on Kiro Crew: claim a requirement, take its documents through the five gates, develop it with AI-DLC Lean in a brain-dev session, hand it to the team runner, follow its questions and the shared in-repo Brain.",
-  "author": "ychchen",
+  "author": "warren830",
   "minKiroCrewVersion": "0.11.0",
   "backend": {
     "hooks": {
