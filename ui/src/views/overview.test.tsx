@@ -472,21 +472,28 @@ describe('交付总览', () => {
     expect(within(batch).getByTestId('eval-notes')).toHaveTextContent(`brain-kit 说：${fx.overview().eval.notes.join('；')}`)
   })
 
-  test('without the evaluate module the eval card says so (or says its error) and what to do', async () => {
+  test('without the evaluate module the eval card says so plainly and what to do, brain-kit’s words folded; another error is said as it is', async () => {
     const ov = fx.overview()
-    ov.eval = { available: false, error: '', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
+    ov.eval = { available: false, error: 'brain-kit 还没有 evaluate 模块（No module named brainkit.evaluate）', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
-    const { unmount } = render(<OverviewView entry={{}} {...props()} />)
+    const s = fx.status()
+    s.brainkit.modules.evaluate = false
+    const { unmount } = render(<OverviewView entry={{}} {...props({ status: s })} />)
     const batch = await screen.findByTestId('eval-batch')
-    expect(batch).toHaveTextContent('brain-kit 还没有评估模块（evaluate）。做什么：换一个新一点的 brain-kit')
+    expect(batch).toHaveTextContent('brain-kit 还没有评估模块。做什么：换一个新一点的 brain-kit，评估的数字就会出来。')
     expect(within(batch).getByRole('button', { name: '去设置 ↗' })).toBeInTheDocument()
+    const folded = within(batch).getByText('细节').closest('details') as HTMLDetailsElement
+    expect(folded.open).toBe(false)
+    expect(folded).toHaveTextContent('No module named brainkit.evaluate')
     expect(screen.queryByTestId('eval-queue')).toBeNull()
     unmount()
     const ov2 = fx.overview()
     ov2.eval = { available: false, error: '评估读默认分支失败：没有 runs/', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov2 })
     render(<OverviewView entry={{}} {...props()} />)
-    expect(await screen.findByTestId('eval-batch')).toHaveTextContent('评估读默认分支失败：没有 runs/')
+    const other = await screen.findByTestId('eval-batch')
+    expect(other).toHaveTextContent('评估读默认分支失败：没有 runs/')
+    expect(other).not.toHaveTextContent('换一个新一点的 brain-kit') // not the missing module's fix
   })
 
   test('the decision funnel: the total, a row per category that has any; the questions only in team mode', async () => {

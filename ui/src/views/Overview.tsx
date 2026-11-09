@@ -247,7 +247,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
               : 'brain-kit 的评估还没给出数字：下面先看 credits 和合并'}
             {' · '}口径见末尾
             {!c.available && status?.brainkit.modules.evaluate === false && (
-              <>。做什么：换一个带评估模块（evaluate）的 brain-kit<button type="button" className="br-link" onClick={() => go({ kind: 'settings' })}>去设置 ↗</button></>
+              <>。做什么：换一个带评估模块的 brain-kit<button type="button" className="br-link" onClick={() => go({ kind: 'settings' })}>去设置 ↗</button></>
             )}
           </p>
         </section>
@@ -344,7 +344,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
             {rows.length > limit && <button type="button" className="kt-btn is-small" style={{ marginTop: 10 }} onClick={() => setLimit((n) => n + 30)}>显示更多（还有 {rows.length - limit} 个）</button>}
           </section>
 
-          <EvalCard ev={data.eval} onBoard={(k) => openKey(k)} onItem={(k) => openKey(k, true)} onSettings={() => go({ kind: 'settings' })} />
+          <EvalCard ev={data.eval} noModule={status?.brainkit.modules.evaluate === false} onBoard={(k) => openKey(k)} onItem={(k) => openKey(k, true)} onSettings={() => go({ kind: 'settings' })} />
         </>
       )}
 
@@ -702,7 +702,9 @@ function metricValue(v: EvalMetric['value']): string | null {
 
 /** brain-kit's eval batch: its numbers with what each means, the runs to look at again, the runs it skipped and its
  * notes. The batch is what the default branch has records of: it does not follow the ledger's filters. */
-function EvalCard({ ev, onBoard, onItem, onSettings }: { ev: EvalView; onBoard: (k: string) => void; onItem: (k: string) => void; onSettings: () => void }) {
+function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
+  ev: EvalView; noModule: boolean; onBoard: (k: string) => void; onItem: (k: string) => void; onSettings: () => void
+}) {
   return (
     <section className="cto-card br-eval" aria-label="brain-kit 的评估" data-testid="eval-batch">
       <div className="cto-chart-head">
@@ -710,10 +712,13 @@ function EvalCard({ ev, onBoard, onItem, onSettings }: { ev: EvalView; onBoard: 
         <span className="cto-dim">{ev.available ? `这一批：${ev.ref || '默认分支'}上已经有记录的需求 · 不跟着交付清单的筛选变` : ''}</span>
       </div>
       {!ev.available ? (
-        <p className="br-note" style={{ marginTop: 6 }}>
-          {ev.error || 'brain-kit 还没有评估模块（evaluate）'}。做什么：换一个新一点的 brain-kit，评估的数字就会出来。
-          <button type="button" className="br-link" style={{ marginLeft: 6 }} onClick={onSettings}>去设置 ↗</button>
-        </p>
+        noModule || !ev.error ? (
+          <div className="br-note" style={{ marginTop: 6 }}>
+            brain-kit 还没有评估模块。做什么：换一个新一点的 brain-kit，评估的数字就会出来。
+            <button type="button" className="br-link" style={{ marginLeft: 6 }} onClick={onSettings}>去设置 ↗</button>
+            {ev.error && <details className="br-raw"><summary>细节</summary><pre>{ev.error}</pre></details>}
+          </div>
+        ) : <p className="br-note" style={{ marginTop: 6 }}>{ev.error}</p>
       ) : (
         <>
           <div className="br-metrics">
