@@ -710,10 +710,14 @@ function metricValue(v: EvalMetric['value']): string | null {
 }
 
 /** brain-kit's eval batch: its numbers with what each means, the runs to look at again, the runs it skipped and its
- * notes. The batch is what the default branch has records of: it does not follow the ledger's filters. */
+ * notes. The batch is what the default branch has records of: it does not follow the ledger's filters. Without a batch:
+ * why in words (a missing module: what to do and 去设置), brain-kit's own words folded under 细节. */
 function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
   ev: EvalView; noModule: boolean; onBoard: (k: string) => void; onItem: (k: string) => void; onSettings: () => void
 }) {
+  const missing = noModule || !ev.error
+  // brain-kit's own words; a backend older than EvalView.raw put them in the error of a missing module
+  const folded = ev.raw ?? (missing ? ev.error : '')
   return (
     <section className="cto-card br-eval" aria-label="brain-kit 的评估" data-testid="eval-batch">
       <div className="cto-chart-head">
@@ -721,13 +725,15 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
         <span className="cto-dim">{ev.available ? `这一批：${ev.ref || '默认分支'}上已经有记录的需求 · 不跟着交付清单的筛选变` : ''}</span>
       </div>
       {!ev.available ? (
-        noModule || !ev.error ? (
-          <div className="br-note" style={{ marginTop: 6 }}>
-            brain-kit 还没有评估模块。做什么：换一个新一点的 brain-kit，评估的数字就会出来。
-            <button type="button" className="br-link" style={{ marginLeft: 6 }} onClick={onSettings}>去设置 ↗</button>
-            {ev.error && <details className="br-raw"><summary>细节</summary><pre>{ev.error}</pre></details>}
-          </div>
-        ) : <p className="br-note" style={{ marginTop: 6 }}>{ev.error}</p>
+        <div className="br-note" style={{ marginTop: 6 }}>
+          {missing ? (
+            <>
+              brain-kit 还没有评估模块。做什么：换一个新一点的 brain-kit，评估的数字就会出来。
+              <button type="button" className="br-link" style={{ marginLeft: 6 }} onClick={onSettings}>去设置 ↗</button>
+            </>
+          ) : ev.error}
+          {folded && <details className="br-raw"><summary>细节</summary><pre>{folded}</pre></details>}
+        </div>
       ) : (
         <>
           <div className="br-metrics">
