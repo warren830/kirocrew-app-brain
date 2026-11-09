@@ -322,8 +322,20 @@ describe('Brain', () => {
     const hero = screen.getByTestId('repos-unusable')
     expect(hero).toHaveTextContent('列表里的仓库现在都读不了')
     expect(hero).toHaveTextContent('shop-pay：brain-kit 没装载')
+    expect(within(hero).getByRole('button', { name: '去导入仓库检查' })).toBeInTheDocument()
     expect(screen.queryByTestId('import-cta')).toBeNull()
     expect(apiCalls.filter((c) => c.path.startsWith(`${API}/brain`))).toHaveLength(0)
+  })
+
+  test('no repo readable because brain-kit is not found: the way on is 设置', async () => {
+    const status = fx.status()
+    status.brainkit = { ...status.brainkit, ok: false, error: '这里没有 brain-kit（找不到 /x/brainkit/__init__.py）' }
+    status.repos = status.repos.map((r) => ({ ...r, ok: false, error: 'brain-kit 没装载' }))
+    installFixtureRoutes()
+    const go = vi.fn()
+    render(<BrainPage entry={{}} status={status} go={go} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} />)
+    await userEvent.setup().click(within(screen.getByTestId('repos-unusable')).getByRole('button', { name: '去设置' }))
+    expect(go).toHaveBeenCalledWith({ kind: 'settings' })
   })
 
   test('no repo the app can use: the way in is 导入仓库', async () => {

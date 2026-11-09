@@ -191,9 +191,15 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
         <EmptyHero testid="repos-unusable" title="列表里的仓库现在都读不了"
           text={props.status.repos.map((r) => `${r.name}：${r.pending ? r.pending.text : r.error || '读不了'}`)}
           punch="按上面的提示修好以后，这里就能看到它的 Brain。">
-          <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'import' })}>
-            <RoleIcon role="import" size={17} />去导入仓库检查
-          </button>
+          {props.status.brainkit.ok ? (
+            <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'import' })}>
+              <RoleIcon role="import" size={17} />去导入仓库检查
+            </button>
+          ) : (
+            <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'settings' })}>
+              <RoleIcon role="settings" size={17} />去设置
+            </button>
+          )}
         </EmptyHero>
       )}
       {props.status && props.status.repos.length === 0 && (
