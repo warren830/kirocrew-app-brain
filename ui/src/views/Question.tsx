@@ -1,12 +1,14 @@
 /**
  * Pieces 需求详情, 需求看板 and 待办 share: a question with its answer form, a Brain entry chip, and the MR's 变更说明
- * with 复制. All text is plain text (never rendered as HTML).
+ * with 复制. Text is never rendered as HTML: Markdown is built into elements (Markdown.tsx).
  */
 import { useState } from 'react'
 import { fmtTime } from '../format'
 import { ENTRY_RE, fileOfEntry } from '../nav'
 import type { MrDesc, Question } from '../types'
 import { AnswerForm, ExtLink, Icon, isOpenQuestion, questionMeta } from '../ui'
+import { ACT, approvalName } from '../vocab'
+import { Inline, Markdown } from './Markdown'
 import type { ViewProps } from './props'
 
 const SOURCE_LABEL: Record<Question['source'], string> = { park: '本地会话', bridge: '运行机', mr: 'MR' }
@@ -38,6 +40,9 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
   const open = isOpenQuestion(q)
   const formHere = q.answerable_here && !q.lean_request
   const link = mrUrl === undefined ? q.mr_url : mrUrl
+  // a question the bridge put on the MR is answered there (handed over); only a local run's park.json is the session's
+  const onMr = q.source !== 'park'
+  const what = q.lean_request ? `${approvalName(q.lean_request.split(' ')[0]) || '审批'}请求` : ''
   return (
     <article className={`br-q${open ? ' is-open' : ''}`} aria-label={`问题 ${q.id ?? q.kind_label}`} data-testid="question">
       <div className="br-row">
@@ -47,12 +52,12 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
         <span className={`br-chip tone-${meta.tone}`}>{meta.label}</span>
         {q.at !== null && <span className="br-dim br-small">{fmtTime(q.at)}</span>}
       </div>
-      {q.question && <p className="br-pre br-strong">{q.question}</p>}
+      {q.question && <p className="br-pre br-strong"><Inline text={q.question} /></p>}
       {q.options.length > 0 && !formHere && (
         <ol className="br-opts" aria-label="选项">
           {q.options.map((o) => (
             <li key={o.id}>
-              <b className="br-mono">{o.id}</b> {o.text}
+              <b className="br-mono">{o.id}</b> <Inline text={o.text} />
               {q.recommend === o.id && <span className="br-chip tone-ok" style={{ marginLeft: 6 }}>推荐</span>}
             </li>
           ))}
@@ -60,20 +65,21 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
       )}
       {q.recommend && !q.options.some((o) => o.id === q.recommend) && <p className="br-note">推荐：{q.recommend}</p>}
       {q.lean_request && (
-        <p className="br-note">
-          这是 Lean 的审批请求（<code>{q.lean_request}</code>）：在会话里自己打批准那一行，这里不能回答。
+        <p className="br-note" title={q.lean_request} data-testid="lean-request">
+          {onMr
+            ? <>这是 Lean 的{what}：在 MR 上回答{q.id ? ` ${q.id}` : ''}（approve 批准 / reject 退回），这里不能回答。</>
+            : <>这是 Lean 的{what}：在会话里自己打批准那一行，这里不能回答。</>}
         </p>
       )}
       {q.answer && (
-        <p className="br-pre" style={{ margin: 0 }}>
+        <p className="br-pre" style={{ margin: 0 }} title={q.voucher_id ? `凭证 ${q.voucher_id}` : undefined}>
           回答：<b className="br-strong">{q.answer}</b>
           {q.answerer ? ` · ${q.answerer}` : ''}
-          {q.voucher_id && <> · 凭证 <code>{q.voucher_id}</code></>}
         </p>
       )}
       {(link || q.refs.length > 0) && (
         <div className="br-row br-small">
-          {link && <ExtLink href={link}>{open && !formHere ? '去 MR 上回答' : '在 MR 上看'}</ExtLink>}
+          {link && <ExtLink href={link}>{open && !formHere ? ACT.answerOnMr : '在 MR 上看'}</ExtLink>}
           {q.refs.map((r) => <span key={r} className="br-tag br-mono">{r}</span>)}
         </div>
       )}
@@ -106,8 +112,8 @@ export function useCopy(text: string) {
 }
 
 /**
- * The MR's 变更说明 (brain mr-desc): its first line, the whole Markdown folded, and 复制 (the clipboard: for the MR
- * description). Text only, never rendered as HTML. *bare*: no card of its own (inside another card).
+ * The MR's 变更说明 (brain mr-desc): its first line, the whole text folded (formatted: tables as tables), and 复制 (the
+ * Markdown as it is, for the MR description). *bare*: no card of its own (inside another card).
  */
 export function MrDescCard({ m, bare = false }: { m: MrDesc; bare?: boolean }) {
   const { copied, copy } = useCopy(m.text)
@@ -125,11 +131,11 @@ export function MrDescCard({ m, bare = false }: { m: MrDesc; bare?: boolean }) {
         )}
       </header>
       {m.error && <p className="br-note">{m.error}</p>}
-      {m.first && <p className="br-strong br-mrfirst" style={{ margin: 0 }} data-testid="mr-desc-first">{m.first}</p>}
+      {m.first && <p className="br-strong br-mrfirst" style={{ margin: 0 }} data-testid="mr-desc-first"><Inline text={m.first} /></p>}
       {m.text && (
-        <details className="br-raw">
-          <summary>看全文（Markdown）</summary>
-          <pre data-testid="mr-desc-text">{m.text}</pre>
+        <details className="br-raw br-mdfold">
+          <summary>看全文</summary>
+          <Markdown text={m.text} testid="mr-desc-text" />
         </details>
       )}
       {copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
