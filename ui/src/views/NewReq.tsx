@@ -14,7 +14,7 @@
  *   3 开工      the session options, 「开工」 (POST /intake/start), big, with why it is off next to it: KiroCrew cannot
  *              open the session (a ✗ above), the default branch not on origin yet (推送 right there), the form, a check
  *              of exactly what the form says now. The answer: a success card (branch, worktree) saying what happens in
- *              the session, with 打开会话, 看需求看板, 看需求详情; a failure says why in words and what to do.
+ *              the session, with 打开会话, 需求看板, 需求详情; a failure says why in words and what to do.
  *
  * KiroCrew's failing or doubtful checks are listed above the form with their fix buttons: /status has them at once,
  * GET /crew checks again. Without a usable repo there is no form: 导入仓库, or the way forward of a repo on its way.
@@ -26,7 +26,7 @@ import { lines, splitPaths } from '../format'
 import { KEY_RE, type NewEntry } from '../nav'
 import type { Tone } from '../styles'
 import { CLASS_LABEL, type CheckRow, type Classification, type CrewChecks, type IntakeBody, type IntakeCheck, type IntakeNext, type MeNameResult, type StartBody, type StartResult } from '../types'
-import { CheckRows, Flow, ImportCta, MeLine, PendingRepo, PushBox, RoleIcon, type FlowStep } from '../ui'
+import { CheckRows, Flow, Icon, ImportCta, MeLine, PendingRepo, PushBox, RoleIcon, repoLabel, type FlowStep } from '../ui'
 import { ACT, CLASS_NAME } from '../vocab'
 import type { ViewProps } from './props'
 
@@ -157,7 +157,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
           : keyBad ? '需求号的格式不对'
             : me?.ask ? `先在上面「${me.label}」旁点「保存」${me.suggest ? `（确认是 ${me.suggest}）` : ''}`
               : started?.ok ? '已经开工了'
-                : info?.push ? `先推送 ${info.push.branch}：开工从 origin 上的 ${info.push.branch} 建分支，那里还没有 brain-kit`
+                : info?.push ? `先推送 ${info.push.branch}：开工从远端的 ${info.push.branch} 建分支，那里还没有 brain-kit`
                   : openSession && crewBad ? `KiroCrew 这边有问题，开不了会话：先点上面的${crewFix ? `「${crewFix}」` : '修复按钮'}，或者不勾「开工后开会话」`
                     : classRefused ? NO_CONFIDENTIAL
                       : noDocs ? ''
@@ -278,7 +278,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
                 setKey('')
                 props.replace({ kind: 'new', repo: e.target.value })
               }}>
-                {repos.map((r) => <option key={r.id} value={r.id}>{r.name}（{r.id}）</option>)}
+                {repos.map((r) => <option key={r.id} value={r.id}>{repoLabel(r, repos)}</option>)}
               </select>
             </div>
             <div className="br-field is-4">
@@ -548,7 +548,7 @@ function StartOut({ r, path, onOpen, onBoard, onItem, onMe }: {
         <div>
           <b role="status">{r.ok ? `开工了${r.key ? `：${r.key}` : ''}` : r.problem ? `没开成：${r.problem.text}` : '没开成'}</b>
           <small>{r.ok ? (r.url ? STARTED_NEXT : '分支和工作目录都好了。要开会话时，在需求详情里点「打开会话」。')
-            : r.problem?.todo || '看下面 brain start 的输出。'}</small>
+            : r.problem?.todo || '原因在下面「细节」里（开工时 brain-kit 的原话）：照它改好，再点「开工」。'}</small>
         </div>
       </div>
       {r.ok && (
@@ -565,8 +565,8 @@ function StartOut({ r, path, onOpen, onBoard, onItem, onMe }: {
         )}
         {r.key && r.ok && (
           <>
-            <button type="button" className="br-btn" onClick={() => onBoard(r.key as string)}><RoleIcon role="runner" size={16} />看{ACT.openBoard}</button>
-            <button type="button" className="br-btn" onClick={() => onItem(r.key as string)}><RoleIcon role="file" size={16} />看{ACT.openDetail}</button>
+            <button type="button" className="br-btn" onClick={() => onBoard(r.key as string)}><Icon name="LayoutDashboard" size={15} />{ACT.openBoard}</button>
+            <button type="button" className="br-btn" onClick={() => onItem(r.key as string)}><RoleIcon role="file" size={16} />{ACT.openDetail}</button>
           </>
         )}
       </div>
@@ -578,7 +578,7 @@ function StartOut({ r, path, onOpen, onBoard, onItem, onMe }: {
       {!r.url && r.session_error && <p className="br-error br-pre" role="alert">会话没开成：{r.session_error}</p>}
       {r.output && (
         <details className="br-raw nr-out" open={!r.ok && !r.problem}>
-          <summary>细节：brain start 的输出</summary>
+          <summary>细节：开工时 brain-kit 的原话</summary>
           <pre>{r.output}</pre>
         </details>
       )}

@@ -8,7 +8,8 @@
  * run's use of the Brain (the numbers count the runs merged into the default branch: a run not merged yet is listed on
  * its own, with what 需求详情 says for it), and 回写 as steps: pick a requirement → 预览 → the changes → confirm →
  * written on a new branch (and an MR, linked). An empty Brain says what fills it and leads to 开需求; no repo leads to
- * 导入仓库. Breakpoints follow the app's own width (the `br-app` container).
+ * 导入仓库. Breakpoints follow the view's own width (its root is the `kt-root` container), not the window: inside
+ * KiroCrew the dashboard's sidebar takes ~230 px of it.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppApi } from '@kirocrew/app-sdk'
@@ -17,7 +18,7 @@ import { fmtRate } from '../format'
 import { useReducedMotion } from '../hooks'
 import { fileOfEntry, type BrainEntryRef, type BrainFile } from '../nav'
 import type { BrainEntry, BrainFileView, BrainView, CheckRow, ReflectApplyBody, ReflectApplyResult, ReflectPreview } from '../types'
-import { CheckRows, EmptyHero, ExtLink, Icon, Kpi, LoadState, RoleIcon, Segs, StateChip, type FlowStep } from '../ui'
+import { CheckRows, EmptyHero, ExtLink, Icon, Kpi, LoadState, RoleIcon, Segs, StateChip, repoLabel, type FlowStep } from '../ui'
 import { ACT, GAP_KIND_NAME } from '../vocab'
 import type { ViewProps } from './props'
 
@@ -53,13 +54,6 @@ const lintRows = (lint: BrainView['lint']): CheckRow[] => [...lint.errors, ...li
 export function InlineCode({ text }: { text: string }) {
   const parts = text.split(/(`[^`\n]+`)/)
   return <>{parts.map((x, i) => (x.length > 2 && x.startsWith('`') && x.endsWith('`') ? <code key={i} className="bv-code">{x.slice(1, -1)}</code> : x))}</>
-}
-
-/** A repo by its name; by its name and folder when two listed repos share a name. */
-function repoLabel(r: { name: string; path: string }, all: { name: string }[]): string {
-  if (all.filter((x) => x.name === r.name).length < 2) return r.name
-  const dir = r.path.replace(/\/+$/, '').split('/').slice(-2, -1)[0]
-  return dir ? `${r.name}（${dir}/）` : r.name
 }
 
 /** What fills an empty Brain. */
@@ -744,9 +738,11 @@ const BV_CSS = `
 .bv-repo select { padding: .35em .7em; border-radius: .7em; }
 .bv-ref { font-size: .86em; color: var(--muted); padding: .2em .7em; border-radius: 999px; background: var(--kt-glass); border: 1px solid var(--border); }
 .bv-ref code { color: var(--text-strong); }
+/* five cards: one row; three over two (a grid of six, so each row is full); two by two, the last one as wide as two */
 .bv-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-@container br-app (max-width: 1200px) { .bv-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@container br-app (max-width: 760px) { .bv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container kt-root (max-width: 1200px) { .bv-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); } .bv-kpis > * { grid-column: span 2; } .bv-kpis > :nth-child(n+4) { grid-column: span 3; } }
+@container kt-root (max-width: 760px) { .bv-kpis > *, .bv-kpis > :nth-child(n+4) { grid-column: span 3; } .bv-kpis > :last-child:nth-child(odd) { grid-column: span 6; } }
+@container kt-root (max-width: 460px) { .bv-kpis > *, .bv-kpis > :nth-child(n+4), .bv-kpis > :last-child:nth-child(odd) { grid-column: span 6; } }
 .bv-kpis .br-kpi-big { font-size: 2.6em; }
 .bv-stack { display: flex; gap: 2px; height: .8em; margin-top: .2em; border-radius: .3em; overflow: hidden; }
 .bv-stack i { flex: 1 1 0; min-width: .4em; background: var(--muted); }
@@ -768,10 +764,10 @@ const BV_CSS = `
 .bv-meter.is-cand { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kt-warn) 70%, transparent); }
 
 .bv-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(22em, 30em); gap: var(--kit-gap-block, 16px); align-items: start; }
-@container br-app (max-width: 1200px) { .bv-main { grid-template-columns: minmax(0, 1fr); } }
+@container kt-root (max-width: 1200px) { .bv-main { grid-template-columns: minmax(0, 1fr); } }
 .bv-col { display: grid; gap: var(--kit-gap-row, 12px); min-width: 0; align-content: start; }
 .bv-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6em; }
-@container br-app (max-width: 700px) { .bv-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container kt-root (max-width: 700px) { .bv-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .bv-tab { appearance: none; font: inherit; display: grid; grid-template-columns: 2.3em minmax(0, 1fr) auto; align-items: center; gap: .7em; padding: .6em .9em;
   border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; text-align: left; }
 .bv-tab:hover { border-color: var(--border-strong); }
@@ -827,7 +823,7 @@ const BV_CSS = `
 .bv-load { display: inline-flex; align-items: center; gap: .5em; white-space: nowrap; }
 
 .bv-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; counter-reset: s; }
-@container br-app (max-width: 760px) { .bv-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container kt-root (max-width: 760px) { .bv-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .bv-steps li { position: relative; display: flex; align-items: center; gap: .55em; padding: .5em .6em; font-weight: 650; color: var(--muted); }
 .bv-steps li:not(:last-child)::after { content: ''; flex: 1; height: 2px; margin: 0 .2em 0 .4em; border-radius: 1px; background: color-mix(in srgb, var(--muted) 30%, transparent); }
 .bv-steps li i { font-style: normal; flex: none; display: grid; place-items: center; width: 1.8em; height: 1.8em; border-radius: 50%; font-size: .86em; font-weight: 850;

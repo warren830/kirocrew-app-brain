@@ -717,7 +717,7 @@ function InstallOut({ r, onCommitted }: { r: InstallResult; onCommitted: () => v
       )}
       {(r.output || r.doctor.output) && (
         <details className="imp-more">
-          <summary>细节：brain install 和 brain doctor 的原始输出</summary>
+          <summary>细节：安装和自检时 brain-kit 的原话</summary>
           <pre className="br-findings">{[r.output, r.doctor.output].filter(Boolean).join('\n\n')}</pre>
         </details>
       )}
@@ -837,7 +837,7 @@ function PublishOut({ r }: { r: PublishResult }) {
         )}
         {r.output && (
           <details className="imp-more">
-            <summary>细节：git push 的输出</summary>
+            <summary>细节：推送时 git 的原话</summary>
             <pre className="br-findings">{r.output}</pre>
           </details>
         )}

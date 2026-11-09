@@ -120,9 +120,9 @@ describe('开需求', () => {
 
     await user.click(within(out).getByRole('button', { name: '打开会话' }))
     expect(navigations).toEqual(['/chat?sid=brain-PAY-8-2c9d'])
-    await user.click(within(out).getByRole('button', { name: '看需求看板' }))
+    await user.click(within(out).getByRole('button', { name: '需求看板' }))
     expect(props.go).toHaveBeenCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-8' })
-    await user.click(within(out).getByRole('button', { name: '看需求详情' }))
+    await user.click(within(out).getByRole('button', { name: '需求详情' }))
     expect(props.go).toHaveBeenLastCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-8' })
   })
 
@@ -296,7 +296,7 @@ describe('开需求', () => {
     const { user } = setup({ [`GET ${API}/intake/next*`]: () => ({ ...fx.intakeNext(), push: { branch: 'main', remote_url: 'git@gitlab.example.com:shop/shop-pay.git' } }) })
     await fillBasics(user)
     expect(startBtn()).toBeDisabled()
-    expect(screen.getByTestId('start-why')).toHaveTextContent('先推送 main：开工从 origin 上的 main 建分支')
+    expect(screen.getByTestId('start-why')).toHaveTextContent('先推送 main：开工从远端的 main 建分支')
     const box = screen.getByTestId('new-push')
     await user.click(within(box).getByRole('button', { name: '推送 main' }))
     expect(within(box).getByTestId('push-team')).toHaveTextContent('这会直接改团队的 main，没有 MR 评审')
@@ -347,6 +347,7 @@ describe('开需求', () => {
     render(<NewView entry={{}} status={status} go={vi.fn()} replace={replace} reloadStatus={vi.fn()} setStatus={vi.fn()} />)
     const user = userEvent.setup()
     await waitFor(() => expect(screen.getByLabelText('需求号')).toHaveValue('PAY-8'))
+    expect(within(screen.getByLabelText('仓库')).getAllByRole('option').map((o) => o.textContent)).toEqual(['shop-pay', 'shop-web']) // names, not the app's r1
     await user.selectOptions(screen.getByLabelText('仓库'), 'r2')
     expect(replace).toHaveBeenCalledWith({ kind: 'new', repo: 'r2' })
     await waitFor(() => expect(screen.getByLabelText('需求号')).toHaveValue('WEB-4'))
