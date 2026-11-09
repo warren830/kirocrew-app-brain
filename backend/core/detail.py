@@ -239,21 +239,47 @@ def _iso_minute(ts: Any) -> str:
     return "%s %sZ" % (m.group(1), m.group(2)) if m else str(ts)[:40]
 
 
+# brainkit.trace's "missing": a source it could not read (its own words, an English name and why in brackets) -> in
+# Chinese; and whether it matters only once a requirement is handed over (then a local run, or a repo done only on
+# this machine, is not missing it)
+MISSING = (("bridge ledger", "桥的账本（这台机器上没有：交接以后的问答在 MR 上看）", True),
+           ("vouchers", "签名凭证（这台机器上没有）", True),
+           ("pushes", "推送记录（git 不记推送：交接以后的提交代替它）", True),
+           ("ci pipelines", "CI 流水线（在 GitLab 上，这里读不到）", False))
+
+
+def missing_text(raw: list[Any], *, handed_over: bool, local_only: bool) -> list[str]:
+    """The sources brainkit.trace could not read that matter for this requirement, in Chinese. A requirement not
+    handed over has no bridge, vouchers or pushes to miss; a repo done only on this machine has no CI either."""
+    out = []
+    for x in raw:
+        low = str(x).strip().lower()
+        hit = next((m for m in MISSING if low.startswith(m[0])), None)
+        if hit is None:
+            out.append("brain-kit 还有一个来源没读到")
+        elif not local_only and (handed_over or not hit[2]):
+            out.append(hit[1])
+    return sorted(set(out), key=out.index)
+
+
 def timeline(repo_path: str, cfg: dict[str, Any], key: str, *, ref: str | None, events: list[dict[str, Any]],
              credits: Any = None, ledger_path: str | None = None, vouchers_dir: str | None = None,
-             allowed_signers: str | None = None, app_events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+             allowed_signers: str | None = None, app_events: list[dict[str, Any]] | None = None,
+             has_run: bool = True) -> dict[str, Any]:
+    """The timeline: brainkit.trace's record, else the Lean ledger's. A requirement only claimed has no run to trace
+    (nothing recorded yet is not an error)."""
     out = {"source": "app", "items": [], "missing": [], "error": "", "brain": None, "cost": None, "trace": None}
-    if bk.has("trace"):
+    if has_run and bk.has("trace"):
         try:
             from .deliveries import _call
             t = _call(bk.m("trace").build, repo_path, cfg, key, ref=ref, ledger_path=ledger_path,
                       vouchers_dir=vouchers_dir, credits=credits, allowed_signers=allowed_signers)
             out.update(source="trace", items=trace_timeline(t), missing=[str(x)[:200] for x in t.get("missing") or []],
                        brain=t.get("brain"), cost=t.get("cost"), trace=t)
-        except Exception as exc:  # noqa: BLE001
-            out["error"] = "brainkit.trace 读不出这个需求：%s" % str(exc).split("\n", 1)[0][:200]
-    else:
-        out["error"] = "brain-kit 还没有 trace 模块：时间线只有 Lean 的记录"
+        except Exception:  # noqa: BLE001 - said in Chinese; the Lean ledger's items stand in
+            out["error"] = "brain-kit 读不出这个需求的完整记录：下面只有 Lean 自己记下的事"
+    elif has_run:
+        out["error"] = "brain-kit 还没有 trace 模块：时间线只有 Lean 的记录（在设置里换新一点的 brain-kit）"
     if out["source"] == "app":
         out["items"] = lean_view.stage_events(events)
     out["items"] += app_events or []

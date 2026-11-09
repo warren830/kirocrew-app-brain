@@ -333,8 +333,13 @@ class Service:
 
     # ---- 交付总览 ------------------------------------------------------------------------------------- #
 
+    def _local_only(self, repo: Repo) -> bool:
+        """Its requirements are done only on this machine: no remote, or no GitLab to hand them over through."""
+        base, project = self._gitlab_of(repo)
+        return not (base and project) or not repo.has_origin()
+
     def _row(self, repo: Repo, f: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
-        row = deliveries.base_row(repo.id, f)
+        row = deliveries.base_row(repo.id, f, local_only=self._local_only(repo))
         scope = scope_of(repo.id, f["key"])
         sess = snap["by"].get(scope, [])
         live = self._live(sess)
@@ -347,13 +352,15 @@ class Service:
         bot = 0
         if run.get("handoff") and not mr:
             bot = repo.bot_commits_since((run.get("handoff") or {}).get("local_head"), f.get("origin_sha"))
+        merged = bool(f.get("merged") or (mr or {}).get("state") == "merged")
         deliveries.classify(row, f, mr=mr, slot=live, cfg=repo.cfg, bot_commits=bot,
-                            at_handover=bool(mr) and repo.is_handover_tip(f))
+                            at_handover=bool(mr) and repo.is_handover_tip(f), me=self.me_in(repo),
+                            reflected=merged and f["key"] in repo.reflected(), now=self.now())
         row["credits"] = snap["credits"].get(scope)
         row["sessions"] = len(sess)
         row["updated_at"] = deliveries.updated_at(f, live)
         job = self._desc_job(repo, f, row["credits"])
-        row["summary"] = self.desc.first(*job) if job else None
+        row["summary"] = mrdesc_view.plain_line(self.desc.first(*job)) if job else None
         if mr:
             row["mr"] = {"iid": mr["iid"], "url": mr.get("url") or mrinfo.mr_url(base, project, mr["iid"]),
                          "state": mr.get("state")}
@@ -450,9 +457,13 @@ class Service:
             except Exception as exc:  # noqa: BLE001
                 errors.append({"repo": rid, "error": str(exc)[:300]})
                 continue
+            base, project = self._gitlab_of(repo)
             for f in facts:
                 row = self._row(repo, f, snap)
                 rows.append(row)
+                mr = self.mr.get(project, f["branch"]) if base and project and f.get("branch") else None
+                for k, n in deliveries.questions_asked(f, mr).items():
+                    q_counts[k] += n
                 intent = (f.get("run") or {}).get("intent")
                 all_decisions += [dict(d, key=f["key"]) for d in detail.decisions(
                     f.get("decisions_text"), "aidlc-docs/%s/decisions.md" % intent if intent else "decisions.md",
@@ -476,7 +487,10 @@ class Service:
             funnel = deliveries.funnel_app(all_decisions, q_counts)
         else:
             funnel["questions"] = q_counts
-        cto = deliveries.cto_numbers(parts, rows, available=bool(view.get("available")), now=self.now())
+        scope = [r for rid, r in self.repos.items() if which in ("all", rid)]
+        cto = deliveries.cto_numbers(parts, rows, available=bool(view.get("available")), now=self.now(),
+                                     names={rid: r.name for rid, r in self.repos.items()}, repos=len(scope),
+                                     local_repos=sum(1 for r in scope if self._local_only(r)))
         return {"at": self.now(), "rows": rows, "overlaps": overlaps, "funnel": funnel, "eval": view, "cto": cto,
                 "counts": deliveries.counts(rows), "errors": errors}
 
@@ -487,7 +501,7 @@ class Service:
         ids = [rid for rid in self.repos if which in ("all", rid)]
         if not bk.has("evaluate"):
             return deliveries.evaluate("", {}, None, None)
-        views, funnels, stale = [], [], []
+        views, funnels, stale, got_parts = [], [], [], []
         for rid in ids:
             repo = self.repos[rid]
             sha = repo.git.out("rev-parse", "-q", "--verify", (repo.main_ref() or "HEAD") + "^{commit}")
@@ -497,11 +511,14 @@ class Service:
             if got:
                 v = dict(got[2])
                 part = v.pop("_cto", None)
-                if part is not None and parts is not None:
-                    parts.append((rid, part))
+                if part is not None:
+                    got_parts.append((rid, part))
+                v["_name"] = repo.name
                 views.append(v)
                 if got[3]:
                     funnels.append(got[3])
+        if parts is not None:
+            parts.extend(got_parts)
         for rid, sha in stale:
             if rid not in self._eval_running:
                 self._eval_running.add(rid)
@@ -511,16 +528,26 @@ class Service:
         if not views:
             return {"available": False, "error": "正在算 Eval…" if ids else "没有仓库", "ref": None, "metrics": [],
                     "queue": [], "skipped": [], "notes": []}, None
+        ref = deliveries.branch_words([(v.pop("_name"), v.get("ref")) for v in views])
         if len(views) == 1:
-            return views[0], (dict(funnels[0]) if funnels else None)
+            return dict(views[0], ref=ref), (dict(funnels[0]) if funnels else None)
         merged = {"available": any(v["available"] for v in views), "error": "；".join(v["error"] for v in views if v["error"]),
-                  "ref": None, "metrics": [], "queue": [q for v in views for q in v["queue"]],
+                  "ref": ref, "metrics": [], "queue": [q for v in views for q in v["queue"]],
                   "skipped": [x for v in views for x in v.get("skipped") or []],
                   "notes": [x for v in views for x in v.get("notes") or []]}
         for m in views[0]["metrics"]:
             vals = [next((x["value"] for x in v["metrics"] if x["id"] == m["id"]), None) for v in views]
             pairs = [x for x in vals if isinstance(x, list)]
-            merged["metrics"].append({**m, "value": [sum(p[0] for p in pairs), sum(p[1] for p in pairs)] if pairs else None})
+            nums = [x for x in vals if isinstance(x, (int, float)) and not isinstance(x, bool)]
+            if m["id"] == "credits_per_success":   # an average: the repos' credits over their correct deliveries
+                spent = [p["credits_total"] for _, p in got_parts if p.get("credits_total") is not None]
+                good = sum(p.get("correct") or 0 for _, p in got_parts)
+                value: Any = round(sum(spent) / good, 4) if spent and good else None
+            elif pairs:
+                value = [sum(p[0] for p in pairs), sum(p[1] for p in pairs)]
+            else:
+                value = sum(nums) if nums else None
+            merged["metrics"].append({**m, "value": value})
         funnel = None
         if funnels:
             funnel = dict(funnels[0])
@@ -551,8 +578,7 @@ class Service:
         return scrub_tree(await asyncio.to_thread(self._overview_sync, which, snap), self.scrub)
 
     async def refresh(self, rid: str) -> dict[str, Any]:
-        ok, text = await asyncio.to_thread(self._repo(rid).fetch)
-        return {"ok": ok, "text": text}
+        return await asyncio.to_thread(self._repo(rid).fetch)
 
     # ---- 需求详情 ------------------------------------------------------------------------------------- #
 
@@ -592,7 +618,7 @@ class Service:
         tl = self._timeline(repo, f, snap, scope)
         if parts is not None:
             parts.update(repo=repo, facts=f, trace=tl.get("trace"), mr=mr, scope=scope, decisions=[], me=me,
-                         cfg=repo.cfg, path=repo.path, local_only=not (base and project))
+                         cfg=repo.cfg, path=repo.path, local_only=row["local_only"])
         return {
             "row": row, "where_label": self._where_label(f),
             "run": {"owner": run.get("owner"), "branch": run.get("branch"), "intent": run.get("intent"),
@@ -609,7 +635,9 @@ class Service:
             "decisions": detail.decisions(f.get("decisions_text"), "aidlc-docs/%s/decisions.md" % run.get("intent"),
                                           repo.cfg.get("bot_users") or []),
             "questions": questions,
-            "timeline": {k: tl[k] for k in ("source", "items", "missing", "error")},
+            "timeline": {"source": tl["source"], "items": tl["items"], "error": tl["error"],
+                         "missing": detail.missing_text(tl["missing"], handed_over=bool(run.get("handoff")),
+                                                        local_only=row["local_only"])},
             "sessions": [{k: s[k] for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                              "last_activity", "opened_at", "project", "url", "error")}
                          for s in snap["by"].get(scope, [])],
@@ -621,7 +649,7 @@ class Service:
     def _desc_now(self, job: tuple[tuple, Callable[[], dict]] | None) -> dict[str, Any]:
         """The 变更说明 for the detail page: from the cache, or made now (blocking: called in a thread)."""
         if job is None:
-            return mrdesc_view.empty("还没有 run（只有认领）：开工以后才有变更说明")
+            return mrdesc_view.empty("还没开工：开工以后才有变更说明")
         return self.desc.get_or_make(*job)
 
     def _timeline(self, repo: Repo, f: dict[str, Any], snap: dict[str, Any], scope: str) -> dict[str, Any]:
@@ -634,7 +662,7 @@ class Service:
             c = snap["credits"].get(scope)
             tl = detail.timeline(src_repo, repo.cfg, f["key"], ref=ref, events=f.get("events") or [],
                                  credits={"runs": {f["key"]: {"credits": c}}} if c is not None else None,
-                                 vouchers_dir=self._vouchers_dir(repo))
+                                 vouchers_dir=self._vouchers_dir(repo), has_run=bool(f.get("run")))
             self._trace = {k: v for k, v in self._trace.items() if time.monotonic() - v[0] < TRACE_TTL_S}
             self._trace[sig] = (time.monotonic(), dict(tl))
         tl["items"] = sorted(tl["items"] + self.store.events(scope), key=lambda x: (x["at"] or "", x["kind"]))
@@ -686,7 +714,8 @@ class Service:
                      **lean_view.notes(f.get("state_text"))},
             "decisions": detail.decisions(f.get("decisions_text"), "decisions.md", []),
             "questions": detail.ledger_questions(decs, row["mr"]["url"] if row.get("mr") else None),
-            "timeline": {k: tl[k] for k in ("source", "items", "missing", "error")},
+            "timeline": {"source": tl["source"], "items": tl["items"], "error": tl["error"],
+                         "missing": detail.missing_text(tl["missing"], handed_over=True, local_only=False)},
             "sessions": [{k: s[k] for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                              "last_activity", "opened_at", "project", "url", "error")} for s in sess],
             "credits": {"total": row["credits"], "note": detail.NO_TOKENS},
@@ -706,7 +735,7 @@ class Service:
     @staticmethod
     def _where_label(f: dict[str, Any]) -> str:
         return {"worktree": "这台机器的工作区 %s" % f.get("worktree"), "branch": "分支 %s（没在这台机器上检出）" % (f.get("ref") or ""),
-                "main": "默认分支（已合并）", "claim": "只有认领（claim/%s）" % f["key"], "runner": "运行机"}.get(f.get("where"), "")
+                "main": "默认分支（已合并）", "claim": "只有认领，还没开工", "runner": "运行机"}.get(f.get("where"), "")
 
     async def requirement(self, rid: str, key: str) -> dict[str, Any]:
         snap = self._sessions_snapshot()
@@ -921,7 +950,7 @@ class Service:
             t = f.get("decisions_text") or ""
             if "brain-proposal" in t or "brain-gap" in t:
                 row = deliveries.base_row(repo.id, f)
-                deliveries.classify(row, f, mr=None, slot=None, cfg=repo.cfg)
+                deliveries.classify(row, f, mr=None, slot=None, cfg=repo.cfg, me=self.me_in(repo), now=self.now())
                 out.append({"key": f["key"], "title": row["title"], "state": row["state"]})
         return out
 
@@ -995,15 +1024,17 @@ class Service:
             r = self.repos.get(rid)
             if r is not None:
                 repos.append({"id": rid, "path": r.path, "name": r.name, "ok": True, "error": "",
-                              "kit": importer.kit_view(r.cfg), "pending": None, "me": None})
+                              "kit": importer.kit_view(r.cfg), "pending": None, "me": None,
+                              "remote": await asyncio.to_thread(r.has_origin)})
             elif rid in self.repo_pending:
                 p, pend = self.repo_pending[rid]
                 repos.append({"id": rid, "path": p, "name": os.path.basename(p), "ok": False, "error": "", "kit": None,
-                              "pending": pend, "me": None})
+                              "pending": pend, "me": None, "remote": await asyncio.to_thread(Git(p).has_origin)})
             else:
                 p, err = self.repo_errors.get(rid, (path, "没装载"))
                 repos.append({"id": rid, "path": p, "name": os.path.basename(p), "ok": False, "error": err, "kit": None,
-                              "pending": None, "me": None})
+                              "pending": None, "me": None,
+                              "remote": os.path.isdir(p) and await asyncio.to_thread(Git(p).has_origin)})
         todo = await self.todo()
         token = await asyncio.to_thread(self._token_present)
         loaded = {x["id"]: self.repos[x["id"]] for x in repos if x["ok"] and x["id"] in self.repos}

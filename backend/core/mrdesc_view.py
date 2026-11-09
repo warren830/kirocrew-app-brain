@@ -65,6 +65,29 @@ def first_line(text: str) -> str | None:
     return None
 
 
+SIZE_WORD = {"small": "小", "s": "小", "xs": "很小", "medium": "中", "m": "中", "large": "大", "l": "大", "xl": "很大"}
+# a 变更说明 line's parts that are for the records, not for a person: a source document's section and hash
+# 「（D01#S002 · 097f2e9e）」, a package 「PKG-…」
+REF_RE = re.compile(r"[（(]\s*D[0-9]{2}#S[0-9]{3}[^（）()]*[）)]")
+SIZE_RE = re.compile(r"[（(]规模\s*([A-Za-z]+)[）)]")
+NOW_RE = re.compile(r"[。.]?\s*现在[：:].*$")
+
+
+def plain_line(line: str | None) -> str | None:
+    """The 变更说明's first line as the overview shows it under a requirement: what it is, in plain words. Markdown
+    marks go, the records' own references go (the full text keeps them), 「（规模 small）」 reads 「（规模小）」, and the
+    「现在：…」 tail goes (the row says where the requirement is, the one way the app says it)."""
+    if not line:
+        return line
+    s = NOW_RE.sub("", line)
+    s = REF_RE.sub("", s)
+    s = SIZE_RE.sub(lambda m: "（规模%s）" % SIZE_WORD.get(m.group(1).lower(), m.group(1)), s)
+    s = re.sub(r"\*\*|__|`", "", s).strip()
+    if s and not s.endswith(("。", "！", "？", ".", "!", "?")):
+        s += "。"
+    return s or None
+
+
 def describe(path: str, cfg: dict[str, Any], key: str, sha: str, credits: Any = None) -> dict[str, Any]:
     """The 变更说明 of *key* at commit *sha* of the repo at *path* (blocking: call it in a thread)."""
     if not bk.has("mrdesc"):
