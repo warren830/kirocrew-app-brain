@@ -451,7 +451,7 @@ def test_add_installed_and_pending_repos_then_merge_and_pull(tmp_path, home):
     assert got["overview"]["errors"] == []                                      # pending is no error
     assert got["changed"] is True and got["pulled_seen"] is True
     m = got["merged"]["repos"][1]
-    assert m["pending"]["state"] == "merged" and "已经合进 origin/main" in m["pending"]["text"] and "git pull" in m["pending"]["next"]
+    assert m["pending"]["state"] == "merged" and "已经合进 origin/main" in m["pending"]["text"] and "「拉取」" in m["pending"]["next"]
     assert got["pulled"]["repos"][1]["ok"] is True and got["pulled"]["repos"][1]["pending"] is None
 
 
