@@ -240,7 +240,7 @@ export interface ChecksSay {
 export function todoLeft(w: CheckWall): string[] {
   const watched = w.cells.filter((c) => c.status === 'watch').map((c) => c.name)
   if (w.todo) return w.todo.filter((t) => !watched.some((n) => n.startsWith(t)))
-  return w.cells.filter((c) => c.status === 'skip' && (c.group === 'gate' || c.group === 'verify')).map((c) => (c.group === 'gate' ? `${c.label}审批` : c.label))
+  return w.cells.filter((c) => c.status === 'skip' && (c.group === 'gate' || c.group === 'verify')).map((c) => (c.group === 'gate' ? c.name.replace(/（[^）]*）$/, '') : c.label))
 }
 
 /** What the checks say, the one way (the KPI, the wall, 验收): 「目前 3 项都过 · 还剩 发布审批」. A check that waits for
