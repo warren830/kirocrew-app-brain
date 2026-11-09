@@ -17,6 +17,7 @@ import { FIXTURE_AT, clone, fx } from '../src/test/data'
 import world from './world.json'
 import { API, fixtureRoutes } from '../src/test/routes'
 import { StubApiError, setApiRoutes, setNavigateHook } from '../src/test/stubs/app-sdk'
+import { simulated } from './simulate'
 import type {
   CrewFixBody, ImportInspect, ImportJob, IntakeBody, Overview, ReflectApplyBody, ReflectApplyResult, ReqBoard, RepoInfo, RequirementDetail, Settings, StartBody, Status,
 } from '../src/types'
@@ -146,7 +147,7 @@ setApiRoutes({
   ...Object.fromEntries(Object.entries(routes).map(([k, h]) => [k, (...a: Parameters<typeof h>) => shift(h(...a))])),
   [`GET ${API}/status`]: () => status(),
   [`GET ${API}/requirements/*`]: (_b, path) => shift(detailFor(path)),
-  [`GET ${API}/board/*`]: (_b, path) => shift(boardFor(path)),
+  [`GET ${API}/board/*`]: (_b, path) => shift(simulated(boardFor(path))),
   [`GET ${API}/settings`]: () => clone(settings),
   [`GET ${API}/crew`]: () => ({ ...status().crew }),
   [`GET ${API}/todo`]: () => shift({ ...fx.todo(), team: flags.has('team') }),
