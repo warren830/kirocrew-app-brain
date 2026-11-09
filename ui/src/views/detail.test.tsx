@@ -52,6 +52,7 @@ const handedOver = (d: RequirementDetail) => {
   d.row.waits = { who: 'you', text: '等你验收：在 MR 上回答 D-3', line: null, raw: '', do: 'accept', since: AT - 7200, where: 'mr' }
   d.lean.approvals[3] = { ...d.lean.approvals[3], kind: 'RELEASE', line: 'approve RELEASE 0c9a7e21', path: null }
   d.questions = [mrQuestion({})]
+  d.timeline.missing = ['桥的账本（这台机器上没有：交接以后的问答在 MR 上看）', 'CI 流水线（在 GitLab 上，这里读不到）']
 }
 
 describe('需求详情', () => {
@@ -89,7 +90,7 @@ describe('需求详情', () => {
   test('此刻 for an approval: who it waits on, the line to type, 复制那一行 and 打开会话 right there; nothing sends it', async () => {
     renderDetail()
     const bar = await screen.findByRole('region', { name: '此刻' })
-    expect(bar).toHaveTextContent('等你等你批准 refund-api 的代码计划（在会话里自己打一行）')
+    expect(bar).toHaveTextContent(`等你${fx.detail().row.waits.text}`)
     expect(bar).not.toHaveTextContent('此刻：')
     expect(within(bar).getByTestId('now-line')).toHaveTextContent(LINE)
     fireEvent.click(within(bar).getByRole('button', { name: '复制那一行' }))
@@ -558,13 +559,13 @@ describe('需求详情', () => {
     expect(apiCalls.map((c) => c.path).filter((p) => !p.startsWith(`${API}/overview`))).toEqual([`${API}/requirements/r1/PAY-3`, `${API}/board/r1/PAY-3`])
     // board.json: the local session works, waits at the REQUIREMENTS and DESIGN approvals, works, then waits in the session
     // (the question) and at the pending PLAN; the gaps after each approval have nothing recorded
-    const parts = ['AI 在本机做 31 分钟', '需求审批 21 分钟', 'AI 在本机做 41 分钟', '设计审批 25 分钟', 'AI 在本机做 25 小时 35 分', '会话等人 14 分钟', '设计审批 6 分钟']
+    const parts = ['AI 在本机做 31 分钟', '需求审批 21 分钟', 'AI 在本机做 44 分钟', '设计审批 25 分钟', 'AI 在本机做 25 小时 39 分', '会话等人 14 分钟', '设计审批 6 分钟']
     const chart = within(card).getByRole('group', { name: /^价值流：/ })
     expect(chart).toHaveAttribute('aria-label', '价值流：' + parts.join('，'))
     const segs = within(chart).getAllByRole('button').filter((b) => parts.includes(b.getAttribute('aria-label')!))
     expect(segs.map((b) => b.getAttribute('aria-label'))).toEqual(parts)
     expect(card).toHaveTextContent('从开工到此刻，共 28 小时')
-    expect(chart).toHaveTextContent('25 小时 35 分')
+    expect(chart).toHaveTextContent('25 小时 39 分')
     // the moments: the start, the approvals and the question, not the requests, stages or commits
     expect(within(chart).getAllByTestId('vs-moment')).toHaveLength(4)
     for (const t of ['开工', '你批准了需求', '你批准了设计', '停下问你：澄清']) expect(chart).toHaveTextContent(t)
@@ -768,8 +769,20 @@ describe('需求详情', () => {
     withDetail(handedOver)
     renderDetail()
     const after = await screen.findByRole('region', { name: '时间线' })
-    expect(after).toHaveTextContent('这里读不到：运行机的记录。时间线里没有这些事。')
-    expect(within(after.querySelector('.br-tlmissing') as HTMLElement).getByText('细节').closest('details')).toHaveTextContent('runnerd')
+    // the backend's words, as it says them (each source and why)
+    expect(after.querySelector('.br-tlmissing')).toHaveTextContent(/^时间线里缺这些记录：桥的账本（这台机器上没有：交接以后的问答在 MR 上看）；CI 流水线（在 GitLab 上，这里读不到）$/)
+  })
+
+  test('时间线 from an older backend: brain-kit’s English source named in Chinese, its words folded', async () => {
+    withDetail((d) => {
+      handedOver(d)
+      d.timeline.missing = ['runnerd (no ledger on this machine)']
+    })
+    renderDetail()
+    const after = await screen.findByRole('region', { name: '时间线' })
+    const note = after.querySelector('.br-tlmissing') as HTMLElement
+    expect(note).toHaveTextContent('时间线里缺这些记录：运行机的记录')
+    expect(within(note).getByText('细节').closest('details')).toHaveTextContent('runnerd')
   })
 
   test('时间线 that could not be read in part says so in Chinese, what to do, the original folded', async () => {

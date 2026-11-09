@@ -58,8 +58,8 @@ describe('需求看板', () => {
     expect(kpis.getByTestId('br-checks-counter')).toHaveTextContent('2/4')
     expect(kpis.getByTestId('br-checks-say')).toHaveTextContent('1 项没过')
     const lean = kpis.getByText('AI-DLC Lean').parentElement as HTMLElement
-    expect(lean).toHaveAccessibleName('AI-DLC Lean：做完 8 · 下一步：代码生成')
-    expect(within(lean).getByTestId('br-lean-counter')).toHaveTextContent('8做完')
+    expect(lean).toHaveAccessibleName('AI-DLC Lean：做完 2 · 跳过 4 · 下一步：代码生成')
+    expect(within(lean).getByTestId('br-lean-counter')).toHaveTextContent('2做完 · 跳过 4')
     expect(lean).toHaveTextContent('下一步：代码生成')
     expect(lean).toHaveTextContent('批准 2退回 0拦下 1')
     // the person's acts: 2 approvals, and the answer they decided (D-3) counts as a judgment point too
@@ -304,13 +304,13 @@ describe('需求看板', () => {
     })
     // nothing hovered: the one that failed
     const inspect = within(wall).getByTestId('kt-inspect')
-    expect(inspect).toHaveTextContent('1 项没过 引用')
+    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、verify 引用')
     const plan = b.checks.cells.find((c) => c.id === 'gate-PLAN')!
     const cell = within(wall).getByRole('button', { name: `${plan.name}：等你，${plan.detail}` })
     fireEvent.focus(cell)
     expect(inspect).toHaveTextContent(`✋ ${plan.name}${plan.detail}`)
     fireEvent.blur(cell)
-    expect(inspect).toHaveTextContent('1 项没过 引用')
+    expect(inspect).toHaveTextContent('1 项没过 · 还剩 发布审批、verify 引用')
   })
 
   test('the event feed: the trace newest first; Lean 细节 hides the many quiet steps', async () => {
@@ -488,7 +488,7 @@ function forProduct(): ReqBoard {
 function localOnly(b: ReqBoard = fx.board()): ReqBoard {
   b.row.local_only = true
   b.direct = true
-  for (const a of b.actors) if (['handover', 'bridge', 'signer', 'runner'].includes(a.key)) Object.assign(a, { status: 'skipped', doing: '这个仓库只在本机做：不交给运行机', line: null })
+  for (const a of b.actors) if (['handover', 'bridge', 'signer', 'runner'].includes(a.key)) Object.assign(a, { status: 'skipped', doing: '这次不需要：这个仓库只在本机做', line: null })
   return b
 }
 
@@ -601,7 +601,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     for (const k of ['handover', 'bridge', 'signer', 'runner']) expect(graph.querySelector(`g.kt-node[data-role="${k}"]`)).toBeNull()
     expect(graph.querySelector('g.kt-node[data-role="ci"]')).not.toBeNull()
     expect(screen.getByTestId('br-local-only')).toHaveTextContent('这个仓库只在本机做')
-    expect(screen.getByTestId('kt-lanes-out')).toHaveTextContent('这次不需要：交接、桥、签名、运行机（这个仓库只在本机做：不交给运行机）')
+    expect(screen.getByTestId('kt-lanes-out')).toHaveTextContent(/^这次不需要：交接、桥、签名、运行机（这个仓库只在本机做）$/)
   })
 
   test('a claimed requirement of a repo done only here: its introduction is the way it will go, without the runner', async () => {
@@ -632,7 +632,8 @@ describe('需求看板 · 轮到谁、做什么', () => {
     installFixtureRoutes(boardRoute(() => structuredClone(m)))
     renderBoard(PAY2)
     await loaded()
-    expect(screen.getByTestId('br-checks-say')).toHaveTextContent('9 项全过 · 1 项在观察')
+    // the backend's todo names the 14 days it watches: said once, not 「还剩 合并后 14 天 · 1 项在观察」
+    expect(screen.getByTestId('br-checks-say')).toHaveTextContent(/^目前 9 项都过 · 还剩 合并后 14 天$/)
     expect(screen.getByRole('group', { name: '指标' })).not.toHaveTextContent('等人')
     expect(within(region('检查墙')).getByRole('button', { name: /^合并后 14 天没有回滚或热修：观察中，/ })).toHaveAttribute('data-status', 'watch')
   })
@@ -664,15 +665,37 @@ describe('需求看板 · 轮到谁、做什么', () => {
   })
 
   test('the lanes show what each one changed: the files and their lines, the commits', async () => {
+    const b = fx.board()
+    const [records, skeleton, csv] = b.belt
+    records.changes = [{ path: 'aidlc-docs/261107-refund-export/aidlc-state.md', added: 12, removed: 0, status: 'A' }]
+    skeleton.changes = [
+      { path: 'src/export/__init__.py', added: 4, removed: 0, status: 'A' }, { path: 'src/export/api.py', added: 60, removed: 0, status: 'A' },
+      { path: 'tests/test_export_api.py', added: 40, removed: 0, status: 'A' }, { path: 'src/refund/routes.py', added: 9, removed: 3, status: 'M' },
+    ]
+    csv.changes = [
+      { path: 'src/export/csv.py', added: 120, removed: 0, status: 'A' }, { path: 'src/export/api.py', added: 18, removed: 6, status: 'M' },
+      { path: 'tests/test_export_csv.py', added: 8, removed: 9, status: 'M' },
+    ]
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    await loaded()
+    const lane = screen.getAllByTestId('kt-lane').find((l) => l.dataset.role === 'local') as HTMLElement
+    const changes = within(lane).getByTestId('kt-changes')
+    // a file two commits changed is one row, its lines summed
+    expect(changes.querySelector('.kt-files-head')).toHaveTextContent('改动+271−187 个文件 · 提交 3 次')
+    expect(changes.querySelector('.kt-files li .kt-file-path')).toHaveTextContent('src/export/csv.py')
+    expect(changes).toHaveTextContent('还有 2 个文件')
+    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent('d98cdc55PAY-3：CSV 字段和金额格式')
+  })
+
+  test('a backend that read no files: each commit says how many files it changed', async () => {
     installFixtureRoutes()
     renderBoard()
     await loaded()
     const lane = screen.getAllByTestId('kt-lane').find((l) => l.dataset.role === 'local') as HTMLElement
     const changes = within(lane).getByTestId('kt-changes')
-    expect(changes).toHaveTextContent('改动+271−187 个文件 · 提交 3 次')
-    expect(changes.querySelector('.kt-files li .kt-file-path')).toHaveTextContent('src/export/csv.py')
-    expect(changes).toHaveTextContent('还有 2 个文件')
-    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent('d98cdc55PAY-3：CSV 字段和金额格式')
+    expect(changes.querySelector('.kt-files-head')).toHaveTextContent(/^改动提交 3 次$/)
+    expect(within(changes).getByRole('list', { name: '提交' })).toHaveTextContent('e7e3cc10PAY-3：需求初稿2 个文件 · 只改记录')
   })
 
   test('small words: one credits number everywhere, 运行记录里的合计 without sessions; +N for more Brain entries; one verify round is said, not drawn', async () => {
@@ -850,9 +873,9 @@ describe('需求看板 · 回放', () => {
     const card = region('验收')
     expect(card).toHaveClass('is-signed')
     expect(card).toHaveTextContent('已合并')
-    // who merged it, said as a person, not as a pseudonym code
-    expect(within(card).getByRole('status')).toHaveTextContent('一位组员')
-    expect(card).not.toHaveTextContent(b.accept.done!.who as string)
+    // who merged it, said as a person, never as a pseudonym code
+    expect(within(card).getByRole('status')).toHaveTextContent(b.accept.done!.who as string)
+    expect(within(card).getByRole('status')).not.toHaveTextContent(/P-[0-9A-F]{4}/)
     expect(within(card).getByRole('status')).toHaveTextContent(b.accept.done!.how)
     expect(within(card).queryByTestId('accept-step')).toBeNull()
     fireEvent.click(within(card).getByRole('button', { name: '需求详情 ↗' }))

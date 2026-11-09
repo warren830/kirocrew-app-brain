@@ -61,7 +61,8 @@ export function valueStream(b: ReqBoard, now: number): StreamSeg[] {
     const t0 = pts[i], t1 = pts[i + 1]
     const on = ivs.filter((x) => x.a <= t0 && x.b >= t1)
     if (!on.length) continue
-    const top = on.sort((x, y) => RANK[y.part] - RANK[x.part])[0]
+    // a gate's wait names what is waited for; the session's own wait going on meanwhile says less
+    const top = on.sort((x, y) => RANK[y.part] - RANK[x.part] || Number(x.actor.key === 'local') - Number(y.actor.key === 'local'))[0]
     const last = out[out.length - 1]
     if (last && last.part === top.part && last.actor === top.actor.key && Math.abs(last.to - t0) < 1) last.to = t1
     else out.push({ from: t0, to: t1, part: top.part, actor: top.actor.key, label: labelOf(top.actor, top.part), icon: top.part === 'person' ? 'wait' : top.actor.icon, decision: null })

@@ -1133,7 +1133,9 @@ function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: b
     const day = isoDay(it.at) ?? '没有时间'
     days.set(day, [...(days.get(day) ?? []), it])
   }
-  const missing = [...new Set(t.missing.map(missingSourceName))]
+  // the backend says each source in Chinese, with why; an older one sent brain-kit's English (named here, kept under 细节)
+  const english = t.missing.filter((m) => !/[\u4e00-\u9fff]/.test(m))
+  const missing = [...new Set(t.missing.map((m) => (english.includes(m) ? missingSourceName(m) : m)))]
   return (
     <section className="cto-card" aria-label="时间线">
       <div className="cto-chart-head">
@@ -1176,8 +1178,8 @@ function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: b
       </div>
       {showMissing && missing.length > 0 && (
         <div className="br-note br-small br-tlmissing">
-          这里读不到：{missing.join('、')}。时间线里没有这些事。
-          <details className="br-raw"><summary>细节</summary><pre>{t.missing.join('\n')}</pre></details>
+          时间线里缺这些记录：{missing.join('；')}
+          {english.length > 0 && <details className="br-raw"><summary>细节</summary><pre>{english.join('\n')}</pre></details>}
         </div>
       )}
     </section>
