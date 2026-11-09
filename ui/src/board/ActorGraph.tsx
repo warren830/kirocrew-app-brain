@@ -11,13 +11,13 @@
  * is a calm blue outline that says whom); failed is solid red with ✕; done is a green outline; finished is solid green
  * with ✔; not on this requirement's way is dimmed and dotted, a whole phase of those a narrow grey band.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MutableRefObject, type ReactNode } from 'react'
 import type { Actor, ReqBoard, WaitDo } from '../types'
 import { ACT, DO_NAME } from '../vocab'
 import { Engine, type Item } from './engine'
-import { LIVE, WORKING, actorLabel, actorMeta, clip, fmtCredits, fmtWhen, isFinal, localOnly, waitsOnMe, whoWord } from './format'
+import { LIVE, WORKING, actorLabel, actorMeta, boardWho, clip, fmtCredits, fmtWhen, isFinal, localOnly, waitsOnMe } from './format'
 import { useLatest } from './hooks'
-import { NODE_H, NODE_W, ORCH_BOX, ROSTER, anchorBox, commandPath, headX, particlePath, pathD, type GraphLayout, type NodeBox } from './layout'
+import { NODE_H, NODE_W, ORCH_BOX, ROSTER, anchorBox, commandPath, headX, particlePath, pathD, SCALE, type GraphLayout, type NodeBox } from './layout'
 import { Overlay } from './overlay'
 import { RoleGlyph, RoleIcon } from './RoleIcon'
 import { NodeCard } from './NodeCard'
@@ -112,12 +112,12 @@ export function ActorGraph({ board, lay, focus, onActor, flashes, reducedMotion,
   const waiting = board.actors.filter((a) => a.status === 'awaiting_approval').length
   const done = board.actors.filter((a) => a.status === 'merged').length
   const mine = waitsOnMe(board)
-  const who = whoWord(board.row.waits.who, board.person.owner)
+  const who = boardWho(board)
   const label = `需求的路：${board.actors.length} 个环节，${working} 个在做，${waiting} 个${mine ? '等你' : who}，${done} 个完成；检查 ${board.checks.passed}/${board.checks.total}。点一个环节只看它。`
 
   return (
     <div className="kt-graph is-phased br-graph" data-testid="kt-graph">
-      <div className="kt-graph-stage">
+      <Scroller minWidth={Math.floor(lay.width * SCALE)}>
         <svg className="kt-graph-svg" viewBox={`0 0 ${lay.width} ${lay.height}`} role="group" aria-label={label}>
           <GraphDefs />
           <rect className="kt-g-bg" x={0} y={0} width={lay.width} height={lay.height} fill="url(#kt-dots)" />
@@ -166,17 +166,48 @@ export function ActorGraph({ board, lay, focus, onActor, flashes, reducedMotion,
           return (
             <div key={card} className="kt-ncard" style={style} data-testid="kt-ncard" role="dialog" aria-label={`${byKey.get(card)!.title}做了什么`}
               onMouseEnter={() => hover(card, 0)} onMouseLeave={() => hover(null, 200)}>
-              <NodeCard a={byKey.get(card)!} label={actorLabel(byKey.get(card)!.status, board.row.waits.who, board.person.owner)} onSession={quiet ? undefined : onSession} />
+              <NodeCard a={byKey.get(card)!} label={actorLabel(byKey.get(card)!.status, board)} onSession={quiet ? undefined : onSession} />
             </div>
           )
         })()}
-      </div>
+      </Scroller>
       <Legend handover={board.actors.some((a) => (a.key === 'handover' || a.key === 'signer') && a.status !== 'skipped')} />
     </div>
   )
 }
 
 const PERSON_CARD = '__person'
+
+/** The graph at its size (layout.ts SCALE): when the app is narrower, it scrolls sideways, and the edge that hides
+ * more of it says so (a fade, and 「右边还有」 that scrolls there): a hidden scrollbar shows nothing. */
+function Scroller({ minWidth, children }: { minWidth: number; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [more, setMore] = useState({ left: false, right: false })
+  const read = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    const next = { left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 }
+    setMore((m) => (m.left === next.left && m.right === next.right ? m : next))
+  }, [])
+  useEffect(() => {
+    read()
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(read)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [read, minWidth])
+  const by = (dir: number) => ref.current?.scrollBy?.({ left: dir * ref.current.clientWidth * 0.6, behavior: 'smooth' })
+  return (
+    <div className={`br-graph-view${more.left ? ' has-left' : ''}${more.right ? ' has-right' : ''}`}>
+      <div className="br-graph-scroll" ref={ref} onScroll={read} data-testid="kt-graph-scroll">
+        <div className="kt-graph-stage" style={{ minWidth }}>{children}</div>
+      </div>
+      {more.left && <button type="button" className="br-graph-more is-left" onClick={() => by(-1)}>← 左边还有</button>}
+      {more.right && <button type="button" className="br-graph-more is-right" onClick={() => by(1)} data-testid="kt-graph-more">右边还有 →</button>}
+    </div>
+  )
+}
 
 /** The person's card: the whole sentence their node can only start (UI问题清单 BOARD-10). */
 function PersonCard({ board, mine, who }: { board: ReqBoard; mine: boolean; who: string }) {
@@ -220,6 +251,15 @@ function GraphDefs() {
   )
 }
 
+/** A phase's words for this requirement, the ones its introduction uses: a repo done only here approves its release in
+ * the session (检查 · 发布, no 验收 on an MR); a design Lean skipped is not approved. */
+function phaseWords(p: GraphLayout['phases'][number], board: ReqBoard): { title: string; sub: string } {
+  const only = localOnly(board)
+  if (p.key === 'check' && only) return { title: '检查 · 发布', sub: '自动检查 · 发布审批' }
+  if (p.key === 'local' && board.actors.find((a) => a.key === 'design')?.status === 'skipped') return { title: p.title, sub: 'brain-dev 会话 · 需求审批' }
+  return { title: p.title, sub: p.sub }
+}
+
 function Phases({ board, lay, byKey, reducedMotion }: { board: ReqBoard; lay: GraphLayout; byKey: Map<string, Actor>; reducedMotion: boolean }) {
   const why = localOnly(board) ? '只在本机做' : ''
   return (
@@ -234,13 +274,14 @@ function Phases({ board, lay, byKey, reducedMotion }: { board: ReqBoard; lay: Gr
         const done = actors.length > 0 && !off && actors.every((a) => isFinal(a.status))
         const cx = (p.x1 + p.x2) / 2
         const person = p.key === 'init'
+        const words = phaseWords(p, board)
         return (
           <g key={p.key} className={`kt-phase${off ? ' is-unused' : ''}${live || (person && board.person.status === 'awaiting_approval') ? ' is-live' : ''}${done ? ' is-done' : ''}`} data-phase={p.key}>
             <rect className="kt-phase-band" x={p.x1} y={8} width={p.x2 - p.x1} height={lay.rail.y - 34} rx={18} />
             <text className="kt-phase-title" x={cx} y={30} textAnchor="middle">
-              {p.n} {p.title}
+              {p.n} {words.title}
             </text>
-            <text className="kt-phase-stages" x={cx} y={48} textAnchor="middle">{clip(p.sub, Math.max(6, (p.x2 - p.x1) / 13))}</text>
+            <text className="kt-phase-stages" x={cx} y={48} textAnchor="middle">{clip(words.sub, Math.max(6, (p.x2 - p.x1) / 13))}</text>
             {off && <text className="kt-phase-note" x={cx} y={lay.rail.y / 2 + 10} textAnchor="middle">这次不需要</text>}
             {workingN >= 2 && (
               <g className="kt-par" transform={`translate(${cx},${78})`}>

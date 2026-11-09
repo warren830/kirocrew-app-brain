@@ -30,13 +30,16 @@ export function EntryChip({ id, repo, go }: { id: string; repo: string; go: View
 /**
  * One question: who asked it, its kind and state, the options, the answer so far, and the answer form when the person
  * may answer here (AnswerForm decides; never for a Lean approval request). *mrUrl* overrides the question's own link.
+ * *waiter*: whom an open question on the MR waits on when it is not the person looking (「等产品」, the requirement's
+ * waits by the one rule): then it says so and only looks (看 MR); absent, the person looking answers it.
  */
-export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
+export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered, waiter = null }: {
   q: Question
   repo: string
   reqKey: string
   mrUrl?: string | null
   onAnswered?: () => void
+  waiter?: string | null
 }) {
   const meta = questionMeta(q.state, q.source)
   const open = isOpenQuestion(q)
@@ -47,6 +50,7 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
   const what = q.lean_request ? `${approvalName(q.lean_request.split(' ')[0]) || '审批'}请求` : ''
   const asked = takeRefs(q.question)
   const raw = [...q.refs, ...asked.refs, ...(q.lean_request ? [q.lean_request] : []), ...(q.voucher_id ? [`凭证 ${q.voucher_id}`] : [])]
+  const theirs = onMr && open && !!waiter
   return (
     <article className={`br-q${open ? ' is-open' : ''}`} aria-label={`问题 ${q.id ?? q.kind_label}`} data-testid="question">
       <div className="br-row">
@@ -56,7 +60,8 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
         <span className={`br-chip tone-${meta.tone}`}>{meta.label}</span>
         {q.at !== null && <span className="br-dim br-small">{fmtTime(q.at)}</span>}
       </div>
-      {asked.text && <p className="br-pre br-strong"><Inline text={asked.text} /></p>}
+      {asked.text ? <p className="br-pre br-strong"><Inline text={asked.text} /></p>
+        : onMr && !q.lean_request && <p className="br-dim br-small" data-testid="question-no-text">这个{q.kind_label || ''}问题的原话在 MR 上，运行机的记录里没有。</p>}
       {q.options.length > 0 && !formHere && (
         <ol className="br-opts" aria-label="选项">
           {q.options.map((o) => (
@@ -71,7 +76,7 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
       {q.lean_request && (
         <p className="br-note" data-testid="lean-request">
           {onMr
-            ? <>这是 Lean 的{what}：在 MR 上回答{q.id ? ` ${q.id}` : ''}（approve / reject），桥会把回答带回运行机。</>
+            ? <>这是 Lean 的{what}：{theirs ? waiter : ''}在 MR 上回答{q.id ? ` ${q.id}` : ''}（approve / reject），桥会把回答带回运行机。</>
             : <>这是 Lean 的{what}：在会话里自己打批准那一行，这里不能回答。</>}
         </p>
       )}
@@ -83,7 +88,8 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered }: {
       )}
       {link && (
         <div className="br-row br-small">
-          <ExtLink href={link}>{open && !formHere ? ACT.answerOnMr : '在 MR 上看'}</ExtLink>
+          {theirs && !q.lean_request && <span className="br-dim">{waiter}在 MR 上回答</span>}
+          <ExtLink href={link}>{open && !formHere && !theirs ? ACT.answerOnMr : ACT.viewMr}</ExtLink>
         </div>
       )}
       {raw.length > 0 && (

@@ -261,8 +261,24 @@ export function foldedPhases(actors: ReadonlyArray<{ key: string; status: string
   })
 }
 
-export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [string, string]>, rosterRows = 0, fold: ReadonlyArray<string> = []): GraphLayout {
-  const W = GW
+/** The graph is never drawn smaller than this (UI问题清单 BOARD-31: its 12 px lines stay about 10 px on screen): an app
+ * too narrow for the full width gets a narrower layout first (its columns closer, down to MIN_STEP apart); when even the
+ * narrowest one does not fit, the graph keeps this scale and scrolls sideways (ActorGraph). The text never changes. */
+export const SCALE = 0.84
+/** two columns this far apart at the closest: a node, the commit lane right of it, room for the edges */
+const MIN_STEP = NODE_W + 34
+
+/** The layout's width for a graph *avail* px wide (null: not measured, the full width) with *fold* folded. */
+export function graphWidth(avail: number | null | undefined, fold: ReadonlyArray<string> = []): number {
+  if (!avail) return GW
+  const open = COLS - fold.reduce((n, ph) => n + (SLOTS_BY_PHASE[ph]?.length ?? 0), 0)
+  const bands = PHASES.filter((p) => fold.includes(p.key)).length
+  const narrowest = PAD_X + NODE_W / 2 + ORCH_W + Math.max(0, open - 1) * MIN_STEP + bands * GREY_W + 70 + NODE_W / 2
+  return Math.round(Math.min(GW, Math.max(narrowest, avail / SCALE)))
+}
+
+export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [string, string]>, rosterRows = 0, fold: ReadonlyArray<string> = [], width = GW): GraphLayout {
+  const W = width
   const folded = new Set(fold)
   const left = PAD_X + NODE_W / 2 + ORCH_W
   const right = W - (70 + NODE_W / 2)
@@ -327,7 +343,7 @@ export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [st
   }
   phases.sort((a, b) => a.x1 - b.x1)
   // 0 认领: the person, at the far left, as the sample's orchestrator
-  phases.unshift({ key: 'init', n: '0', title: '你', sub: '认领 · 文档过五关 · 开工', short: '你', x1: 8, x2: round((phases[0]?.x1 ?? 200) - 8), used: true })
+  phases.unshift({ key: 'init', n: '0', title: '认领', sub: '认领 · 文档过五关 · 开工', short: '认领', x1: 8, x2: round((phases[0]?.x1 ?? 200) - 8), used: true })
   const orch = { x: round(PAD_X + ORCH_W / 2 - 10), y: TOP + ORCH_BOX.h / 2 - 6 }
   return { width: W, height: railY + 44, nodes, stages, edges, rail: { x1: PAD_X, x2: station.x - STATION_R, y: railY }, station, mergeX, phases, orch }
 }

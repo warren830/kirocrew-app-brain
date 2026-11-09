@@ -35,7 +35,7 @@ export function Conveyor({ board, fresh, focus, onActor }: { board: ReqBoard; fr
         </span>
       </header>
       {board.belt.length === 0 ? (
-        <p className="kt-dim kt-wall-empty">{board.source === 'trace' ? '运行分支上还没有提交' : '读不到运行分支的提交（brain-kit 没有 trace 模块）'}</p>
+        <p className="kt-dim kt-wall-empty">{board.source === 'trace' ? '运行分支上还没有提交' : '这里还读不到运行分支的提交：图上只画了 Lean 自己记下的事'}</p>
       ) : (
         <ol className={`kt-belt${older ? ' has-older' : ''}`} ref={belt} onScroll={(e) => setOlder(e.currentTarget.scrollLeft > 4)}>
           <li className="kt-belt-end is-base" title="运行分支从这里出发">从 <code>{board.base}</code></li>

@@ -80,6 +80,9 @@ export function replayAt(b: ReqBoard, t: number): ReqBoard {
   if (t >= span.end) return b
   // whom each actor's wait was on then (an older backend did not say: the owner looking, else someone)
   const waitOn = new Map<string, WaitWho>()
+  // a session is there from when it was opened (else from the actor's first step); what it cost is known at the end
+  const opened = (slot: string) => b.sessions.find((x) => x.slot === slot)?.opened_at ?? null
+  const first = (a: ReqBoard['actors'][number]) => Math.min(Infinity, ...a.history.map((x) => x.at), ...a.spans.map((x) => x.a))
   const actors = b.actors.map((a) => {
     const h = [...a.history].reverse().find((x) => x.at <= t)
     if (h?.status === 'awaiting_approval') waitOn.set(a.key, h.who ?? (b.person.me ? 'you' : 'people'))
@@ -88,6 +91,7 @@ export function replayAt(b: ReqBoard, t: number): ReqBoard {
     const now = h ? { status: h.status, doing: h.doing, since: h.at } : off ? { status: a.status, doing: a.doing, since: null } : waiting(a)
     return {
       ...a, ...now, line: null,
+      session: a.session && (opened(a.session.slot) ?? first(a)) <= t ? a.session : null,
       spans: a.spans.filter((s) => s.a <= t).map((s) => ({ ...s, b: s.b !== null && s.b <= t ? s.b : null })),
       marks: a.marks.filter((m) => m.at <= t),
       facts: [],
@@ -114,7 +118,9 @@ export function replayAt(b: ReqBoard, t: number): ReqBoard {
   return {
     ...b,
     row: {
-      ...b.row, state, state_label: STATE_LABEL[state],
+      ...b.row, state, state_label: STATE_LABEL[state], credits: null,
+      // the MR is opened at the hand-over
+      mr: b.events.some((e) => e.kind === 'handover' && e.at <= t) ? b.row.mr : null,
       lean: { ...b.row.lean, done_n: ln.done_n, skipped_n: ln.skipped_n, next: ln.next, done: through, stage: ln.next?.id ?? null, stage_label: ln.next?.label ?? null, stage_n: ln.next?.n ?? null,
         stage_state: ln.next ? (ln.started ? 'started' : 'todo') : through ? 'done' : null },
       waits: { ...b.row.waits, who, text: awaiting ? awaiting.doing : working ? 'AI 在做' : '', line: null, raw: '', do: 'none', since: awaiting?.since ?? null },
@@ -126,6 +132,8 @@ export function replayAt(b: ReqBoard, t: number): ReqBoard {
     actors,
     events: b.events.filter((e) => e.at <= t),
     belt: b.belt.filter((x) => x.at <= t),
+    sessions: b.sessions.filter((x) => x.opened_at !== null && x.opened_at <= t),
+    credits: { ...b.credits, total: null },
     decisions: [],
     brain: { ...b.brain, cited: [], stale: [], unknown: [] },
     checks: { ...b.checks, cells, passed, failed, total: cells.filter((c) => c.status === 'pass' || c.status === 'fail' || c.status === 'wait').length, todo: undefined,

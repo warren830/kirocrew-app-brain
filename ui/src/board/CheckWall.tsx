@@ -8,7 +8,7 @@
  */
 import { useState } from 'react'
 import type { CheckCell, CheckWall as Wall, ReqBoard } from '../types'
-import { CELL_GROUPS, CELL_META, checksSay, fmtAgo, whoWord } from './format'
+import { CELL_GROUPS, CELL_META, boardWho, checksSay, fmtAgo } from './format'
 import { useServerNow } from './hooks'
 import { RoleIcon } from './RoleIcon'
 
@@ -20,10 +20,10 @@ export function CheckWall({ board, focus, onActor, flips, onSettings }: {
   const current = w.cells.find((c) => c.id === inspect) ?? null
   const failing = w.cells.filter((c) => c.status === 'fail')
   const waiting = w.cells.filter((c) => c.status === 'wait')
-  const say = checksSay(w, board.row.waits.who, board.person.owner)
+  const say = checksSay(w, board)
   const green = say.green
   const icon = (c: CheckCell) => board.actors.find((a) => a.key === c.actor)?.icon
-  const meta = (c: CheckCell) => (c.status === 'wait' ? { ...CELL_META.wait, label: board.row.waits.who === 'you' ? '等你' : whoWord(board.row.waits.who, board.person.owner) } : CELL_META[c.status] ?? { label: c.status, glyph: '?' })
+  const meta = (c: CheckCell) => (c.status === 'wait' ? { ...CELL_META.wait, label: boardWho(board) } : CELL_META[c.status] ?? { label: c.status, glyph: '?' })
   const kit = w.cells.filter((c) => c.group === 'brain' && c.id.startsWith('kit') && c.status !== 'pass')
   return (
     <section className={`kt-card kt-wall${green ? ' is-green' : ''}`} data-testid="kt-wall" aria-label="检查墙">

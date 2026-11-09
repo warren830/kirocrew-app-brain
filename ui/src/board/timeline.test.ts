@@ -260,3 +260,23 @@ describe('replayAt', () => {
     }
   })
 })
+
+describe('replayAt: what was there then', () => {
+  it('a session is there once it was opened; what it cost is known at the end; the MR comes with the hand-over', () => {
+    const b = fx.board()
+    const opened = b.sessions[0].opened_at!
+    const before = replayAt(b, opened - 1)
+    expect(before.actors.find((a) => a.key === 'local')!.session).toBeNull()
+    expect(before.sessions).toEqual([])
+    expect(before.credits.total).toBeNull()
+    expect(before.row.credits).toBeNull()
+    const after = replayAt(b, opened + 60)
+    expect(after.actors.find((a) => a.key === 'local')!.session).toEqual(b.actors.find((a) => a.key === 'local')!.session)
+    expect(after.sessions).toHaveLength(1)
+    expect(after.credits.total).toBeNull()
+    const m = fx.boardMerged()
+    const hand = m.events.find((e) => e.kind === 'handover')!.at
+    expect(replayAt(m, hand - 1).row.mr).toBeNull()
+    expect(replayAt(m, hand + 1).row.mr).toEqual(m.row.mr)
+  })
+})

@@ -6,7 +6,7 @@
  */
 import { useState } from 'react'
 import { useNavigate } from '@kirocrew/app-sdk'
-import type { ReqBoard } from '../types'
+import type { ReqBoard, WaitDo } from '../types'
 import { ExtLink, Icon, TYPE_IT_YOURSELF } from '../ui'
 import { ACT, DO_NAME } from '../vocab'
 import { QuestionCard, ReviewButton, ReviewSay } from '../views/Question'
@@ -32,7 +32,7 @@ export function NextStep({ board, repo, reqKey, onAnswered, onBrain, onDetail }:
       <p className="br-next is-other" role="status" data-testid="br-next">
         <span className="br-next-who">此刻不用你做什么</span>
         <span>{n.text}</span>
-        {n.mr && <ExtLink href={n.mr} className="br-link">在 MR 上看 ↗</ExtLink>}
+        {n.mr && <ExtLink href={n.mr} className="br-link">{ACT.viewMr} ↗</ExtLink>}
       </p>
     )
   }
@@ -135,12 +135,15 @@ function StepRow({ s, onBrain, onDetail, repo, reqKey, board }: { s: Step; onBra
         {!s.session && !s.line && (s.do === 'reply' || s.do === 'tool') && onDetail && (
           <button type="button" className="kt-btn" onClick={onDetail} title="需求详情里能开一个新会话">去需求详情开会话</button>
         )}
-        {s.mr && <ExtLink href={s.mr} className={`kt-btn br-extbtn${s.do === 'accept' || s.do === 'answer' || s.do === 'label_handoff' ? ' is-primary' : ''}`}>{s.do === 'answer' ? `${ACT.answerOnMr} ↗` : s.do === 'redo_handoff' ? '在 MR 上看桥说的 ↗' : '去 MR ↗'}</ExtLink>}
+        {s.mr && <ExtLink href={s.mr} className={`kt-btn br-extbtn${MR_ACT[s.do] ? ' is-primary' : ''}`}>{MR_ACT[s.do] ?? ACT.viewMr} ↗</ExtLink>}
         {s.do === 'write_back' && onBrain && <button type="button" className="kt-btn is-primary" onClick={onBrain}>{DO_NAME.write_back} ↗</button>}
       </div>
     </div>
   )
 }
+
+/** The step taken on the MR, by its one name (REST-18); any other MR link only looks (看 MR). */
+const MR_ACT: Partial<Record<WaitDo, string>> = { answer: ACT.answerOnMr, accept: ACT.acceptOnMr, label_handoff: DO_NAME.label_handoff }
 
 /** A command the person types in a terminal, in the requirement's working directory. */
 function Command({ cmd }: { cmd: { text: string; cwd: string | null } }) {

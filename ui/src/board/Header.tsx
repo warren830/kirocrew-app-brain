@@ -8,9 +8,9 @@
 import type { ReqBoard } from '../types'
 import { StateChip } from '../ui'
 import { ACT, leanProgress } from '../vocab'
-import { WORKING, actorLabel, actorMeta, checksSay, fmtCredits, fmtWhen, leanOf, localOnly, waitsOnMe, whoWord } from './format'
+import { WORKING, actorLabel, actorMeta, boardWho, checksSay, fmtCredits, fmtWhen, leanOf, localOnly, waitsOnMe } from './format'
 import { useChangeCount, useTween } from './hooks'
-import { openHere } from './next'
+import { nextOf } from './next'
 import { RoleIcon } from './RoleIcon'
 
 export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail, onSession, onStart }: {
@@ -74,7 +74,7 @@ export function Kpis({ board, reducedMotion, onActor, replaying = false }: { boa
       <ChecksKpi board={board} reducedMotion={reducedMotion} />
       <LeanKpi board={board} />
       <PeopleKpi board={board} />
-      <StepsKpi board={board} onActor={onActor} />
+      <StepsKpi board={board} onActor={onActor} replaying={replaying} />
       <CreditsKpi board={board} reducedMotion={reducedMotion} replaying={replaying} />
     </div>
   )
@@ -86,7 +86,7 @@ function ChecksKpi({ board, reducedMotion }: { board: ReqBoard; reducedMotion: b
   const w = board.checks
   const shown = Math.round(useTween(w.passed, 900, reducedMotion))
   const pop = useChangeCount(w.passed)
-  const say = checksSay(w, board.row.waits.who, board.person.owner)
+  const say = checksSay(w, board)
   return (
     <div className={`kt-kpi kt-kpi-tests${say.green ? ' is-green' : ''}`}>
       <div className="kt-kpi-label">检查通过</div>
@@ -120,7 +120,7 @@ function LeanKpi({ board }: { board: ReqBoard }) {
       <div className="kt-segs" aria-hidden="true">
         {Array.from({ length: ln.total }, (_, i) => <i key={i} className={seg(i)} />)}
       </div>
-      <div className="kt-kpi-note br-lean-next">{ln.next ? <>下一步：<b>{ln.next.label}</b></> : through ? '全部做完' : '还没开始'}</div>
+      <div className="kt-kpi-note br-lean-next">{ln.next ? <>{ln.started ? '在做' : '下一步'}：<b>{ln.next.label}</b></> : through ? '全部做完' : '还没开始'}</div>
       <div className="kt-gates-rows">
         <span>批准 <b>{approved}</b></span>
         <span className={back ? 'is-hit' : ''}>退回 <b>{back}</b></span>
@@ -163,13 +163,14 @@ function PeopleKpi({ board }: { board: ReqBoard }) {
   )
 }
 
-function StepsKpi({ board, onActor }: { board: ReqBoard; onActor?: (k: string) => void }) {
+function StepsKpi({ board, onActor, replaying }: { board: ReqBoard; onActor?: (k: string) => void; replaying: boolean }) {
   const on = board.actors.filter((a) => a.status !== 'skipped')
   const done = on.filter((a) => a.status === 'merged' || a.status === 'done').length
   const working = on.filter((a) => WORKING.has(a.status)).length
   const mine = waitsOnMe(board)
-  const waiting = on.filter((a) => a.status === 'awaiting_approval').length + (mine ? board.questions.filter(openHere).length : 0)
-  const { who } = board.row.waits
+  // what waits on the person looking is what 你要做的一步 lists (a stalled hand-over to label too); on someone else, the
+  // actors that wait for them
+  const waiting = mine && !replaying ? nextOf(board).steps.length : on.filter((a) => a.status === 'awaiting_approval').length
   return (
     <div className="kt-kpi kt-kpi-roles">
       <div className="kt-kpi-label">这条路走到哪了</div>
@@ -180,7 +181,7 @@ function StepsKpi({ board, onActor }: { board: ReqBoard; onActor?: (k: string) =
       <div className="kt-role-dots">
         {on.map((a) => {
           const m = actorMeta(a.status)
-          const label = actorLabel(a.status, who, board.person.owner)
+          const label = actorLabel(a.status, board)
           const tone = a.status === 'awaiting_approval' && !mine ? 'info' : m.tone
           return (
             <button key={a.key} type="button" className={`kt-role-dot tone-${tone}${WORKING.has(a.status) ? ' is-working' : ''}`}
@@ -192,7 +193,7 @@ function StepsKpi({ board, onActor }: { board: ReqBoard; onActor?: (k: string) =
       </div>
       <div className="kt-kpi-note">
         {working ? <b className="tone-run">在做 {working}</b> : '没有在做的'}
-        {waiting ? <b className={mine ? 'tone-approve' : 'tone-info'}> · {waiting} 个{mine ? '等你' : whoWord(who, board.person.owner)}</b> : null}
+        {waiting ? <b className={mine ? 'tone-approve' : 'tone-info'}> · {waiting} 个{boardWho(board)}</b> : null}
       </div>
     </div>
   )
@@ -271,7 +272,7 @@ export function Intro({ board, onStart }: { board: ReqBoard; onStart?: () => voi
                     <div key={s.title} className="kt-intro-role">
                       <RoleIcon role={s.icon} size={26} className="kt-intro-emoji" />
                       <span className="kt-intro-name"><b>{s.title}</b></span>
-                      <span className="kt-intro-does">{s.does}</span>
+                      <span className="kt-intro-does">{s.does.split(/(?<=、)/).map((w) => <span key={w} className="br-phrase">{w}</span>)}</span>
                     </div>
                   ))}
                 </div>
