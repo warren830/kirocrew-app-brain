@@ -614,18 +614,22 @@ describe('需求详情', () => {
     const { go } = renderDetail()
     const card = await screen.findByRole('region', { name: '价值流' })
     expect(apiCalls.map((c) => c.path).filter((p) => !p.startsWith(`${API}/overview`))).toEqual([`${API}/requirements/r1/PAY-3`, `${API}/board/r1/PAY-3`])
-    // board.json: the local session works, waits at the REQUIREMENTS and DESIGN approvals, works, then waits in the session
-    // (the question) and at the pending PLAN; the gaps after each approval have nothing recorded
-    const parts = ['AI 在本机做 31 分钟', '需求审批 21 分钟', 'AI 在本机做 44 分钟', '设计审批 25 分钟', 'AI 在本机做 25 小时 39 分', '会话等人 14 分钟', '设计审批 6 分钟']
+    // board.json: the local session works and waits at the approvals (the 设计审批 node also asks for each code-generation
+    // plan: the part says which), waits overnight for the person's reply, works, then waits in the session (the question)
+    // and at the second plan; the gaps after each approval have nothing recorded
+    const parts = [
+      'AI 在本机做 31 分钟', '需求审批 21 分钟', 'AI 在本机做 44 分钟', '设计审批 25 分钟', 'AI 在本机做 48 分钟', '代码生成计划审批 17 分钟',
+      'AI 在本机做 58 分钟', '会话等人 18 小时 56 分', 'AI 在本机做 4 小时 40 分', '会话等人 14 分钟', '代码生成计划审批 6 分钟',
+    ]
     const chart = within(card).getByRole('group', { name: /^价值流：/ })
     expect(chart).toHaveAttribute('aria-label', '价值流：' + parts.join('，'))
     const segs = within(chart).getAllByRole('button').filter((b) => parts.includes(b.getAttribute('aria-label')!))
     expect(segs.map((b) => b.getAttribute('aria-label'))).toEqual(parts)
     expect(card).toHaveTextContent('从开工到此刻，共 28 小时')
-    expect(chart).toHaveTextContent('25 小时 39 分')
-    // the moments: the start, the approvals and the question, not the requests, stages or commits
-    expect(within(chart).getAllByTestId('vs-moment')).toHaveLength(4)
-    for (const t of ['开工', '你批准了需求', '你批准了设计', '停下问你：澄清']) expect(chart).toHaveTextContent(t)
+    expect(chart).toHaveTextContent('18 小时 56 分')
+    // the moments: the start, the approvals, the reply and the question, not the requests, stages or commits
+    expect(within(chart).getAllByTestId('vs-moment')).toHaveLength(6)
+    for (const t of ['开工', '你批准了需求', '你批准了设计', '你批准了代码生成计划', '你在会话里回话了', '停下问你：澄清']) expect(chart).toHaveTextContent(t)
     expect(chart).not.toHaveTextContent('请你批准')
     // the legend lists only the parts there are
     expect(within(card).queryByText('运行机在做')).toBeNull()
@@ -652,10 +656,12 @@ describe('需求详情', () => {
     const card = await screen.findByRole('region', { name: '价值流' })
     fireEvent.click(within(within(card).getByRole('group', { name: '图或表格' })).getByRole('button', { name: '表格' }))
     const rows = within(within(card).getByRole('table', { name: '价值流的每一段' })).getAllByRole('row').slice(1)
-    expect(rows).toHaveLength(7)
+    expect(rows).toHaveLength(11)
+    expect(rows[0]).toHaveTextContent('AI（本机会话）31 分钟')
     expect(rows[1]).toHaveTextContent('需求审批人21 分钟批准')
     expect(rows[3]).toHaveTextContent('设计审批人25 分钟批准')
-    expect(rows[0]).toHaveTextContent('AI（本机会话）31 分钟')
+    expect(rows[5]).toHaveTextContent('代码生成计划审批人17 分钟批准')
+    expect(rows[7]).toHaveTextContent('会话等人人18 小时 56 分回答了')
   })
 
   test('a merged requirement: nothing after the merge counts (the write-back wait is not the delivery’s); ▶ 回放 ↗', async () => {

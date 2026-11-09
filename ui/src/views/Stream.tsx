@@ -9,6 +9,7 @@ import { RoleGlyph } from '../board/RoleIcon'
 import { Hit, Tip, useWidth, type TipState } from '../cto/charts'
 import { fmtDay, fmtSpan, isoDay } from '../format'
 import type { Actor, BoardEvent, ReqBoard } from '../types'
+import { APPROVAL_NAME } from '../vocab'
 
 const RUNNERS = new Set(['runner', 'bridge', 'signer'])
 const GATES = new Set(['req', 'design', 'release', 'reflect'])
@@ -40,10 +41,20 @@ function partOf(a: Actor, kind: 'work' | 'wait' | 'fix'): Part {
   return kind === 'wait' ? 'person' : kind === 'fix' ? 'rework' : RUNNERS.has(a.key) ? 'runner' : 'agent'
 }
 
-function labelOf(a: Actor, part: Part): string {
+// the longest first: 请你批准需求和设计 is 需求和设计审批, not 设计审批
+const APPROVALS = Object.values(APPROVAL_NAME).sort((x, y) => y.length - x.length)
+
+/** A gate's wait is what it waited for: the request that opened it (请你批准代码生成计划 → 代码生成计划审批; 设计审批
+ * also asks for the code-generation plan), else the gate itself. */
+function gateName(b: ReqBoard, a: Actor, at: number): string {
+  const asked = b.events.filter((e) => e.kind === 'request' && e.to === a.key && e.at <= at + 1).at(-1)
+  return (asked && APPROVALS.find((n) => asked.text.endsWith(n.replace(/审批$/, '')))) || a.title
+}
+
+function labelOf(b: ReqBoard, a: Actor, part: Part, at: number): string {
   if (part === 'rework') return PART_LABEL.rework
   // a gate's wait is the gate (需求审批); the session or the runner waiting on a person says so (运行机等人)
-  if (part === 'person') return GATES.has(a.key) ? a.title : a.key === 'local' ? '会话等人' : `${a.title}等人`
+  if (part === 'person') return GATES.has(a.key) ? gateName(b, a, at) : a.key === 'local' ? '会话等人' : `${a.title}等人`
   return a.key === 'local' ? PART_LABEL.agent : a.title
 }
 
@@ -68,7 +79,7 @@ export function valueStream(b: ReqBoard, now: number): StreamSeg[] {
     const top = on.sort((x, y) => RANK[y.part] - RANK[x.part] || Number(x.actor.key === 'local') - Number(y.actor.key === 'local'))[0]
     const last = out[out.length - 1]
     if (last && last.part === top.part && last.actor === top.actor.key && Math.abs(last.to - t0) < 1) last.to = t1
-    else out.push({ from: t0, to: t1, part: top.part, actor: top.actor.key, label: labelOf(top.actor, top.part), icon: top.part === 'person' ? 'wait' : top.actor.icon, decision: null })
+    else out.push({ from: t0, to: t1, part: top.part, actor: top.actor.key, label: labelOf(b, top.actor, top.part, t0), icon: top.part === 'person' ? 'wait' : top.actor.icon, decision: null })
   }
   for (const s of out) {
     if (s.part !== 'person') continue
