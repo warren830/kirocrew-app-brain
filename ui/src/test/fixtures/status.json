@@ -14,7 +14,8 @@
       "evaluate": true,
       "golden": false,
       "intents": true,
-      "mrdesc": true
+      "mrdesc": true,
+      "split": true
     }
   },
   "repos": [

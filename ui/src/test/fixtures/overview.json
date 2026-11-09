@@ -41,7 +41,8 @@
       "expected_paths": [
         "src/refund/",
         "src/export/csv.py"
-      ]
+      ],
+      "family": null
     },
     {
       "repo": "r1",
@@ -91,7 +92,8 @@
       "expected_paths": [
         "src/refund/ledger.py",
         "src/statement/"
-      ]
+      ],
+      "family": null
     },
     {
       "repo": "r1",
@@ -138,7 +140,8 @@
       ],
       "expected_paths": [
         "src/callback/"
-      ]
+      ],
+      "family": null
     },
     {
       "repo": "r1",
@@ -181,7 +184,8 @@
       "open_questions": [],
       "expected_paths": [
         "web/refund/"
-      ]
+      ],
+      "family": null
     },
     {
       "repo": "r1",
@@ -218,7 +222,8 @@
       "sessions": 0,
       "overlap": [],
       "open_questions": [],
-      "expected_paths": []
+      "expected_paths": [],
+      "family": null
     },
     {
       "repo": "r1",
@@ -263,7 +268,8 @@
       "open_questions": [],
       "expected_paths": [
         "src/refund/id.py"
-      ]
+      ],
+      "family": null
     }
   ],
   "overlaps": [
@@ -407,7 +413,8 @@
     "notes": [
       "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
       "PAY-2：已知交付有问题，14 天还没满，先不算"
-    ]
+    ],
+    "families": []
   },
   "counts": {
     "claimed": 1,
@@ -418,7 +425,9 @@
     "parked": 1,
     "acceptance": 1,
     "merged": 1,
-    "closed": 0
+    "closed": 0,
+    "unclaimed": 0,
+    "merged_into_parent": 0
   },
   "errors": [
     {
@@ -466,7 +475,13 @@
         "at_points": 5,
         "outside": 0,
         "credits": 22.7,
-        "merged_at": 1793661540
+        "merged_at": 1793661540,
+        "state": null,
+        "state_label": "",
+        "stuck": null,
+        "delivery": null,
+        "delivery_label": "",
+        "parent": null
       },
       {
         "key": "PAY-4",
@@ -476,7 +491,13 @@
         "at_points": 2,
         "outside": 0,
         "credits": null,
-        "merged_at": null
+        "merged_at": null,
+        "state": null,
+        "state_label": "",
+        "stuck": null,
+        "delivery": null,
+        "delivery_label": "",
+        "parent": null
       },
       {
         "key": "PAY-5",
@@ -486,7 +507,45 @@
         "at_points": 2,
         "outside": 0,
         "credits": 31.0,
-        "merged_at": null
+        "merged_at": null,
+        "state": null,
+        "state_label": "",
+        "stuck": null,
+        "delivery": null,
+        "delivery_label": "",
+        "parent": null
+      },
+      {
+        "key": "PAY-9",
+        "repo": "r1",
+        "how": "local",
+        "beyond": [],
+        "at_points": 1,
+        "outside": 0,
+        "credits": 6.2,
+        "merged_at": null,
+        "state": "merged_into_parent",
+        "state_label": "已合进大需求",
+        "stuck": false,
+        "delivery": "open",
+        "delivery_label": "还没合并",
+        "parent": "PAY-8"
+      },
+      {
+        "key": "PAY-10",
+        "repo": "r1",
+        "how": "pending",
+        "beyond": [],
+        "at_points": 0,
+        "outside": 0,
+        "credits": 3.2,
+        "merged_at": null,
+        "state": "open",
+        "state_label": "进行中",
+        "stuck": false,
+        "delivery": "open",
+        "delivery_label": "还没合并",
+        "parent": "PAY-8"
       }
     ],
     "weekly": [

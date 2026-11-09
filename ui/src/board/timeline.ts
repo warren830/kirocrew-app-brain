@@ -118,7 +118,7 @@ export function replayAt(b: ReqBoard, t: number): ReqBoard {
 
 const STATE_LABEL: Record<ReqState, string> = {
   claimed: '已认领', local: '本地开发中', handed_over: '已交接', rejected: '接手被拒', running: '运行机在跑', parked: '停下等回答',
-  acceptance: '等验收', merged: '已合并', closed: '已关闭',
+  acceptance: '等验收', merged: '已合并', closed: '已关闭', unclaimed: '待认领', merged_into_parent: '已合进大需求',
 }
 
 /** The requirement's state at *t* in a replay (the header's chip): from what had happened by then. */

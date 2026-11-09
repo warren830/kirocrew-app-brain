@@ -39,7 +39,8 @@
     "expected_paths": [
       "src/refund/",
       "src/export/csv.py"
-    ]
+    ],
+    "family": null
   },
   "where_label": "本机的工作目录",
   "run": {

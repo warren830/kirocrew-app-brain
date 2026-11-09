@@ -40,7 +40,8 @@
     "expected_paths": [
       "src/refund/",
       "src/export/csv.py"
-    ]
+    ],
+    "family": null
   },
   "branch": "ai/alice/PAY-3-refund-export",
   "base": "main",
@@ -1001,5 +1002,6 @@
   "missing": [
     "CI pipelines (GitLab, not readable here)"
   ],
-  "error": ""
+  "error": "",
+  "rollup": null
 }

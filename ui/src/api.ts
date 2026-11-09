@@ -20,6 +20,14 @@ export const paths = {
   board: (repo: string, key: string) => `${BASE}/board/${enc(repo)}/${enc(key)}`,
   session: (repo: string, key: string) => `${BASE}/requirements/${enc(repo)}/${enc(key)}/session`,
   answer: (repo: string, key: string) => `${BASE}/requirements/${enc(repo)}/${enc(key)}/answer`,
+  /** 拆成小需求: `brain split` in the big requirement's worktree ({apply: false} the preview, nothing written) */
+  split: (repo: string, key: string) => `${BASE}/requirements/${enc(repo)}/${enc(key)}/split`,
+  /** 认领 / 放弃认领 a small requirement: `brain claim [--release]` */
+  claim: (repo: string, key: string) => `${BASE}/requirements/${enc(repo)}/${enc(key)}/claim`,
+  /** 开工 on a small requirement: `brain start --key [--on DEP]` in its own worktree, then its session */
+  childStart: (repo: string, key: string) => `${BASE}/requirements/${enc(repo)}/${enc(key)}/start`,
+  /** 同步: `brain sync` in a small requirement's worktree (the big one's branch merged in) */
+  sync: (repo: string, key: string) => `${BASE}/requirements/${enc(repo)}/${enc(key)}/sync`,
   intakeNext: (repo: string) => `${BASE}/intake/next?repo=${enc(repo)}`,
   intakeCheck: () => `${BASE}/intake/check`,
   intakeStart: () => `${BASE}/intake/start`,

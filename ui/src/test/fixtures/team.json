@@ -28,7 +28,8 @@
     "handoffs": {
       "accepted": 4,
       "rejected": 1
-    }
+    },
+    "outbox": {}
   },
   "runs": [
     {
@@ -39,7 +40,8 @@
       "state": "signing",
       "slot": null,
       "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/48",
-      "updated": "2026-11-08T21:59:00+08:00"
+      "updated": "2026-11-08T21:59:00+08:00",
+      "notes": []
     },
     {
       "run_id": "RUN-PAY-4-1",
@@ -49,7 +51,8 @@
       "state": "dispatched",
       "slot": "brain-run-PAY-4-1",
       "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
-      "updated": "2026-11-08T19:00:00+08:00"
+      "updated": "2026-11-08T19:00:00+08:00",
+      "notes": []
     },
     {
       "run_id": "RUN-PAY-5-1",
@@ -59,7 +62,8 @@
       "state": "dispatched",
       "slot": null,
       "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
-      "updated": "2026-11-07T20:00:00+08:00"
+      "updated": "2026-11-07T20:00:00+08:00",
+      "notes": []
     },
     {
       "run_id": "RUN-PAY-2-1",
@@ -69,7 +73,8 @@
       "state": "merged",
       "slot": null,
       "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/37",
-      "updated": "2026-11-06T10:00:00+08:00"
+      "updated": "2026-11-06T10:00:00+08:00",
+      "notes": []
     }
   ],
   "handovers": [
@@ -133,5 +138,7 @@
         "since": "2026-11-08T21:40:00+08:00"
       }
     ]
-  }
+  },
+  "config": [],
+  "hooks": []
 }
