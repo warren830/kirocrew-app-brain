@@ -826,7 +826,7 @@ def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str,
             cell("verify-%s-%d" % (name, n), "verify", name, "自动检查：%s" % name, "pass" if ok else "fail", r["at"],
                  "通过" if ok else "没过：在会话里看 verify 的输出", "ci")
     else:
-        cell("verify", "verify", "verify", "自动检查", "skip", None, "还没跑过 verify（构建和测试阶段跑）", "ci", later="verify")
+        cell("verify", "verify", "verify", "自动检查", "skip", None, "还没跑过 verify（构建和测试阶段跑）", "ci", later="自动检查")
     # the hand-over: the bridge and the signer (not on the way of a repo done only here, or of one done here and merged)
     if not local_only and not (hand_at is None and merged_at is not None):
         cell("bridge", "handover", "桥", "桥核对交接", "pass" if A["handover"]["status"] == "merged" else
