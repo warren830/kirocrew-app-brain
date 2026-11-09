@@ -8,6 +8,7 @@ on the event loop (a snapshot of it goes into the thread).
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -16,8 +17,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from . import (bk, brainview, crewcheck, deliveries, detail, identity, importer, inplace, installer, intake, landing,
-               lean_view, mrdesc_view, mrinfo)
+from . import (bk, brainview, crewcheck, deliveries, detail, family, identity, importer, inplace, installer, intake,
+               landing, lean_view, mrdesc_view, mrinfo)
 from . import problems
 from . import board as board_mod
 from . import settings as settings_mod
@@ -98,6 +99,9 @@ class Service:
         self.desc = mrdesc_view.DescCache()     # each requirement's 变更说明, by the commits it is made from
         self._subj: dict[tuple, dict[str, str]] = {}   # the board's commit subjects, by the commits asked for
         self._me: str | None = None
+        self.families = family.Families()      # brain-kit's listing per repo (大需求 and their 小需求), made in the background
+        self._big_file = self.data_dir / "big.json"
+        self._big = self._load_big()           # scopes opened here as 「大需求：先拆成小需求」
 
     # ---- lifecycle ------------------------------------------------------------------------------------ #
 
@@ -276,6 +280,35 @@ class Service:
 
     # ---- small helpers -------------------------------------------------------------------------------- #
 
+    def _load_big(self) -> set[str]:
+        try:
+            got = json.loads(self._big_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return set()
+        return {s for s in got if isinstance(s, str) and re.match(r"^r[1-9][0-9]{0,2}-[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}$", s)} \
+            if isinstance(got, list) else set()
+
+    def _mark_big(self, scope: str) -> None:
+        """Blocking: a requirement opened as 「大需求：先拆成小需求」 (its family is 'big' until it is split)."""
+        self._big.add(scope)
+        tmp = self._big_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps(sorted(self._big)), encoding="utf-8")
+        os.replace(tmp, self._big_file)
+
+    def _families_of(self, repo: Repo, facts: list[dict[str, Any]] | None = None) -> dict[str, dict[str, Any]]:
+        """{key: ReqFamily} of the repo's family members (family.families): brain-kit's listing when it has answered
+        (asked for again in the background, at most every FAMILY_TTL_S), else this machine's claims. Only for a repo
+        with split requirements, or one opened here as a big one. Blocking (a few stat calls)."""
+        facts = repo.scan() if facts is None else facts
+        big = {f["key"] for f in facts if scope_of(repo.id, f["key"]) in self._big or family.units_here(f)}
+        here = family.has_family(facts)
+        if not here and not big:
+            return {}
+        if here and bk.has("split"):
+            self.families.want(repo.id, repo.path)
+        docs, at, _err = self.families.get(repo.id)
+        return family.families(facts, docs, me=self.me_in(repo), cfg=repo.cfg, can_split=bk.has("split"), big=big, at=at)
+
     def _repo(self, rid: str) -> Repo:
         if not REPO_ID_RE.match(rid or "") or rid not in self.repos:
             raise AppError("没有这个仓库", "no_repo", 404)
@@ -333,7 +366,8 @@ class Service:
 
     # ---- 交付总览 ------------------------------------------------------------------------------------- #
 
-    def _row(self, repo: Repo, f: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
+    def _row(self, repo: Repo, f: dict[str, Any], snap: dict[str, Any],
+             fams: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
         row = deliveries.base_row(repo.id, f)
         scope = scope_of(repo.id, f["key"])
         sess = snap["by"].get(scope, [])
@@ -349,6 +383,9 @@ class Service:
             bot = repo.bot_commits_since((run.get("handoff") or {}).get("local_head"), f.get("origin_sha"))
         deliveries.classify(row, f, mr=mr, slot=live, cfg=repo.cfg, bot_commits=bot,
                             at_handover=bool(mr) and repo.is_handover_tip(f))
+        fams = self._families_of(repo) if fams is None else fams
+        row["family"] = fams.get(f["key"])
+        family.classify(row, row["family"], f, self.me_in(repo) if row["family"] else None)
         row["credits"] = snap["credits"].get(scope)
         row["sessions"] = len(sess)
         row["updated_at"] = deliveries.updated_at(f, live)
@@ -451,8 +488,9 @@ class Service:
             except Exception as exc:  # noqa: BLE001
                 errors.append({"repo": rid, "error": str(exc)[:300]})
                 continue
+            fams = self._families_of(repo, facts)
             for f in facts:
-                row = self._row(repo, f, snap)
+                row = self._row(repo, f, snap, fams)
                 rows.append(row)
                 intent = (f.get("run") or {}).get("intent")
                 all_decisions += [dict(d, key=f["key"]) for d in detail.decisions(
@@ -554,7 +592,10 @@ class Service:
         return scrub_tree(await asyncio.to_thread(self._overview_sync, which, snap), self.scrub)
 
     async def refresh(self, rid: str) -> dict[str, Any]:
-        ok, text = await asyncio.to_thread(self._repo(rid).fetch)
+        repo = self._repo(rid)
+        ok, text = await asyncio.to_thread(repo.fetch)
+        if ok and bk.has("split"):
+            self.families.want(rid, repo.path, now=True)    # the 大需求 too: who claimed which small one
         return {"ok": ok, "text": text}
 
     # ---- 需求详情 ------------------------------------------------------------------------------------- #
@@ -771,7 +812,7 @@ class Service:
                 "events": g["events"], "belt": g["belt"], "checks": g["checks"], "accept": g["accept"],
                 "brain": d["brain"], "decisions": d["decisions"], "questions": d["questions"], "mr_desc": d["mr_desc"],
                 "sessions": d["sessions"], "credits": d["credits"], "source": d["timeline"]["source"],
-                "missing": d["timeline"]["missing"], "error": d["timeline"]["error"]}
+                "missing": d["timeline"]["missing"], "error": d["timeline"]["error"], "rollup": board_mod.rollup(t)}
 
     async def board(self, rid: str, key: str) -> dict[str, Any]:
         """需求看板: polled every 2 s; the trace, the facts and the 变更说明 come from their caches."""
@@ -791,7 +832,7 @@ class Service:
         return await self._open_local(repo, key, f["branch"], f["worktree"], run, trust=trust, kickoff=kickoff)
 
     async def _open_local(self, repo: Repo, key: str, branch: str, wt: str, run: dict[str, Any], *, trust: bool,
-                          kickoff: bool) -> dict[str, Any]:
+                          kickoff: bool, task: str | None = None) -> dict[str, Any]:
         self.crew = await asyncio.to_thread(self.crew_sync)
         if not crewcheck.agent_ok(self.crew["rows"]):
             raise AppError("brain-dev 还没带上 Lean 的 hook：先在设置里修好（KiroCrew 检查）", "agent_not_ready", 409)
@@ -800,9 +841,12 @@ class Service:
                 (self.sessions.slot_stats(i.slot) or {}).get("missing")]
         if live:
             return {"ok": True, "slot": live[-1].slot, "url": "/chat?sid=%s" % live[-1].slot}
-        task = intake.kickoff(key, branch, run.get("intent"),
-                              [str(m.get("package")) for m in run.get("materials") or [] if isinstance(m, dict)]) \
-            if kickoff else ""
+        if task is None:
+            task = intake.kickoff(key, branch, run.get("intent"),
+                                  [str(m.get("package")) for m in run.get("materials") or [] if isinstance(m, dict)]) \
+                if kickoff else ""
+            if kickoff and scope_of(repo.id, key) in self._big:
+                task += "\n" + family.BIG_KICKOFF
         slug = branch.rsplit("/", 1)[-1][len(key) + 1:] or key.lower()
         info = await self.sessions.open_session(
             task, parent_session_key="%s:%s" % (self.name, scope), cwd=wt, title="%s · 本地开发" % key,
@@ -889,6 +933,9 @@ class Service:
         scope = scope_of(repo.id, out["key"])
         await asyncio.to_thread(self.store.append, scope, "app", "在 app 里开工",
                                 "工作区 %s，分支 %s" % (out["worktree"], out["branch"]))
+        if body.get("big") is True:      # 「大需求：先拆成小需求」: Lean's design splits it into units, then 拆成小需求
+            await asyncio.to_thread(self._mark_big, scope)
+            await asyncio.to_thread(self.store.append, scope, "app", "大需求：先拆成小需求", None)
         if body.get("open_session", True):
             f = await asyncio.to_thread(self._facts, repo, out["key"])
             try:
@@ -898,6 +945,127 @@ class Service:
             except AppError as exc:
                 out["session_error"] = str(exc)
         return out
+
+    # ---- 大需求拆成小需求 -------------------------------------------------------------------------------- #
+
+    def _member(self, rid: str, key: str) -> tuple[Repo, dict[str, Any], dict[str, Any] | None, str | None]:
+        """The repo, the requirement's facts, its family (family.families) and who the person is there. Blocking."""
+        if rid == "runner":
+            raise AppError("运行机上的需求不在这里拆、认领或开工", "no_repo", 404)
+        repo = self._repo(rid)
+        f = self._facts(repo, key)
+        return repo, f, self._families_of(repo).get(key), self.me_in(repo)
+
+    def _after_family(self, repo: Repo) -> None:
+        """After an act: this machine's refs read again, and brain-kit's listing made now (the answer and the next
+        poll have it). Blocking."""
+        repo.invalidate()
+        self.families.make_now(repo.id, repo.path)
+
+    async def family_split(self, rid: str, key: str, apply: bool) -> dict[str, Any]:
+        """拆成小需求: the preview (apply false: `brain split --dry-run --json`, nothing written), then the split, in the
+        big requirement's worktree on this machine; only its owner."""
+        if not bk.has("split"):
+            raise AppError("brain-kit 太旧：没有 brain split（要 0d52e97 或更新）", "no_split", 409)
+        repo, f, fam, me = await asyncio.to_thread(self._member, rid, key)
+        if (f.get("claim") or {}).get("parent") or (f.get("run") or {}).get("parent"):
+            raise AppError("%s 自己就是拆出来的小需求：拆大需求" % key, "is_child", 409)
+        act = family.split_act(f, me, repo.cfg.get("tracker") == "none", True)
+        if act is None:
+            raise AppError("只有需求的负责人本人能拆它（它在这台机器上开工）", "not_owner", 403)
+        if not act["ok"] and not act["why"].startswith("批了 DESIGN"):
+            raise AppError(act["why"], "not_ready", 409)       # without the DESIGN approval brain-kit says why itself
+        out = await asyncio.to_thread(family.split, f["worktree"], key, apply)
+        if apply and out["ok"]:
+            await asyncio.to_thread(self._after_family, repo)
+            filed = [a["key"] for a in out["actions"] if a["key"] and a["kind"] in ("new", "update", "same")]
+            await asyncio.to_thread(self.store.append, scope_of(rid, key), "app", "拆成小需求：%s" % "、".join(filed[:20]),
+                                    out.get("branch"))
+        return scrub_tree(out, self.scrub)
+
+    async def family_claim(self, rid: str, key: str, release: bool) -> dict[str, Any]:
+        """认领 / 放弃认领 a small requirement `brain split` filed (never any other key: brain-kit would file a new claim
+        for it)."""
+        if not bk.has("split"):
+            raise AppError("brain-kit 太旧：没有 brain split（要 0d52e97 或更新）", "no_split", 409)
+        repo, f, fam, me = await asyncio.to_thread(self._member, rid, key)
+        if not fam or fam["role"] != "child":
+            raise AppError("只有拆出来的小需求能在这里认领", "not_child", 409)
+        if not me:
+            raise AppError("先在设置里填上你在这个仓库里的名字", "no_me", 409)
+        if release:
+            if fam["owner"] != me:
+                raise AppError("%s 不是你认领的" % key if fam["owner"] else "%s 没人认领" % key, "not_owner", 409)
+            if fam["state"] != "claimed":
+                raise AppError("%s 已经开工了：不能放回" % key, "started", 409)
+        elif fam["owner"] and fam["owner"] != me:
+            return {"ok": False, "text": "晚了一步：%s 已经被 %s 认领了" % (key, fam["owner"]), "owner": fam["owner"],
+                    "problem": problems.mk("FAIL", "晚了一步：%s 已经被 %s 认领了" % (key, fam["owner"]), "换一个待认领的小需求"),
+                    "output": ""}
+        out = await asyncio.to_thread(family.claim, repo.path, key, release, me)
+        await asyncio.to_thread(self._after_family, repo)
+        if out["ok"]:
+            await asyncio.to_thread(self.store.append, scope_of(rid, key), "app", "放弃认领" if release else "认领了", None)
+        return scrub_tree(out, self.scrub)
+
+    async def family_start(self, rid: str, key: str, on: Any, open_session: bool, trust: bool) -> dict[str, Any]:
+        """开工 on a small requirement (it claims it on the way): `brain start --key` into a worktree under work_root,
+        optionally on its one unmerged dependency's branch (--on); then its brain-dev session there."""
+        if not bk.has("split"):
+            raise AppError("brain-kit 太旧：没有 brain split（要 0d52e97 或更新）", "no_split", 409)
+        if on is not None and (not isinstance(on, str) or not KEY_RE.match(on)):
+            raise AppError("on 要写它依赖的那个小需求的号", "invalid_on")
+        repo, f, fam, me = await asyncio.to_thread(self._member, rid, key)
+        if not fam or fam["role"] != "child":
+            raise AppError("只有拆出来的小需求能在这里这样开工", "not_child", 409)
+        if not me:
+            raise AppError("先在设置里填上你在这个仓库里的名字", "no_me", 409)
+        if fam["owner"] and fam["owner"] != me:
+            raise AppError("%s 是 %s 认领的" % (key, fam["owner"]), "not_owner", 409)
+        if fam["state"] not in ("unclaimed", "claimed"):
+            raise AppError("%s 已经开工了" % key if fam["state"] == "in_progress" else "%s %s" % (key, fam["state_label"]),
+                           "started", 409)
+        if on and on not in [d["key"] for d in fam["depends_on"]]:
+            raise AppError("%s 不依赖 %s" % (key, on), "invalid_on")
+        try:
+            wt = family.worktree_for(self.settings["work_root"], repo.name, key, fam.get("unit"))
+        except ValueError as exc:
+            raise AppError(str(exc), "no_worktree", 409)
+        await asyncio.to_thread(os.makedirs, os.path.dirname(wt), exist_ok=True)
+        out = await asyncio.to_thread(family.start, repo.path, key, wt, on)
+        await asyncio.to_thread(self._after_family, repo)
+        if not out["ok"]:
+            return scrub_tree(out, self.scrub)
+        scope = scope_of(rid, key)
+        await asyncio.to_thread(self.store.append, scope, "app", "开工（小需求，单元 %s）" % (fam.get("unit") or "?"),
+                                "工作区 %s，分支 %s%s" % (out["worktree"], out["branch"], "，从 %s 的分支" % on if on else ""))
+        if open_session and out.get("worktree") and out.get("branch"):
+            f2 = await asyncio.to_thread(self._facts, repo, key)
+            run = f2.get("run") or {}
+            task = family.kickoff(key, out["branch"], run.get("intent"), fam["parent"], fam.get("unit") or "")
+            try:
+                got = await self._open_local(repo, key, out["branch"], f2.get("worktree") or out["worktree"], run,
+                                             trust=trust, kickoff=True, task=task)
+                out.update(slot=got["slot"], url=got["url"])
+            except AppError as exc:
+                out["session_error"] = str(exc)
+        return scrub_tree(out, self.scrub)
+
+    async def family_sync(self, rid: str, key: str) -> dict[str, Any]:
+        """同步: `brain sync` in a small requirement's worktree (its big one's branch merged in)."""
+        if not bk.has("split"):
+            raise AppError("brain-kit 太旧：没有 brain split（要 0d52e97 或更新）", "no_split", 409)
+        repo, f, fam, me = await asyncio.to_thread(self._member, rid, key)
+        if not fam or fam["role"] != "child":
+            raise AppError("只有拆出来的小需求能同步大需求的分支", "not_child", 409)
+        if not me or fam["owner"] != me:
+            raise AppError("只有认领它的人能同步它", "not_owner", 403)
+        if not f.get("worktree"):
+            raise AppError("这台机器上没有它的工作区", "no_worktree", 409)
+        out = await asyncio.to_thread(family.sync, f["worktree"])
+        await asyncio.to_thread(self._after_family, repo)
+        await asyncio.to_thread(self.store.append, scope_of(rid, key), "app", "同步大需求的分支：%s" % out["text"][:80], None)
+        return scrub_tree(out, self.scrub)
 
     # ---- KiroCrew checks ------------------------------------------------------------------------------ #
 
@@ -958,9 +1126,10 @@ class Service:
                 continue
             base, project = self._gitlab_of(repo)
             me = self.me_in(repo)
+            fams = self._families_of(repo, facts)
             for f in facts:
-                row = self._row(repo, f, snap)
-                if row["state"] in ("merged", "closed"):
+                row = self._row(repo, f, snap, fams)
+                if row["state"] in ("merged", "closed", "merged_into_parent", "unclaimed"):
                     continue
                 live = self._live(snap["by"].get(scope_of(rid, f["key"]), []))
                 own = bool(me) and me == f.get("owner")

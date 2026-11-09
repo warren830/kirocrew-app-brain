@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from appkit import mod
+from appkit import BRAINKIT, mod
 from brainfix import FakeGateway, install_brain_dev, make_project, make_service, needs_brainkit, run
 
 pytestmark = needs_brainkit
@@ -45,7 +45,10 @@ def test_the_dry_run_lists_every_finding_verbatim_and_what_would_stop_the_start(
 
     (tmp_path / "b").mkdir(), (tmp_path / "c").mkdir(), (tmp_path / "d").mkdir()
     nxt, first, fixed, unsure, no_consent = run(go())
+    big = nxt.pop("big")     # 「大需求：先拆成小需求」: only with a brain-kit that has brain split (0d52e97)
     assert nxt == {"repo": "r1", "key": "PAY-1", "tracker": "none", "prefix": "PAY", "error": ""}
+    assert big == ({"ok": True, "why": ""} if (BRAINKIT / "brainkit" / "split.py").is_file() else
+                   {"ok": False, "why": "brain-kit 太旧：没有 brain split（要 0d52e97 或更新）"})
     assert first["ok"] is False and any(b.startswith("门 3：") for b in first["blocking"])
     assert first["findings"] and first["findings"][0].startswith("- **D01 ")
     assert fixed["ok"] is True and not fixed["blocking"] and "个人信息（已打码）" in fixed["findings"][0]

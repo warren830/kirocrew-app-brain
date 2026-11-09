@@ -769,6 +769,30 @@ def _accept(f: dict[str, Any], row: dict[str, Any], A: dict[str, dict[str, Any]]
     return {"state": state, "step": step, "by": by, "checks": checks_line, "done": done}
 
 
+NUMBERS = ("stages_done", "verify_rounds", "verify_failed", "commits_bot", "commits_person", "blocked",
+           "human_at_judgment", "human_outside_judgment", "decisions", "questions", "credits")
+
+
+def _numbers(x: Any) -> dict[str, Any] | None:
+    if not isinstance(x, dict):
+        return None
+    return {k: (x[k] if isinstance(x.get(k), (int, float)) and not isinstance(x.get(k), bool) else None) for k in NUMBERS}
+
+
+def rollup(t: dict[str, Any] | None) -> dict[str, Any] | None:
+    """A big requirement's family numbers from its trace (brain-kit 0d52e97 trace `family.rollup`: its own, and with
+    every small one added; each small one's): FamilyRollup, or None for any other requirement (or an older brain-kit)."""
+    fam = (t or {}).get("family")
+    if not isinstance(fam, dict) or fam.get("role") != "parent":
+        return None
+    r = fam.get("rollup") if isinstance(fam.get("rollup"), dict) else {}
+    return {"own": _numbers(r.get("own")), "total": _numbers(r.get("total")),
+            "unknown": [str(u)[:80] for u in r.get("unknown") or []][:20],
+            "children": [{"key": str(c["key"]), "unit": str(c.get("unit") or "") or None,
+                          "merged": bool((c.get("merged_into_parent") or {}).get("value")), "numbers": _numbers(c.get("numbers"))}
+                         for c in fam.get("children") or [] if isinstance(c, dict) and c.get("key")][:50]}
+
+
 def run_of(f: dict[str, Any]) -> dict[str, Any]:
     return f.get("run") if isinstance(f.get("run"), dict) else {}
 

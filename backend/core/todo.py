@@ -7,7 +7,10 @@
   question is void or could not be asked) is listed for a person to look at;
 - the person's own runs: a clarify question may be answered here (into the local session, or as their own MR
   comment); acceptance waits for the product on the MR; a refused hand-over says why; a hand-over that was pushed
-  but carries no label on its MR (nothing was handed over: `brain handoff` exits 1 then) says so.
+  but carries no label on its MR (nothing was handed over: `brain handoff` exits 1 then) says so;
+- 大需求拆成小需求 (brain-kit 0d52e97): a small requirement the person claimed whose dependencies have all merged
+  into the big one's branch (开工 now), and a big requirement of theirs whose small ones have all merged (review and
+  release it).
 """
 
 from __future__ import annotations
@@ -45,6 +48,16 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
                 items.append({**base, "kind": "handoff_rejected", "text": row["waits"]["text"]})
             continue
         f = e.get("facts") or {}
+        fam = row.get("family") or {}
+        acts = fam.get("acts") or {}
+        if fam.get("role") == "child" and row["state"] == "claimed" and e.get("own") and (acts.get("start") or {}).get("ok"):
+            items.append({**base, "kind": "child_start",
+                          "text": "%s 的小需求（%s）你认领了，依赖都合进来了：可以开工" % (fam.get("parent"), fam.get("unit") or "?")})
+        if fam.get("role") == "parent" and fam.get("family_state") == "ready_to_release" and e.get("own"):
+            pr = fam.get("progress") or {}
+            items.append({**base, "kind": "parent_release",
+                          "text": "小需求都合进来了（%s/%s）：在大需求的分支上评审、lean release，再批 RELEASE；或者 brain handoff 交给运行机"
+                                  % (pr.get("merged", 0), pr.get("total", 0))})
         if row["state"] == "local":
             for a in f.get("approvals") or []:
                 if a["state"] == "pending" and a.get("line"):

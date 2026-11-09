@@ -38,7 +38,9 @@ class IntakeError(Exception):
 
 def next_key(repo: Repo) -> dict[str, Any]:
     cfg = repo.cfg
-    out = {"repo": repo.id, "key": None, "tracker": cfg["tracker"], "prefix": cfg["req_prefix"], "error": ""}
+    big = {"ok": False, "why": "这个仓库接 Jira：大需求只能在 tracker none 的仓库里拆"} if cfg["tracker"] != "none" else \
+        {"ok": True, "why": ""} if bk.has("split") else {"ok": False, "why": "brain-kit 太旧：没有 brain split（要 0d52e97 或更新）"}
+    out = {"repo": repo.id, "key": None, "tracker": cfg["tracker"], "prefix": cfg["req_prefix"], "error": "", "big": big}
     if cfg["tracker"] != "none":
         return out
     rx = re.compile(r"^refs/(?:heads|remotes/origin)/claim/%s-([1-9][0-9]*)$" % re.escape(cfg["req_prefix"]))

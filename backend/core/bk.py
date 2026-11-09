@@ -6,7 +6,8 @@ imports its siblings relatively, so the package works under any name.
 
 Required modules (the app does nothing without them): common, config, claims, runrec, lean, entries, brainlint, usage,
 reflect, sign, cli, intake.package, bridge.handoff, bridge.decisions, bridge.runnerd, rest.
-Optional ones, added while this app was written, are guarded: trace, evaluate, golden, intents, mrdesc. A missing or
+Optional ones, added while this app was written, are guarded: trace, evaluate, golden, intents, mrdesc, split
+(0d52e97: brain split, claim, start --key, sync; without it the 大需求 features are off). A missing or
 broken optional module turns its feature off (``has()``), with the import error kept for the page.
 The public interfaces of brain-kit 72b278e are required too (NEEDS: the spool signer, the answer verifier bound to
 the recorded question note, the question's first line, the hand-over commit rule, run reservations (``signing``) and
@@ -32,7 +33,7 @@ from typing import Any
 PKG = "_brainapp_brainkit"
 REQUIRED = ("common", "config", "claims", "runrec", "lean", "entries", "brainlint", "usage", "reflect", "sign", "cli",
             "rest", "intake.package", "bridge.handoff", "bridge.decisions", "bridge.runnerd", "bridge.ledger")
-OPTIONAL = ("trace", "evaluate", "golden", "intents", "mrdesc")
+OPTIONAL = ("trace", "evaluate", "golden", "intents", "mrdesc", "split")   # split: brain-kit 0d52e97
 CANDIDATES = ("~/brain-kit", "~/warren_ws/brain-kit", "~/workplace/brain-kit", "/opt/brain-kit")
 NEEDS = (("sign", "SpoolSigner"), ("sign", "SignerRefused"), ("sign", "signer_from_config"),
          ("bridge.decisions", "check_answer"), ("bridge.decisions", "Q_HEAD_RE"),
