@@ -112,7 +112,8 @@ def test_the_import_routes_answer_with_the_fixtures_keys(tmp_path, home, monkeyp
                    "import-inspect.json": await svc.import_inspect({"path": str(repo)})}
             job = (await svc.import_clone({"url": str(bare), "parent": str(home / "workplace"), "name": "copy"}))["job"]
             out["import-clone-job.json"] = await svc.wait_job(job["id"])
-            job = (await svc.import_install({"path": str(repo), "kit": dict(KIT, gitlab_project="grp/pay")}))["job"]
+            job = (await svc.import_install({"path": str(repo), "kit": dict(KIT, gitlab_project="grp/pay"),
+                                             "mode": "branch"}))["job"]
             out["import-job.json"] = await svc.wait_job(job["id"])
             out["import-inspect-pending.json"] = await svc.import_inspect({"path": str(repo)})
             p = out["import-inspect-pending.json"]["pending"]

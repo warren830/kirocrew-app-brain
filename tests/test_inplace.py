@@ -80,7 +80,7 @@ def test_in_place_on_a_clean_checkout_commits_on_its_branch_and_is_usable_at_onc
     c = got["install"]
     assert c["recommend"] == "inplace" and [o["mode"] for o in c["options"]] == ["inplace"]   # nothing to choose
     assert c["options"][0] == {"mode": "inplace", "title": "直接装在 main", "ok": True, "why": "",
-                               "line": "装在你现在的检出里，提交在 main 上，马上能用"}
+                               "line": "装在你现在的检出里，提交在 main 上，马上能开需求"}
     assert done["state"] == "done", done
     assert [s["id"] for s in done["steps"]] == [s for s, _ in inplace.INSTALL_STEPS]
     assert all(s["state"] in ("ok", "warn") for s in done["steps"]), done["steps"]
@@ -115,7 +115,7 @@ def test_in_place_with_unrelated_changes_commits_only_what_brain_install_wrote(t
 
     c, done = started(svc, go)
     assert c["recommend"] == "inplace" and [o["mode"] for o in c["options"]] == ["inplace", "branch"]   # offered
-    assert c["options"][0]["ok"] and "只提交 brain install 写的文件，你自己没提交的改动不动" in c["options"][0]["line"]
+    assert c["options"][0]["ok"] and "只提交安装写的文件，你自己没提交的改动不动" in c["options"][0]["line"]
     assert c["overlap"] == [] and set(c["dirty"]) == set(mine)
     assert done["state"] == "done" and done["result"]["commit"]["ok"], done
     committed = names_in(repo)
@@ -187,13 +187,16 @@ def test_the_recommended_option_follows_the_remote_and_the_changes(tmp_path, hom
 
     got = started(svc, go)
     plan = {k: (c["recommend"], [(o["mode"], o["ok"]) for o in c["options"]]) for k, c in got.items()}
+    # UI问题清单 #11: the recommended way is the one that lets the person open a requirement today, a team repo too
     assert plan == {"alone": ("inplace", [("inplace", True)]),
                     "dirty": ("inplace", [("inplace", True), ("branch", True)]),
-                    "team": ("branch", [("inplace", True), ("branch", True)]),
+                    "team": ("inplace", [("inplace", True), ("branch", True)]),
                     "feature": ("inplace", [("inplace", True)])}
     t = got["team"]
-    assert t["options"][1]["title"] == "装到新分支，开 MR 给团队看" and "不会自己推送" in t["options"][0]["line"]
-    assert t["options"][1]["line"].startswith("从 origin/main 建新分支") and "开 MR 给团队看" in t["options"][1]["line"]
+    assert "推送到 origin 以后就能开需求" in t["options"][0]["line"] and "直接改团队的 main，没有 MR 评审" in t["options"][0]["line"]
+    assert t["options"][1]["title"] == "装到新分支，开 MR 给团队看"
+    assert t["options"][1]["line"].startswith("从 origin/main 建新分支") and "MR 合进 main 以后才能开需求" in t["options"][1]["line"]
+    assert "马上能开需求" in got["alone"]["options"][0]["line"]
     assert got["dirty"]["options"][1]["title"] == "装到新分支" and "「合并到 main」" in got["dirty"]["options"][1]["line"]
     assert got["feature"]["options"][0]["title"] == "直接装在 wip" and "wip 不是默认分支 main" in got["feature"]["options"][0]["line"]
 
@@ -316,6 +319,35 @@ def test_merge_fast_forwards_a_local_branch_install_and_cleans_up(tmp_path, home
     assert after["repos"][0]["ok"] is True and after["repos"][0]["pending"] is None
 
 
+def test_an_install_branch_main_moved_past_is_replaced_by_an_install_in_place(tmp_path, home):
+    """SETUP-6: 「合并到 main」 cannot fast-forward any more: 检查 offers 直接装在 main (that way only); once it is
+    committed there, the install branch that was never pushed and its worktree go."""
+    repo = local_repo(tmp_path)
+    svc = make_service(tmp_path, [])
+
+    async def go():
+        first = await install_mode(svc, repo, "branch")
+        commit_file(repo, "src/more.py", "y = 1\n", "more work on main")
+        stuck = await svc.import_inspect({"path": str(repo)})
+        again = await install_mode(svc, repo, "inplace")
+        after = await svc.import_inspect({"path": str(repo)})
+        return first, stuck, again, after
+
+    first, stuck, again, after = started(svc, go)
+    wt = first["result"]["worktree"]
+    assert stuck["next"] == "pending" and stuck["pending"]["merge"]["ok"] is False
+    assert [o["mode"] for o in stuck["install"]["options"]] == ["inplace"] and stuck["install"]["recommend"] == "inplace"
+    assert again["state"] == "done" and again["result"]["commit"]["ok"]
+    assert "删掉了没推送的那次安装" in again["result"]["commit"]["text"] and "分支 brain/install" in again["result"]["commit"]["text"]
+    assert sh("git", "-C", repo, "branch", "--list", "brain/*").stdout == "" and len(worktrees(repo)) == 1
+    assert not (tmp_path / wt).exists() and has_kit_on(repo, "main")
+    assert after["kit"]["state"] == "checkout" and after["install"] is None
+
+
+def has_kit_on(repo, ref):
+    return sh("git", "-C", repo, "cat-file", "-e", "%s:.brain/kit.json" % ref, check=False).returncode == 0
+
+
 def test_merge_is_refused_when_main_moved_or_the_checkout_is_dirty(tmp_path, home):
     moved = local_repo(tmp_path, "moved")
     dirty = local_repo(tmp_path, "dirty")
@@ -336,8 +368,8 @@ def test_merge_is_refused_when_main_moved_or_the_checkout_is_dirty(tmp_path, hom
 
     status, out = started(svc, go)
     m, d = status["repos"][0]["pending"], status["repos"][1]["pending"]
-    assert m["merge"]["ok"] is False and "后来有了新提交" in m["merge"]["why"] and m["next"] == m["merge"]["why"]
-    assert "可以直接装在 main 上" in m["merge"]["why"]
+    assert m["merge"]["ok"] is False and "又有了新提交" in m["merge"]["why"] and m["next"] == m["merge"]["why"]
+    assert "改成直接装在 main 上" in m["merge"]["why"]
     assert d["merge"]["ok"] is False and "没提交的改动（README.md）" in d["merge"]["why"]
     assert out["moved"].code == "cannot_merge" and str(out["moved"]) == m["merge"]["why"]
     assert out["dirty"].code == "cannot_merge" and "git stash" in str(out["dirty"])

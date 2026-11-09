@@ -54,11 +54,10 @@ MAX_FILES = 500
 BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
 BASE_RE = re.compile(r"^https?://[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~-]+)*$")
 DOCTOR_RE = re.compile(r"^(OK|WARN|FAIL)\s+(.+)$")
-INSTALL_STEPS = (("branch", "建分支和工作目录"), ("install", "跑 brain install"), ("kit", "写 kit.json"),
-                 ("doctor", "跑 brain doctor"), ("commit", "提交"))
+INSTALL_STEPS = (("branch", "建分支和工作目录"), ("install", "装 brain-kit 的文件"), ("kit", "写这个仓库的设置"),
+                 ("doctor", "自检"), ("commit", "提交"))
 UPGRADE_BRANCH = "brain/upgrade-kit"
-UPGRADE_STEPS = (("branch", "建分支和工作目录"), ("install", "跑 brain install（更新 kit 文件）"),
-                 ("doctor", "跑 brain doctor"), ("commit", "提交"))
+UPGRADE_STEPS = (("branch", "建分支和工作目录"), ("install", "更新 kit 文件"), ("doctor", "自检"), ("commit", "提交"))
 PURPOSES = ("install", "upgrade")
 UP_TO_DATE = "已经是最新的：没有要提交的改动"
 # Lean's install.sh starts a new audit file (one INIT event) each time it runs: a reinstall that adds nothing else
@@ -137,7 +136,8 @@ def kit_data(data: dict[str, Any], kit: dict[str, str]) -> dict[str, Any]:
 
 
 def kit_line(kit: dict[str, str]) -> str:
-    parts = ["需求号 %s-n" % kit["req_prefix"], "跟踪 %s" % kit["tracker"], "默认分支 %s" % kit["default_branch"]]
+    parts = ["需求号 %s-n" % kit["req_prefix"], problems.TRACKER_NAME.get(kit["tracker"], "跟踪 %s" % kit["tracker"]),
+             "默认分支 %s" % kit["default_branch"]]
     if kit.get("gitlab_project"):
         parts.append("GitLab %s（%s）" % (kit["gitlab_project"], kit["gitlab_base"]))
     if kit.get("team"):
@@ -183,7 +183,8 @@ def doctor_rows(text: str) -> list[dict[str, Any]]:
     out = []
     for line in (text or "").splitlines():
         m = DOCTOR_RE.match(line.strip())
-        if m:
+        # its KiroCrew lines are this machine's, which the page's own KiroCrew checks list (with their fixes) already
+        if m and not m.group(2).strip().startswith("KiroCrew"):
             out.append(problems.row(m.group(1), m.group(2).strip()[:500]))
     return out
 
@@ -289,7 +290,7 @@ def install(top: str, kit: dict[str, str], branch: str, work_root: str, records:
     fails = sum(1 for r in rows if r["level"] == "FAIL")
     warns = sum(1 for r in rows if r["level"] == "WARN")
     if not rows:
-        step("doctor", "warn", "brain doctor 没给出结果（退出码 %d）" % p.returncode)
+        step("doctor", "warn", "自检没给出结果（退出码 %d）" % p.returncode)
     else:
         step("doctor", "warn" if fails else "ok", "%d 项通过，%d 项注意，%d 项没过" % (len(rows) - fails - warns, warns, fails))
 
@@ -428,7 +429,7 @@ def upgrade(top: str, branch: str, work_root: str, records: Records, step: Calla
         fails = sum(1 for r in rows if r["level"] == "FAIL")
         warns = sum(1 for r in rows if r["level"] == "WARN")
         if not rows:
-            step("doctor", "warn", "brain doctor 没给出结果（退出码 %d）" % p.returncode)
+            step("doctor", "warn", "自检没给出结果（退出码 %d）" % p.returncode)
         else:
             step("doctor", "warn" if fails else "ok", "%d 项通过，%d 项注意，%d 项没过" % (len(rows) - fails - warns, warns,
                                                                                  fails))
@@ -462,7 +463,7 @@ def commit_message(kit: dict[str, str], purpose: str = "install", version: Any =
         return ("Update brain-kit's kit files (brain install)",
                 "brain-kit%s 的 `brain install` %s重装了这个仓库的 kit 文件（AI-DLC Lean、KiroCrew 的 hook "
                 "适配、aidlc-docs/lean.json 的 fingerprint_exclude 加上 runs/** 等）；.brain/kit.json 没动。由 Brain app "
-                "的「修复」发起。\n\nkit.json: %s" % (" " + str(version) if version else "", where_zh, kit_line(kit)))
+                "的「重装 kit 文件」发起。\n\nkit.json: %s" % (" " + str(version) if version else "", where_zh, kit_line(kit)))
     return ("Install brain-kit (brain install)",
             "AI-DLC Lean, the KiroCrew hook adapter, .brain/kit.json, the Brain files and AGENTS.md, made by brain-kit's "
             "`brain install` %s (the Brain app's 导入仓库).\n\nkit.json: %s" % (where_en, kit_line(kit)))
@@ -605,7 +606,7 @@ def publish(top: str, records: Records, confirm: dict[str, Any], *, transport: A
     instead. *records*: the install records, or the upgrade records for purpose "upgrade"."""
     rec = records.get(top)
     if not rec or not rec.get("branch"):
-        raise ImportFail("这个仓库没有 app 更新 kit 文件的分支：先点「修复」" if purpose == "upgrade" else
+        raise ImportFail("这个仓库没有 app 更新 kit 文件的分支：先点「重装 kit 文件」" if purpose == "upgrade" else
                          "这个仓库没有 app 装的分支：先装到新分支", "no_install", 409)
     if not rec.get("commit"):
         raise ImportFail("还没提交：先提交，再推送", "not_committed", 409)
