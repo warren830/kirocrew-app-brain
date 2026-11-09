@@ -918,7 +918,8 @@ export interface RequirementDetail {
   }
   decisions: Decision[]
   questions: Question[]
-  timeline: { source: 'trace' | 'app'; items: TimelineItem[]; missing: string[]; error: string }
+  /** other_runs (brain-kit 0d52e97, rule H0): this requirement's runs on another branch, not read into this trace, in words */
+  timeline: { source: 'trace' | 'app'; items: TimelineItem[]; missing: string[]; error: string; other_runs: string[] }
   sessions: SessionRow[]
   credits: { total: number | null; note: string }
   brain: { loaded: number | null; cited: string[]; stale: string[]; unknown: string[]; proposals: number | null }

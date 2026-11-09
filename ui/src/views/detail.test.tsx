@@ -48,6 +48,8 @@ describe('需求详情', () => {
     const tl = screen.getByRole('region', { name: '时间线' })
     expect(tl).toHaveTextContent('来自 brain-kit trace')
     expect(tl).toHaveTextContent('这些来源没读到：runnerd')
+    // brain-kit 0d52e97 trace's other_runs: this key's runs on another branch, not counted here
+    expect(within(tl).getByTestId('tl-other-runs')).toHaveTextContent('别的分支上的 run（不算在这里）：RUN-PAY-3-1（ai/alice/PAY-3-refund-export-old，已关闭）')
     expect(screen.getByRole('region', { name: '会话记录' })).toHaveTextContent('refund-api 的代码计划写好了，等批准。')
     expect(apiCalls[0]).toMatchObject({ method: 'GET', path: `${API}/requirements/r1/PAY-3` })
   })

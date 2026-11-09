@@ -571,6 +571,9 @@ function TimelineCard({ t }: { t: RequirementDetail['timeline'] }) {
         ))}
       </div>
       {t.missing.length > 0 && <p className="br-note br-small">这些来源没读到：{t.missing.join('、')}</p>}
+      {(t.other_runs ?? []).length > 0 && (
+        <p className="br-note br-small" data-testid="tl-other-runs">别的分支上的 run（不算在这里）：{t.other_runs.join('；')}</p>
+      )}
     </section>
   )
 }

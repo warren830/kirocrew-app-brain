@@ -289,3 +289,20 @@ def test_eval_batch_states_and_families_reach_the_numbers():
                     "credits": 4.5}]
     weekly = deliveries.cto_numbers([("r1", deliveries.cto_part(data))], [], available=True, now=1794146400)["weekly"]
     assert all(set(w) == {"week", "unattended", "people", "local", "pending"} for w in weekly)   # 'ended' is never merged
+
+
+def test_the_timeline_says_a_bridge_decisions_state_and_commit_and_the_runs_on_another_branch():
+    """brain-kit 0d52e97 trace: decisions[].sha (the MR head the bridge asked at) and other_runs (rule H0: this key's
+    runs on another branch, not read into this trace), in words on 需求详情."""
+    detail = mod("detail")
+    t = {"decisions": [{"id": "D-2", "source": "bridge", "state": "delivered", "choice": "B", "who": "carol",
+                        "at": "2026-11-09T10:00:00Z", "sha": SHA, "src": ["bridge ledger decisions"]},
+                       {"id": "D-3", "source": "bridge", "state": "a_new_state", "choice": None, "who": None,
+                        "asked_at": "2026-11-09T11:00:00Z", "sha": None, "src": []}],
+         "other_runs": [{"run_id": "RUN-PAY-3-1", "branch": "ai/alice/PAY-3-old", "state": "closed", "src": "ledger"},
+                        {"run_id": "RUN-PAY-3-2", "branch": None, "state": None, "src": "vouchers"}, "junk"]}
+    items = {i["label"]: i for i in detail.trace_timeline(t) if i["kind"] == "decision"}
+    assert items["D-2 已送回"]["detail"] == "B · 问在提交 a1b2c3d4e5f6" and items["D-2 已送回"]["who"] == "carol"
+    assert items["D-3 a_new_state"]["detail"] is None             # a state brain-kit adds later: as it is
+    assert detail.other_runs(t) == ["RUN-PAY-3-1（ai/alice/PAY-3-old，已关闭）", "RUN-PAY-3-2（分支认不出，桥上没有它的状态）"]
+    assert detail.other_runs({}) == []

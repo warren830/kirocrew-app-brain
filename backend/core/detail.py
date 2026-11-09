@@ -33,6 +33,13 @@ MERGE_HOW = {
     "squash merge (the branch is gone): the commit that brought run.json": "squash 合并（分支已删）：带来 run.json 的提交",
     "fast-forward or rebase merge (the branch is gone): the last run commit": "快进或 rebase 合并（分支已删）：run 的最后一个提交",
 }
+# a bridge decision's state (the ledger's), in the words the page uses for questions (ui.tsx QUESTION_STATE)
+DECISION_STATE = {"open": "已发出，等回答", "posting": "正在发到 MR", "asking": "正在发到 MR",
+                  "answered": "已收到回答，等桥签名送回", "delivered": "已送回", "delivery_unknown": "送没送到不清楚",
+                  "refused": "签名服务拒签", "void": "作废", "invalid": "无效", "stale": "过期", "closed": "已关闭"}
+# a bridge run's state (the ledger's), as 运行机 says it (Team.tsx RUN_STATE)
+RUN_STATE = {"signing": "签名中", "spooled": "排队等工作区", "ready": "工作区好了", "dispatched": "已派给会话",
+             "send_unknown": "送没送到不清楚", "failed": "没能开始", "merged": "已合并", "closed": "已关闭"}
 
 
 # ---------------------------------------------------------------- decisions
@@ -212,8 +219,12 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                       "detail": q.get("lean_request"), "who": None, "src": q.get("src")})
     for d in t.get("decisions") or []:
         if d.get("source") == "bridge":
+            # 0d52e97: sha, the MR head the bridge asked it at
+            st = str(d.get("state") or "")
+            detail = " · ".join(x for x in (str(d.get("choice") or ""),
+                                             "问在提交 %s" % str(d["sha"])[:12] if d.get("sha") else "") if x)
             items.append({"at": d.get("at") or d.get("asked_at"), "kind": "decision",
-                          "label": "%s %s" % (d.get("id"), d.get("state") or ""), "detail": d.get("choice"),
+                          "label": "%s %s" % (d.get("id"), DECISION_STATE.get(st, st)), "detail": detail or None,
                           "who": d.get("who"), "src": ", ".join(d.get("src") or [])[:200] or None})
     for r in (t.get("checks") or {}).get("verify") or []:
         items.append({"at": r.get("at"), "kind": "verify", "label": "verify %s" % ("通过" if r.get("ok") else "没过"),
@@ -233,6 +244,18 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
     return items
 
 
+def other_runs(t: dict[str, Any]) -> list[str]:
+    """brain-kit 0d52e97 trace's other_runs (docs/eval.md rule H0): this requirement's runs on another branch (its
+    first MR closed, started again on a new branch), not read into this trace, in words: 「RUN-PAY-3-1（分支 …，已关闭）」."""
+    out = []
+    for o in t.get("other_runs") or []:
+        if isinstance(o, dict) and o.get("run_id"):
+            st = str(o.get("state") or "")
+            out.append("%s（%s，%s）" % (str(o["run_id"])[:80], str(o.get("branch") or "分支认不出")[:200],
+                                       RUN_STATE.get(st, st) if st else "桥上没有它的状态"))
+    return out[:20]
+
+
 def _iso_minute(ts: Any) -> str:
     """2026-11-09T02:05:33Z -> 2026-11-09 02:05Z (UTC, as brain-kit writes it)."""
     m = re.match(r"^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2})", str(ts or ""))
@@ -242,14 +265,15 @@ def _iso_minute(ts: Any) -> str:
 def timeline(repo_path: str, cfg: dict[str, Any], key: str, *, ref: str | None, events: list[dict[str, Any]],
              credits: Any = None, ledger_path: str | None = None, vouchers_dir: str | None = None,
              allowed_signers: str | None = None, app_events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    out = {"source": "app", "items": [], "missing": [], "error": "", "brain": None, "cost": None, "trace": None}
+    out = {"source": "app", "items": [], "missing": [], "error": "", "brain": None, "cost": None, "trace": None,
+           "other_runs": []}
     if bk.has("trace"):
         try:
             from .deliveries import _call
             t = _call(bk.m("trace").build, repo_path, cfg, key, ref=ref, ledger_path=ledger_path,
                       vouchers_dir=vouchers_dir, credits=credits, allowed_signers=allowed_signers)
             out.update(source="trace", items=trace_timeline(t), missing=[str(x)[:200] for x in t.get("missing") or []],
-                       brain=t.get("brain"), cost=t.get("cost"), trace=t)
+                       brain=t.get("brain"), cost=t.get("cost"), trace=t, other_runs=other_runs(t))
         except Exception as exc:  # noqa: BLE001
             out["error"] = "brainkit.trace 读不出这个需求：%s" % str(exc).split("\n", 1)[0][:200]
     else:

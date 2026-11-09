@@ -653,7 +653,7 @@ class Service:
             "decisions": detail.decisions(f.get("decisions_text"), "aidlc-docs/%s/decisions.md" % run.get("intent"),
                                           repo.cfg.get("bot_users") or []),
             "questions": questions,
-            "timeline": {k: tl[k] for k in ("source", "items", "missing", "error")},
+            "timeline": {k: tl[k] for k in ("source", "items", "missing", "error", "other_runs")},
             "sessions": [{k: s[k] for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                              "last_activity", "opened_at", "project", "url", "error")}
                          for s in snap["by"].get(scope, [])],
@@ -692,7 +692,7 @@ class Service:
         run = f.get("run") or {}
         path = f.get("worktree")
         tl = {"source": "app", "items": lean_view.stage_events(f.get("events") or []), "missing": [], "error": "",
-              "brain": None}
+              "brain": None, "other_runs": []}
         if path:
             try:
                 cfg = bk.m("config").load(path)
@@ -730,7 +730,7 @@ class Service:
                      **lean_view.notes(f.get("state_text"))},
             "decisions": detail.decisions(f.get("decisions_text"), "decisions.md", []),
             "questions": detail.ledger_questions(decs, row["mr"]["url"] if row.get("mr") else None),
-            "timeline": {k: tl[k] for k in ("source", "items", "missing", "error")},
+            "timeline": {k: tl[k] for k in ("source", "items", "missing", "error", "other_runs")},
             "sessions": [{k: s[k] for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                              "last_activity", "opened_at", "project", "url", "error")} for s in sess],
             "credits": {"total": row["credits"], "note": detail.NO_TOKENS},
