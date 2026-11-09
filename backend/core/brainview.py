@@ -1,7 +1,7 @@
 """Brain: the entries on the default branch by file and section with their sources, how runs use them
 (brainkit.usage: the runs merged into the default branch; a run not merged yet is listed on its own, read where
 需求详情 reads it, so the two pages say the same numbers), lint (brainkit.brainlint, static rules; each line a
-problems.lint CheckRow), and reflect (brainkit.reflect).
+CheckRow, the legacy ids one quiet note: problems.lint_rows), and reflect (brainkit.reflect).
 
 brain-kit says what reflect found in English (``proposal at line 27: already in the Brain as P-7, skipped``): the
 preview carries each line in Chinese (REFLECT_SAYS) and the originals in ``raw``, for the page to fold.
@@ -36,6 +36,9 @@ PRINTED_WT_RE = (re.compile(r"已提交到本地分支 \S+（(/[^（）\n]+)）"
                  re.compile(r"描述在 (/[^\n]+?)\.mr\.md"))
 
 
+# what the page says when brain-kit cannot read the Brain or its use (brain-kit's own words go in ``raw``, folded)
+UNREADABLE = "读不出这个仓库默认分支上的 Brain：细节里是 brain-kit 的原话，看不懂就发给维护 brain-kit 的人"
+NO_USAGE = "Brain 用量读不出来：条目照常显示，有用率和每次运行这次没有数字。细节里是 brain-kit 的原话"
 FILE_NAME = {"PRODUCT": "产品", "TECH": "技术", "IMPROVEMENT": "改进", "PROJECT": "项目"}
 TYPE_NAME = {"principle": "原则", "correction": "纠正", "decision": "决定", "model": "模型", "guideline": "准则",
              "pitfall": "坑", "process": "流程"}
@@ -138,18 +141,18 @@ def view(repo: Repo, reflectable: list[dict[str, Any]]) -> dict[str, Any]:
     out: dict[str, Any] = {"repo": repo.id, "ref": "", "files": [], "lint": {"errors": [], "warnings": []},
                            "usage": {"useful": [0, 0], "repeat_rate": [0, 0], "archived": 0, "purged": 0, "runs": [],
                                      "never_cited": [], "repeats_any": [], "unmerged": []},
-                           "reflect": reflectable, "error": ""}
+                           "reflect": reflectable, "error": "", "raw": ""}
     try:
         brain, label = _brain(repo)
     except bk.brain_error() as exc:
-        out["error"] = str(exc)
+        out["error"], out["raw"] = UNREADABLE, str(exc)[:2000]
         return out
     out["ref"] = label
     try:
         u = bk.m("usage").collect(repo.path, repo.cfg, ref=repo.main_ref())
     except Exception as exc:  # noqa: BLE001 - usage is a view: the entries still show
         u = None
-        out["error"] = "Brain 用量读不出来：%s" % str(exc)[:200]
+        out["error"], out["raw"] = NO_USAGE, str(exc)[:2000]
     used = {x["id"]: x for x in (u or {}).get("entries") or []}
     for key in E.FILES:
         f = brain.files.get("%s.md" % key)
@@ -179,9 +182,8 @@ def view(repo: Repo, reflectable: list[dict[str, Any]]) -> dict[str, Any]:
         out["files"].append({"key": key, "letter": meta["letter"], "side": meta["side"], "types": list(meta["types"]),
                              "count": count, "sections": sections})
     errors, warnings = bk.m("brainlint").check(brain)
-    bd = str(repo.cfg.get("brain_dir") or "brain")
-    out["lint"] = {"errors": [problems.lint("FAIL", e, brain_dir=bd, repo=repo.path) for e in errors][:100],
-                   "warnings": [problems.lint("WARN", w, brain_dir=bd, repo=repo.path) for w in warnings][:100]}
+    out["lint"] = problems.lint_rows(errors, warnings, brain_dir=str(repo.cfg.get("brain_dir") or "brain"),
+                                     repo=repo.path, prefix=str(repo.cfg.get("req_prefix") or ""))
     if u:
         out["usage"] = {
             "useful": list(u.get("useful") or [0, 0]), "repeat_rate": list(u.get("repeat_rate") or [0, 0]),
