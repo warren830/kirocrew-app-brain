@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test } from 'vitest'
-import BrainApp from './main'
+import BrainApp, { pickRequirement } from './main'
 import { AppBar } from './AppBar'
 import { parseView, type View } from './nav'
 import { fx } from './test/data'
@@ -27,11 +27,36 @@ describe('the app: one bar over the views', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Brain')
     expect(bar().getByRole('tab', { name: '交付总览' })).toHaveAttribute('aria-selected', 'true')
     expect(bar().getAllByRole('tab').map((t) => t.textContent)).toEqual(['交付总览', '需求详情', '需求看板', '开需求', 'Brain', '待办6'])
-    expect(bar().getByRole('tab', { name: '需求详情' })).toBeDisabled() // no requirement in hand yet
-    expect(bar().getByRole('tab', { name: '需求看板' })).toBeDisabled()
+    expect(bar().getByRole('tab', { name: '需求详情' })).toBeEnabled() // nothing in hand yet: they still open one
+    expect(bar().getByRole('tab', { name: '需求看板' })).toBeEnabled()
     expect(await bar().findByRole('tab', { name: '待办 6' })).toBeInTheDocument()
     expect(badges).toContain(6) // the sidebar badge
     expect(bar().getByRole('button', { name: '设置' })).toBeInTheDocument()
+  })
+
+  test('需求看板 with nothing opened yet opens the requirement that waits on you; it is still in hand after a reload', async () => {
+    const user = userEvent.setup()
+    installFixtureRoutes()
+    const want = pickRequirement(fx.overview().rows)
+    expect(want?.waits.who).toBe('you')
+    const { unmount } = render(<BrainApp pollMs={60_000} />)
+    await screen.findByTestId('req-table')
+    await user.click(bar().getByRole('tab', { name: '需求看板' }))
+    await waitFor(() => expect(parseView(window.location.search)).toMatchObject({ kind: 'board', repo: want!.repo, key: want!.key }))
+    unmount()
+    window.history.replaceState(null, '', '/apps/brain?view=overview')
+    render(<BrainApp pollMs={60_000} />)
+    await screen.findByTestId('req-table')
+    await user.click(bar().getByRole('tab', { name: '需求详情' }))
+    expect(parseView(window.location.search)).toMatchObject({ kind: 'item', repo: want!.repo, key: want!.key })
+  })
+
+  test('pickRequirement: waits on you first, else the newest; none when there are no rows', () => {
+    const rows = fx.overview().rows
+    const r = (key: string, who: string, at: number) => ({ ...rows[0], key, waits: { ...rows[0].waits, who }, updated_at: at }) as typeof rows[0]
+    expect(pickRequirement([])).toBeNull()
+    expect(pickRequirement([r('A-1', 'agent', 9), r('A-2', 'you', 1), r('A-3', 'you', 5)])?.key).toBe('A-3')
+    expect(pickRequirement([r('A-1', 'agent', 9), r('A-2', 'runner', 10)])?.key).toBe('A-2')
   })
 
   test('运行机 is a tab only in team mode', async () => {

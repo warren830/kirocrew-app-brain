@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavBadge, useNavigate } from '@kirocrew/app-sdk'
 import { paths, usePoll } from './api'
+import { useAppApi } from '@kirocrew/app-sdk'
 import { AppBar } from './AppBar'
 import { BoardPage } from './board/BoardPage'
 import { BOARD_CSS } from './board/styles'
@@ -23,7 +24,7 @@ import { CTO_CSS } from './cto/styles'
 import { KIT_CSS } from './kit'
 import { parseView, searchOf, type View, type ViewKind } from './nav'
 import { APP_CSS } from './styles'
-import type { Status } from './types'
+import type { Overview, Requirement, Status } from './types'
 import { CheckRows } from './ui'
 import { BrainPage } from './views/Brain'
 import { DetailView } from './views/Detail'
@@ -42,7 +43,9 @@ type Held = { repo: string; key: string } | null
 
 export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
   const [view, setView] = useState<View & { n: number }>(() => ({ ...parseView(window.location.search), n: 0 }))
-  const [held, setHeld] = useState<Held>(() => heldOf(parseView(window.location.search), null))
+  const [held, setHeld] = useState<Held>(() => heldOf(parseView(window.location.search), loadHeld()))
+  const api = useAppApi()
+  const [picking, setPicking] = useState(false)
   const navigate = useNavigate()
   const badge = useNavBadge()
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -58,7 +61,11 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
   const remember = useCallback((v: View) => {
     current.current = v
     if (v.kind === 'overview') overviewFilters.current = v
-    setHeld((h) => heldOf(v, h))
+    setHeld((h) => {
+      const next = heldOf(v, h)
+      if (next !== h) saveHeld(next)
+      return next
+    })
   }, [])
   const href = (v: View) => `${window.location.pathname}${searchOf(v)}`
   const depth = () => Number((window.history.state as { brDepth?: number } | null)?.brDepth ?? 0)
@@ -106,12 +113,21 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
 
   const onTab = useCallback((k: ViewKind) => {
     if (k === 'overview') return go(overviewFilters.current)
-    if (k === 'item' || k === 'board') return held ? go({ kind: k, ...held }) : undefined
+    if (k === 'item' || k === 'board') {
+      if (held) return go({ kind: k, ...held })
+      // nothing opened yet: the requirement that waits on you, else the one with the newest activity
+      setPicking(true)
+      void api.get<Overview>(paths.overview('all')).then((o) => {
+        const pick = pickRequirement(o.rows)
+        go(pick ? { kind: k, repo: pick.repo, key: pick.key } : overviewFilters.current)
+      }, () => go(overviewFilters.current)).finally(() => setPicking(false))
+      return
+    }
     const repo = repoOfView(current.current)
     if (k === 'new') return go({ kind: 'new', ...(repo ? { repo } : {}) })
     if (k === 'brain') return go({ kind: 'brain', ...(repo ? { repo } : {}) })
     go({ kind: k })
-  }, [go, held])
+  }, [go, held, api])
 
   // 需求详情 and 需求看板 say which view they were opened from (their crumb and ← 返回)
   const goView = useCallback((v: View) => {
@@ -161,7 +177,7 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
       <style>{CTO_CSS}</style>
       <style>{APP_CSS}</style>
       <style>{KIT_CSS}</style>
-      <AppBar view={v.kind} onView={onTab} item={held?.key} todo={todoCount} team={!!s?.app.team} />
+      <AppBar view={v.kind} onView={onTab} item={held?.key} picking={picking} todo={todoCount} team={!!s?.app.team} />
       <div className="br-banners" data-testid="br-banners">
         {status.error && (
           <div className={`br-banner${s ? '' : ' is-error'}`} role="alert">
@@ -187,6 +203,36 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
       {body}
     </div>
   )
+}
+
+const HELD_KEY = 'brain.app.held'
+
+/** The requirement in hand survives a reload of the page (this browser only). */
+function loadHeld(): Held {
+  try {
+    const h = JSON.parse(window.localStorage.getItem(HELD_KEY) || 'null')
+    return h && typeof h.repo === 'string' && typeof h.key === 'string' ? { repo: h.repo, key: h.key } : null
+  } catch {
+    return null
+  }
+}
+
+function saveHeld(h: Held): void {
+  try {
+    if (h) window.localStorage.setItem(HELD_KEY, JSON.stringify(h))
+  } catch {
+    /* storage off: the requirement in hand lasts until the page reloads */
+  }
+}
+
+/** What 需求详情 / 需求看板 open when no requirement was opened yet: the one that waits on you, else any;
+ * the newest activity first; null when there is none. */
+export function pickRequirement(rows: Requirement[]): Requirement | null {
+  if (!rows.length) return null
+  const t = (r: Requirement) => r.updated_at ?? 0
+  const mine = rows.filter((r) => r.waits.who === 'you')
+  if (mine.length) return [...mine].sort((a, b) => t(b) - t(a))[0]
+  return [...rows].sort((a, b) => t(b) - t(a))[0]
 }
 
 /** The requirement in hand after a move to *v*: the 需求详情 or 需求看板 it is; else the one before. */

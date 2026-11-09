@@ -2,7 +2,7 @@
  * The bar every view shares (the sample's app bar): the app's name, the views as tabs — 交付总览 (every requirement),
  * 需求详情 and 需求看板 (the requirement in hand: the last one opened), 开需求, Brain, 待办 (with its count), 运行机 (team
  * mode only) — and at the right 导入仓库 (how a repo gets into the app) and 设置. It stays where it is when the view
- * changes. Without a requirement in hand, 需求详情 and 需求看板 are off.
+ * changes. Without a requirement in hand, 需求详情 and 需求看板 open the one that waits on you (else the newest one).
  */
 import type { ViewKind } from './nav'
 import { Icon } from './ui'
@@ -19,11 +19,13 @@ const TABS: [Tab, string, string][] = [
   ['team', '运行机', '团队运行机：交接、运行、签名'],
 ]
 
-export function AppBar({ view, onView, item, todo, team }: {
+export function AppBar({ view, onView, item, picking, todo, team }: {
   view: ViewKind
   onView: (v: ViewKind) => void
   /** the requirement in hand (KEY), what 需求详情 and 需求看板 open */
   item?: string
+  /** 需求详情 / 需求看板 clicked with nothing in hand: the app is picking one */
+  picking?: boolean
   /** status.counts.todo */
   todo: number
   /** team mode: the 运行机 tab */
@@ -36,8 +38,8 @@ export function AppBar({ view, onView, item, todo, team }: {
         {TABS.filter(([k]) => k !== 'team' || team).map(([k, name, hint]) => {
           const held = k === 'item' || k === 'board'
           return (
-            <button type="button" role="tab" key={k} aria-selected={view === k} disabled={held && !item && view !== k}
-              title={held ? (item ? `${hint}（${item}）` : '先在交付总览里点一个需求') : hint}
+            <button type="button" role="tab" key={k} aria-selected={view === k} disabled={held && !item && !!picking}
+              title={held ? (item ? `${hint}（${item}）` : `${hint}（打开等你的那个需求，没有就打开最近的）`) : hint}
               aria-label={k === 'todo' && todo > 0 ? `待办 ${todo}` : undefined}
               onClick={() => view !== k && onView(k)}>
               {name}
