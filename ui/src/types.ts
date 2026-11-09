@@ -1066,6 +1066,10 @@ export interface BeltItem {
   records_only: boolean
   /** the actor whose lane it drops into the rail from: local, runner, handover */
   actor: ActorKey
+  /** the files it changed, with lines added and removed (git show --numstat; A added, M modified, D deleted, R renamed):
+   * the lanes' 改动 block (UI问题清单 BOARD-21). Absent from a backend that does not read them: the lane shows the
+   * commits and their file counts */
+  changes?: { path: string; added: number; removed: number; status: 'A' | 'M' | 'D' | 'R' }[]
 }
 
 /** One cell of the check wall: a Lean approval, a verify check, the bridge's and the signer's checks, Brain lint, the

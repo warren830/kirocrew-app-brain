@@ -684,7 +684,21 @@
       "text": "PAY-3：需求初稿",
       "files": 2,
       "records_only": true,
-      "actor": "local"
+      "actor": "local",
+      "changes": [
+        {
+          "path": "aidlc-docs/refund-export/requirements.md",
+          "added": 48,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "runs/PAY-3/run.json",
+          "added": 31,
+          "removed": 0,
+          "status": "A"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -694,7 +708,33 @@
       "text": "PAY-3：导出接口的骨架",
       "files": 4,
       "records_only": false,
-      "actor": "local"
+      "actor": "local",
+      "changes": [
+        {
+          "path": "src/export/csv.py",
+          "added": 62,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "src/refund/api.py",
+          "added": 18,
+          "removed": 3,
+          "status": "M"
+        },
+        {
+          "path": "tests/test_csv.py",
+          "added": 40,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "aidlc-docs/refund-export/plan.md",
+          "added": 12,
+          "removed": 2,
+          "status": "M"
+        }
+      ]
     },
     {
       "kind": "commit",
@@ -704,7 +744,27 @@
       "text": "PAY-3：CSV 字段和金额格式",
       "files": 3,
       "records_only": false,
-      "actor": "local"
+      "actor": "local",
+      "changes": [
+        {
+          "path": "src/export/csv.py",
+          "added": 24,
+          "removed": 9,
+          "status": "M"
+        },
+        {
+          "path": "src/refund/money.py",
+          "added": 15,
+          "removed": 0,
+          "status": "A"
+        },
+        {
+          "path": "tests/test_csv.py",
+          "added": 21,
+          "removed": 4,
+          "status": "M"
+        }
+      ]
     }
   ],
   "checks": {

@@ -1,13 +1,16 @@
 /**
  * 回放: a requirement played again (the sample team board's timeline.ts). The board at any moment *t*, rebuilt from the
- * snapshot itself: each actor's status history, its spans and marks up to *t*, the events, the conveyor and the check
- * cells decided by then. Pure: the same snapshot and *t* always give the same board, so the replay can be scrubbed.
+ * snapshot itself: each actor's status history, its spans and marks up to *t*, the events, the conveyor, the check
+ * cells decided by then, Lean's stages from its stage events, whom it waited for then. What has no time of its own (the
+ * decisions, what the Brain was cited for, credits) is not shown until the end. Pure: the same snapshot and *t* always
+ * give the same board, so the replay can be scrubbed.
  *
  * A requirement takes hours or days with long quiet gaps (a night, a wait for a person): the replay's clock is
  * compressed — every quiet gap plays as at most GAP_S — so what happened is what plays, and the bar still says the
  * real time.
  */
-import type { ActorStatus, CheckCell, ReqBoard, ReqState } from '../types'
+import type { ActorStatus, CheckCell, ReqBoard, ReqState, WaitWho } from '../types'
+import { leanFromEvents } from './format'
 
 export interface ReplaySpan {
   start: number
@@ -77,7 +80,9 @@ export function replayAt(b: ReqBoard, t: number): ReqBoard {
   if (t >= span.end) return b
   const actors = b.actors.map((a) => {
     const h = [...a.history].reverse().find((x) => x.at <= t)
-    const now = h ? { status: h.status, doing: h.doing, since: h.at } : waiting(a)
+    // not on this requirement's way, and never was: it stays so through the replay
+    const off = a.status === 'skipped' && !a.history.length
+    const now = h ? { status: h.status, doing: h.doing, since: h.at } : off ? { status: a.status, doing: a.doing, since: null } : waiting(a)
     return {
       ...a, ...now, line: null,
       spans: a.spans.filter((s) => s.a <= t).map((s) => ({ ...s, b: s.b !== null && s.b <= t ? s.b : null })),
@@ -99,16 +104,26 @@ export function replayAt(b: ReqBoard, t: number): ReqBoard {
   const rel = statusOf.get('release')
   const merged = b.ended_at !== null && b.ended_at <= t
   const state = stateAt(b, t, statusOf, merged)
+  const ln = leanFromEvents(b.events, t, b.row.lean.total)
+  const through = ln.done_n + ln.skipped_n
+  const who: WaitWho = awaiting ? (b.person.me ? 'you' : 'people') : working ? (statusOf.get('runner') === 'running' ? 'runner' : 'agent') : 'nobody'
   return {
     ...b,
-    row: { ...b.row, state, state_label: STATE_LABEL[state] },
+    row: {
+      ...b.row, state, state_label: STATE_LABEL[state],
+      lean: { ...b.row.lean, done_n: ln.done_n, skipped_n: ln.skipped_n, next: ln.next, done: through, stage: ln.next?.id ?? null, stage_label: ln.next?.label ?? null, stage_n: ln.next?.n ?? null,
+        stage_state: ln.next ? (ln.started ? 'started' : 'todo') : through ? 'done' : null },
+      waits: { ...b.row.waits, who, text: awaiting ? awaiting.doing : working ? 'AI 在做' : '', line: null, raw: '', do: 'none', since: awaiting?.since ?? null },
+    },
     ended_at: merged ? b.ended_at : null,
     live: working,
     person: { ...b.person, status: awaiting ? 'awaiting_approval' : working ? 'running' : 'waiting', doing: awaiting ? awaiting.doing : working ? 'AI 在做' : '没有等你的事' },
     actors,
     events: b.events.filter((e) => e.at <= t),
     belt: b.belt.filter((x) => x.at <= t),
-    checks: { ...b.checks, cells, passed, failed, total: cells.filter((c) => c.status !== 'skip').length,
+    decisions: [],
+    brain: { ...b.brain, cited: [], stale: [], unknown: [] },
+    checks: { ...b.checks, cells, passed, failed, total: cells.filter((c) => c.status === 'pass' || c.status === 'fail' || c.status === 'wait').length, todo: undefined,
       at: Math.max(0, ...cells.filter((c) => c.at !== null).map((c) => c.at as number)) || null,
       history: b.checks.history.filter((x) => x.at <= t) },
     accept: { ...b.accept, state: rel === 'awaiting_approval' ? 'waiting' : rel === 'merged' ? 'accepted' : rel === 'fixing' ? 'rejected' : 'not_yet',

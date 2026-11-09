@@ -45,6 +45,7 @@ export const BOARD_EXTRA_CSS = `
 .br-board .kt-track-mark.is-commit { top: 4px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--text-strong); box-shadow: 0 0 0 2px var(--card); }
 .br-board .kt-track-mark.is-session { background: var(--kt-run); }
 .br-board .br-fact { color: var(--text); }
+.br-board .br-facts-chips li { max-width: none; }
 .br-board .br-mark { padding: 0 6px; border-radius: 6px; font-family: var(--font-body, sans-serif); font-weight: 750; font-size: .95em;
   background: color-mix(in srgb, var(--muted) 16%, transparent); color: var(--text-strong) !important; }
 .br-board .br-mark:is(.is-approved, .is-answer, .is-accepted, .is-verify-ok, .is-reflect) { background: color-mix(in srgb, var(--kt-ok) 18%, transparent); }
@@ -62,9 +63,16 @@ export const BOARD_EXTRA_CSS = `
 .br-board .kt-belt-end.is-head.is-merged { background: var(--kt-ok-solid); color: #fff; border-color: var(--kt-ok-solid); }
 .br-board .kt-belt-end.is-head.is-merged code { color: #fff; }
 
-/* the counters */
-.br-board .br-kpis { grid-template-columns: minmax(190px, 1fr) minmax(260px, 1.45fr) minmax(190px, 1fr) minmax(220px, 1.1fr) minmax(130px, .7fr); }
-@media (max-width: 1240px) { .br-board .br-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* the counters: one row as long as the app is wide enough (its own width, not the window's: the KiroCrew sidebar) */
+.br-board .br-kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1.1fr) minmax(0, 1.05fr) minmax(0, .7fr); }
+.br-board .br-kpis > * { grid-column: auto; order: 0; }
+@container kt-root (max-width: 860px) { .br-board .br-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); } .br-board .br-kpis > * { grid-column: span 2; } .br-board .br-kpis > :nth-child(n+4) { grid-column: span 3; } }
+@container kt-root (max-width: 560px) { .br-board .br-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .br-board .br-kpis > *, .br-board .br-kpis > :nth-child(n+4) { grid-column: auto; } }
+.br-board .kt-kpi-note { white-space: normal; overflow: visible; }
+.br-board .br-lean-next b { color: var(--kt-approve); }
+.kt-segs i.is-skip { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 38%, transparent) 0 3px, transparent 3px 6px); }
+.kt-segs i.is-next { background: color-mix(in srgb, var(--kt-approve) 30%, transparent); box-shadow: inset 0 0 0 2px var(--kt-approve); }
+.kt-segs i.is-watch { background: color-mix(in srgb, var(--kt-info) 60%, transparent); }
 .br-board .kt-kpi.is-warn { border-color: var(--kit-wait); }
 .br-dots { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; min-height: 12px; }
 .br-dots i { width: 12px; height: 12px; border-radius: 4px; }
@@ -89,8 +97,77 @@ export const BOARD_EXTRA_CSS = `
 .br-board .br-board-qs { display: grid; gap: 10px; }
 .br-board .kt-sign-blocked { font-size: .95em; }
 
-/* the introduction: five phases */
+/* the introduction: five phases (four for a repo done only here); a name never breaks inside a word */
 .br-way.kt-team-intro.is-phased { grid-template-columns: .7fr 1.25fr 1.7fr 1.1fr .8fr; }
-@media (max-width: 1100px) { .br-way.kt-team-intro.is-phased { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.br-way.kt-team-intro.is-phased.is-local { grid-template-columns: .8fr 1.4fr 1.2fr .8fr; }
+@container kt-root (max-width: 1180px) { .br-way.kt-team-intro.is-phased, .br-way.kt-team-intro.is-phased.is-local { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.br-board .kt-intro-name b { white-space: nowrap; }
 .br-btn-big { padding: 10px 20px; font-size: 1.02em; border-radius: 12px; }
+
+/* whom it waits for: magenta is the person looking only; anyone else is a calm blue, no blinking */
+.br-board .kt-orch.br-person.is-other .kt-orch-body { fill: color-mix(in srgb, var(--kt-info) 9%, var(--card)); stroke: var(--kt-info); stroke-width: 2.5; }
+.br-board .kt-orch-sub.is-other { fill: var(--kt-info); font-weight: 750; }
+.br-board .kt-orch.br-person { cursor: default; }
+.br-board .kt-node.is-awaiting_approval.is-other .kt-node-body { stroke: var(--kt-info); stroke-width: 2.5; fill: color-mix(in srgb, var(--kt-info) 9%, var(--card)); }
+.br-board .kt-node.is-awaiting_approval.is-other .kt-node-sub { fill: var(--kt-info); }
+.kt-node-badge.is-other { --kt-badge: var(--kt-info); }
+.kt-legend-item.is-other i { border-color: var(--kt-info); background: color-mix(in srgb, var(--kt-info) 16%, transparent); }
+.br-board .kt-track-span.is-wait.is-other { background: color-mix(in srgb, var(--kt-info) 55%, transparent); }
+.br-board .kt-track-span.is-wait.is-other.is-live { background: var(--kt-info); box-shadow: none; }
+.br-board .kt-track-span.is-wait.is-other.is-live::after { display: none; }
+
+/* a phase not on the way, folded to a narrow band */
+.br-board .kt-phase.is-folded .kt-phase-title { font-size: 14px; }
+.br-board .kt-phase.is-folded .kt-phase-band { fill: color-mix(in srgb, var(--muted) 5%, transparent); }
+
+/* the check wall: watching (the 14 days, nobody's turn) and not needed this time */
+.br-board .kt-cell.is-watch { --kt-c: var(--kt-info); }
+.br-board .kt-cell.is-watch .kt-cell-face { color: var(--kt-info); }
+.br-board .kt-wall-inspect.is-watch { background: color-mix(in srgb, var(--kt-info) 9%, transparent); }
+.br-board .kt-cell.is-not_needed { --kt-c: var(--muted); opacity: .6; }
+.br-board .kt-cell.is-not_needed .kt-cell-face { border-style: dotted; background: none; color: var(--muted); }
+.br-wall-fix { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 8px 0 0; font-size: .86em; color: var(--muted); }
+.br-wall-fix .br-link { font-weight: 750; }
+.br-spark-one { margin: -2px 0 8px; }
+
+/* the lanes: the quiet tail drawn short, the change block */
+.br-board .kt-axis .kt-axis-tick { transform: translateX(-50%); }
+.br-board .kt-axis .kt-axis-tick.is-first { transform: none; }
+.br-board .kt-axis .kt-axis-tick.is-last { transform: translateX(-100%); }
+.kt-axis-tail { position: absolute; top: 0; padding-left: 6px; border-left: 2px dotted color-mix(in srgb, var(--muted) 55%, transparent); font-size: .76em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kt-track-tail { position: absolute; top: 0; height: 14px; border-left: 2px dotted color-mix(in srgb, var(--muted) 55%, transparent);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 12%, transparent) 0 4px, transparent 4px 8px); }
+.br-changes { display: grid; gap: 4px; min-width: 0; }
+.br-commit-rows li { align-items: center; }
+.br-commit-rows li .br-commit-subj { flex: 1 1 auto; }
+.br-commit-rows li.is-records .br-commit-subj { color: var(--muted); }
+.br-commit-rows .br-commit-files { flex: none; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.br-commit-rows .br-commit-files .kt-file-bar { width: 56px; }
+.br-board .kt-owned { margin-top: 2px; }
+
+/* 你要做的一步: the strip above the graph */
+.br-next { display: grid; gap: 8px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--kit-wait, var(--kt-approve));
+  background: color-mix(in srgb, var(--kt-approve) 7%, var(--card)); }
+.br-next-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.br-next-who { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: var(--kt-approve); white-space: nowrap; }
+.br-next-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.br-next-item + .br-next-item { border-top: 1px dashed color-mix(in srgb, var(--kt-approve) 30%, var(--border)); padding-top: 8px; }
+.br-next-row { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
+.br-next-text { flex: 1 1 340px; min-width: 0; display: grid; gap: 4px; }
+.br-next-text p { margin: 0; }
+.br-next-text .br-line { margin-top: 2px; }
+.br-next-acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.br-next-k { display: inline-block; min-width: 5.2em; margin-right: 8px; color: var(--muted); font-size: .88em; }
+.br-next-hint { color: var(--text); }
+.br-next-cmd { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; }
+.br-next-cmd code { padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--kt-glass); }
+.br-next-cwd { font-size: .8em; overflow-wrap: anywhere; }
+.br-next .br-q { margin: 0; }
+.br-next.is-other { display: flex; align-items: baseline; gap: 6px 10px; flex-wrap: wrap; margin: 0; padding: 8px 14px; border-color: var(--border); background: var(--card); }
+.br-next.is-other .br-next-who { color: var(--muted); font-weight: 700; }
+
+/* 验收's small parts; the board's problem said with what to do */
+.br-board .br-copy { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.br-board .br-desc-ref { cursor: help; }
+.br-board .br-problem { display: grid; gap: 4px; }
 `
