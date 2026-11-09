@@ -75,6 +75,16 @@ describe('待办', () => {
     expect(screen.getByTestId('todo-count')).toHaveTextContent('2件')
   })
 
+  test('a merge whose new knowledge is not written back yet leads to Brain’s 回写, on it', async () => {
+    const wb = { ...fx.todo().items[3], kind: 'write_back', key: 'PAY-2', title: '退款单号校验', approval: null, question: null,
+      text: '合并了：这次提议了 2 条新知识，还没回写' } as unknown as TodoItem
+    installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items: [wb] }) })
+    const { go } = renderTodo()
+    const g = await screen.findByRole('region', { name: '等回写 Brain' })
+    fireEvent.click(within(g).getByRole('button', { name: '回写 Brain' }))
+    expect(go).toHaveBeenCalledWith({ kind: 'brain', repo: 'r1', reflect: 'PAY-2' })
+  })
+
   test('the tab’s count is read again when it disagrees with the list', async () => {
     const status = fx.status()
     status.counts.todo = 2

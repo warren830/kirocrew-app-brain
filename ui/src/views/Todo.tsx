@@ -11,6 +11,7 @@
  *   question            a question on the MR (the team runner's)                    去 MR 上回答
  *   acceptance          the product accepts on the MR                               去 MR 上验收
  *   start               claimed by you, not started                                 去开工 (开需求 with its key)
+ *   write_back          merged, its new knowledge not written back yet               回写 Brain (Brain's 回写, on it)
  *   handoff_rejected    the hand-over was refused: why, and what to say to the AI   打开会话 · 看 MR
  *   handoff_unlabelled  pushed, but the MR has no hand-over label                   补上交接标签 · 看 MR
  *   stuck               a run on the runner that no answer can move any more        看 MR
@@ -33,7 +34,7 @@ export const TODO_POLL_MS = 10_000
 
 type GroupTone = 'wait' | 'bad' | 'warn'
 /** what an item is on this page: its kind, except a runner question no answer can move any more */
-type GroupKey = TodoItem['kind'] | 'stuck'
+type GroupKey = TodoItem['kind'] | 'stuck' | 'write_back'
 interface Group { key: GroupKey; heading: string; icon: string; tone: GroupTone; hint: string }
 
 const GROUPS: Group[] = [
@@ -43,6 +44,7 @@ const GROUPS: Group[] = [
   { key: 'question', heading: '运行机上的问题', icon: 'question', tone: 'wait', hint: '在 MR 上回答' },
   { key: 'acceptance', heading: '等验收', icon: 'release', tone: 'wait', hint: '在 MR 上验收' },
   { key: 'start', heading: '认领了还没开工', icon: 'new', tone: 'wait', hint: '去开需求开工' },
+  { key: 'write_back', heading: '等回写 Brain', icon: 'brain', tone: 'wait', hint: '合并了：把学到的写回 Brain' },
   { key: 'handoff_rejected', heading: '接手被拒', icon: 'handover', tone: 'bad', hint: '改好再交接' },
   { key: 'handoff_unlabelled', heading: '没交出去的交接', icon: 'handover', tone: 'warn', hint: 'MR 上没有交接标签' },
   { key: 'stuck', heading: '卡住了的运行', icon: 'blocked', tone: 'bad', hint: '这一步答不了了：找负责人' },
@@ -188,6 +190,11 @@ function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; 
         {it.kind === 'start' && it.key && (
           <button type="button" className="br-btn is-small is-primary" onClick={() => go({ kind: 'new', repo: it.repo, key: it.key, title: it.title })}>
             <RoleIcon role="new" size={14} />{DO_NAME.start}
+          </button>
+        )}
+        {group.key === 'write_back' && it.key && (
+          <button type="button" className="br-btn is-small is-primary" onClick={() => go({ kind: 'brain', repo: it.repo, reflect: it.key })}>
+            <RoleIcon role="brain" size={14} />{DO_NAME.write_back}
           </button>
         )}
         {mr && mrFirst && <ExtLink href={mr} className={`br-btn is-small${group.tone !== 'bad' || group.key === 'stuck' ? ' is-primary' : ''}`}>{mrAct}</ExtLink>}
