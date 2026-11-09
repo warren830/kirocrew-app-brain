@@ -48,8 +48,6 @@ const CHANGE_TONE: Record<FileChange['change'], Tone> = { added: 'ok', modified:
 const CHANGE_ORDER: FileChange['change'][] = ['added', 'modified', 'deleted', 'other']
 const EMPTY_FORM: KitForm = { req_prefix: '', tracker: 'none', jira_base: '', gitlab_base: '', gitlab_project: '', default_branch: 'main', team: '' }
 type StepState = FlowStep['state']
-/** GET /import/defaults, with the checkouts found on this machine when the backend sends them */
-type Defaults = ImportDefaults & { found?: FoundRepo[] }
 
 /** The folder name a clone of *url* gets when the name is left empty (as the backend makes it). */
 export function nameFromUrl(url: string): string {
@@ -63,7 +61,7 @@ const isNext = (c: ImportInspect, x: ImportCheck) => x.id === 'kit' && c.next ==
 export function ImportView({ entry, go, setStatus, reloadStatus, pollMs }: { entry: ImportEntry } & ViewProps) {
   const api = useAppApi()
   const jobMs = Math.min(pollMs ?? JOB_POLL_MS, JOB_POLL_MS)
-  const defaults = usePoll<Defaults>(paths.importDefaults(), 0)
+  const defaults = usePoll<ImportDefaults>(paths.importDefaults(), 0)
   const [source, setSource] = useState<'local' | 'clone'>('local')
   const [path, setPath] = useState(entry.path ?? '')
   const [checked, setChecked] = useState<{ path: string; result: ImportInspect } | null>(null)
