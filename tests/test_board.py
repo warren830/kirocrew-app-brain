@@ -222,10 +222,11 @@ def row_of(state, who, text, **waits):
 
 
 def snapshot(f, row, *, t=None, sessions=(), me="ychchen", now=T + 11.5 * H, local_only=True, mr=None,
-             app_events=(), reflect_refs=(), brain_=None, team_decisions=()):
+             app_events=(), reflect_refs=(), brain_=None, team_decisions=(), changes=None):
     return board.build(f, row, t, mr=mr, sessions=list(sessions), app_events=list(app_events),
                        team_decisions=list(team_decisions), subjects={}, reflect_refs=list(reflect_refs),
-                       default_branch="main", local_only=local_only, kit_rows=[], decisions=[], brain=brain_, me=me, now=now)
+                       default_branch="main", local_only=local_only, kit_rows=[], decisions=[], brain=brain_, me=me, now=now,
+                       changes=changes)
 
 
 def session(last, busy=False, awaiting=False):
@@ -374,3 +375,47 @@ def test_a_claim_not_started_says_since_when_and_to_start_it():
     assert b["accept"]["step"]["text"] == "认领了，还没开工：在开需求里开工 DEMO-3"
     b = snapshot(facts([], run=False, owner="carol"), row_of("claimed", "people", "已认领，还没开工"), me="alice")
     assert b["accept"]["step"]["text"] == "carol 认领的，等 carol 开工"
+
+
+def test_each_commit_on_the_conveyor_carries_the_files_it_changed(tmp_path):
+    """BOARD-21: git's own answer to the board's one log call (board.GIT_LOG), read back: each commit's files with
+    their status and lines, a rename as R under its new name; the merge has none."""
+    g = ["git", "-C", str(tmp_path), "-c", "user.email=a@example.com", "-c", "user.name=a"]
+    subprocess.run(g[:3] + ["init", "-q"], check=True)
+    (tmp_path / "keep.py").write_text("a\nb\n")
+    (tmp_path / "old.py").write_text("x\ny\nz\n")
+    (tmp_path / "gone.py").write_text("gone\n")
+    subprocess.run(g + ["add", "-A"], check=True)
+    subprocess.run(g + ["commit", "-qm", "one"], check=True)
+    (tmp_path / "keep.py").write_text("a\nB\nc\n")
+    subprocess.run(g + ["mv", "old.py", "new.py"], check=True)
+    subprocess.run(g + ["rm", "-q", "gone.py"], check=True)
+    (tmp_path / "add.py").write_text("n\n")
+    subprocess.run(g + ["add", "-A"], check=True)
+    subprocess.run(g + ["commit", "-qm", "two: 改"], check=True)
+    shas = subprocess.run(g + ["rev-list", "HEAD"], capture_output=True, text=True, check=True).stdout.split()
+    log = subprocess.run(g + list(board.GIT_LOG) + shas, capture_output=True, text=True, check=True).stdout
+    assert board.subjects_from_log(log) == {shas[0]: "two: 改", shas[1]: "one"}
+    got = board.changes_from_log(log)
+    assert sorted(got[shas[0]], key=lambda c: c["path"]) == [
+        {"path": "add.py", "added": 1, "removed": 0, "status": "A"},
+        {"path": "gone.py", "added": 0, "removed": 1, "status": "D"},
+        {"path": "keep.py", "added": 2, "removed": 1, "status": "M"},
+        {"path": "new.py", "added": 0, "removed": 0, "status": "R"}]
+    assert {c["path"] for c in got[shas[1]]} == {"keep.py", "old.py", "gone.py"}
+    t = merged_trace(T + 20 * M, T + 15 * 86400)
+    t["actions"] = {"commits": [{"sha": shas[0], "at": iso(T + 5 * M), "by": "person", "files": 4}]}
+    b = snapshot(facts(demo3_events(), merged=True), row_of("merged", "nobody", "已合并"), t=t, changes=got)
+    belt = {x["kind"]: x for x in b["belt"]}
+    assert belt["commit"]["changes"] == got[shas[0]] and belt["merge"]["changes"] == []
+
+
+def test_the_replay_says_what_the_session_is_doing_while_it_works():
+    """A stage done inside another (逆向工程 inside 需求分析) leaves the session at work on the outer one: the replay
+    never shows 「做完…」 for a session at work; the progress itself is the KPI's, not a lane fact."""
+    b = snapshot(facts(demo3_events()), row_of("local", "you", "会话空着：轮到你回话"), sessions=[session(T + 16 * M)])
+    local = actor(b, "local")
+    running = [h["doing"] for h in local["history"] if h["status"] == "running"]
+    assert "在做：需求分析" in running[running.index("在做：逆向工程") + 1:]
+    assert not [d for d in running if d.startswith("做完")]
+    assert not [x for x in local["facts"] if x.startswith("Lean")]

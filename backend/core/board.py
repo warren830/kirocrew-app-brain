@@ -379,9 +379,10 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
           sessions: list[dict[str, Any]], app_events: list[dict[str, Any]], team_decisions: list[dict[str, Any]],
           subjects: dict[str, str], reflect_refs: list[tuple[str, float]], default_branch: str, local_only: bool,
           kit_rows: list[dict[str, Any]], decisions: list[dict[str, Any]], brain: dict[str, Any] | None,
-          me: str | None, now: float) -> dict[str, Any]:
-    """The board's graph part (actors, events, belt, checks, accept, person, live, direct); the service adds the
-    requirement's detail (decisions, questions, 变更说明, sessions, credits)."""
+          me: str | None, now: float, changes: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, Any]:
+    """The board's graph part (actors, events, belt, checks, accept, person, live, direct, missing); the service adds
+    the requirement's detail (decisions, questions, 变更说明, sessions, credits). *changes*: changes_from_log of the
+    commits (GIT_LOG), by full sha."""
     run = f.get("run") or {}
     handoff = run.get("handoff") if isinstance(run.get("handoff"), dict) else None
     hand_at = _epoch((handoff or {}).get("requested_at"))
@@ -407,6 +408,7 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
                 else "没有请人批设计和代码计划"), at)
 
     last_local = [None]   # the last moment the local session was seen at work (a Lean step, a commit, a turn)
+    open_stages: dict[str, list[str]] = {"local": [], "runner": []}   # stages begun and not done, by side
     for e in evs:
         at, kind = e["at"], e["kind"]
         if hand_at is None or at <= hand_at:
@@ -421,14 +423,19 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
             if A[s]["status"] in ("skipped",):
                 continue
             label = lean_view.STAGE_LABEL.get(str(e.get("stage") or ""), "一个阶段")
+            doing = open_stages[s]
+            if label in doing:
+                doing.remove(label)
             if e.get("state") == "started":
+                doing.append(label)
                 fo.put(s, "fixing" if A[s]["status"] == "fixing" else "running", "在做：%s" % label, at)
                 fo.open(s, "fix" if A[s]["status"] == "fixing" else "work", at)
                 if e.get("stage") == "build-and-test" and A["ci"]["status"] == "waiting":
                     fo.put("ci", "running", "跑 verify：构建和测试", at)
                     fo.open("ci", "work", at)
             elif e.get("state") == "done" and A[s]["status"] in ("running", "fixing"):
-                fo.put(s, A[s]["status"], "做完%s" % label, at)
+                # still at work: on the stage it had begun before this one, else on the next one
+                fo.put(s, A[s]["status"], "在做：%s" % (doing[-1] if doing else "下一个阶段"), at)
             if e.get("stage") in AFTER_PLAN or (e.get("stage") == "code-generation" and e.get("state") == "done"):
                 past_design(at)
         elif kind == "request":
@@ -571,7 +578,7 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
     _facts(fo, f, evs, row, sessions, proposals)
     person = _person(row, me, f)
     accept = _accept(f, row, A, checks, decisions, t, sessions, merged_at, proposals, you, mr, team_decisions)
-    belt = _belt(evs)
+    belt = _belt(evs, changes or {})
     direct = hand_at is None and (local_only or merged_at is not None or A["ci"]["status"] != "waiting"
                                   or A["release"]["status"] != "waiting")
     live = any(x["status"] in ("running", "fixing") for x in actors) and row.get("state") not in ("merged", "closed")
@@ -729,21 +736,23 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
                 fo.close("runner", at)
 
 
-def _belt(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _belt(evs: list[dict[str, Any]], changes: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """The conveyor: each commit and the hand-over with the files it changed (BOARD-21's 改动 block), then the merge."""
     out = []
     for e in evs:
         if e["kind"] == "commit" and e.get("sha"):
             out.append({"kind": "commit", "at": e["at"], "sha": e["sha"][:12], "by": e.get("by") or "person",
                         "text": _clip(e.get("subject") or ("运行机的提交" if e.get("by") == "bot" else "提交"), 80),
                         "files": int(e.get("files") or 0), "records_only": bool(e.get("records")),
-                        "actor": e.get("actor") or "local"})
+                        "actor": e.get("actor") or "local", "changes": list(changes.get(e["sha"]) or [])})
         elif e["kind"] == "handover":
             out.append({"kind": "handover", "at": e["at"], "sha": str(e.get("sha") or "")[:12], "by": "person",
                         "text": _clip(e.get("subject") or "交接", 80), "files": int(e.get("files") or 0),
-                        "records_only": bool(e.get("records")), "actor": "handover"})
+                        "records_only": bool(e.get("records")), "actor": "handover",
+                        "changes": list(changes.get(str(e.get("sha") or "")) or [])})
         elif e["kind"] == "merge":
             out.append({"kind": "merge", "at": e["at"], "sha": str(e.get("sha") or "")[:12], "by": "person",
-                        "text": e["text"], "files": 0, "records_only": False, "actor": "release"})
+                        "text": e["text"], "files": 0, "records_only": False, "actor": "release", "changes": []})
     return out[-MAX_BELT:]
 
 
@@ -855,7 +864,6 @@ def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str,
 def _facts(fo: _Fold, f: dict[str, Any], evs: list[dict[str, Any]], row: dict[str, Any], sessions: list[dict[str, Any]],
            proposals: int) -> None:
     A = fo.a
-    lean = row.get("lean") or {}
     n_commits = {"local": 0, "runner": 0}
     for e in evs:
         if e["kind"] == "commit" and e.get("actor") in n_commits:
@@ -865,7 +873,6 @@ def _facts(fo: _Fold, f: dict[str, Any], evs: list[dict[str, Any]], row: dict[st
         if e["kind"] == "blocked" and e["from"] in blocked:
             blocked[e["from"]] += 1
     A["local"]["facts"] = [x for x in (
-        lean_progress(lean) if lean.get("stage") else "",
         "提交 %d 次" % n_commits["local"] if n_commits["local"] else "",
         "Lean 拦下 %d 次" % blocked["local"] if blocked["local"] else "",
         "会话 %d 个" % len([s for s in sessions if s.get("kind", "local") == "local"]) if sessions else "") if x]
@@ -893,15 +900,6 @@ def _facts(fo: _Fold, f: dict[str, Any], evs: list[dict[str, Any]], row: dict[st
     for x in A.values():   # an actor not on this requirement's way has nothing to say
         if x["status"] == "skipped":
             x["facts"] = []
-
-
-def lean_progress(lean: dict[str, Any]) -> str:
-    """Lean's progress the one way the app says it (ui/src/vocab.ts leanProgress): 「做完 4 · 跳过 6 · 下一步：发布」."""
-    if "done_n" not in lean:
-        return "Lean 做完 %d/%d 个阶段" % (lean.get("done") or 0, lean.get("total") or 11)
-    parts = ["做完 %d" % (lean.get("done_n") or 0)] + (["跳过 %d" % lean["skipped_n"]] if lean.get("skipped_n") else [])
-    nxt = lean.get("next")
-    return "Lean " + " · ".join(parts + ["下一步：%s" % nxt["label"] if nxt else "全部做完"])
 
 
 def _person(row: dict[str, Any], me: str | None, f: dict[str, Any]) -> dict[str, Any]:
@@ -1081,13 +1079,43 @@ def run_of(f: dict[str, Any]) -> dict[str, Any]:
     return f.get("run") if isinstance(f.get("run"), dict) else {}
 
 
+# the one git call the board's commits are read with (read only): each commit's subject, and the files it changed with
+# their status (--raw) and lines added and removed (--numstat), renames found (-M)
+GIT_LOG = ("log", "--no-walk=unsorted", "-M", "--raw", "--numstat", "--format=%x01%H%x00%s")
+MAX_CHANGES = 40
+
+
 def subjects_from_log(text: str) -> dict[str, str]:
-    """`git log --no-walk --format=%H%x00%s` output → {sha: subject}."""
+    """`git log` output in GIT_LOG's format (or `--format=%H%x00%s`) → {sha: subject}."""
     out = {}
     for line in (text or "").splitlines():
-        sha, _, subj = line.partition("\0")
-        if re.match(r"^[0-9a-f]{40}$", sha):
+        sha, _, subj = line.lstrip("\x01").partition("\0")
+        if re.match(r"^[0-9a-f]{40}$", sha) and "\0" in line:
             out[sha] = subj.strip()[:200]
+    return out
+
+
+def changes_from_log(text: str) -> dict[str, list[dict[str, Any]]]:
+    """`git log` output in GIT_LOG's format → {sha: [{path, added, removed, status}]}: status A, M, D or R (a copy is
+    an A, a type change an M); a binary file's lines are 0. git prints the --raw and the --numstat lines of a commit
+    in the same order, so the n-th of one is the n-th of the other (no rename paths to parse)."""
+    out: dict[str, list[dict[str, Any]]] = {}
+    for block in (text or "").split("\x01")[1:]:
+        head, _, body = block.partition("\n")
+        sha = head.partition("\0")[0]
+        if not re.match(r"^[0-9a-f]{40}$", sha):
+            continue
+        raw, nums = [], []
+        for line in body.splitlines():
+            if line.startswith(":"):
+                meta, *paths = line.split("\t")
+                letter = (meta.split() or ["M"])[-1][:1]
+                raw.append(({"C": "A", "T": "M"}.get(letter, letter) if letter in "AMDRCT" else "M", paths[-1] if paths else ""))
+            elif line.count("\t") >= 2:
+                a, r, _ = line.split("\t", 2)
+                nums.append((int(a) if a.isdigit() else 0, int(r) if r.isdigit() else 0))
+        out[sha] = [{"path": path[:300], "added": n[0], "removed": n[1], "status": st}
+                    for (st, path), n in zip(raw, nums + [(0, 0)] * (len(raw) - len(nums)))][:MAX_CHANGES]
     return out
 
 
