@@ -886,7 +886,9 @@ export interface ReflectApplyResult {
 // ---------------------------------------------------------------- GET /todo
 
 /** handoff_unlabelled: pushed, but its MR carries no hand-over label (nothing was handed over) */
+/** reply: a local session idle, your turn to talk (opens it); start: claimed by you, no run yet (开工) */
 export type TodoKind = 'lean_approval' | 'question' | 'clarify' | 'acceptance' | 'handoff_rejected' | 'handoff_unlabelled' | 'crew'
+  | 'reply' | 'start'
 export interface TodoItem {
   kind: TodoKind
   repo: string
