@@ -70,3 +70,6 @@ export function leanProgress(lean: Pick<LeanSummary, 'done_n' | 'skipped_n' | 'n
   parts.push(lean.next ? `下一步：${lean.next.label}` : '全部做完')
   return parts.join(' · ')
 }
+
+/** what kind of gap a run found missing (brain-gap blocks, brainkit.intents GAP_KINDS) */
+export const GAP_KIND_NAME: Record<string, string> = { knowledge: '缺知识', test: '缺测试', other: '其他' }

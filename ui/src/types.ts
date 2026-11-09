@@ -854,6 +854,9 @@ export interface BrainView {
     runs: { intent: string; key: string; loaded: number | null; cited: string[]; stale: string[]; unknown: string[] }[]
     never_cited: string[]
     repeats_any: [string, number][]
+    /** the numbers above count the runs merged into the default branch only; these runs are not merged yet, read where
+     * 需求详情 reads them (their worktree, else their branch), with its numbers. The backend always sends it */
+    unmerged?: { key: string; loaded: number | null; cited: string[]; where: 'worktree' | 'branch' }[]
   }
   /** requirements whose run can be reflected (they have a decisions.md) */
   reflect: { key: string; title: string; state: ReqState }[]
@@ -873,6 +876,9 @@ export interface ReflectPreview {
   /** at least one op that is more than sources added: --apply would open a branch */
   substantive: boolean
   error: string
+  /** what brain-kit said, verbatim (notes, warnings, problems and error are its words in Chinese): for 细节. The backend
+   * always sends it */
+  raw?: string[]
 }
 export interface ReflectApplyBody { repo: string; key: string; push: boolean }
 export interface ReflectApplyResult {
@@ -881,6 +887,10 @@ export interface ReflectApplyResult {
   branch: string | null
   /** the worktree brain-kit wrote the new brain/<KEY>-reflect-<n> branch in (the person's own checkout is not touched) */
   worktree: string | null
+  /** with push: the MR brain-kit opened (null: none, e.g. no GitLab token); pushed: the branch is on the remote. The
+   * backend always sends them */
+  mr_url?: string | null
+  pushed?: boolean
 }
 
 // ---------------------------------------------------------------- GET /todo
