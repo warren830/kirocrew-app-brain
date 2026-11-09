@@ -713,19 +713,19 @@
         {
           "at": 1793651940,
           "status": "running",
-          "doing": "跑 verify：构建和测试",
+          "doing": "跑自动检查：构建和测试",
           "who": null
         },
         {
           "at": 1793652660,
           "status": "failed",
-          "doing": "verify 没过：pytest",
+          "doing": "自动检查没过：pytest",
           "who": null
         },
         {
           "at": 1793654580,
           "status": "done",
-          "doing": "verify 通过（3 项）",
+          "doing": "自动检查通过（3 项）",
           "who": null
         },
         {
@@ -751,18 +751,18 @@
         {
           "at": 1793652660,
           "kind": "verify-fail",
-          "title": "verify 没过：pytest"
+          "title": "自动检查没过：pytest"
         },
         {
           "at": 1793654580,
           "kind": "verify-ok",
-          "title": "verify 通过（3 项）"
+          "title": "自动检查通过（3 项）"
         }
       ],
       "facts": [
-        "verify 2 次",
+        "自动检查 2 次",
         "没过 1 次",
-        "verify 通过（3 项）"
+        "自动检查通过（3 项）"
       ],
       "credits": null,
       "session": null,
@@ -1254,7 +1254,7 @@
       "kind": "verify",
       "from": "branch",
       "to": "checks",
-      "text": "verify 没过：pytest",
+      "text": "自动检查没过：pytest",
       "detail": false,
       "src": null
     },
@@ -1274,7 +1274,7 @@
       "kind": "verify",
       "from": "branch",
       "to": "checks",
-      "text": "verify 通过（3 项）",
+      "text": "自动检查通过（3 项）",
       "detail": false,
       "src": null
     },
@@ -1840,9 +1840,9 @@
     }
   },
   "brain": {
-    "loaded": 12,
+    "loaded": 4,
     "cited": [
-      "P-PAY-2-1",
+      "P-7",
       "T-12"
     ],
     "stale": [],

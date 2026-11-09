@@ -136,7 +136,8 @@ describe('Brain', () => {
     expect(lint).toHaveTextContent('Brain 检查')
     expect(lint).toHaveClass('is-bad')
     expect(lint).toHaveTextContent('1个错')
-    expect(lint).toHaveTextContent('5 个提醒')
+    // the old entry ids are one quiet note, not a 提醒 each
+    expect(lint).toHaveTextContent('1 个提醒')
   })
 
   test('a rate with something to count is a percentage and its cells; no withdraw candidate says so with what was archived', async () => {
@@ -155,7 +156,12 @@ describe('Brain', () => {
     const lint = await screen.findByRole('region', { name: '检查' })
     const { errors, warnings } = fx.brain().lint
     const rows = within(lint).getAllByRole('listitem')
-    expect(rows.map((r) => r.dataset.level)).toEqual([...errors.map(() => 'FAIL'), ...warnings.map(() => 'WARN')])
+    expect(rows.map((r) => r.dataset.level)).toEqual(['FAIL', 'WARN', 'OK'])
+    expect(errors).toHaveLength(1)
+    // brain lint warns about each old entry id; there is nothing to do: one quiet note names them all, the new pattern in words
+    expect(rows[2]).toHaveTextContent('P-7、J-3、T-12、T-13 是旧式条目号，不用改。新条目的编号是 字母-需求号-序号，比如 P-PAY-3-1')
+    expect(rows[2]).not.toHaveTextContent('做什么')
+    expect(within(lint).queryAllByRole('listitem').filter((r) => /旧式条目号/.test(r.textContent!))).toHaveLength(1)
     expect(rows[0]).toHaveTextContent(errors[0].text)
     expect(rows[0]).toHaveTextContent(`做什么${errors[0].todo}`)
     expect(within(rows[0]).getByText('brain-kit 的原话').closest('details')).not.toHaveAttribute('open')

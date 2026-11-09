@@ -29,12 +29,12 @@ describe('待办', () => {
     // one card per item; KiroCrew's problems are its checks' rows, with their fixes
     expect(screen.getAllByTestId('todo-item')).toHaveLength(8)
     expect(screen.queryByText(TEAM_SENTENCE)).toBeNull()
-    expect(group('接手被拒')).toHaveTextContent('run.json 的 brain_commit 不在 main 上')
+    expect(group('接手被拒')).toHaveTextContent('接手被拒：标签是 bob 打的，不是负责人 alice')
     expect(within(group('接手被拒')).getByRole('link', { name: '看 MR' })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/46')
     expect(within(group('等验收')).getByRole('link', { name: '去 MR 上验收' })).toHaveAttribute('target', '_blank')
     // pushed, but the MR carries no hand-over label (brain handoff exits 1 then): nothing was handed over
     const unlabelled = group('没交出去的交接')
-    expect(unlabelled).toHaveTextContent('MR 上没有交接标签 ai-handoff：什么也没交出去')
+    expect(unlabelled).toHaveTextContent('推上去了，但 MR 上没有交接标签：什么也没交出去')
     expect(within(unlabelled).getByRole('link', { name: '补上交接标签' })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/52')
     expect(badges).toEqual([]) // the shell sets the badge from /status, not this view
   })
@@ -76,7 +76,7 @@ describe('待办', () => {
   })
 
   test('a merge whose new knowledge is not written back yet leads to Brain’s 回写, on it', async () => {
-    const wb = { ...fx.todo().items[3], kind: 'write_back', key: 'PAY-2', title: '退款单号校验', approval: null, question: null,
+    const wb = { ...fx.todo().items[3], kind: 'write_back', repo: 'r1', key: 'PAY-2', title: '退款单号校验', approval: null, question: null,
       text: '合并了：这次提议了 2 条新知识，还没回写' } as unknown as TodoItem
     installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items: [wb] }) })
     const { go } = renderTodo()
@@ -107,7 +107,7 @@ describe('待办', () => {
     const { go } = renderTodo()
     await screen.findByRole('region', { name: '运行机上的问题' })
     fireEvent.click(within(group('运行机上的问题')).getByRole('button', { name: 'PAY-4' }))
-    expect(go).toHaveBeenCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-4', from: 'todo' })
+    expect(go).toHaveBeenCalledWith({ kind: 'item', repo: 'runner', key: 'PAY-4', from: 'todo' })
     // the second way: its 需求看板
     fireEvent.click(within(group('接手被拒')).getByRole('button', { name: '需求看板' }))
     expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-7', from: 'todo' })
@@ -154,9 +154,11 @@ describe('待办', () => {
     renderTodo()
     await screen.findByRole('region', { name: '运行机上的问题' })
     const q = group('运行机上的问题')
-    expect(q).toHaveTextContent('D-2')
-    expect(q).toHaveTextContent('按商户拆分后，老的合并对账单还要不要保留？')
-    expect(within(q).getByRole('link', { name: '去 MR 上回答' })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/41#note_812')
+    expect(q).toHaveTextContent('D-2 等人在 MR 上回答')
+    expect(q).toHaveTextContent('对账单按商户拆分')     // the requirement's title, not its branch slug
+    expect(q).toHaveTextContent('设计')                 // its kind in words
+    expect(q).not.toHaveTextContent(/design|merchant split/)
+    expect(within(q).getByRole('link', { name: '去 MR 上回答' })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/41')
     expect(within(q).queryByRole('form')).toBeNull()
   })
 

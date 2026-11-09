@@ -213,7 +213,11 @@ export interface RepoMe {
 
 /** POST /me/name: git config brain.user <name> in that repo (brain-kit's USER_RE, lowercased; no token, ever). */
 export interface MeNameBody { path: string; name: string }
-export interface MeNameResult { ok: true; text: string; me: RepoMe; status: Status }
+export interface MeNameResult {
+  ok: true; text: string; me: RepoMe; status: Status
+  /** the command it ran (git config brain.user <name>), for 细节 */
+  raw?: string
+}
 
 export interface Status {
   app: { name: string; version: string; team: boolean }
@@ -888,6 +892,8 @@ export interface BrainView {
   /** requirements whose run can be reflected (they have a decisions.md) */
   reflect: { key: string; title: string; state: ReqState }[]
   error: string
+  /** brain-kit's own words when it could not read the Brain or its use (`error` says it in Chinese): for 细节 */
+  raw?: string
 }
 
 export interface ReflectOp { kind: string; target: string | null; file: string | null; type: string | null; section: string | null; src: string[]; text: string }

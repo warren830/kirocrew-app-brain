@@ -397,60 +397,196 @@
     "source": "trace",
     "items": [
       {
-        "at": "2026-11-07T15:00:00+08:00",
+        "at": "2026-11-07T10:00:00Z",
         "kind": "app",
-        "label": "认领",
-        "detail": "claim/PAY-3 推到 origin",
-        "who": "alice",
-        "src": "claim.json"
-      },
-      {
-        "at": "2026-11-07T16:00:00+08:00",
-        "kind": "session",
-        "label": "开了本机会话",
-        "detail": "工具调用不用逐个批准",
-        "who": "alice",
+        "label": "在 app 里开工",
+        "detail": "工作区 /Users/alice/workplace/brain-app/shop-pay/refund-export，分支 ai/alice/PAY-3-refund-export",
+        "who": null,
         "src": "app"
       },
       {
-        "at": "2026-11-07T18:00:00+08:00",
-        "kind": "approval",
-        "label": "批准 REQUIREMENTS",
-        "detail": "8cf2cbce",
-        "who": "alice",
-        "src": "aidlc-state.md"
+        "at": "2026-11-07T10:00:20Z",
+        "kind": "app",
+        "label": "开了本机会话",
+        "detail": "工具调用不用逐个批准",
+        "who": null,
+        "src": "app"
       },
       {
-        "at": "2026-11-07T19:00:00+08:00",
-        "kind": "question",
-        "label": "澄清：金额列要不要带币种？",
-        "detail": "回答 A",
-        "who": "alice",
-        "src": "park.json"
-      },
-      {
-        "at": "2026-11-07T22:00:00+08:00",
-        "kind": "approval",
-        "label": "批准 DESIGN",
-        "detail": "c41d09e2",
-        "who": "alice",
-        "src": "aidlc-state.md"
-      },
-      {
-        "at": "2026-11-08T15:00:00+08:00",
-        "kind": "commit",
-        "label": "refund-export：分批写 CSV",
-        "detail": "a91c2f0",
-        "who": "brain-dev",
-        "src": "git"
-      },
-      {
-        "at": "2026-11-08T21:54:00+08:00",
+        "at": "2026-11-07T10:02:00Z",
         "kind": "stage",
-        "label": "代码生成：refund-api 的计划写好了",
+        "label": "逆向工程：跳过",
+        "detail": "新功能，代码已经读过",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T10:28:00Z",
+        "kind": "commit",
+        "label": "提交（只改记录）",
+        "detail": "e7e3cc104242",
+        "who": "G-3F2A1C",
+        "src": null
+      },
+      {
+        "at": "2026-11-07T10:52:00Z",
+        "kind": "human",
+        "label": "批准需求",
         "detail": null,
-        "who": "brain-dev",
-        "src": "lean events"
+        "who": "P-1A2B",
+        "src": null
+      },
+      {
+        "at": "2026-11-07T10:53:00Z",
+        "kind": "stage",
+        "label": "需求分析：完成",
+        "detail": "需求写好了，6 条验收标准",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T10:54:00Z",
+        "kind": "stage",
+        "label": "用户故事：跳过",
+        "detail": "小需求",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T11:10:00Z",
+        "kind": "blocked",
+        "label": "Lean 拦下了一个不该做的改动：需求和设计还没批",
+        "detail": "src/refund/service.py",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T12:01:00Z",
+        "kind": "human",
+        "label": "批准设计",
+        "detail": null,
+        "who": "P-1A2B",
+        "src": null
+      },
+      {
+        "at": "2026-11-07T12:02:00Z",
+        "kind": "stage",
+        "label": "应用设计：完成",
+        "detail": "设计过了",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T12:12:00Z",
+        "kind": "stage",
+        "label": "拆分单元：完成",
+        "detail": "拆成 2 个单元：refund-export、refund-api",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T12:32:00Z",
+        "kind": "stage",
+        "label": "功能设计：完成（refund-export）",
+        "detail": "导出字段和分批规则定了",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T12:32:00Z",
+        "kind": "stage",
+        "label": "功能设计：完成（refund-api）",
+        "detail": "导出字段和分批规则定了",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T12:34:00Z",
+        "kind": "stage",
+        "label": "非功能设计：跳过（refund-export）",
+        "detail": "没有新的指标",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T12:34:00Z",
+        "kind": "stage",
+        "label": "非功能设计：跳过（refund-api）",
+        "detail": "没有新的指标",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T12:35:00Z",
+        "kind": "stage",
+        "label": "基础设施设计：跳过（refund-export）",
+        "detail": "不动基础设施",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T12:35:00Z",
+        "kind": "stage",
+        "label": "基础设施设计：跳过（refund-api）",
+        "detail": "不动基础设施",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-07T13:06:00Z",
+        "kind": "human",
+        "label": "批准代码生成计划",
+        "detail": null,
+        "who": "P-1A2B",
+        "src": null
+      },
+      {
+        "at": "2026-11-07T13:24:00Z",
+        "kind": "commit",
+        "label": "提交",
+        "detail": "93b2dea57790",
+        "who": "G-3F2A1C",
+        "src": null
+      },
+      {
+        "at": "2026-11-07T13:49:00Z",
+        "kind": "commit",
+        "label": "提交",
+        "detail": "193239b77a5f",
+        "who": "G-3F2A1C",
+        "src": null
+      },
+      {
+        "at": "2026-11-07T14:04:00Z",
+        "kind": "stage",
+        "label": "代码生成：完成（refund-export）",
+        "detail": "refund-export 的代码写完了，单测全过",
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-08T09:02:00Z",
+        "kind": "stage",
+        "label": "代码生成：开始（refund-api）",
+        "detail": null,
+        "who": null,
+        "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
+      },
+      {
+        "at": "2026-11-08T13:20:00Z",
+        "kind": "commit",
+        "label": "提交（只改记录）",
+        "detail": "61ddbc3019ed",
+        "who": "G-3F2A1C",
+        "src": null
+      },
+      {
+        "at": "2026-11-08T13:40:00Z",
+        "kind": "question",
+        "label": "停下问人：澄清",
+        "detail": null,
+        "who": null,
+        "src": null
       }
     ],
     "missing": [
@@ -480,19 +616,16 @@
     "note": "只算这个 app 开的会话；KiroCrew 只报 credits"
   },
   "brain": {
-    "loaded": 14,
+    "loaded": 7,
     "cited": [
-      "P-PAY-2-1",
-      "T-PAY-2-1",
-      "T-12"
+      "T-12",
+      "T-PAY-2-1"
     ],
-    "stale": [
-      "T-12"
-    ],
+    "stale": [],
     "unknown": [
       "T-PAY-9-1"
     ],
-    "proposals": 1
+    "proposals": 0
   },
   "mr_desc": {
     "available": true,
