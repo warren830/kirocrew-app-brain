@@ -739,7 +739,8 @@ describe('需求详情', () => {
     expect(items.at(-1)).toHaveTextContent('认领')
     expect(tl).toHaveTextContent('最新的在上面 · brain-kit 记下的')
     expect(tl).toHaveTextContent('开了 brain-dev 会话 · 工具调用不用逐个批准')
-    expect(tl).not.toHaveTextContent(/brain reflect|--apply|8efc|G-A29056/)
+    expect(items.at(-1)).toHaveTextContent('认领 · 认领推到了远端')
+    expect(tl).not.toHaveTextContent(/brain reflect|--apply|8efc|G-A29056|claim\/|origin/)
     expect(items.find((i) => i.textContent!.includes('批准需求'))!.title).toContain('化名 G-A29056')
     expect(tl).not.toHaveTextContent('读不到')   // a local run: the bridge's and the runner's records are not on its way
   })

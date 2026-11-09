@@ -1350,6 +1350,7 @@ function itemText(it: TimelineItem): { label: string; detail: string | null; tit
   if (reflect) return { label: `回写 Brain${reflect[1] ? '并推送' : ''}：${reflect[2]}`, detail: it.detail ? `分支 ${it.detail}` : null, title: it.label }
   if (it.label === '开了 brain-dev 会话') return { label: it.label, detail: it.detail?.includes('信任') ? '工具调用不用逐个批准' : null, title: it.detail }
   if (it.kind === 'commit' && it.detail && /^[0-9a-f]{7,40}$/.test(it.detail)) return { label: it.label, detail: it.detail.slice(0, 8), title: it.detail }
+  if (it.detail && /^claim\/\S+ 推到 origin$/.test(it.detail)) return { label: it.label, detail: '认领推到了远端', title: it.detail }
   return { label: it.label, detail: it.detail ? it.detail.replace(/^工作区 /, '工作目录 ') : null, title: null }
 }
 
