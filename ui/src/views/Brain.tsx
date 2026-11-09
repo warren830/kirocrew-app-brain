@@ -18,7 +18,7 @@ import { fmtRate } from '../format'
 import { useReducedMotion } from '../hooks'
 import { fileOfEntry, type BrainEntryRef, type BrainFile } from '../nav'
 import type { BrainEntry, BrainFileView, BrainView, CheckRow, ReflectApplyBody, ReflectApplyResult, ReflectPreview } from '../types'
-import { CheckRows, EmptyHero, ExtLink, Icon, Kpi, LoadState, RoleIcon, Segs, StateChip, repoLabel, type FlowStep } from '../ui'
+import { CheckRows, EmptyHero, ExtLink, Icon, Kpi, LoadState, RoleIcon, Segs, StateChip, brainkitProblem, repoLabel, type FlowStep } from '../ui'
 import { ACT, GAP_KIND_NAME } from '../vocab'
 import type { ViewProps } from './props'
 
@@ -174,28 +174,24 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
                 {repos.map((r) => <option key={r.id} value={r.id}>{repoLabel(r, repos)}</option>)}
               </select>
             </label>
-            {data?.ref && <span className="bv-ref" title="Brain 读的是默认分支上的这个版本">读的是 <code>{data.ref}</code></span>}
+            {data?.ref && <span className="bv-ref" title={`Brain 读的是默认分支上的这个版本：${data.ref}`}>读的是 <code>{data.ref.split('@')[0]}</code></span>}
             <button type="button" className="br-btn" onClick={brain.reload} disabled={!repo}>
               <Icon name="RefreshCw" size={14} />重新读取
             </button>
           </>
         )}
       </header>
-      {props.status && repos.length === 0 && props.status.repos.length > 0 && (
+      {props.status && repos.length === 0 && props.status.repos.length > 0 && (props.status.brainkit.ok ? (
         <EmptyHero testid="repos-unusable" title="列表里的仓库现在都读不了"
           text={props.status.repos.map((r) => `${r.name}：${r.pending ? r.pending.text : r.error || '读不了'}`)}
           punch="按上面的提示修好以后，这里就能看到它的 Brain。">
-          {props.status.brainkit.ok ? (
-            <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'import' })}>
-              <RoleIcon role="import" size={17} />去导入仓库检查
-            </button>
-          ) : (
-            <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'settings' })}>
-              <RoleIcon role="settings" size={17} />去设置
-            </button>
-          )}
+          <button type="button" className="br-btn is-primary is-big" onClick={() => props.go({ kind: 'import' })}>
+            <RoleIcon role="import" size={17} />去导入仓库检查
+          </button>
         </EmptyHero>
-      )}
+      ) : (
+        <NoKit status={props.status} onSettings={() => props.go({ kind: 'settings' })} />
+      ))}
       {props.status && props.status.repos.length === 0 && (
         <EmptyHero testid="import-cta" label="导入仓库" title="还没有能用的仓库"
           text={['Brain 是一个仓库里大家共用的知识：做需求时定下的原则、决定和踩过的坑。每次运行会加载它，用上了就引用。']}
@@ -289,6 +285,26 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
         </>
       )}
     </main>
+  )
+}
+
+/** No repo readable because brain-kit cannot be used: that one cause once (the banner above says what to do), the
+ * repos with a cause of their own, and the same way on as the banner. */
+function NoKit({ status, onSettings }: { status: NonNullable<ViewProps['status']>; onSettings: () => void }) {
+  const p = brainkitProblem(status.brainkit.error)
+  const waiting = status.repos.filter((r) => !r.pending && /没装载/.test(r.error))
+  const own = status.repos.filter((r) => !waiting.includes(r))
+  return (
+    <EmptyHero testid="repos-unusable" title={`${p.text}：这里还看不了 Brain`}
+      text={[
+        `${waiting.length === status.repos.length ? '列表里的 ' : ''}${waiting.length} 个仓库的 Brain 都要 brain-kit 才读得出来。`,
+        ...own.map((r) => `${r.name}：${r.pending ? r.pending.text : r.error || '读不了'}`),
+      ]}
+      punch={p.kind === 'missing' ? '写对 brain-kit 的位置以后，这里就能看到它们的 Brain。' : 'brain-kit 修好以后，这里就能看到它们的 Brain。'}>
+      <button type="button" className="br-btn is-primary is-big" onClick={onSettings}>
+        <RoleIcon role="settings" size={17} />{p.kind === 'missing' ? '去填位置' : '去设置'}
+      </button>
+    </EmptyHero>
   )
 }
 
