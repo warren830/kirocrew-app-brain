@@ -97,7 +97,7 @@
         {
           "at": 1794048780,
           "status": "running",
-          "doing": "做完需求分析"
+          "doing": "在做：下一个阶段"
         },
         {
           "at": 1794048900,
@@ -117,7 +117,7 @@
         {
           "at": 1794052920,
           "status": "running",
-          "doing": "做完应用设计"
+          "doing": "在做：下一个阶段"
         },
         {
           "at": 1794053100,
@@ -190,7 +190,6 @@
         }
       ],
       "facts": [
-        "Lean 做完 8 · 下一步：代码生成",
         "提交 3 次",
         "Lean 拦下 1 次",
         "会话 1 个"
@@ -707,7 +706,8 @@
       "text": "PAY-3：需求初稿",
       "files": 2,
       "records_only": true,
-      "actor": "local"
+      "actor": "local",
+      "changes": []
     },
     {
       "kind": "commit",
@@ -717,7 +717,8 @@
       "text": "PAY-3：导出接口的骨架",
       "files": 4,
       "records_only": false,
-      "actor": "local"
+      "actor": "local",
+      "changes": []
     },
     {
       "kind": "commit",
@@ -727,7 +728,8 @@
       "text": "PAY-3：CSV 字段和金额格式",
       "files": 3,
       "records_only": false,
-      "actor": "local"
+      "actor": "local",
+      "changes": []
     }
   ],
   "checks": {

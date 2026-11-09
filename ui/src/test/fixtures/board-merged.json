@@ -96,7 +96,7 @@
         {
           "at": 1793631180,
           "status": "running",
-          "doing": "做完需求分析"
+          "doing": "在做：下一个阶段"
         },
         {
           "at": 1793631300,
@@ -126,7 +126,7 @@
         {
           "at": 1793638020,
           "status": "running",
-          "doing": "做完应用设计"
+          "doing": "在做：下一个阶段"
         },
         {
           "at": 1793639340.0,
@@ -189,7 +189,6 @@
         }
       ],
       "facts": [
-        "Lean 做完 11 · 全部做完",
         "提交 3 次",
         "Lean 拦下 1 次",
         "会话 1 个"
@@ -494,7 +493,7 @@
         {
           "at": 1793651880,
           "status": "running",
-          "doing": "做完代码生成"
+          "doing": "在做：下一个阶段"
         },
         {
           "at": 1793651940,
@@ -504,7 +503,7 @@
         {
           "at": 1793654640,
           "status": "running",
-          "doing": "做完构建测试"
+          "doing": "在做：下一个阶段"
         },
         {
           "at": 1793654700,
@@ -534,7 +533,7 @@
         {
           "at": 1793659560,
           "status": "running",
-          "doing": "做完发布"
+          "doing": "在做：下一个阶段"
         },
         {
           "at": 1793661540.0,
@@ -1348,7 +1347,8 @@
       "text": "PAY-2：需求初稿",
       "files": 2,
       "records_only": true,
-      "actor": "local"
+      "actor": "local",
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1358,7 +1358,8 @@
       "text": "PAY-2：按意见改设计（接口加分页）",
       "files": 1,
       "records_only": true,
-      "actor": "local"
+      "actor": "local",
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1368,7 +1369,8 @@
       "text": "PAY-2：交接说明",
       "files": 1,
       "records_only": true,
-      "actor": "local"
+      "actor": "local",
+      "changes": []
     },
     {
       "kind": "handover",
@@ -1378,7 +1380,8 @@
       "text": "PAY-2：交接（brain handoff）",
       "files": 2,
       "records_only": true,
-      "actor": "handover"
+      "actor": "handover",
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1388,7 +1391,8 @@
       "text": "PAY-2：接口和数据结构（refund-api）",
       "files": 3,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1398,7 +1402,8 @@
       "text": "PAY-2：主流程（refund-api）",
       "files": 4,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1408,7 +1413,8 @@
       "text": "PAY-2：错误处理和重试（refund-api）",
       "files": 5,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1418,7 +1424,8 @@
       "text": "PAY-2：测试（refund-api）",
       "files": 6,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1428,7 +1435,8 @@
       "text": "PAY-2：按 D-1 的回答改",
       "files": 2,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": []
     },
     {
       "kind": "commit",
@@ -1438,7 +1446,8 @@
       "text": "PAY-2：修好 pytest 里没过的两个用例",
       "files": 2,
       "records_only": false,
-      "actor": "runner"
+      "actor": "runner",
+      "changes": []
     },
     {
       "kind": "merge",
@@ -1448,7 +1457,8 @@
       "text": "合并进 main（合并提交）",
       "files": 0,
       "records_only": false,
-      "actor": "release"
+      "actor": "release",
+      "changes": []
     }
   ],
   "checks": {
