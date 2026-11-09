@@ -114,6 +114,7 @@ def test_in_place_with_unrelated_changes_commits_only_what_brain_install_wrote(t
         return (await svc.import_inspect({"path": str(repo)}))["install"], await install_mode(svc, repo, "inplace")
 
     c, done = started(svc, go)
+    assert svc.settings["repos"] == [done["result"]["path"]]   # listed once its commit went in, page open or not (SETUP-18)
     assert c["recommend"] == "inplace" and [o["mode"] for o in c["options"]] == ["inplace", "branch"]   # offered
     assert c["options"][0]["ok"] and "只提交安装写的文件，你自己没提交的改动不动" in c["options"][0]["line"]
     assert c["overlap"] == [] and set(c["dirty"]) == set(mine)

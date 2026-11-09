@@ -322,6 +322,8 @@ export interface ImportDefaults {
   /** a GitLab token is on this machine (never the token) */
   token: boolean
   brainkit_ok: boolean
+  /** the checkouts found on this machine to pick from (importer.found_repos) */
+  found: FoundRepo[]
 }
 /** A git checkout under ~/workplace or ~/workspace that 导入仓库 offers to pick (importer.found_repos), sent as
  * ImportDefaults' `found` once the backend's GET /import/defaults has it */

@@ -1094,8 +1094,9 @@ class Service:
 
     async def import_defaults(self) -> dict[str, Any]:
         token = await asyncio.to_thread(self._token_present)
+        found = await asyncio.to_thread(importer.found_repos, list(self.settings["repos"]), self.settings["work_root"])
         return {"clone_parent": importer.default_parent(self.settings["work_root"]), "work_root": self.settings["work_root"],
-                "branch": importer.DEFAULT_BRANCH, "token": token, "brainkit_ok": bk.ok()}
+                "branch": importer.DEFAULT_BRANCH, "token": token, "brainkit_ok": bk.ok(), "found": found}
 
     async def import_inspect(self, body: dict[str, Any]) -> dict[str, Any]:
         """检查: read only (see importer.inspect)."""
@@ -1226,9 +1227,11 @@ class Service:
             raise self._fail(exc)
         work_root = self.settings["work_root"]
 
-        async def after(_res: Any) -> None:
+        async def after(res: Any) -> None:
             if top in self.settings["repos"]:   # a listed repo that was not installed: usable now, or pending
                 await asyncio.to_thread(self.reload_sync)
+            elif ((res or {}).get("commit") or {}).get("ok"):   # listed even when the page was closed (SETUP-18)
+                await self.import_add({"path": top})
 
         if mode == "inplace":
             jid = self._start_job("install", top, inplace.INSTALL_STEPS,
