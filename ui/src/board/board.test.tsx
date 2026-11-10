@@ -567,6 +567,34 @@ describe('需求看板 · 轮到谁、做什么', () => {
     const intro = await screen.findByTestId('br-board-intro')
     expect(within(intro).getByTestId('br-intro-start')).toHaveTextContent('carol 认领的，等 carol 开工')
     expect(screen.queryByRole('button', { name: /^开工/ })).toBeNull()
+    // the way's first step is carol's: 「0 认领 · carol · 认领、交文档、开工」, no 你 anywhere in it (BOARD-11)
+    const claim = intro.querySelector('.kt-intro-phase') as HTMLElement
+    expect(claim).toHaveTextContent('0 认领一个需求号，文档过五关carol认领、交文档、开工')
+    expect(intro).not.toHaveTextContent('你')
+  })
+
+  test('the owner’s own claim speaks to them: 0 认领 · 你; a board that names its owner offers no 开工, whoever the repo thinks is looking', async () => {
+    const b = fx.board()
+    Object.assign(b.row, { state: 'claimed', state_label: '已认领' })
+    b.person = { ...b.person, you: true }
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    let intro = await screen.findByTestId('br-board-intro')
+    expect(intro.querySelector('.kt-intro-phase')).toHaveTextContent('0 认领一个需求号，文档过五关你认领、交文档、开工')
+    expect(within(intro).getByRole('button', { name: '开工 PAY-3' })).toBeInTheDocument()
+    cleanup()
+    // erin's claim in a repo where 你是谁 is not set yet: the backend named erin, so does the introduction
+    Object.assign(b.row, { owner: 'erin' })
+    b.person = { ...b.person, owner: 'erin', me: false, you: false }
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    const status = fx.status()
+    status.repos = status.repos.map((r) => ({ ...r, me: r.me ? { ...r.me, name: null } : r.me }))
+    renderBoard(PAY3, { status })
+    intro = await screen.findByTestId('br-board-intro')
+    expect(screen.queryByRole('button', { name: /^开工/ })).toBeNull()
+    expect(intro).toHaveTextContent('需求和设计由 erin 在会话里自己批准')
+    expect(within(intro).getByTestId('br-intro-start')).toHaveTextContent('erin 认领的，等 erin 开工')
+    expect(intro).not.toHaveTextContent('你')
   })
 
   test('a board brain-kit could not read whole: one Chinese sentence and what to do, its own words under 细节', async () => {

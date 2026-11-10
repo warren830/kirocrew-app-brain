@@ -438,7 +438,7 @@ def test_someone_elses_requirement_names_them_and_a_question_for_the_product_is_
     b = snapshot(f, row, me="alice", mr=mr, local_only=False, now=hand + 3 * H)
     text = json.dumps(b, ensure_ascii=False)
     assert "carol 批准了需求" in [e["text"] for e in b["events"]] and "你批准了" not in text
-    assert b["person"]["status"] != "awaiting_approval" and b["person"]["me"] is False
+    assert b["person"]["status"] != "awaiting_approval" and b["person"]["me"] is False and b["person"]["you"] is False
     step = b["accept"]["step"]
     assert step["who"] == "产品" and step["text"].startswith("在 MR 上回答 D-2（A / B）")
     assert step["mr_url"] == mr["url"] and step["line"] is None and step["session_url"] is None
@@ -447,6 +447,7 @@ def test_someone_elses_requirement_names_them_and_a_question_for_the_product_is_
     for me in ("alice", None):
         b = snapshot(f, dict(row, where="runner", repo="runner"), me=me, mr=mr, local_only=False, now=hand + 3 * H)
         assert "carol 批准了需求" in [e["text"] for e in b["events"]], (me, [e["text"] for e in b["events"]])
+        assert b["person"]["you"] is False
 
 
 def test_a_claim_not_started_says_since_when_and_to_start_it():
@@ -455,8 +456,14 @@ def test_a_claim_not_started_says_since_when_and_to_start_it():
     local = actor(b, "local")
     assert local["status"] == "waiting" and local["since"] == T and local["facts"] == []
     assert b["accept"]["step"]["text"] == "认领了，还没开工：在开需求里开工 DEMO-3"
+    assert b["person"]["you"] is True
     b = snapshot(facts([], run=False, owner="carol"), row_of("claimed", "people", "已认领，还没开工"), me="alice")
     assert b["accept"]["step"]["text"] == "carol 认领的，等 carol 开工"
+    # BOARD-11: the board calls carol by her name, so the page offers alice no 开工 and says no 你; nobody known reading
+    # it on this machine is taken for its person, as every line of the board says
+    assert b["person"]["you"] is False
+    b = snapshot(facts([], run=False, owner="carol"), row_of("claimed", "you", "已认领，还没开工"), me=None)
+    assert b["person"]["you"] is True and b["accept"]["step"]["text"].startswith("认领了，还没开工")
 
 
 def test_each_commit_on_the_conveyor_carries_the_files_it_changed(tmp_path):

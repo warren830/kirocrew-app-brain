@@ -214,9 +214,12 @@ function CreditsKpi({ board, reducedMotion, replaying }: { board: ReqBoard; redu
 
 type Way = { phase: string; title: string; steps: { icon: string; title: string; does: string }[][] }[]
 
-/** The way a requirement goes, before its run started (the sample's empty-state introduction of the team). */
+/** 0 认领: the one who claimed it, 你 only to them (BOARD-11). */
+const claimPhase = (who: string): Way[number] => ({ phase: '0 认领', title: '一个需求号，文档过五关', steps: [[{ icon: 'person', title: who, does: '认领、交文档、开工' }]] })
+
+/** The way a requirement goes after its claim, before its run started (the sample's empty-state introduction of the
+ * team). */
 const WAY: Way = [
-  { phase: '0 认领', title: '一个需求号，文档过五关', steps: [[{ icon: 'person', title: '你', does: '认领、交文档、开工' }]] },
   { phase: '1 本机 · Lean', title: 'brain-dev 会话带着 Lean 推进', steps: [
     [{ icon: 'laptop', title: '本机会话', does: '读需求、读 Brain、写文档' }],
     [{ icon: 'req', title: '需求审批', does: '会话里打一行' }, { icon: 'design', title: '设计审批', does: '会话里打一行' }],
@@ -233,15 +236,15 @@ const WAY: Way = [
 /** A repo done only on this machine: no runner, no MR; the release is approved in the session too. */
 const LOCAL_WAY: Way = [
   WAY[0],
-  WAY[1],
   { phase: '2 检查 · 发布', title: '机器检查，你批准发布', steps: [[{ icon: 'ci', title: 'CI 检查', does: '跑自动检查' }, { icon: 'release', title: '发布审批', does: '会话里打一行' }]] },
   { phase: '3 回写', title: '学到的写回 Brain', steps: [[{ icon: 'brain', title: '回写 Brain', does: '学到的写回去' }]] },
 ]
 
+/** *onStart*: the one looking is the owner (only they start it): the way speaks to them as 你, else it names the owner. */
 export function Intro({ board, onStart }: { board: ReqBoard; onStart?: () => void }) {
   const only = localOnly(board)
-  const way = only ? LOCAL_WAY : WAY
   const owner = board.person.owner
+  const way = [claimPhase(onStart ? '你' : owner ?? '负责人'), ...(only ? LOCAL_WAY : WAY)]
   const who = onStart ? '你' : owner ? ` ${owner} ` : '负责人'
   return (
     <section className="kt-empty" data-testid="br-board-intro" aria-label="这个需求还没开工">

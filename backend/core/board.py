@@ -628,7 +628,7 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
     checks = _checks(f, evs, A, kit_rows, t, local_only, hand_at, merged_at, you, asked)
     actors = [A[k] for k, *_ in ACTORS]
     _facts(fo, f, evs, row, sessions, proposals)
-    person = _person(row, me, f)
+    person = _person(row, me, f, you)
     accept = _accept(f, row, A, checks, decisions, t, sessions, merged_at, proposals, you, mr, team_decisions)
     belt = _belt(evs, changes or {})
     direct = hand_at is None and (local_only or merged_at is not None or A["ci"]["status"] != "waiting"
@@ -965,9 +965,11 @@ def _facts(fo: _Fold, f: dict[str, Any], evs: list[dict[str, Any]], row: dict[st
             x["facts"] = []
 
 
-def _person(row: dict[str, Any], me: str | None, f: dict[str, Any]) -> dict[str, Any]:
+def _person(row: dict[str, Any], me: str | None, f: dict[str, Any], you: str = "你") -> dict[str, Any]:
     """The owner's node: it asks for the person only when the requirement waits on them (waits.who `you`); a question
-    for the product or someone else is said, not flashed at the owner (BOARD-5)."""
+    for the product or someone else is said, not flashed at the owner (BOARD-5). `you`: the board calls the owner 你
+    (_you: the one reading is the owner, or nobody known reads it on their machine), so the page offers them 开工 and
+    says 你 where everything else on it does (BOARD-11)."""
     waits = row.get("waits") or {}
     owner = f.get("owner")
     st = row.get("state")
@@ -981,7 +983,7 @@ def _person(row: dict[str, Any], me: str | None, f: dict[str, Any]) -> dict[str,
         status, doing = "running", waits.get("text") or "AI 在做"
     else:
         status, doing = "waiting", waits.get("text") or "没有等你的事"
-    return {"status": status, "doing": _clip(doing, 80), "owner": owner, "me": bool(me) and me == owner}
+    return {"status": status, "doing": _clip(doing, 80), "owner": owner, "me": bool(me) and me == owner, "you": you == "你"}
 
 
 def _lines(s: str) -> str:

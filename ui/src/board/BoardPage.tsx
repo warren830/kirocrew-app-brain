@@ -178,9 +178,10 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
   // the crumb's first step and ← 返回 name the view it was opened from (the way back)
   const fromName = VIEW_NAME[entry.from ?? 'overview']
   const toBrain = () => go({ kind: 'brain', repo: entry.repo, reflect: entry.key })
-  // 开工 the requirement claimed already: 开需求 with its key (fixed there) and title; only its owner starts it
+  // 开工 the requirement claimed already: 开需求 with its key (fixed there) and title; only its owner starts it: the one
+  // the board calls 你 (an older backend did not say: the owner, or anyone while it is not known who is looking)
   const me = status?.repos.find((r) => r.id === entry.repo)?.me?.name ?? null
-  const startable = !!board && entry.repo !== 'runner' && (board.person.me || !board.person.owner || !me)
+  const startable = !!board && entry.repo !== 'runner' && (board.person.you ?? (board.person.me || !board.person.owner || !me))
   const toStart = () => go({ kind: 'new', repo: entry.repo, key: entry.key, ...(board?.row.title ? { title: board.row.title } : {}) })
   // a node that waits for the person: the session for what is said or approved there, the step strip for the rest (a
   // review is not said in the session that wrote the code: the strip has 开审查会话)
