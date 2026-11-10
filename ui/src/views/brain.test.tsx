@@ -338,6 +338,15 @@ describe('Brain', () => {
     expect(within(preview).getByText('proposal at line 27: already in the Brain as P-PAY-2-1, skipped').closest('details')).not.toHaveAttribute('open')
   })
 
+  test('a run that proposed nothing says so, not that its proposals are in the Brain', async () => {
+    const { user } = setup({ repo: 'r1', reflect: 'PAY-5' }, { [`POST ${API}/brain/reflect/preview`]: (): ReflectPreview => ({ ...fx.reflect(), ops: [], gaps: [], warnings: [], notes: [], raw: [], substantive: false }) })
+    const card = await screen.findByRole('region', { name: '回写' })
+    await user.click(within(card).getByRole('button', { name: '预览' }))
+    const preview = await within(card).findByTestId('reflect-preview')
+    expect(within(preview).getByTestId('reflect-nothing')).toHaveTextContent('这次运行没有给 Brain 的提议：不用回写。')
+    expect(preview).not.toHaveTextContent('Brain 里都有了')
+  })
+
   test('a Brain error from the backend is shown; the repo select rewrites the entry', async () => {
     const status = fx.status()
     status.repos[1] = { ...status.repos[0], id: 'r2', name: 'shop-web' }

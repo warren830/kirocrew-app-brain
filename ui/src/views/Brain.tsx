@@ -419,7 +419,6 @@ function IdChips({ ids, onEntry, tone = 'idle' }: { ids: string[]; onEntry: (id:
   )
 }
 
-/** The requirements to write back, the merged ones first (the usual time to write one back), else in the backend's order. */
 /** Where the preview read the run's decisions.md (brain-kit's 「<branch>:<path>」 for a branch, a path in a worktree):
  * 「读的是 main 分支上的 runs/PAY-2/decisions.md」. */
 function SourceNote({ source }: { source: string }) {
@@ -431,6 +430,7 @@ function SourceNote({ source }: { source: string }) {
   )
 }
 
+/** The requirements to write back, the merged ones first (the usual time to write one back), else in the backend's order. */
 const mergedFirst = (items: BrainView['reflect']) => [...items.filter((r) => r.state === 'merged'), ...items.filter((r) => r.state !== 'merged')]
 
 /** what to do about a withdraw candidate (an entry runs keep loading and never cite) */
@@ -603,6 +603,8 @@ type StepState = 'done' | 'now' | 'bad' | 'off' | undefined
 function previewSays(p: ReflectPreview): { what: 'write' | 'nothing' | 'blocked'; text: string } {
   if (p.error || p.problems.length) return { what: 'blocked', text: '' }
   const gaps = p.gaps.length ? '下面「Brain 里缺的」是这次发现还缺的知识或测试，可以开成新的需求。' : ''
+  // brain-kit says a line for each proposal it skips; none at all: the run proposed nothing
+  if (p.ops.length === 0 && p.notes.length === 0) return { what: 'nothing', text: `这次运行没有给 Brain 的提议：不用回写。${gaps}` }
   if (p.ops.length === 0) return { what: 'nothing', text: `这次的提议 Brain 里都有了（或者已经在别的回写分支上）：不用回写。${gaps}` }
   if (!p.substantive) {
     const ids = Array.from(new Set(p.ops.map((o) => o.target).filter((x): x is string => !!x)))
