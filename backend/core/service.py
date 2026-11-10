@@ -776,7 +776,8 @@ class Service:
                                              "last_activity", "opened_at", "project", "url", "error")} for s in sess],
             "credits": {"total": row["credits"], "note": detail.NO_TOKENS},
             "brain": detail.brain_block(tl.get("brain"), None, f.get("decisions_text")),
-            "mr_desc": self._desc_now(self._runner_desc(f, key, row) if run else None),
+            # no run read yet: the runner has not started on it, nothing is waiting for 开工
+            "mr_desc": self._desc_now(self._runner_desc(f, key, row)) if run else mrdesc_view.empty(board_mod.RUNNER_NO_DESC),
         }
 
     @staticmethod

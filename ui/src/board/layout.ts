@@ -103,9 +103,11 @@ export const PHASES: ReadonlyArray<{ key: string; n: string; title: string; sub:
 /** A folded phase's band. */
 export const GREY_W = 92
 
+type Slot = { col: number; half: number; row: number; phase: string }
+
 /** Each actor's column (0 = the first right of the person), its height in half row steps from the top row (0 top, 2
  * middle, 4 bottom; 1 and 3 for a pair), its place in its column (0 the upper) and its phase. */
-export const SLOTS: Record<string, { col: number; half: number; row: number; phase: string }> = {
+export const SLOTS: Record<string, Slot> = {
   local: { col: 0, half: 2, row: 0, phase: 'local' },
   req: { col: 1, half: 1, row: 0, phase: 'local' },
   design: { col: 1, half: 3, row: 1, phase: 'local' },
@@ -117,7 +119,32 @@ export const SLOTS: Record<string, { col: number; half: number; row: number; pha
   release: { col: 4, half: 3, row: 1, phase: 'check' },
   reflect: { col: 5, half: 2, row: 0, phase: 'land' },
 }
-const COLS = 6
+
+/** An app too narrow for six columns (UI问题清单 BOARD-31, 1050 px): one column per phase, its actors one above the other
+ * in the order they take their turn — 本机会话 over 需求审批 over 设计审批; 交接 over 桥 over 签名 over 运行机; CI 检查 over
+ * 发布验收; 回写 Brain — so every phase is in view at the text's own size. */
+const COMPACT_SLOTS: Record<string, Slot> = {
+  local: { col: 0, half: 0, row: 0, phase: 'local' },
+  req: { col: 0, half: 2, row: 1, phase: 'local' },
+  design: { col: 0, half: 4, row: 2, phase: 'local' },
+  handover: { col: 1, half: 0, row: 0, phase: 'runner' },
+  bridge: { col: 1, half: 2, row: 1, phase: 'runner' },
+  signer: { col: 1, half: 4, row: 2, phase: 'runner' },
+  runner: { col: 1, half: 6, row: 3, phase: 'runner' },
+  ci: { col: 2, half: 2, row: 0, phase: 'check' },
+  release: { col: 2, half: 4, row: 1, phase: 'check' },
+  reflect: { col: 3, half: 4, row: 0, phase: 'land' },
+}
+
+/** A layout's columns: where each actor stands, the columns of each phase band, the phase of each column. */
+interface Grid {
+  slots: Record<string, Slot>
+  byPhase: Record<string, number[]>
+  phaseOfCol: string[]
+}
+const FULL: Grid = { slots: SLOTS, byPhase: { local: [0, 1], runner: [2, 3], check: [4], land: [5] }, phaseOfCol: ['local', 'local', 'runner', 'runner', 'check', 'land'] }
+const COMPACT: Grid = { slots: COMPACT_SLOTS, byPhase: { local: [0], runner: [1], check: [2], land: [3] }, phaseOfCol: ['local', 'runner', 'check', 'land'] }
+const gridOf = (compact: boolean): Grid => (compact ? COMPACT : FULL)
 
 const round = (v: number) => Math.round(v * 10) / 10
 
@@ -241,10 +268,11 @@ function routeEdge(a: NodeBox, b: NodeBox, stages: StageInfo[], nodes: Map<strin
 }
 
 /** The edges of a requirement's way. *direct*: it never went to the runner (a local-only requirement past its design):
- * the way runs from the design approval straight to the checks. */
-export function edgesOf(keys: ReadonlySet<string>, direct: boolean): [string, string][] {
+ * the way runs from the design approval straight to the checks. *compact*: the approvals stand under the session in one
+ * column, so the session's line runs to 需求审批 and on down to 设计审批. */
+export function edgesOf(keys: ReadonlySet<string>, direct: boolean, compact = false): [string, string][] {
   const all: [string, string][] = [
-    ['local', 'req'], ['local', 'design'], ['req', 'handover'], ['design', 'handover'], ['handover', 'bridge'],
+    ['local', 'req'], compact ? ['req', 'design'] : ['local', 'design'], ['req', 'handover'], ['design', 'handover'], ['handover', 'bridge'],
     ['bridge', 'signer'], ['signer', 'runner'], ['runner', 'ci'], ['ci', 'release'], ['release', 'reflect'],
   ]
   // the runner's part folded away: the approvals lead straight to the checks
@@ -262,41 +290,56 @@ export function foldedPhases(actors: ReadonlyArray<{ key: string; status: string
 }
 
 /** The graph is never drawn smaller than this (UI问题清单 BOARD-31: its 12 px lines stay about 10 px on screen): an app
- * too narrow for the full width gets a narrower layout first (its columns closer, down to MIN_STEP apart); when even the
- * narrowest one does not fit, the graph keeps this scale and scrolls sideways (ActorGraph). The text never changes. */
+ * too narrow for the full width gets a narrower layout first (its columns closer, down to MIN_STEP apart), then the
+ * compact one (one column per phase); only when even that does not fit, the graph keeps this scale and scrolls
+ * sideways (ActorGraph). The text never changes. */
 export const SCALE = 0.84
 /** two columns this far apart at the closest: a node, the commit lane right of it, room for the edges */
 const MIN_STEP = NODE_W + 34
 
-/** The layout's width for a graph *avail* px wide (null: not measured, the full width) with *fold* folded. */
-export function graphWidth(avail: number | null | undefined, fold: ReadonlyArray<string> = []): number {
-  if (!avail) return GW
-  const open = COLS - fold.reduce((n, ph) => n + (SLOTS_BY_PHASE[ph]?.length ?? 0), 0)
+/** The narrowest layout of *grid* with *fold* folded. */
+function narrowest(grid: Grid, fold: ReadonlyArray<string>): number {
+  const open = grid.phaseOfCol.filter((ph) => !fold.includes(ph)).length
   const bands = PHASES.filter((p) => fold.includes(p.key)).length
-  const narrowest = PAD_X + NODE_W / 2 + ORCH_W + Math.max(0, open - 1) * MIN_STEP + bands * GREY_W + 70 + NODE_W / 2
-  return Math.round(Math.min(GW, Math.max(narrowest, avail / SCALE)))
+  return PAD_X + NODE_W / 2 + ORCH_W + Math.max(0, open - 1) * MIN_STEP + bands * GREY_W + 70 + NODE_W / 2
 }
 
-export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [string, string]>, rosterRows = 0, fold: ReadonlyArray<string> = [], width = GW): GraphLayout {
+/** The layout for a graph *avail* px wide (null: not measured, the full width) with *fold* folded: its width, and
+ * whether it is the compact one (the six columns do not fit at SCALE). */
+export function graphShape(avail: number | null | undefined, fold: ReadonlyArray<string> = []): { width: number; compact: boolean } {
+  if (!avail) return { width: GW, compact: false }
+  const compact = narrowest(FULL, fold) * SCALE > avail
+  return { width: Math.round(Math.min(GW, Math.max(narrowest(gridOf(compact), fold), avail / SCALE))), compact }
+}
+
+/** The layout's width for a graph *avail* px wide (graphShape's). */
+export const graphWidth = (avail: number | null | undefined, fold: ReadonlyArray<string> = []): number => graphShape(avail, fold).width
+
+export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [string, string]>, rosterRows = 0, fold: ReadonlyArray<string> = [], width = GW,
+  compact = false): GraphLayout {
   const W = width
+  const grid = gridOf(compact)
+  const COLS = grid.phaseOfCol.length
   const folded = new Set(fold)
   const left = PAD_X + NODE_W / 2 + ORCH_W
   const right = W - (70 + NODE_W / 2)
-  const open = Array.from({ length: COLS }, (_, i) => i).filter((i) => !folded.has(PHASE_OF_COL[i]))
+  const open = Array.from({ length: COLS }, (_, i) => i).filter((i) => !folded.has(grid.phaseOfCol[i]))
   const bands = PHASES.filter((p) => folded.has(p.key)).length
   const step = (right - left - bands * GREY_W) / Math.max(1, open.length - 1)
   // a folded phase's columns take no room; the band it folds into takes GREY_W
   const colX = (i: number) => {
-    const before = PHASES.filter((p) => folded.has(p.key) && SLOTS_BY_PHASE[p.key][0] < i).length
+    const before = PHASES.filter((p) => folded.has(p.key) && grid.byPhase[p.key][0] < i).length
     return round(left + Math.max(0, open.indexOf(i)) * step + before * GREY_W)
   }
-  const stages: StageInfo[] = Array.from({ length: COLS }, (_, i) => ({ index: i, x: colX(i), keys: [], phase: '', folded: folded.has(PHASE_OF_COL[i]) }))
+  const stages: StageInfo[] = Array.from({ length: COLS }, (_, i) => ({ index: i, x: colX(i), keys: [], phase: '', folded: folded.has(grid.phaseOfCol[i]) }))
   const yTop = TOP + NODE_H / 2
-  const yBot = yTop + 2 * ROW_GAP
+  // as many rows as the tallest column on this way has (the compact runner column: four)
+  const halves = Math.max(4, ...keys.filter((k) => grid.slots[k] && !folded.has(grid.slots[k].phase)).map((k) => grid.slots[k].half))
+  const yBot = yTop + (halves / 2) * ROW_GAP
   const nodes = new Map<string, NodeBox>()
   const mergeX = new Map<string, number>()
   for (const key of keys) {
-    const s = SLOTS[key]
+    const s = grid.slots[key]
     if (!s || folded.has(s.phase)) continue
     const st = stages[s.col]
     st.keys.push(key)
@@ -318,11 +361,15 @@ export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [st
   }
   const station = { x: W - 42, y: railY, r: STATION_R }
   const phases: PhaseBand[] = []
+  // a compact band (one column) takes the room up to halfway to the next column, as a two-column band does
+  const reach = compact ? Math.max(NODE_W / 2 + 14, step / 2 - 4) : NODE_W / 2 + 14
   for (const p of PHASES) {
     if (folded.has(p.key)) continue
-    const cols = stages.filter((s) => SLOTS_BY_PHASE[p.key]?.includes(s.index))
+    const cols = stages.filter((s) => grid.byPhase[p.key]?.includes(s.index))
     if (!cols.length) continue
-    phases.push({ ...p, x1: round(cols[0].x - NODE_W / 2 - 14), x2: round(cols[cols.length - 1].x + NODE_W / 2 + 14), used: cols.some((c) => c.keys.length > 0) })
+    const first = p.key === PHASES.find((x) => !folded.has(x.key))?.key
+    const last = p.key === [...PHASES].reverse().find((x) => !folded.has(x.key))?.key
+    phases.push({ ...p, x1: round(cols[0].x - (first ? NODE_W / 2 + 14 : reach)), x2: round(cols[cols.length - 1].x + (last ? NODE_W / 2 + 14 : reach)), used: cols.some((c) => c.keys.length > 0) })
   }
   for (let i = 1; i < phases.length; i++) {
     const gap = PHASES.findIndex((p) => p.key === phases[i].key) - PHASES.findIndex((p) => p.key === phases[i - 1].key) > 1
@@ -347,10 +394,6 @@ export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [st
   const orch = { x: round(PAD_X + ORCH_W / 2 - 10), y: TOP + ORCH_BOX.h / 2 - 6 }
   return { width: W, height: railY + 44, nodes, stages, edges, rail: { x1: PAD_X, x2: station.x - STATION_R, y: railY }, station, mergeX, phases, orch }
 }
-
-/** The columns of each phase band. */
-const SLOTS_BY_PHASE: Record<string, number[]> = { local: [0, 1], runner: [2, 3], check: [4], land: [5] }
-const PHASE_OF_COL: string[] = ['local', 'local', 'runner', 'runner', 'check', 'land']
 
 // ---------------------------------------------------------------------------------------------
 // anchors and the routes particles take

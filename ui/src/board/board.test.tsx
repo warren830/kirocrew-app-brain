@@ -8,10 +8,11 @@ import type { BoardEntry } from '../nav'
 import type { ReqBoard } from '../types'
 import { TYPE_IT_YOURSELF } from '../ui'
 import type { ViewProps } from '../views/props'
+import { optionText } from '../views/ReqSwitch'
 import { BoardPage } from './BoardPage'
 import { tickLabel } from './Lanes'
-import { GW, SCALE, graphWidth } from './layout'
-import { CELL_GROUPS, actorMeta, fmtCredits, fmtWhen } from './format'
+import { GW, NODE_H, NODE_W, SCALE, SLOTS, edgesOf, graphShape, graphWidth, layoutGraph } from './layout'
+import { CELL_GROUPS, actorMeta, fmtCredits, fmtSpan, fmtWhen } from './format'
 
 const PAY3: BoardEntry = { repo: 'r1', key: 'PAY-3' }
 const PAY2: BoardEntry = { repo: 'r1', key: 'PAY-2' }
@@ -176,6 +177,26 @@ describe('需求看板', () => {
     expect(within(graph).getByTestId('kt-station')).toHaveAccessibleName('检查 2/4')
     expect(within(graph).getByTestId('kt-orch')).toHaveTextContent(b.person.owner as string)
     expect(within(graph).getByRole('note', { name: '图例' })).toHaveTextContent('等你')
+    // nothing here waits on anyone else: the blue key keeps its general word
+    expect(within(graph).getByTestId('kt-legend-other')).toHaveTextContent('等别人')
+  })
+
+  test('the legend names whom the blue waits are on, as the lanes’ pills and spans do (等产品, 等 carol), not 等别人', async () => {
+    installFixtureRoutes(boardRoute(() => fx.boardMerged()))
+    renderBoard(PAY2)
+    let graph = await loaded()
+    expect(within(graph).getByTestId('kt-legend-other')).toHaveTextContent(/^等产品$/)
+    expect(region('各环节的泳道').querySelector('.kt-track-span.is-other')?.getAttribute('title')).toMatch(/^等产品：/)
+    cleanup()
+    // carol's requirement waiting on her, read by alice
+    const b = fx.board()
+    Object.assign(b.row, { owner: 'carol', waits: { ...b.row.waits, who: 'people', line: null } })
+    b.person = { ...b.person, owner: 'carol', me: false, you: false }
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    graph = await loaded()
+    expect(within(graph).getByTestId('kt-legend-other')).toHaveTextContent('等 carol')
+    expect(within(graph).getByTestId('kt-legend-other')).not.toHaveTextContent('等别人')
   })
 
   test('a node’s card on hover: what it is, what it waits for, the line to type; 打开会话 opens its session', async () => {
@@ -250,6 +271,70 @@ describe('需求看板', () => {
     fireEvent.click(within(local).getByRole('button', { name: '打开会话 ›' }))
     expect(navigations).toEqual([b.actors[0].session!.url])
     expect(screen.queryByTestId('kt-lanes-out')).toBeNull()
+  })
+
+  test('the graph’s name counts and names what waits as 这条路走到哪了 does: a hand-over to label is 1 个等你; nothing waiting is not said', async () => {
+    const b = fx.board()
+    Object.assign(b.row, { state: 'handed_over', state_label: '已交接', waits: { ...b.row.waits, who: 'you', do: 'label_handoff', line: null, text: '推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次' } })
+    b.actors = b.actors.map((a) => (a.status === 'awaiting_approval' ? { ...a, status: 'done' as const, line: null } : a))
+    b.questions = []
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    const graph = await loaded()
+    const kpi = within(screen.getByRole('group', { name: '指标' }))
+    expect(kpi.getByText('· 1 个等你', { exact: false })).toBeInTheDocument()
+    expect(within(graph).getByRole('group', { name: /^需求的路/ })).toHaveAccessibleName(/，1 个等你，/)
+    cleanup()
+    const c = fx.board()
+    Object.assign(c.row, { waits: { ...c.row.waits, who: 'runner', do: 'none', line: null, text: '运行机在跑' } })
+    c.actors = c.actors.map((a) => (a.status === 'awaiting_approval' ? { ...a, status: 'done' as const, line: null } : a))
+    installFixtureRoutes(boardRoute(() => structuredClone(c)))
+    renderBoard()
+    const g2 = await loaded()
+    const name = within(g2).getByRole('group', { name: /^需求的路/ }).getAttribute('aria-label')
+    expect(name).not.toMatch(/0 个等/)
+    expect(name).not.toContain('等运行机')
+  })
+
+  test('a run is said as the 运行机 page says it (第 1 次运行), its id only on hover: the feed and the runner’s lane', async () => {
+    const b = fx.boardMerged()
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard(PAY2)
+    await loaded()
+    const id = b.row.run_ids[0]
+    const feed = screen.getByTestId('kt-feed')
+    const signed = feed.querySelector('.kt-ev.is-signed') as HTMLElement
+    expect(signed).toHaveTextContent('签名服务签了接手合同（第 1 次运行）')
+    expect(signed).toHaveAttribute('title', `运行号 ${id}`)
+    expect(feed).not.toHaveTextContent(id)
+    const lane = region('各环节的泳道').querySelector('[data-role="runner"]') as HTMLElement
+    expect(within(lane).getByText('第 1 次运行')).toHaveAttribute('title', `运行号 ${id}`)
+    expect(lane).not.toHaveTextContent(id)
+  })
+
+  test('the lanes’ time starts at 开工, the moment 需求详情 says it started; the claim before it is 认领, not 开工', async () => {
+    installFixtureRoutes()
+    renderBoard()
+    await loaded()
+    const b = fx.board()
+    const claim = b.events.find((e) => e.kind === 'claim')!
+    const start = b.events.find((e) => e.kind === 'start')!
+    expect(start.at).toBeGreaterThan(claim.at)
+    expect(screen.getByTestId('kt-axis-title')).toHaveTextContent(`时间线（从 ${fmtWhen(start.at)} 开工起）`)
+    const span = region('各环节的泳道').querySelector('.kt-track-span') as HTMLElement
+    const a = b.actors.flatMap((x) => x.spans).sort((p, q) => p.a - q.a).find((x) => x.a >= start.at)!
+    expect(span.getAttribute('title')).toContain('（开工后 ')
+    expect(span.getAttribute('title')).not.toContain(`（开工后 ${fmtSpan(a.a - claim.at)}）`)
+    cleanup()
+    // a board with no 开工 recorded (the run's record not read) starts at the claim and says so
+    const c = fx.board()
+    c.events = c.events.filter((e) => e.kind !== 'start')
+    c.started_at = claim.at
+    installFixtureRoutes(boardRoute(() => structuredClone(c)))
+    renderBoard()
+    await loaded()
+    expect(screen.getByTestId('kt-axis-title')).toHaveTextContent(`时间线（从 ${fmtWhen(claim.at)} 认领起）`)
+    expect(region('各环节的泳道').querySelector('.kt-track-span')?.getAttribute('title')).toContain('（认领后 ')
   })
 
   test('an actor not on this requirement’s way has no lane: one line says what is not needed', async () => {
@@ -448,6 +533,9 @@ describe('需求看板', () => {
     expect(card).toHaveTextContent('做什么：在上面「切换需求」里换一个，或者回交付总览找。')
     expect(screen.getByTestId('br-board')).not.toHaveTextContent(/404|r1 ·/)
     expect(screen.queryByTestId('kt-graph')).toBeNull()
+    // the crumb says the key and links nothing: there is no 需求详情 of it to open
+    expect(crumb().queryByRole('button', { name: 'PAY-9' })).toBeNull()
+    expect(crumb().getByTestId('kt-where-key')).toHaveTextContent('PAY-9')
     fireEvent.click(within(card).getByRole('button', { name: '回交付总览' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'overview', repo: 'r1' })
     expect(boardCalls({ repo: 'r1', key: 'PAY-9' })).toHaveLength(1)
@@ -561,12 +649,40 @@ describe('需求看板 · 轮到谁、做什么', () => {
   test('someone else’s claim: it says whose it is and waits for them; no 开工', async () => {
     const b = fx.board()
     Object.assign(b.row, { state: 'claimed', state_label: '已认领', owner: 'carol' })
-    b.person = { ...b.person, owner: 'carol', me: false }
+    b.person = { ...b.person, owner: 'carol', me: false, you: false }
     installFixtureRoutes(boardRoute(() => structuredClone(b)))
     renderBoard()
     const intro = await screen.findByTestId('br-board-intro')
     expect(within(intro).getByTestId('br-intro-start')).toHaveTextContent('carol 认领的，等 carol 开工')
     expect(screen.queryByRole('button', { name: /^开工/ })).toBeNull()
+    // the way's first step is carol's: 「0 认领 · carol · 认领、交文档、开工」, no 你 anywhere in it (BOARD-11)
+    const claim = intro.querySelector('.kt-intro-phase') as HTMLElement
+    expect(claim).toHaveTextContent('0 认领一个需求号，文档过五关carol认领、交文档、开工')
+    expect(intro).not.toHaveTextContent('你')
+  })
+
+  test('the owner’s own claim speaks to them: 0 认领 · 你; a board that names its owner offers no 开工, whoever the repo thinks is looking', async () => {
+    const b = fx.board()
+    Object.assign(b.row, { state: 'claimed', state_label: '已认领' })
+    b.person = { ...b.person, you: true }
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    let intro = await screen.findByTestId('br-board-intro')
+    expect(intro.querySelector('.kt-intro-phase')).toHaveTextContent('0 认领一个需求号，文档过五关你认领、交文档、开工')
+    expect(within(intro).getByRole('button', { name: '开工 PAY-3' })).toBeInTheDocument()
+    cleanup()
+    // erin's claim in a repo where 你是谁 is not set yet: the backend named erin, so does the introduction
+    Object.assign(b.row, { owner: 'erin' })
+    b.person = { ...b.person, owner: 'erin', me: false, you: false }
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    const status = fx.status()
+    status.repos = status.repos.map((r) => ({ ...r, me: r.me ? { ...r.me, name: null } : r.me }))
+    renderBoard(PAY3, { status })
+    intro = await screen.findByTestId('br-board-intro')
+    expect(screen.queryByRole('button', { name: /^开工/ })).toBeNull()
+    expect(intro).toHaveTextContent('需求和设计由 erin 在会话里自己批准')
+    expect(within(intro).getByTestId('br-intro-start')).toHaveTextContent('erin 认领的，等 erin 开工')
+    expect(intro).not.toHaveTextContent('你')
   })
 
   test('a board brain-kit could not read whole: one Chinese sentence and what to do, its own words under 细节', async () => {
@@ -1096,17 +1212,42 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     expect(screen.queryByRole('link', { name: '去 MR ↗' })).toBeNull()
   })
 
-  test('the graph is never drawn below its scale: a narrow app gets a narrower layout, then the graph scrolls (the text stays)', () => {
+  test('the graph is never drawn below its scale: a narrow app gets closer columns, then one column per phase; every phase in view (BOARD-31)', () => {
     expect(graphWidth(null)).toBe(GW)
     expect(graphWidth(1558)).toBe(GW)
-    // the full way cannot be narrower than its columns: it keeps the scale and scrolls
-    const full = graphWidth(1008)
-    expect(full).toBeLessThan(GW)
-    expect(Math.floor(full * SCALE)).toBeGreaterThan(1008)
-    // a repo done only here fits 1050 (1280 minus the KiroCrew sidebar) at the scale
-    const local = graphWidth(1008, ['runner'])
-    expect(Math.floor(local * SCALE)).toBeLessThanOrEqual(1008)
+    expect(graphShape(1558).compact).toBe(false)
     expect(SCALE * 12).toBeGreaterThanOrEqual(10)
+    // 1050 and 1280 wide (the graph card 1008 and 1240 px): six columns do not fit at the scale, one per phase does; a
+    // repo done only here (no runner columns) still fits its five at 1050, and one per phase when narrower
+    const keys = fx.board().actors.map((a) => a.key)
+    for (const [avail, fold, compact] of [[1008, [], true], [1240, [], true], [1008, ['runner'], false], [960, ['runner'], true]] as const) {
+      const g = graphShape(avail, fold)
+      expect(g.compact).toBe(compact)
+      expect(Math.floor(g.width * SCALE)).toBeLessThanOrEqual(avail)
+      const on = keys.filter((k) => !fold.includes(SLOTS[k].phase as never))
+      const lay = layoutGraph(on, edgesOf(new Set(on), false, g.compact), 2, fold, g.width, g.compact)
+      // every phase has its band inside the graph, in order, none over another
+      const bands = lay.phases.map((p) => [p.key, p.x1, p.x2] as const)
+      expect(bands.map((x) => x[0])).toEqual(['init', 'local', 'runner', 'check', 'land'])
+      for (let i = 1; i < bands.length; i++) expect(bands[i][1]).toBeGreaterThan(bands[i - 1][2])
+      expect(bands[bands.length - 1][2]).toBeLessThanOrEqual(lay.width)
+      // every node inside, none on another
+      const boxes = [...lay.nodes.values()]
+      expect(boxes).toHaveLength(on.length)
+      for (const n of boxes) expect(n.x + NODE_W / 2).toBeLessThanOrEqual(lay.width)
+      for (const p of boxes) for (const q of boxes) if (p !== q) expect(Math.abs(p.x - q.x) >= NODE_W || Math.abs(p.y - q.y) >= NODE_H).toBe(true)
+    }
+    // the way reads down each column: 本机会话 → 需求审批 → 设计审批, 交接 → 桥 → 签名 → 运行机
+    const lay = layoutGraph(keys, edgesOf(new Set(keys), false, true), 2, [], graphWidth(1008), true)
+    const at = (k: string) => lay.nodes.get(k)!
+    expect(new Set(['local', 'req', 'design'].map((k) => at(k).x)).size).toBe(1)
+    expect(at('local').y).toBeLessThan(at('req').y)
+    expect(at('req').y).toBeLessThan(at('design').y)
+    expect(['handover', 'bridge', 'signer', 'runner'].map((k) => at(k).y)).toEqual([...['handover', 'bridge', 'signer', 'runner'].map((k) => at(k).y)].sort((x, y) => x - y))
+    expect(lay.edges.map((e) => `${e.from}>${e.to}`)).toContain('req>design')
+    expect(lay.edges.map((e) => `${e.from}>${e.to}`)).not.toContain('local>design')
+    // narrower than even that: it keeps the scale and scrolls
+    expect(Math.floor(graphWidth(700) * SCALE)).toBeGreaterThan(700)
   })
 
   test('the introduction keeps every word whole: what a step does breaks only after a 、', async () => {
@@ -1155,12 +1296,44 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     expect(belt).not.toHaveTextContent('不在这台机器上')
   })
 
+  test('the runner’s page of a hand-over it cannot read yet tells one story: no title twice, no 还没开工, no session to report', async () => {
+    const b = fx.board()
+    Object.assign(b, { source: 'app', belt: [], branch: null, events: [], sessions: [], credits: { ...b.credits, total: null } })
+    Object.assign(b.row, { where: 'runner', worktree: null, title: b.row.key, state: 'handed_over', state_label: '已交接',
+      waits: { ...b.row.waits, who: 'bridge', do: 'none', line: null, text: '签名服务在签接手合同' } })
+    b.mr_desc = { ...b.mr_desc, text: '', first: null, error: '运行机还没开始做：它做完提交以后才有变更说明' }
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    const graph = await loaded()
+    const top = document.querySelector('.kt-top') as HTMLElement
+    expect(top.querySelector('.kt-run-title')).toBeNull()
+    expect(top).toHaveTextContent('运行分支还读不到：运行机还没建工作区')
+    expect(top).not.toHaveTextContent('还没有运行分支')
+    expect(graph.querySelector('.kt-rail-label')).toHaveTextContent('运行分支 （运行机还读不到）')
+    const kpis = within(screen.getByRole('group', { name: '指标' }))
+    expect(kpis.getByText('credits').parentElement).toHaveTextContent('还没开过会话')
+    expect(kpis.getByText('AI-DLC Lean').parentElement).toHaveTextContent('运行机还读不到 Lean 的记录')
+    const accept = screen.getByTestId('br-accept')
+    expect(accept).toHaveTextContent(new RegExp(`需求${b.row.key}\\s*变更说明`))
+    expect(accept).toHaveTextContent('运行机还没开始做')
+    expect(screen.getByTestId('br-board')).not.toHaveTextContent('还没开工')
+    expect(kpis.getByText('AI-DLC Lean').parentElement!.querySelector('.kt-segs .is-next, .kt-segs .is-run')).toBeNull()
+    // 切换需求 names it once too
+    expect(optionText({ ...fx.overview().rows[0], key: 'PAY-9', title: 'PAY-9', state_label: '已交接', waits: { ...b.row.waits } })).toBe('PAY-9 · 已交接')
+  })
+
   test('a repo done only here: the graph numbers and names its phases as its introduction does (2 检查 · 发布, 3 回写), no 验收', async () => {
     installFixtureRoutes(boardRoute(() => structuredClone(localOnly())))
     renderBoard()
     const graph = await loaded()
     const phases = [...graph.querySelectorAll('.kt-phase-title')].map((t) => t.textContent)
     expect(phases).toEqual(['0 认领', '1 本机 · Lean', '运行机', '2 检查 · 发布', '3 回写'])
+    // its sign-off is Lean's 发布审批 in the session: no 验收 card
+    expect(screen.queryByRole('region', { name: '验收' })).toBeNull()
+    const sign = region('发布审批')
+    expect(within(sign).getByRole('heading', { level: 2 })).toHaveTextContent('发布审批')
+    expect(sign.querySelector('.kt-sign-head')).toHaveTextContent('发布审批还没到发布审批')
+    expect(sign.querySelector('.kt-sign-head')).not.toHaveTextContent('验收')
     cleanup()
     const b = fx.board()
     Object.assign(b.row, { state: 'claimed', state_label: '已认领', local_only: true })
@@ -1168,5 +1341,7 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     renderBoard()
     const intro = await screen.findByTestId('br-board-intro')
     expect([...intro.querySelectorAll('.kt-intro-phase-head b')].map((x) => x.textContent)).toEqual(['0 认领', '1 本机 · Lean', '2 检查 · 发布', '3 回写'])
+    expect(intro).toHaveTextContent('人只在判断点上出手：批准需求、设计和发布，回答问题。')
+    expect(intro).not.toHaveTextContent('验收')
   })
 })
