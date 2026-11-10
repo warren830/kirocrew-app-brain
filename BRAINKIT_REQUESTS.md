@@ -243,7 +243,7 @@ Lean timeline follow them when trace is missing), `decisions.USER` (the MR reade
 The app's tests pass against a clean checkout of 0d52e97 (its vendor/aidlc-lean from the checkout's submodule) and of
 48b6b97 (the split tests skipped there); the identity tests take the clean clone as the brain-kit with 91e2fee's
 login-name rule when it has it, else a copy of 48b6b97 with the rule applied. The
-fake GitLab serves GraphQL's edit marks the way they were measured on gitlab.aws.dev (lastEditedBy only for a text
+fake GitLab serves GraphQL's edit marks the way they were measured on a self-managed GitLab (lastEditedBy only for a text
 edit) and the edit of a note by its own author (48b6b97's 变更说明 comment); the runner's test commits are now really
 the bot account's (they were the test person's), which 72b278e's hand-over rule reads. Run the app's tests again
 against the next commit.

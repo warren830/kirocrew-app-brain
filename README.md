@@ -80,7 +80,7 @@ shown folded): `backend/core/problems.py`.
    top level, or the main checkout of a worktree). Or 克隆: the git URL (SSH or https, never with a password or token
    in it), the folder it goes under (default `~/workplace`, never inside the work root), its name. The clone runs in
    the background with no prompt (an SSH key or certificate that has expired fails at once: refresh your SSH
-   credentials, e.g. `mwinit`, and retry); the new folder is checked next.
+   credentials and retry); the new folder is checked next.
 3. **检查** (read only): repo top level, git, current and default branch (origin/HEAD, else main / master), origin and
    the GitLab project it suggests, uncommitted changes (they do not matter: nothing touches your checkout),
    brain-kit (`.brain/kit.json`, committed, on the default branch), AI-DLC Lean, the Brain files, AGENTS.md, the Kiro
@@ -274,7 +274,7 @@ The app runs as the same OS user as the agent sessions, and agents have a shell.
   wrote" is check_answer's `edits`, made as brain-kit's own `collect` makes them: `DecisionLoop.reply_states` on the
   signer's ledger (each reply recorded at the signer's first sight with its text's hash) and GitLab GraphQL with the
   signer's own token (`GitLab.note_edits`: lastEditedBy, which an award emoji leaves empty and a text edit sets, as
-  measured on gitlab.aws.dev on 2026-11-09). A reply someone else edited never counts and, from an allowed person,
+  measured on a self-managed GitLab on 2026-11-09). A reply someone else edited never counts and, from an allowed person,
   holds the round (a conflict: nothing signed); one its author fixed before the signer read it counts as it reads;
   one whose text changed after that never counts. When GraphQL does not answer, the signer answers nothing (the bridge
   asks again) and records nothing for that reply: fail closed, but not for good. brain-kit's own bridge does the same
@@ -427,7 +427,7 @@ throwaway one in a temp dir, and git hooks are off in them (`core.hooksPath` at 
 every git the tests start, the app's clones too: a machine-wide secret scanner costs about 0.5 s a commit);
 `BRAIN_TEST_KEEP_HOOKS=1` keeps the hooks. The import tests use a bare repo as the remote, a fake ssh for the failures
 and a fake GitLab for the MR: no network. The fake GitLab (`tests/teamfix.py`) serves commits with their `parent_ids`,
-authors and committers from a bare repo, and GraphQL's edit marks as measured on gitlab.aws.dev (lastEditedBy for a
+authors and committers from a bare repo, and GraphQL's edit marks as measured on a self-managed GitLab (lastEditedBy for a
 text edit only); every hand-over in the tests is a real `brain handoff` commit, and the runner's commits are the bot
 account's. The 你是谁 tests run against a brain-kit without brain-kit 91e2fee's login-name rule (48b6b97: no name without
 GitLab) and one with it (the checkout itself from 91e2fee on, else a copy of 48b6b97 with the rule applied:
