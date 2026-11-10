@@ -574,7 +574,10 @@ describe('交付总览', () => {
     expect(skipped).toHaveTextContent('做什么：在它的分支上把这个文件改对')
     await user.click(within(skipped).getByRole('button', { name: 'PAY-1 ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-1', from: 'overview' })
-    expect(within(batch).getByTestId('eval-notes')).toHaveTextContent(`brain-kit 说：${fx.overview().eval.notes.join('；')}`)
+    // each of brain-kit's notes on its own line, with what to do (the backend's note_rows)
+    const notes = within(batch).getAllByTestId('eval-notes')
+    expect(notes.map((n) => n.textContent)).toEqual((fx.overview().eval.note_rows ?? []).map((n) =>
+      expect.stringContaining(`brain-kit 说：${n.text}做什么：${n.todo}`)))
   })
 
   test('without the evaluate module the eval card says so plainly and what to do, brain-kit’s words folded; another error is said as it is', async () => {
