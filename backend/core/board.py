@@ -404,13 +404,15 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
         else:
             add(at, "app", "person", "person", label)
     applied = [e for e in out if e["kind"] == "reflect"]
-    for ref, at, _ in reflect_refs:   # the branch this app's write-back made is the same write-back: one event (BOARD-32)
+    for ref, at, merged in reflect_refs:   # the branch this app's write-back made is the same write-back: one event (BOARD-32)
         hit = next((e for e in applied if e.get("ref") == ref or (not e.get("ref") and abs(e["at"] - at) < 120)), None)
         if hit:
             hit["text"] = _clip("%s（回写分支 %s）" % (hit["text"], ref), 200)
             hit["ref"] = ref
         else:
             add(at, "reflect", "person", "reflect", "写好了回写分支 %s" % ref, ref=ref)
+        if merged is not None and merged > at + 60:     # merged later (a merge commit): that moment is an event too
+            add(merged, "reflect", "person", "reflect", "回写分支 %s 已合并" % ref, ref=ref, merged=True)
     out.sort(key=lambda x: (x["at"], x["_n"]))
     return out
 
@@ -595,6 +597,9 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
                 fo.open("ci", "fix", at)
         elif kind == "merge":
             _merged(fo, at, hand_at, proposals, you=you)
+        elif kind == "reflect" and e.get("merged"):
+            fo.put("reflect", "merged", e["text"], at)
+            fo.mark("reflect", at, "reflect", e["text"])
         elif kind == "reflect":
             fo.put("reflect", "done", e["text"].replace("写好了回写分支 ", "回写分支 "), at)
             fo.close("reflect", at)
