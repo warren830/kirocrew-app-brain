@@ -64,6 +64,15 @@ def scrub_tree(obj: Any, scrub: Callable[[str], str], key: str = "") -> Any:
     return obj
 
 
+def me_line(repos: list[dict[str, Any]], token: bool, env: str) -> dict[str, Any]:
+    """/status's machine-wide 你是谁: $BRAIN_USER (*env*), else the name of the first repo that has one (each repo's is
+    in its row: identity.of), and whether a GitLab token is there."""
+    first = next((x["me"] for x in repos if x["me"] and x["me"]["name"]), None)
+    how = "GitLab 令牌（%s）" % ("有" if token else "没有") + (
+        "；这台机器的环境变量里设的 %s" % env if env else "；%s" % first["text"] if first else "")
+    return {"user": env or (first["name"] if first else None), "token": token, "how": how}
+
+
 class Service:
     def __init__(self, ctx: Any, *, sessions: Any = None, transport: Any = None, now: Callable[[], float] = time.time,
                  signer_kick: Callable[[], Any] | None = None, sign_timeout: float | None = None) -> None:
@@ -312,7 +321,7 @@ class Service:
             st = self.sessions.slot_stats(info.slot) or {}
             by.setdefault(info.key, []).append({
                 "slot": info.slot, "title": info.title, "agent": info.agent, "kind": info.kind or "local",
-                "credits": st.get("credits") if st.get("credits") is not None else info.credits,
+                "credits": self.sessions.slot_credits(info.slot),   # the very number credits_by_key adds up
                 "turns": int(st.get("turns") or info.turns or 0), "busy": bool(st.get("busy")),
                 "awaiting": bool(st.get("awaiting")), "last_activity": st.get("last_activity") or info.last_activity,
                 "opened_at": st.get("opened_at") or info.started, "project": info.cwd or None,
@@ -420,7 +429,8 @@ class Service:
         out = []
         for key, r in sorted(latest.items()):
             facts = {"key": key, "claim": None, "where": "runner", "branch": None, "owner": r.get("owner"),
-                     "worktree": None, "stages": [], "events": [], "approvals": [], "run": None, "park": None}
+                     "worktree": None, "stages": [], "events": [], "approvals": [], "run": None, "park": None,
+                     "project": r.get("project")}
             path = r.get("path")
             if path and os.path.isdir(path):
                 g = Git(path)
@@ -443,6 +453,31 @@ class Service:
             out.append((row, facts, decs))
         return out
 
+    def _team_split(self, mine: list[tuple[str, dict[str, Any], dict[str, Any]]], snap: dict[str, Any]
+                    ) -> tuple[list[tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]], set[tuple[str, str]]]:
+        """Team mode, one row per requirement: the runner's requirements listed as its own (_team_rows'), each with
+        the listed repo of its GitLab project (row ``home``, None when this machine does not list it), and the
+        (repo id, key) of this machine's rows (*mine*: repo id, facts, row) they stand for (deliveries.runner_takes)."""
+        team = self._team_rows(snap)
+        rid_of: dict[str, str] = {}
+        for rid, repo in self.repos.items():
+            if self._gitlab_of(repo)[1]:
+                rid_of.setdefault(self._gitlab_of(repo)[1], rid)
+        by ={(rid, f["key"]): (f, row) for rid, f, row in mine}
+        keep, taken = [], set()
+        for t in team:
+            rid = rid_of.get(str(t[1].get("project") or ""))
+            f, row = by.get((rid, t[0]["key"]), (None, None)) if rid else (None, None)
+            if deliveries.runner_takes(f, row, t[0]):
+                t[0]["home"] = rid
+                keep.append(t)
+                if f is not None:
+                    taken.add((rid, t[0]["key"]))
+        return keep, taken
+
+    def _team_on(self) -> bool:
+        return self.team is not None and self.team.host is not None
+
     def _runner_desc(self, facts: dict[str, Any], key: str, row: dict[str, Any]):
         path = facts.get("worktree")
         if not path:
@@ -455,31 +490,44 @@ class Service:
 
     def _overview_sync(self, which: str, snap: dict[str, Any]) -> dict[str, Any]:
         rows, errors, all_decisions, q_counts = [], [], [], {"asked": 0, "answered": 0, "delivered": 0}
+        team = self._team_on()
+        mine = []
         for rid, repo in self.repos.items():
-            if which not in ("all", rid):
+            if which not in ("all", rid) and not team:   # team mode: every repo's rows, to list each requirement once
                 continue
             try:
                 facts = repo.scan()
-            except Exception as exc:  # noqa: BLE001
-                errors.append({"repo": rid, "error": str(exc)[:300]})
+            except Exception as exc:  # noqa: BLE001 - git's or brain-kit's own words go under 细节
+                if which in ("all", rid):
+                    errors.append({"repo": rid, "name": repo.name, "path": repo.path,
+                                   "error": "读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对",
+                                   "raw": str(exc)[:2000]})
                 continue
+            mine += [(rid, f, self._row(repo, f, snap)) for f in facts]
+        runner, taken = self._team_split(mine, snap) if team else ([], set())
+        for rid, f, row in mine:
+            if which not in ("all", rid) or (rid, f["key"]) in taken:
+                continue
+            repo = self.repos[rid]
             base, project = self._gitlab_of(repo)
-            for f in facts:
-                row = self._row(repo, f, snap)
-                rows.append(row)
-                mr = self.mr.get(project, f["branch"]) if base and project and f.get("branch") else None
-                for k, n in deliveries.questions_asked(f, mr).items():
-                    q_counts[k] += n
-                intent = (f.get("run") or {}).get("intent")
-                all_decisions += [dict(d, key=f["key"]) for d in detail.decisions(
-                    f.get("decisions_text"), "aidlc-docs/%s/decisions.md" % intent if intent else "decisions.md",
-                    repo.cfg.get("bot_users") or [])]
+            rows.append(row)
+            mr = self.mr.get(project, f["branch"]) if base and project and f.get("branch") else None
+            for k, n in deliveries.questions_asked(f, mr).items():
+                q_counts[k] += n
+            intent = (f.get("run") or {}).get("intent")
+            all_decisions += [dict(d, key=f["key"]) for d in detail.decisions(
+                f.get("decisions_text"), "aidlc-docs/%s/decisions.md" % intent if intent else "decisions.md",
+                repo.cfg.get("bot_users") or [])]
         for rid, (path, err) in self.repo_errors.items():
-            if which in ("all", rid):
-                errors.append({"repo": rid, "error": "%s：%s" % (path, err)})
-        if which in ("all", "runner"):
-            for row, _, decs in self._team_rows(snap):
+            if which in ("all", rid):   # the app's own words say what to do; anything else is under 细节
+                said = re.search(r"[\u4e00-\u9fff]", err)
+                errors.append({"repo": rid, "name": os.path.basename(path), "path": path,   # /status's name for it
+                               "error": err if said else "读不了这个仓库：在「导入仓库」里检查它，那里会说哪里不对",
+                               "raw": path if said else "%s：%s" % (path, err)})
+        for row, f, decs in runner:   # a repo's view has what the runner does for it, as 全部 and the runner's do
+            if which in ("all", "runner", row["home"]):
                 rows.append(row)
+                all_decisions += [dict(d, key=row["key"]) for d in detail.decisions(f.get("decisions_text"), "decisions.md", [])]
                 for d in decs:
                     if d.get("state") == "invalid" or d.get("state") in deliveries.NOT_POSTED:   # not on the MR (yet)
                         continue
@@ -508,10 +556,12 @@ class Service:
         if not bk.has("evaluate"):
             return deliveries.evaluate("", {}, None, None)
         views, funnels, stale, got_parts = [], [], [], []
+        computing = False    # a repo's numbers for its default branch as it is now are still being worked out
         for rid in ids:
             repo = self.repos[rid]
             sha = repo.git.out("rev-parse", "-q", "--verify", (repo.main_ref() or "HEAD") + "^{commit}")
             got = self._eval.get(rid)
+            computing = computing or not got or got[0] != sha
             if not got or got[0] != sha or time.monotonic() - got[1] > EVAL_TTL_S:
                 stale.append((rid, sha))
             if got:
@@ -533,15 +583,16 @@ class Service:
                 threading_start(self._eval_compute, rid, sha, credits)
         if not views:
             return {"available": False, "error": "正在算交付评估…" if ids else "没有仓库", "raw": "", "ref": None,
-                    "metrics": [], "queue": [], "skipped": [], "notes": []}, None
+                    "metrics": [], "queue": [], "skipped": [], "notes": [], "note_rows": [], "computing": bool(ids)}, None
         ref = deliveries.branch_words([(v.pop("_name"), v.get("ref")) for v in views])
         if len(views) == 1:
-            return dict(views[0], ref=ref), (dict(funnels[0]) if funnels else None)
-        merged = {"available": any(v["available"] for v in views),
+            return dict(views[0], ref=ref, computing=computing), (dict(funnels[0]) if funnels else None)
+        merged = {"available": any(v["available"] for v in views), "computing": computing,
                   "error": "；".join(dict.fromkeys(v["error"] for v in views if v["error"])),
                   "raw": "\n".join(v.get("raw") or "" for v in views if v.get("raw")), "ref": ref, "metrics": [], "queue": [q for v in views for q in v["queue"]],
                   "skipped": [x for v in views for x in v.get("skipped") or []],
-                  "notes": [x for v in views for x in v.get("notes") or []]}
+                  "notes": [x for v in views for x in v.get("notes") or []],
+                  "note_rows": [x for v in views for x in v.get("note_rows") or []]}
         for m in views[0]["metrics"]:
             vals = [next((x["value"] for x in v["metrics"] if x["id"] == m["id"]), None) for v in views]
             pairs = [x for x in vals if isinstance(x, list)]
@@ -574,7 +625,7 @@ class Service:
         except Exception as exc:  # noqa: BLE001
             self._eval[rid] = (sha, time.monotonic(), {"available": False, "error": "交付评估没算成：原话在细节里",
                                                         "raw": str(exc)[:2000], "ref": None, "metrics": [],
-                                                        "queue": [], "skipped": [], "notes": []}, None)
+                                                        "queue": [], "skipped": [], "notes": [], "note_rows": []}, None)
         finally:
             self._eval_running.discard(rid)
 
@@ -704,7 +755,9 @@ class Service:
                 cfg_t = bk.m("config").load(path) if path else dict(bk.m("config").DEFAULTS)
             except Exception:  # noqa: BLE001
                 cfg_t = dict(bk.m("config").DEFAULTS)
-            parts.update(repo=None, facts=f, trace=tl.get("trace"), mr=None, scope=None, decisions=decs, me=None,
+            home = next((r for r in self.repos.values() if f.get("project") and self._gitlab_of(r)[1] == f["project"]), None)
+            parts.update(repo=None, facts=f, trace=tl.get("trace"), mr=None, scope=None, decisions=decs,
+                         me=self.me_in(home) if home is not None else None,   # who reads it, as in its repo
                          cfg=cfg_t, path=path, local_only=False, sessions=sess,
                          app_events=[e for rid in row["run_ids"] for e in self.store.events(rid)])
         return {
@@ -727,7 +780,8 @@ class Service:
                                              "last_activity", "opened_at", "project", "url", "error")} for s in sess],
             "credits": {"total": row["credits"], "note": detail.NO_TOKENS},
             "brain": detail.brain_block(tl.get("brain"), None, f.get("decisions_text")),
-            "mr_desc": self._desc_now(self._runner_desc(f, key, row) if run else None),
+            # no run read yet: the runner has not started on it, nothing is waiting for 开工
+            "mr_desc": self._desc_now(self._runner_desc(f, key, row)) if run else mrdesc_view.empty(board_mod.RUNNER_NO_DESC),
         }
 
     @staticmethod
@@ -768,9 +822,13 @@ class Service:
         return got
 
     @staticmethod
-    def _reflect_refs(git: Git, key: str) -> list[tuple[str, float]]:
-        """brain reflect's branches for *key* (brain/<KEY>-reflect-<n>, local or origin's) and when they were made."""
+    def _reflect_refs(git: Git, key: str, default_branch: str) -> list[tuple[str, float, float | None]]:
+        """brain reflect's branches for *key* (brain/<KEY>-reflect-<n>, local or origin's): when each was made, and
+        when it was merged into the default branch (the merge commit on its first-parent line; its own time when the
+        branch is on that line, fast-forwarded), or None while it waits."""
         out, seen = [], set()
+        main = next((r for r in ("refs/remotes/origin/" + default_branch, "refs/heads/" + default_branch)
+                     if git.ok("rev-parse", "-q", "--verify", r + "^{commit}")), None)
         rx = re.compile(r"^refs/(?:heads|remotes/origin)/(brain/%s-reflect-[1-9][0-9]*)$" % re.escape(key))
         for ref in sorted(git.refs("refs/heads/brain/", "refs/remotes/origin/brain/")):
             m = rx.match(ref)
@@ -778,7 +836,13 @@ class Service:
                 at = git.commit_time(ref)
                 if at:
                     seen.add(m.group(1))
-                    out.append((m.group(1), at))
+                    merged = None
+                    if main and git.ok("merge-base", "--is-ancestor", ref, main):
+                        line = git.out("rev-list", "--first-parent", "--ancestry-path", "--reverse",
+                                       "%s..%s" % (ref, main)).split()
+                        ff = not line or git.out("rev-parse", line[0] + "^1") == git.out("rev-parse", ref)
+                        merged = at if ff else git.commit_time(line[0])
+                    out.append((m.group(1), at, merged))
         return out
 
     def _board_sync(self, rid: str, key: str, snap: dict[str, Any]) -> dict[str, Any]:
@@ -795,7 +859,7 @@ class Service:
         g = board_mod.build(
             f, d["row"], t, mr=parts.get("mr"), sessions=sessions, app_events=app_events,
             team_decisions=parts.get("decisions") or [], subjects=subjects, changes=changes,
-            reflect_refs=self._reflect_refs(git, key) if git is not None else [],
+            reflect_refs=self._reflect_refs(git, key, str(cfg.get("default_branch") or "main")) if git is not None else [],
             default_branch=str(cfg.get("default_branch") or "main"), local_only=bool(parts.get("local_only")),
             kit_rows=board_mod.kit_cells(self.crew.get("rows") or [], parts.get("path") or ""),
             decisions=d["decisions"], brain=d["brain"], me=parts.get("me"), now=self.now())
@@ -833,12 +897,12 @@ class Service:
                           kickoff: bool, review: bool = False) -> dict[str, Any]:
         self.crew = await asyncio.to_thread(self.crew_sync)
         if not crewcheck.agent_ok(self.crew["rows"]):
-            raise AppError("brain-dev 还没带上 Lean 的 hook：先在设置里修好（KiroCrew 检查）", "agent_not_ready", 409)
+            raise AppError(crewcheck.not_ready(self.crew["rows"]), "agent_not_ready", 409)
         scope = scope_of(repo.id, key)
         if review:
             task = intake.review_task(key, branch, run.get("intent"))
             if not task:
-                raise AppError("这个需求的记录里没有 Lean 的 intent：开不了审查会话", "no_intent", 409)
+                raise AppError("这个需求的记录里找不到它在 Lean 里的名字：开不了审查会话", "no_intent", 409)
             title, said = "%s · 审查" % key, "开了审查会话"
         else:
             live = [i for i in self.sessions.roots(key=scope, kind="local") if i.slot and not
@@ -904,8 +968,10 @@ class Service:
         try:
             await asyncio.to_thread(self.mr.post_answer, base, project, mr["iid"], q["id"], choice, note,
                                     transport=self.transport)
-        except Exception as exc:  # noqa: BLE001
-            raise AppError("发不到 MR 上：%s" % str(exc).split("\n", 1)[0][:200], "post_failed", 502)
+        except Exception as exc:  # noqa: BLE001 - GitLab's own words go to the log
+            self.log.warning("brain: posting the answer to %s on MR !%s failed: %s", q["id"], mr["iid"], exc)
+            raise AppError("没发到 MR 上：GitLab 没收下。看看网络和你的 GitLab 令牌，再点一次；或者直接去 MR 上回答",
+                           "post_failed", 502)
         await asyncio.to_thread(self.store.append, scope, "app", "在 MR 上回答了 %s：%s" % (q["id"], choice), None)
         return {"ok": True, "via": "mr", "text": "已经以你的 GitLab 身份发在 MR 上：桥核对后送回运行机"}
 
@@ -994,29 +1060,33 @@ class Service:
     # ---- 待办 ----------------------------------------------------------------------------------------- #
 
     def _todo_sync(self, snap: dict[str, Any]) -> dict[str, Any]:
-        entries = []
+        entries, mine = [], []
         token = self._token_present()
         for rid, repo in self.repos.items():
             try:
                 facts = repo.scan()
             except Exception:  # noqa: BLE001
                 continue
+            mine += [(rid, f, self._row(repo, f, snap)) for f in facts]
+        runner, taken = self._team_split(mine, snap) if self._team_on() else ([], set())
+        for rid, f, row in mine:
+            repo = self.repos[rid]
             base, project = self._gitlab_of(repo)
             me = self.me_in(repo)
-            for f in facts:
-                row = self._row(repo, f, snap)
-                if row["state"] == "closed" or (row["state"] == "merged" and row["waits"]["who"] != "you"):
-                    continue    # a merge waits for nobody, unless its write-back waits for you
-                live = self._live(snap["by"].get(scope_of(rid, f["key"]), []))
-                own = bool(me) and me == f.get("owner")
-                entries.append({"row": row, "facts": f, "own": own, "has_session": bool(live),
-                                "can_post": own and bool(base and project) and token,
-                                "mr": self.mr.get(project, f.get("branch") or "") if base and project else None,
-                                "session": {"slot": live["slot"], "title": live["title"], "url": live["url"]} if live else None})
+            if (rid, f["key"]) in taken:
+                continue    # listed as the runner's
+            if row["state"] == "closed" or (row["state"] == "merged" and row["waits"]["who"] != "you"):
+                continue    # a merge waits for nobody, unless its write-back waits for you
+            live = self._live(snap["by"].get(scope_of(rid, f["key"]), []))
+            own = bool(me) and me == f.get("owner")
+            entries.append({"row": row, "facts": f, "own": own, "has_session": bool(live),
+                            "can_post": own and bool(base and project) and token,
+                            "mr": self.mr.get(project, f.get("branch") or "") if base and project else None,
+                            "session": {"slot": live["slot"], "title": live["title"], "url": live["url"]} if live else None})
         out = todo_mod.build(entries, team=False, crew_rows=self.crew["rows"])
-        if self.team is not None and self.team.host is not None:
+        if self._team_on():
             team_entries = [{"row": row, "decisions": decs, "mr_url": (row.get("mr") or {}).get("url")}
-                            for row, _, decs in self._team_rows(snap)]
+                            for row, _, decs in runner]
             t = todo_mod.build(team_entries, team=True, crew_rows=[])
             out["items"] += t["items"]
             out["team"] = True
@@ -1031,7 +1101,8 @@ class Service:
     def _team_status(self) -> dict[str, Any]:
         if self.team is None:
             on = bool(self.settings["team"].get("enabled"))
-            return {"enabled": on, "ok": False, "error": "brain-kit 没装载" if on else "",
+            why = problems.team_start("brain-kit 没装载" if on else "")
+            return {"enabled": on, "ok": False, "error": why["text"], "error_todo": why["todo"], "error_raw": why["raw"],
                     "last_loop_at": None, "loop_error": "", "same_user": False, "signer": {"pending": 0, "refused": 0}}
         return self.team.status()
 
@@ -1060,17 +1131,11 @@ class Service:
         mes = await asyncio.to_thread(lambda: {rid: self._me_view(r, token) for rid, r in loaded.items()})
         for x in repos:
             x["me"] = mes.get(x["id"])
-        # machine-wide: $BRAIN_USER, else the name of the first repo that has one (each repo's is in its row)
-        env = os.environ.get("BRAIN_USER", "").strip().lower()
-        first = next((x["me"] for x in repos if x["me"] and x["me"]["name"]), None)
-        me = env or (first["name"] if first else None)
-        how = "GitLab token（%s）" % ("有" if token else "没有") + (
-            "；环境变量 BRAIN_USER = %s" % env if env else "；%s" % first["text"] if first else "")
         return {"app": {"name": self.name, "version": VERSION, "team": self.team is not None},
                 "brainkit": {"path": info["path"], "ok": info["ok"], "version": info["version"], "error": info["error"],
                              "modules": info["modules"]},
                 "repos": repos, "crew": self.crew,
-                "me": {"user": me, "token": token, "how": how},
+                "me": me_line(repos, token, os.environ.get("BRAIN_USER", "").strip().lower()),
                 "team": self._team_status(), "counts": {"todo": len(todo["items"])}}
 
     def settings_view(self) -> dict[str, Any]:
@@ -1369,7 +1434,7 @@ class Service:
         top = await self._import_top(body.get("path"))
         rid = importer.listed_id(top, self.settings["repos"])
         if rid:
-            return {"ok": True, "id": rid, "text": "已经在列表里了（%s）" % rid, "status": await self.status()}
+            return {"ok": True, "id": rid, "text": "已经在列表里了", "status": await self.status()}
         token = await asyncio.to_thread(self._token_present)
 
         def state() -> tuple[bool, dict[str, Any] | None, str]:
@@ -1379,7 +1444,7 @@ class Service:
                 try:
                     bk.m("config").load(top)
                 except Exception as exc:  # noqa: BLE001
-                    return False, None, "kit.json 有问题：%s。改好再加" % str(exc).split("\n", 1)[0][:200]
+                    return False, None, "这个仓库的 brain-kit 设置读不懂：在「导入仓库」里检查它，那里会说哪里不对"
                 return True, None, ""
             pend = importer.pending_state(top, self.imports.get(top), token=token)
             return (True, pend, "") if pend else (False, None, "这个仓库还没装 brain-kit：先检查它，装上再加入")
@@ -1436,7 +1501,8 @@ class Service:
 
     async def team_loop(self) -> dict[str, Any]:
         if self.team is None or self.team.host is None:
-            raise AppError((self.team.error if self.team else "") or "运行机模式没打开", "team_off", 409)
+            raise AppError((problems.team_start(self.team.error)["text"] if self.team else "") or "运行机模式没打开",
+                           "team_off", 409)
         try:
             summary = await self._in_team(self.team.loop_once)
         except Exception as exc:  # noqa: BLE001

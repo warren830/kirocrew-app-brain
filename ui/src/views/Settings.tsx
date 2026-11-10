@@ -86,7 +86,7 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
       {save.error && <span className="br-error" role="alert">{save.error}</span>}
     </div>
   )
-  const kitProblem = status && noKit ? brainkitProblem(status.brainkit.error, status.brainkit.path) : null
+  const kitProblem = status && noKit ? brainkitProblem(status.brainkit.error, status.brainkit.path, true) : null
   const kitCard = kitProblem && status && (
     <section className="br-card st-kitfix is-bad" aria-label="找不到 brain-kit" data-testid="settings-no-brainkit">
       <header>
@@ -185,7 +185,7 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
           {formCard}
         </div>
         <div className="st-col">
-          {status && <CrewCard crew={status.crew} onFixed={reloadStatus} />}
+          {status && <CrewCard crew={status.crew} onFixed={reloadStatus} kitCard={kitProblem?.text} />}
         </div>
       </div>
     </main>
@@ -238,7 +238,7 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
           </div>
         )}
         <div className="st-mods">
-          <span className={`br-chip tone-${s.me.token ? 'ok' : 'warn'}`}><i aria-hidden="true">{s.me.token ? '✓' : '!'}</i>GitLab token {yes(s.me.token)}</span>
+          <span className={`br-chip tone-${s.me.token ? 'ok' : 'warn'}`}><i aria-hidden="true">{s.me.token ? '✓' : '!'}</i>GitLab 令牌 {yes(s.me.token)}</span>
         </div>
         {s.me.how && <div className="br-kpi-note st-how">{s.me.how}</div>}
       </section>
@@ -379,10 +379,13 @@ function RepoRow({ r, kitOk, onImport, onRemoved, onChanged }: {
   )
 }
 
-function CrewCard({ crew, onFixed }: { crew: Status['crew']; onFixed: () => void }) {
-  const bad = crew.rows.filter((r) => r.level === 'FAIL').length
-  const warn = crew.rows.filter((r) => r.level === 'WARN').length
-  const ok = crew.rows.length - bad - warn
+/** KiroCrew's checks. *kitCard*: the title of the brain-kit card at the top of this page when brain-kit is not loaded:
+ * KiroCrew's row about it then points at that card, here on 设置 (its own words say 「在「设置」里」). */
+function CrewCard({ crew, onFixed, kitCard }: { crew: Status['crew']; onFixed: () => void; kitCard?: string }) {
+  const rows = kitCard ? crew.rows.map((r) => (r.level === 'FAIL' && !r.repo && !r.fix ? { ...r, todo: `照最上面「${kitCard}」那张卡做` } : r)) : crew.rows
+  const bad = rows.filter((r) => r.level === 'FAIL').length
+  const warn = rows.filter((r) => r.level === 'WARN').length
+  const ok = rows.length - bad - warn
   return (
     <section className={`br-card${bad ? ' is-bad' : warn ? '' : ' is-ok'}`} aria-label="KiroCrew">
       <header>
@@ -394,12 +397,12 @@ function CrewCard({ crew, onFixed }: { crew: Status['crew']; onFixed: () => void
         {warn > 0 && <span className="br-chip tone-warn">{warn} 注意</span>}
         {bad > 0 && <span className="br-chip tone-bad">{bad} 有问题</span>}
       </header>
-      {crew.rows.length > 0 && (
+      {rows.length > 0 && (
         <div className="kt-segs st-cells" role="img" aria-label={`${ok} 正常，${warn} 注意，${bad} 有问题`}>
-          {crew.rows.map((r, i) => <i key={i} className={`is-${LEVEL_TONE[r.level] ?? 'idle'}`} title={r.text} />)}
+          {rows.map((r, i) => <i key={i} className={`is-${LEVEL_TONE[r.level] ?? 'idle'}`} title={r.text} />)}
         </div>
       )}
-      <CheckRows rows={crew.rows} fix={crew.fix} onFixed={onFixed} />
+      <CheckRows rows={rows} fix={crew.fix} onFixed={onFixed} />
     </section>
   )
 }

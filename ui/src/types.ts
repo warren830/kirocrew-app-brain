@@ -96,6 +96,9 @@ export interface Waits {
   /** the reply is Lean's review in a NEW session (开审查会话: the session that wrote the code may not review it), not a
    * turn in the open one. The backend always sends it */
   review?: boolean
+  /** what to do, in words, when the step alone does not say it: a refused hand-over's reasons' own 做什么
+   * (backend/core/problems.py REASON_RULES); '' otherwise. The backend always sends it */
+  todo?: string
 }
 
 export interface LeanSummary {
@@ -125,6 +128,9 @@ export interface MrRef { iid: number; url: string | null; state: string | null }
 export interface Requirement {
   /** repo id from /status (r1, r2 …); team-mode rows use 'runner' */
   repo: string
+  /** a team-mode row on the runner: the listed repo (r1 …) of its GitLab project, whose view and pill hold it; null
+   * when this machine does not list that project, and for every other row. The backend always sends it */
+  home?: string | null
   key: string
   title: string
   owner: string | null
@@ -240,7 +246,12 @@ export interface Status {
 export interface TeamStatus {
   enabled: boolean
   ok: boolean
+  /** why the bridge did not start, in words ('' when it did) */
   error: string
+  /** what to do about it, in words (problems.team_start). The backend always sends it */
+  error_todo?: string
+  /** the error as it was (file names, keys), for 细节. The backend always sends it */
+  error_raw?: string
   last_loop_at: number | null
   loop_error: string
   /** the signer runs as this app's OS user (the local trial, or its signed/ and refused/ are writable here): it would
@@ -547,12 +558,17 @@ export interface EvalView {
   ref: string | null
   metrics: EvalMetric[]
   /** 复看队列 (low-score queue): runs that need a human look */
-  queue: { key: string; intent: string | null; reasons: string[] }[]
-  /** runs brain-kit could not read: listed with brain-kit's reason, not counted in any metric */
-  skipped: { key: string; why: string }[]
+  /** todo: what to do about it, in words (deliveries.QUEUE_TODO by brain-kit's rule). The backend always sends it */
+  queue: { key: string; intent: string | null; reasons: string[]; todo?: string }[]
+  /** runs brain-kit could not read: listed with the reason in words (brain-kit's own in raw), not counted in any metric */
+  skipped: { key: string; why: string; raw?: string }[]
   /** brain-kit's notes on the numbers, verbatim (credits it could not attribute to a run, deliveries already known
    * wrong whose 14 days are not over …) */
   notes: string[]
+  /** the same notes, each in words with what to do (做什么) and brain-kit's own words for 细节 */
+  note_rows?: EvalNote[]
+  /** true while brainkit.evaluate is still computing a repo's numbers: say 正在算, not 还没有 */
+  computing?: boolean
   /** brain-kit's own words behind error (for 细节); '' when none. The backend always sends it */
   raw?: string
 }
@@ -584,7 +600,10 @@ export interface Overview {
   cto: CtoNumbers
   /** state → count */
   counts: Partial<Record<ReqState, number>>
-  errors: { repo: string; error: string }[]
+  /** a repo whose requirements could not be read: what happened and what to do, in words; raw: the original (细节) */
+  /** a repo that could not be read: its name and path as /status says them (the banner names it and opens 导入仓库 at
+   * that path even when /status cannot be read). The backend always sends name and path */
+  errors: { repo: string; name?: string; path?: string; error: string; raw?: string }[]
 }
 
 // ---------------------------------------------------------------- GET /requirements/{repo}/{key}
@@ -631,6 +650,8 @@ export interface Decision {
   cites: string[]
   vouchers: string[]
   src: string
+  /** the questions the AI asked straight in the session (Q1 …) whose answer this row records, from its text and why */
+  asked?: string[]
 }
 
 export interface QuestionOption { id: string; text: string }
@@ -814,7 +835,8 @@ export interface IntakeCheck {
   blocking_raw?: string[]
   /** the findings per file, said plainly: what was found and what happened to it, 请你确认, why a file was not taken */
   files?: { id: string; name: string; items: string[]; review: string; refused: string }[]
-  refused: { id: string; name: string; reason: string }[]
+  /** files not taken: why, in words (raw: brain-kit's own words) */
+  refused: { id: string; name: string; reason: string; raw?: string }[]
   /** a hard stop before any finding (no consent, nothing to take in …), verbatim */
   error: string
 }
@@ -905,7 +927,9 @@ export interface ReflectPreview {
   gaps: { title: string; kind: string; what: string }[]
   notes: string[]
   warnings: string[]
-  problems: string[]
+  /** what blocks --apply, each a FAIL row in the app's words (a brain lint line as the Brain 检查 card says it, with
+   * its 做什么); brain-kit's lines are in raw */
+  problems: CheckRow[]
   /** at least one op that is more than sources added: --apply would open a branch */
   substantive: boolean
   error: string
@@ -953,6 +977,13 @@ export interface TodoItem {
   /** the brain-dev session to open, for lean_approval / clarify */
   session: { slot: string; title: string; url: string } | null
   since: number | null
+  /** lean_approval: the document to read before approving (the approval's path), shown as 要读的 */
+  path?: string | null
+  /** handoff_rejected: what to do, each reason's own 做什么 in words ('' otherwise). The backend always sends it */
+  todo?: string
+  /** handoff_rejected / handoff_unlabelled: the bridge's words as it wrote them, and how to do it by hand (做法), for
+   * 细节 ('' otherwise). The backend always sends it */
+  raw?: string
 }
 export interface Todo { items: TodoItem[]; team: boolean }
 
@@ -1185,7 +1216,9 @@ export interface ReqBoard {
   /** something is at work right now (a session busy, the runner running): the board glows */
   live: boolean
   /** the owner (the sample's orchestrator slot) */
-  person: { status: ActorStatus; doing: string; owner: string | null; me: boolean }
+  /** *me*: the one reading is the owner; *you*: the board calls the owner 你 (they are, or nobody known reads it on their
+   * machine): the page says 你 and offers 开工 only then (an older backend did not say) */
+  person: { status: ActorStatus; doing: string; owner: string | null; me: boolean; you?: boolean }
   actors: Actor[]
   /** the way's edges (from, to) */
   edges: [string, string][]
@@ -1246,3 +1279,6 @@ export interface CtoNumbers {
   /** merged per week (Monday, YYYY-MM-DD), by how: the last 12 weeks */
   weekly: { week: string; unattended: number; people: number; local: number; pending: number }[]
 }
+
+/** One of brain-kit's notes on the 交付评估 numbers: what it says, what to do, its own words (细节). */
+export interface EvalNote { text: string; todo: string; raw: string }

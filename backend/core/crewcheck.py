@@ -44,7 +44,6 @@ from . import bk
 from . import problems as P
 from .constants import kirocrew_bin
 
-TRIGGER_NAMES = P.TRIGGER_NAMES
 NEEDS = ("CREW_HOOK", "CREW_EVENTS", "agent_hook_commands", "missing_lean_hooks", "add_lean_hooks",
          "runner_kit_problems")
 AGENT_OK = P.AGENT_OK   # the one row agent_ok accepts (always the start of its text)
@@ -73,22 +72,20 @@ def _load(path: str) -> tuple[dict[str, Any] | None, str]:
     try:
         spec = json.loads(raw.decode("utf-8"))
     except ValueError:
-        return None, "不是合法的 JSON"
+        return None, "读不懂：文件格式坏了"
     if not isinstance(spec, dict):
-        return None, "不是一个 JSON 对象"
+        return None, "读不懂：里面不是一份设置"
     hooks = spec.get("hooks")
     if not (hooks is None or isinstance(hooks, list) or
             (isinstance(hooks, dict) and all(isinstance(v, list) for v in hooks.values()))):
-        return None, "的 hooks 格式认不出"
+        return None, "读不懂：拦截那一段的写法认不出"
     return spec, ""
 
 
 def _unreadable(why: str) -> str:
-    return "~/.kiro/agents/brain-dev.json %s：自己修好或删掉它（这里不会覆盖它）" % why
-
-
-def _names(missing: list[tuple[str, str]]) -> str:
-    return "、".join("%s（%s）" % (TRIGGER_NAMES.get(t, t), t) for t, _ in missing)
+    """fix_agent's answer for a spec it never writes. The answer has no 细节: the OS error stays with the row the
+    checks show (agent_unreadable)."""
+    return "没改：brain-dev 的设置%s。%s，细节看上面 brain-dev 那一行" % (why.split("（")[0], P.UNREADABLE_TODO)
 
 
 def _write_in_place(path: str, spec: dict[str, Any]) -> None:
@@ -150,6 +147,8 @@ def checks(repo_paths: list[str], team_paths: Any = None) -> dict[str, Any]:
             probs = []
         for p in probs:
             rows.append(P.row("FAIL", p, repo=rp, team=is_team))
+        for p in kit_files_missing(rp, told=probs):
+            rows.append(P.row("FAIL", p, repo=rp, team=is_team))
         why = _records_counted(rp)
         if why:
             rows.append(P.row("FAIL", why, repo=rp, team=is_team))
@@ -158,6 +157,27 @@ def checks(repo_paths: list[str], team_paths: Any = None) -> dict[str, Any]:
     if be not in (None, "kas", ""):
         fix["engine"] = True
     return {"rows": rows, "fix": fix, "checked_at": time.time()}
+
+
+BRAIN_FILES = ("PRODUCT.md", "TECH.md", "IMPROVEMENT.md", "PROJECT.md")   # brain install's Brain (kit.json brain_files)
+LEAN_SCRIPT = ".kiro/aidlc-lean/aidlc_lean.py"                               # cli.runner_kit_problems names it
+
+
+def kit_files_missing(rp: str, told: list[str] = ()) -> list[str]:
+    """The kit files `brain install` puts in a checkout that are not in this one (AI-DLC Lean, the Brain files,
+    AGENTS.md), in `brain doctor`'s words, so their rows offer 重装 kit 文件 as its rows do, also for a file gone from
+    the disk that git still has (runner_kit_problems reads git). *told*: runner_kit_problems' lines, which already say
+    when Lean is not in git."""
+    try:
+        cfg = bk.m("config").load(rp)
+    except Exception:  # noqa: BLE001 - no readable kit.json: the repo's own row says so
+        return []
+    lean = bk.m("lean").installed(rp) or any(x.startswith(LEAN_SCRIPT + " ") for x in told)
+    bdir = str(cfg.get("brain_dir") or "brain")
+    names = [n for n in cfg.get("brain_files") or BRAIN_FILES if not os.path.isfile(os.path.join(rp, bdir, n))]
+    out = ([] if lean else ["AI-DLC Lean not installed"]) + (
+        ["Brain files in %s/: missing %s" % (bdir, ", ".join(names))] if names else [])
+    return out + ([] if os.path.isfile(os.path.join(rp, "AGENTS.md")) else ["AGENTS.md at repo root"])
 
 
 def _unreadable_row(why: str) -> dict[str, Any]:
@@ -199,6 +219,17 @@ def agent_ok(rows: list[dict[str, Any]]) -> bool:
     return any(r.get("level") == "OK" and str(r.get("text", "")).startswith(AGENT_OK) for r in rows)
 
 
+def not_ready(rows: list[dict[str, Any]]) -> str:
+    """Why a brain-dev session cannot be opened (agent_ok says no), in the words of the row 设置's KiroCrew shows for
+    it: its text and its 做什么, whose 点「…」 is the button that row has there (装上 brain-dev when brain-dev.json is
+    not there, 补上 Lean 的拦截 when hooks are missing), else what to do (brain-kit not loaded, the file unreadable)."""
+    r = next((r for r in rows if r.get("level") == "FAIL" and not r.get("repo")), None)
+    if r is None:
+        return "brain-dev 还没准备好：到「设置」的 KiroCrew 里再检查一次"
+    todo = str(r.get("todo") or "")
+    return "%s。%s%s" % (r["text"], "在「设置」的 KiroCrew 里" if todo.startswith("点「") else "", todo)
+
+
 def fix_agent() -> str:
     cli = bk.m("cli")
     path = cli.crew_agent_path()
@@ -206,28 +237,32 @@ def fix_agent() -> str:
         with open(cli.CREW_AGENT_SRC, encoding="utf-8") as f:
             spec = json.load(f)
         bk.m("common").write_json(path, spec)
-        return "装好了 ~/.kiro/agents/brain-dev.json（brain-kit 带的版本）。新开的会话才会带上它。"
+        return "装好了 brain-dev（brain-kit 带的那一份）。新开的会话才会用上它。"
     spec, why = _load(path)
     if spec is None:
         raise RuntimeError(_unreadable(why))
     missing = cli.missing_lean_hooks(spec)
     if not missing:
-        return "brain-dev.json 已经带着 Lean 的三个 hook：什么都没改"
+        return AGENT_OK + "：什么都没改"
     stamp = time.strftime("%Y%m%d-%H%M%S")
     bak, n = "%s.bak-%s" % (path, stamp), 1
     while os.path.exists(bak):
         bak, n = "%s.bak-%s-%d" % (path, stamp, n), n + 1
     shutil.copy2(path, bak)
     _write_in_place(path, cli.add_lean_hooks(spec, missing))
-    return ("给 brain-dev.json 补上了 Lean 的 hook：%s；别的 hook 和设置都没动，原来的留在 %s。新开的会话才会带上它。"
-            % (_names(missing), os.path.basename(bak)))
+    # the answer has no 细节: the backup's name (to put the old one back) stays after the words
+    return ("给 brain-dev 的设置补上了 Lean 的拦截：%s。别的都没动；改之前的那份留作备份：%s。新开的会话才会用上。"
+            % (P.trigger_names(missing), os.path.basename(bak)))
 
 
 def fix_engine() -> str:
+    # the answer has no 细节: the command (when the app cannot run it) and KiroCrew's error stay after the words
     kc = kirocrew_bin()
     if not kc:
-        raise RuntimeError("找不到 kirocrew 命令：自己跑 kirocrew config set agent.acp_backend kas")
+        raise RuntimeError("没换成：找不到 KiroCrew 的命令行工具。确认 KiroCrew 装好了；也可以在终端里自己换："
+                           "kirocrew config set agent.acp_backend kas")
     p = subprocess.run([kc, "config", "set", "agent.acp_backend", "kas"], capture_output=True, text=True, timeout=30)
     if p.returncode != 0:
-        raise RuntimeError("kirocrew config set 失败：%s" % (p.stderr or p.stdout).strip()[:300])
+        raise RuntimeError("引擎没换成 kas：KiroCrew 报了错。看下面它的原话，改好以后再点一次\n%s"
+                           % (p.stderr or p.stdout).strip()[:200])
     return "引擎设成了 kas。KiroCrew 可能要重开才生效。"

@@ -28,13 +28,13 @@
       "id": "default",
       "level": "OK",
       "label": "默认分支",
-      "why": "main（origin/HEAD）",
+      "why": "main（远端标的默认分支）",
       "todo": ""
     },
     {
       "id": "origin",
       "level": "OK",
-      "label": "origin",
+      "label": "远端",
       "why": "git@gitlab.example.com:shop/refund.git（GitLab https://gitlab.example.com，项目 shop/refund）",
       "todo": ""
     },
@@ -71,11 +71,11 @@
     "rows": [
       {
         "level": "FAIL",
-        "text": "没有 ~/.kiro/agents/brain-dev.json",
-        "todo": "点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的 hook 在 KiroCrew 里不会跑",
+        "text": "KiroCrew 里还没有 brain-dev",
+        "todo": "点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的拦截在 KiroCrew 里不会跑",
         "fix": "agent",
         "repo": null,
-        "raw": ""
+        "raw": "没有 ~/.kiro/agents/brain-dev.json"
       },
       {
         "level": "OK",

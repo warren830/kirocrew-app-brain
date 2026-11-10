@@ -103,7 +103,7 @@ def expected_paths(v: Any) -> list[str]:
     elif isinstance(v, list) and all(isinstance(x, str) for x in v):
         items = v
     else:
-        raise IntakeError("paths 要是路径的列表，或一串用逗号、空格分开的路径")
+        raise IntakeError("预计改动的路径要写成一串，用逗号或空格分开")
     out = []
     for p in (x.strip() for x in items):
         if p and p not in out:
@@ -154,6 +154,13 @@ def clean_body(repo: Repo, body: dict[str, Any], *, start: bool) -> dict[str, An
             "exclude": exclude, "paths": paths}
 
 
+def store_path(repo: Repo) -> str:
+    """Where brain-kit keeps material packages on this machine, as cli._store finds it, without making the folder: a
+    dry run only reads it (the next package id), so 先检查 creates nothing (BRAINKIT_REQUESTS.md 35)."""
+    s = os.environ.get("BRAIN_INTAKE_DIR") or repo.git.out("config", "brain.intake") or "~/.brain/intake"
+    return os.path.abspath(os.path.expanduser(s))
+
+
 def check(repo: Repo, body: dict[str, Any], me: str | None) -> dict[str, Any]:
     """brain-kit's dry run of the five gates (blocking: call it in a thread)."""
     out = {"ok": False, "key": None, "package": None, "classification": None, "segments": 0, "sources": 0,
@@ -169,14 +176,13 @@ def check(repo: Repo, body: dict[str, Any], me: str | None) -> dict[str, Any]:
         out["error"] = "没有文档：不用检查，可以直接开工"
         return out
     pkg = bk.m("intake.package")
-    cli = bk.m("cli")
     try:
-        store = cli._store(repo.path, None)
+        store = store_path(repo)
         rep = pkg.build(b["docs"], key, store, submitter=me or "unknown", consent=b["consent"],
                         classification=b["classification"], business=b["business"] or None,
                         kit_intake=repo.cfg["intake"], dry_run=True, exclude=b["exclude"])
     except bk.brain_error() as exc:
-        out["error"] = gate_text(str(exc))
+        out["error"] = gate_text(str(exc), b)
         out["blocking_raw"] = [str(exc)]
         return out
     except (OSError, ValueError) as exc:
@@ -185,10 +191,10 @@ def check(repo: Repo, body: dict[str, Any], me: str | None) -> dict[str, Any]:
     raw = [str(x) for x in rep.get("blocking") or []]
     out.update(ok=not raw, package=rep.get("package"), classification=rep.get("classification"),
                segments=int(rep.get("segments") or 0), sources=int(rep.get("sources") or 0),
-               findings=[str(x) for x in rep.get("findings") or []], blocking=[gate_text(x) for x in raw],
+               findings=[str(x) for x in rep.get("findings") or []], blocking=[gate_text(x, b) for x in raw],
                blocking_raw=raw,
-               refused=[{"id": str(r.get("id")), "name": str(r.get("name")), "reason": str(r.get("reason"))}
-                        for r in rep.get("refused") or []])
+               refused=[{"id": str(r.get("id")), "name": str(r.get("name")), "reason": refused_text(str(r.get("reason"))),
+                         "raw": str(r.get("reason"))} for r in rep.get("refused") or []])
     out["review"] = review_items(out["findings"])
     out["files"] = file_items(out["findings"], b["business"])
     return out
@@ -201,41 +207,104 @@ def _kinds(text: str) -> str:
     return "、".join("%s %s 处" % (KIND_ZH.get(k, k), n) for k, n in pairs) or text
 
 
-def _what(text: str) -> str:
-    """brain-kit's 「D03.pdf=confidential」 / 「你选的是 unsure」 said plainly."""
-    out = []
+def _marked(text: str, cls: str) -> tuple[list[str], str]:
+    """brain-kit's 「a.pdf=confidential, b.docx=secret」 / 「你选的是 unsure」 / (before dac1856) 「a.pdf」 for *cls*: (the
+    files it names, said 「a.pdf 标着机密」 by file name: an older brain-kit put the document code first), the class the
+    person picked ('' when it names files)."""
+    files, picked = [], ""
     for part in [x.strip() for x in text.split(",") if x.strip()]:
-        m = re.match(r"^(?P<f>.+)=(?P<c>[a-z]+)$", part)
-        if m:
-            out.append("%s 标着%s" % (m.group("f"), CLASS_ZH.get(m.group("c"), m.group("c"))))
-            continue
         m = re.match(r"^你选的是 (?P<c>[a-z]+)$", part)
-        out.append("你选的是「%s」" % CLASS_ZH.get(m.group("c"), m.group("c")) if m else part)
-    return "、".join(out)
+        if m:
+            picked = m.group("c")
+            continue
+        m = re.match(r"^(?:D\d+ )?(?P<f>.+?)(?:=(?P<c>[a-z]+))?$", part)
+        files.append("%s 标着%s" % (m.group("f"), CLASS_ZH.get(m.group("c") or cls, m.group("c") or cls)))
+    return files, picked
+
+
+SUMMARY = "先请产品写一份脱敏摘要，交摘要"
+GATE2 = {"confidential": ("这个仓库不收机密材料", ("confidential", "unsure")), "secret": ("绝密材料不收", ("secret",))}
+
+
+def _gate2(what: str, cls: str, picked: str) -> str:
+    """Gate 2's stop line for material taken as *cls*: what this repo refuses, why (the files marked, the class picked),
+    what to do. Leaving a file out helps only when a file is the cause: the person's own pick (brain-kit's 你选的是, or
+    *picked* when gate 2 refuses it here) is changed on gate 2, or summarised."""
+    rule, refuses = GATE2[cls]
+    files, said_pick = _marked(what, cls)
+    pick = said_pick or (picked if picked in refuses else "")
+    why = "、".join(files + (["你选的是「%s」" % CLASS_ZH.get(pick, pick)] if pick else []))
+    head = "第 2 关：%s%s：%s" % (rule, "（%s）" % why if why else "", SUMMARY)
+    return head if pick or not files else head + "；不想交这份，就把它写进「不收这些文件」"
+
+
+def _taken_none(listed: str) -> str:
+    """brain-kit's 「D01 pic/截图.png（图片不单独收（没有 OCR）：…）；D02 …」: each file by its name, why in words."""
+    out = []
+    for part in [x.strip() for x in listed.split("；") if x.strip()]:
+        m = re.match(r"^(?:D\d+ )?(?P<n>.+?)（(?P<r>.*)）$", part)
+        out.append("%s（%s）" % (m.group("n"), refused_text(m.group("r"))) if m else part)
+    return "没有一个文件收得进来，这次没有材料可交：%s。按原因改好再交" % "；".join(out)
 
 
 GATE_ZH += [(re.compile(rx), fn) for rx, fn in (
     (r"^门 2：材料按机密处理（(?P<w>.*)），而 intake\.allow_confidential 是 false",
-     lambda g: "第 2 关：这个仓库不收机密材料（%s）。请产品写一份脱敏摘要再交，或者把这份写进「不收这些文件」" % _what(g["w"])),
-    (r"^门 2：材料是绝密（(?P<w>.*)），不收", lambda g: "第 2 关：绝密材料不收（%s）：只交脱敏摘要" % _what(g["w"])),
-    (r"^门 2：--classification", lambda g: "第 2 关：选一个密级"),
+     lambda g, b: _gate2(g["w"], "confidential", b.get("classification") or "")),
+    # brain-kit dac1856: 门 2：材料按绝密处理（你选的是 secret / a.pdf=secret）：绝密材料不收，不写材料包。…; before it:
+    # 门 2：材料是绝密（a.pdf），不收，只留哈希
+    (r"^门 2：材料按绝密处理（(?P<w>.*?)）：绝密材料不收",
+     lambda g, b: _gate2(g["w"], "secret", b.get("classification") or "")),
+    (r"^门 2：材料是绝密（(?P<w>.*)），不收",
+     lambda g, b: _gate2(g["w"], "secret", b.get("classification") or "")),
+    (r"^门 2：--classification", lambda g, b: "第 2 关：选一个密级"),
     (r"^门 3：找到商业敏感内容 (?P<s>.*?)，请选 --business",
-     lambda g: "第 3 关：找到%s：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」" % _kinds(g["s"])),
-    (r"^门 5：(?P<f>.+?) 里有私钥或云访问密钥", lambda g: "第 5 关：%s 里有私钥或云访问密钥，整份不收：先从文档里删掉，再换一把新密钥"
-     % g["f"]),
-    (r"^门 1：确认你是作者", lambda g: "第 1 关：勾上「我是作者，或已取得作者同意」"),
-    (r"^没有可收的文件$", lambda g: "没有可收的文件：文档是空的，或者都被「不收这些文件」排除了"),
+     lambda g, b: "第 3 关：找到%s：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」" % _kinds(g["s"])),
+    (r"^门 5：(?P<f>.+?) 里有私钥或云访问密钥",
+     lambda g, b: "第 5 关：%s 里有私钥或云访问密钥，整份不收：先从文档里删掉，再换一把新密钥" % g["f"]),
+    (r"^门 1：确认你是作者", lambda g, b: "第 1 关：勾上「我是作者，或已取得作者同意」"),
+    # brain-kit 2340f88: a set where no file can be taken stops instead of writing an empty package
+    (r"^没有一个文件收得进来，不写材料包：(?P<l>.+?)。请按原因改好再交。?$", lambda g, b: _taken_none(g["l"])),
+    # brain-kit f3ca3ec says when the excludes left nothing; before it, and for an empty folder: no reason
+    (r"^没有可收的文件（--exclude 把文件都去掉了）$",
+     lambda g, b: "没有可收的文件：「不收这些文件」把给的文件都去掉了：少写几个，或者不交文档"),
+    (r"^没有可收的文件$", lambda g, b: "没有可收的文件：给的文件夹里没有文件" if b and not b.get("exclude") else
+     "没有可收的文件：文档是空的，或者都被「不收这些文件」排除了"),
 )]
 
 
-def gate_text(line: str) -> str:
-    """One of brain-kit's gate lines (or hard stops) as the page action; a line nobody mapped as it is."""
+def gate_text(line: str, body: dict[str, Any] | None = None) -> str:
+    """One of brain-kit's gate lines (or hard stops) as the page action; a line nobody mapped as it is. *body*: the
+    form checked (clean_body), for what brain-kit's line does not say: the class picked, whether files were left out."""
     s = str(line or "")
     for rx, fn in GATE_ZH:
         m = rx.match(s)
         if m:
-            return fn({k: (v or "") for k, v in m.groupdict().items()})
+            return fn({k: (v or "") for k, v in m.groupdict().items()}, body or {})
     return s
+
+
+# why brain-kit did not take a file (intake/convert.py's Refused), said as what to do; its own words stay in findings
+REFUSED_ZH = [(re.compile(rx), say) for rx, say in (
+    (r"^图片(?:文件)?不(?:单独)?收（没有 OCR）", "图片里的字读不出来：把图里的文字写进文档再交"),
+    (r"^PDF 几乎没有文字", "这份 PDF 几乎没有文字（像是扫描件），读不出来：请交文字版"),
+    (r"^PDF 需要 MarkItDown", "这台机器读不了 PDF：请另存为 docx 再交"),
+    (r"^PDF 转换失败", "这份 PDF 读不出来：请另存为 docx 再交"),
+    (r"^文本编码无法识别", "文字的编码认不出来：请另存为 UTF-8 的文本再交"),
+    (r"^文件里有 XML DOCTYPE", "文件里有不安全的声明：另存一份再交"),
+    (r"^XML 损坏", "文件里的内容坏了：另存一份再交"),
+    (r"^不是有效的 (?:xlsx|docx)", "这份文件不完整：另存一份再交"),
+    (r"^解压后过大", "解开以后太大"),
+    (r"^文件内容损坏或格式不对", "文件内容坏了或格式不对：另存一份再交"),
+    (r"^看起来不是文本文件", "看起来不是文本文件"),
+)]
+
+
+def refused_text(reason: str) -> str:
+    """brain-kit's reason a file was not taken, in words (REFUSED_ZH); one nobody mapped as it is."""
+    for rx, say in REFUSED_ZH:
+        if rx.match(reason):
+            return say
+    return reason
 
 
 def file_items(findings: list[str], business: str) -> list[dict[str, Any]]:
@@ -249,7 +318,7 @@ def file_items(findings: list[str], business: str) -> list[dict[str, Any]]:
         rest = m.group("rest")
         f = {"id": m.group("id"), "name": m.group("name"), "items": [], "review": "", "refused": ""}
         if rest.startswith("没收——"):
-            f["refused"] = rest[len("没收——"):]
+            f["refused"] = refused_text(rest[len("没收——"):])
             out.append(f)
             continue
         rv = REVIEW_RE.search(rest)

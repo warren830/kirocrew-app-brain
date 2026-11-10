@@ -3,6 +3,8 @@
     "enabled": true,
     "ok": true,
     "error": "",
+    "error_todo": "",
+    "error_raw": "",
     "last_loop_at": 1794146350,
     "loop_error": "",
     "same_user": true,
@@ -118,10 +120,10 @@
         "req_id": "SIG-0039",
         "kind": "handoff",
         "reasons": [
-          "MR 的作者 dave 不在 decision_roles.owner 里"
+          "负责人和认领记录对不上"
         ],
         "raw": [
-          "MR 的作者 dave 不在 decision_roles.owner 里"
+          "claim.json owner bob is not the branch owner alice"
         ]
       }
     ],

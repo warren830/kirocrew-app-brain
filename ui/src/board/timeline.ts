@@ -10,7 +10,7 @@
  * real time.
  */
 import type { ActorStatus, CheckCell, ReqBoard, ReqState, WaitWho } from '../types'
-import { leanFromEvents } from './format'
+import { leanFromEvents, ownerIsYou } from './format'
 
 export interface ReplaySpan {
   start: number
@@ -127,21 +127,32 @@ export function replayAt(b: ReqBoard, t: number): ReqBoard {
   const ln = leanFromEvents(b.events, t, b.row.lean.total)
   const through = ln.done_n + ln.skipped_n
   const who: WaitWho = awaiting ? waitOn.get(awaiting.key) ?? 'people' : working ? (statusOf.get('runner') === 'running' ? 'runner' : 'agent') : 'nobody'
+  // only claimed: as a live claim of that owner shows it (deliveries' row, board.py's person): no run branch, no working
+  // directory, it waits on its owner to start it
+  const claimed = state === 'claimed'
+  const claimAt = b.events.find((e) => e.kind === 'claim')?.at ?? null
+  const starts = ownerIsYou(b) ? '已认领，还没开工' : `等 ${b.person.owner} 开工`
   return {
     ...b,
     row: {
       ...b.row, state, state_label: STATE_LABEL[state], credits: null,
       // the MR is opened at the hand-over
       mr: b.events.some((e) => e.kind === 'handover' && e.at <= t) ? b.row.mr : null,
+      ...(claimed ? { branch: null, worktree: null } : {}),
       lean: { ...b.row.lean, done_n: ln.done_n, skipped_n: ln.skipped_n, next: ln.next, done: through, stage: ln.next?.id ?? null, stage_label: ln.next?.label ?? null, stage_n: ln.next?.n ?? null,
         stage_state: ln.next ? (ln.started ? 'started' : 'todo') : through ? 'done' : null },
-      waits: { ...b.row.waits, who, text: awaiting ? awaiting.doing : working ? 'AI 在做' : '', line: null, raw: '', do: 'none', since: awaiting?.since ?? null },
+      waits: claimed
+        ? { ...b.row.waits, who: ownerIsYou(b) ? 'you' : 'people', text: starts, line: null, raw: '', do: 'start', since: claimAt }
+        : { ...b.row.waits, who, text: awaiting ? awaiting.doing : working ? 'AI 在做' : '', line: null, raw: '', do: 'none', since: awaiting?.since ?? null },
     },
+    branch: claimed ? null : b.branch,
     ended_at: merged ? b.ended_at : null,
     live: working,
     // the owner's node asks only when the wait is on them; one on the product or someone else is said (as the live board)
-    person: { ...b.person, status: who === 'you' ? 'awaiting_approval' : working && !awaiting ? 'running' : 'waiting', doing: awaiting ? awaiting.doing : working ? 'AI 在做' : '没有等你的事' },
-    actors,
+    person: claimed
+      ? { ...b.person, status: ownerIsYou(b) ? 'awaiting_approval' : 'waiting', doing: starts }
+      : { ...b.person, status: who === 'you' ? 'awaiting_approval' : working && !awaiting ? 'running' : 'waiting', doing: awaiting ? awaiting.doing : working ? 'AI 在做' : '没有等你的事' },
+    actors: claimed ? actors.map((a) => (a.key === 'local' ? { ...a, doing: '认领了，还没开工' } : a)) : actors,
     events: b.events.filter((e) => e.at <= t),
     belt: b.belt.filter((x) => x.at <= t),
     sessions: b.sessions.filter((x) => openedAt(x) <= t),

@@ -6,18 +6,51 @@
 import type { ReactNode } from 'react'
 
 const INLINE = /`([^`]+)`|\*\*([^*]+)\*\*|\[([^\]]+)\]\([^)\s]*\)/g
+/** a path or a branch (ai/alice/PAY-3-refund-export, /Users/alice/…, aidlc-docs/…/): names joined by 「/」 */
+const PATH = /\/?[\w.~@+-]+(?:\/[\w.~@+-]*)+/g
 
-/** One line's `code`, **bold** and [links](…) (their words only). */
-export function Inline({ text }: { text: string | null | undefined }) {
+/** A path's pieces as it may break: only next to a 「/」 (a folder's trailing 「/」 stays with its name). */
+export function pathPieces(path: string): string[] {
+  const parts = path.split('/').map((p, i) => (i ? `/${p}` : p)).filter((p, i) => p || i)
+  if (parts.length > 1 && parts[parts.length - 1] === '/') parts.splice(-2, 2, `${parts[parts.length - 2]}/`)
+  return parts
+}
+
+/** A path drawn so that it breaks only at a 「/」, never at a 「-」 inside a name (.br-path > span is nowrap). */
+export function PathPieces({ path }: { path: string }) {
+  return <span className="br-path">{pathPieces(path).map((p, i) => <span key={i}><span>{p}</span><wbr /></span>)}</span>
+}
+
+/** Plain text with its paths and branches drawn by PathPieces. */
+export function Paths({ text }: { text: string | null | undefined }) {
   if (!text) return null
   const out: ReactNode[] = []
   let last = 0
-  for (const m of text.matchAll(INLINE)) {
+  for (const m of text.matchAll(PATH)) {
     if (m.index > last) out.push(text.slice(last, m.index))
-    out.push(m[1] !== undefined ? <code key={m.index}>{m[1]}</code> : m[2] !== undefined ? <b key={m.index}>{m[2]}</b> : m[3])
+    out.push(<PathPieces key={m.index} path={m[0]} />)
     last = m.index + m[0].length
   }
   if (last < text.length) out.push(text.slice(last))
+  return <>{out}</>
+}
+
+/** A text cut short (「…」) inside its `code` keeps the code: its open backtick is closed before the 「…」, so no lone
+ * backtick shows (brain-kit cuts long table cells at a length, wherever that falls). */
+const closeCut = (text: string) => ((text.match(/`/g)?.length ?? 0) % 2 && /…$/.test(text) ? text.replace(/…$/, '`…') : text)
+
+/** One line's `code`, **bold** and [links](…) (their words only); a path in it breaks only at a 「/」. */
+export function Inline({ text: raw }: { text: string | null | undefined }) {
+  if (!raw) return null
+  const text = closeCut(raw)
+  const out: ReactNode[] = []
+  let last = 0
+  for (const m of text.matchAll(INLINE)) {
+    if (m.index > last) out.push(<Paths key={`t${m.index}`} text={text.slice(last, m.index)} />)
+    out.push(m[1] !== undefined ? <code key={m.index}><Paths text={m[1]} /></code> : m[2] !== undefined ? <b key={m.index}><Paths text={m[2]} /></b> : m[3])
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push(<Paths key="end" text={text.slice(last)} />)
   return <>{out}</>
 }
 
@@ -85,8 +118,12 @@ export function blocks(text: string): Block[] {
   return out
 }
 
-/** A whole Markdown text as formatted text (the 变更说明's 看全文). */
-export function Markdown({ text, testid }: { text: string; testid?: string }) {
+/** A whole Markdown text as formatted text (the 变更说明's 看全文). *foldRefs*: the material refs (「（D01#S002 · 097f2e9e）」)
+ * are taken out of the lines and said once, at the end (BOARD-17). */
+export function Markdown({ text: raw, testid, foldRefs = false }: { text: string; testid?: string; foldRefs?: boolean }) {
+  const refs: string[] = []
+  const text = foldRefs ? raw.split('\n').map((l) => { const t = takeRefs(l); refs.push(...t.refs); return t.text }).join('\n') : raw
+  const once = [...new Set(refs)]
   return (
     <div className="br-md" data-testid={testid}>
       {blocks(text).map((b, i) => {
@@ -108,6 +145,7 @@ export function Markdown({ text, testid }: { text: string; testid?: string }) {
           default: return <p key={i}>{b.lines.map((t, j) => <span key={j}>{j > 0 && <br />}<Inline text={t} /></span>)}</p>
         }
       })}
+      {once.length > 0 && <p className="br-hint" data-testid="md-refs">引用的材料段落：{once.join('、')}</p>}
     </div>
   )
 }

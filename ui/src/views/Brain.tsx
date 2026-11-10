@@ -276,7 +276,7 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
                     <label className="bv-search" htmlFor="brain-text">
                       <span className="br-sr">按文字筛</span>
                       <Icon name="Search" size={14} />
-                      <input id="brain-text" type="text" placeholder="按 id、文字、来源筛" value={text} onChange={(e) => setText(e.target.value)} />
+                      <input id="brain-text" type="text" placeholder="按条目号、文字、来源筛" value={text} onChange={(e) => setText(e.target.value)} />
                     </label>
                     <TypeChips file={file} type={type} onType={setType} />
                   </div>
@@ -448,7 +448,7 @@ function TypeChips({ file, type, onType }: { file: BrainFileView; type: string; 
     <div className="bv-types" role="group" aria-label="按类型筛">
       <button type="button" className="bv-type" aria-pressed={type === ''} onClick={() => onType('')}>全部 <b>{all.length}</b></button>
       {types.map((t) => (
-        <button key={t} type="button" className="bv-type" aria-pressed={type === t} title={t} onClick={() => onType(type === t ? '' : t)}>
+        <button key={t} type="button" className="bv-type" aria-pressed={type === t} onClick={() => onType(type === t ? '' : t)}>
           {TYPE_LABEL[t] ?? t} <b>{all.filter((e) => e.type === t).length}</b>
         </button>
       ))}
@@ -462,7 +462,7 @@ function EntryCard({ e, hl }: { e: BrainEntry; hl: boolean }) {
     <article className={`bv-entry${hl ? ' is-hl' : ''}${e.candidate ? ' is-cand' : ''}`} data-entry-id={e.id} aria-current={hl ? 'true' : undefined} aria-label={e.id}>
       <div className="bv-entry-top">
         <b className="br-key">{e.id}</b>
-        <span className="br-chip tone-info" title={e.type}>{TYPE_LABEL[e.type] ?? e.type}</span>
+        <span className="br-chip tone-info">{TYPE_LABEL[e.type] ?? e.type}</span>
         <span className="br-tag">{SIDE_LABEL[e.side] ?? e.side}</span>
         {e.rel && REL_ON_CARD.has(e.rel.split(' ')[0]) && <span className="br-tag">{relLabel(e.rel)}</span>}
         <span className="br-grow" />
@@ -689,7 +689,7 @@ function ReflectCard({ repo, branch, items, pick, onPick, onItem, onApplied, pos
           {p.source && <SourceNote source={p.source} />}
           {p.error && <p className="br-error br-pre" role="alert">{p.error}</p>}
           {p.problems.length > 0 && (
-            <div data-testid="reflect-problems"><CheckRows rows={p.problems.map((x) => ({ level: 'FAIL', text: x }))} /></div>
+            <div data-testid="reflect-problems"><CheckRows rows={p.problems} /></div>
           )}
           {says.what === 'write' && (
             <div className="br-scroll">
@@ -769,7 +769,7 @@ function ReflectCard({ repo, branch, items, pick, onPick, onItem, onApplied, pos
               <span>MR 合并进 {branch} 以后，这里的条目就更新了。</span>
             </p>
           )}
-          {r.ok && !r.mr_url && r.pushed && <p>推上去了，但没开成 MR（这台机器没有 GitLab 的 token）：在 GitLab 上用这个分支开一个 MR，合并以后这里就更新了。</p>}
+          {r.ok && !r.mr_url && r.pushed && <p>推上去了，但没开成 MR（这台机器没有 GitLab 的令牌）：在 GitLab 上用这个分支开一个 MR，合并以后这里就更新了。</p>}
           {r.ok && !r.pushed && <p>只写在本机，还没推。要给团队看：把这个分支推上去再开 MR（怎么推在「细节」里）；合并进 {branch} 以后这里就更新了。</p>}
           {r.worktree && <p className="br-note" data-testid="reflect-worktree">工作区：<span className="br-mono">{r.worktree}</span></p>}
           {r.output && (

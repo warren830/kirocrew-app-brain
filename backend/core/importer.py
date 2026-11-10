@@ -56,7 +56,7 @@ MAX_OUT = 20000
 WORK_DIRS = ("workplace", "workplaces", "workspace", "workspaces")
 LEAN_SCRIPT = ".kiro/aidlc-lean/aidlc_lean.py"
 LEAN_CONFIG = "aidlc-docs/lean.json"
-BRAIN_FILES = ("PRODUCT.md", "TECH.md", "IMPROVEMENT.md", "PROJECT.md")
+BRAIN_FILES = crewcheck.BRAIN_FILES
 
 CTRL_RE = re.compile(r"[\x00-\x1f\x7f\u2028\u2029]")
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
@@ -278,7 +278,7 @@ def git_failure(p: subprocess.CompletedProcess, what: str, url: str = "") -> tup
     if p.returncode == 124:
         if what == "克隆":
             span = "%d 分钟" % (CLONE_TIMEOUT_S // 60) if CLONE_TIMEOUT_S >= 60 else "%d 秒" % CLONE_TIMEOUT_S
-            return "timeout", ("克隆超过 %s 还没完：网络太慢或仓库太大。可以在终端里自己 git clone，再回来用「本机目录」"
+            return "timeout", ("克隆超过 %s 还没完：网络太慢或仓库太大。可以在终端里自己克隆它，再回来用「本机目录」"
                                "导入。" % span)
         return "timeout", "%s超时了：网络太慢。稍后再试。" % what
     low = text.lower()
@@ -290,13 +290,14 @@ def git_failure(p: subprocess.CompletedProcess, what: str, url: str = "") -> tup
             if kind == "notfound":
                 return kind, "找不到这个仓库，或者你没有权限看它：检查地址，确认你在 GitLab 网页上能打开它。"
             if kind == "hook":
-                return kind, "%s被 hook 拦下了，它说：\n%s" % (what, last_lines(hide_credentials(text), 12))
+                return kind, "%s被拦下了（远端或你本机的 git 检查不让过），它说：\n%s" % (
+                    what, last_lines(hide_credentials(text), 12))
             if kind == "rejected":
                 return kind, "远端已经有这个分支，而且和这里的不一样：换个分支名重装，或者先在 GitLab 上看看它是谁的。"
             if kind == "auth":
                 if https:
-                    return kind, ("https 登录没过：git 没有能用的凭据（这里不会弹窗问密码）。改用 SSH 地址，或者先在终端里 "
-                                  "git clone 一次让 git 记住凭据，再试。")
+                    return kind, ("https 登录没过：git 没有能用的凭据（这里不会弹窗问密码）。改用 SSH 地址，或者先在终端里"
+                                  "克隆一次、按提示登录，让 git 记住凭据，再试。")
                 return kind, ("SSH 登录没过（密钥或证书不对，或者过期了）：刷新你的 SSH 凭据（ssh-add 加上密钥，或者重新登录"
                               "你们的 SSH 证书），再试一次。")
             host = _host_of(url)
@@ -340,7 +341,7 @@ def locate(real: str) -> dict[str, str]:
             raise NotARepo("这是一个裸仓库（没有检出的文件）", "用「克隆」，地址写这个路径，克隆出一个检出再导入")
         if g.out("rev-parse", "--is-inside-git-dir") == "true":
             raise NotARepo("这是仓库的 .git 目录", "选仓库本身的目录（.git 的上一层）")
-        raise NotARepo("不是 git 仓库", "在终端里 git init 并提交一次；或者用「克隆」")
+        raise NotARepo("不是 git 仓库", "先在终端里把它建成 git 仓库（git init），提交一次；或者用「克隆」")
     top = os.path.realpath(p.stdout.strip())
     gitdir = g.out("rev-parse", "--absolute-git-dir")
     common = g.out("rev-parse", "--path-format=absolute", "--git-common-dir")
@@ -372,10 +373,10 @@ def default_branch(g: Git) -> tuple[str | None, str]:
     """(the default branch, how it was found): origin/HEAD, else main or master (origin's, else the local one)."""
     head = g.out("symbolic-ref", "-q", "refs/remotes/origin/HEAD")
     if head.startswith("refs/remotes/origin/") and g.ok("rev-parse", "-q", "--verify", head + "^{commit}"):
-        return head[len("refs/remotes/origin/"):], "origin/HEAD"
+        return head[len("refs/remotes/origin/"):], "远端标的默认分支"
     for name in ("main", "master"):
-        for ref, how in (("refs/remotes/origin/" + name, "没有 origin/HEAD，origin 上有 %s" % name),
-                         ("refs/heads/" + name, "没有 origin/HEAD，本机有 %s" % name)):
+        for ref, how in (("refs/remotes/origin/" + name, "远端没标默认分支，它有 %s" % name),
+                         ("refs/heads/" + name, "本机有 %s" % name)):
             if g.ok("rev-parse", "-q", "--verify", ref + "^{commit}"):
                 return name, how
     return None, ""
@@ -393,6 +394,12 @@ def base_ref(g: Git, d: str) -> tuple[str, str] | None:
 
 def short_ref(ref: str) -> str:
     return ref.replace("refs/remotes/", "").replace("refs/heads/", "")
+
+
+def ref_word(ref: str) -> str:
+    """A ref as a person reads it, put straight after a Chinese word (从…, 合进…): 远端的 main, 本机的 main."""
+    remote = "refs/remotes/origin/"
+    return ("远端的 " + ref[len(remote):]) if ref.startswith(remote) else "本机的 " + short_ref(ref)
 
 
 def shown_url(url: str) -> str:
@@ -565,7 +572,7 @@ def pending_state(top: str, rec: dict[str, Any] | None, *, token: bool = False) 
             cur = g.out("symbolic-ref", "-q", "--short", "HEAD")
             if ref.startswith("refs/remotes/") and not has_at(g, "refs/heads/" + d, KIT):
                 ok, why = pull_check(g, d)
-                p = _pending("merged", short, rec, origin, d, token, "已经合进 %s，这个目录还没更新" % short,
+                p = _pending("merged", short, rec, origin, d, token, "已经合进%s，这个目录还没更新" % ref_word(ref),
                              "点「拉取」更新这个目录" if ok else why)
                 p.update(word="要拉取", pull={"ok": ok, "why": why})
             elif cur != d:
@@ -573,9 +580,9 @@ def pending_state(top: str, rec: dict[str, Any] | None, *, token: bool = False) 
                              "切到 %s 就能用（git switch %s）" % (d, d))
                 p["word"] = "不在 %s 上" % d
             else:
-                p = _pending("merged", short, rec, origin, d, token, "%s 上有 brain-kit，这个目录里少了 .brain/kit.json" % d,
-                             "在终端里 git checkout -- .brain/kit.json 拿回来")
-                p["word"] = "少了 kit.json"
+                p = _pending("merged", short, rec, origin, d, token, "%s 上有 brain-kit，这个目录里少了 brain-kit 设置" % d,
+                             "在终端里把它拿回来（git checkout -- %s）" % KIT)
+                p["word"] = "少了 brain-kit 设置"
             return p
     b = (rec or {}).get("branch") or (DEFAULT_BRANCH if g.ok("rev-parse", "-q", "--verify", "refs/heads/" + DEFAULT_BRANCH)
                                        else None)
@@ -625,9 +632,10 @@ def _pending(state: str, branch: str, rec: dict[str, Any] | None, origin: dict[s
 
 # what `brain install` writes besides brain-kit's and Lean's kit folders (.kiro/<name>, read from the kit itself)
 WRITES = (".brain", "aidlc-docs/lean.json", "aidlc-docs/audit", "AGENTS.md", ".gitignore")
-OPS = (("MERGE_HEAD", "合并", "git merge --abort"), ("rebase-merge", "变基（rebase）", "git rebase --abort"),
-       ("rebase-apply", "变基（rebase）", "git rebase --abort"), ("CHERRY_PICK_HEAD", "cherry-pick", "git cherry-pick --abort"),
-       ("REVERT_HEAD", "revert", "git revert --abort"), ("BISECT_LOG", "二分查找（bisect）", "git bisect reset"))
+OPS = (("MERGE_HEAD", "合并", "git merge --abort"), ("rebase-merge", "变基", "git rebase --abort"),
+       ("rebase-apply", "变基", "git rebase --abort"), ("CHERRY_PICK_HEAD", "拣选提交", "git cherry-pick --abort"),
+       ("REVERT_HEAD", "还原提交", "git revert --abort"), ("BISECT_LOG", "二分查找", "git bisect reset"))
+STATUS_SLOW = "看不出有没有没提交的改动（git 查了 %d 秒还没查完）：过一会再试"
 
 
 def status_map(g: Git) -> dict[str, str] | None:
@@ -693,7 +701,7 @@ def merge_check(g: Git, branch: str, base_sha: str | None, d: str) -> tuple[bool
         return False, "这个检出正在%s的中间：先做完或放弃（%s），再合并" % (what, how)
     dirty = tracked_changes(g)
     if dirty is None:
-        return False, "看不出有没有没提交的改动（git status 没在 %d 秒内结束）" % STATUS_TIMEOUT_S
+        return False, STATUS_SLOW % STATUS_TIMEOUT_S
     if dirty:
         return False, "你的检出有没提交的改动（%s）：先提交或收起来（git stash），再合并" % _names(dirty)
     head = g.out("rev-parse", "-q", "--verify", "HEAD^{commit}")
@@ -714,7 +722,7 @@ def pull_check(g: Git, d: str) -> tuple[bool, str]:
     """(git pull --ff-only can run here, why not): an origin, the checkout on the default branch, clean, in the middle
     of nothing."""
     if origin_of(g) is None:
-        return False, "没有 origin：拉取不了"
+        return False, "没有远端：拉取不了"
     cur = g.out("symbolic-ref", "-q", "--short", "HEAD")
     if cur != d:
         return False, "你的检出在 %s 上，不在 %s：切到 %s 再拉取" % (cur or "一个提交上（不在分支上）", d, d)
@@ -724,7 +732,7 @@ def pull_check(g: Git, d: str) -> tuple[bool, str]:
     dirty = tracked_changes(g)
     if dirty:
         return False, "你的检出有没提交的改动（%s）：先提交或收起来（git stash），再拉取" % _names(dirty)
-    return (False, "看不出有没有没提交的改动（git status 没在 %d 秒内结束）" % STATUS_TIMEOUT_S) if dirty is None else (True, "")
+    return (False, STATUS_SLOW % STATUS_TIMEOUT_S) if dirty is None else (True, "")
 
 
 def _names(paths: list[str], n: int = 3) -> str:
@@ -752,11 +760,11 @@ def choices(top: str, *, purpose: str = "install", cfg: dict[str, Any] | None = 
     overlap = [p for p in dirty if touches(p, targets)]
     what, how = in_progress(g)
     if rows is None:
-        why = "看不出有没有没提交的改动（git status 没在 %d 秒内结束）" % STATUS_TIMEOUT_S
+        why = STATUS_SLOW % STATUS_TIMEOUT_S
     elif what:
         why = "检出正在%s的中间：先做完或放弃（%s）" % (what, how)
     elif not cur:
-        why = "检出现在不在任何分支上（detached HEAD）：先切到一个分支"
+        why = "检出现在不在任何分支上：先切到一个分支"
     elif overlap:
         why = "你没提交的改动碰到了安装要写的文件（%s）：先提交或收起来（git stash），才能直接装" % _names(overlap)
     else:
@@ -768,21 +776,22 @@ def choices(top: str, *, purpose: str = "install", cfg: dict[str, Any] | None = 
     if origin is None:
         line = "%s在你现在的检出里，提交在 %s 上，%s" % (verb, cur or "当前分支", "马上生效" if upgrade else "马上能开需求")
     else:
-        line = "%s在你现在的检出里，提交在 %s 上；推送到 origin 以后%s（这会直接改团队的 %s，没有 MR 评审）" % (
+        line = "%s在你现在的检出里，提交在 %s 上；推送到远端以后%s（这会直接改团队的 %s，没有 MR 评审）" % (
             verb, cur or "当前分支", "生效" if upgrade else "就能开需求", tgt)
     if cur and d and cur != d:
         line += "（%s 不是默认分支 %s：合进 %s 以后，app 给需求建的工作目录里才有）" % (cur, d, d)
-    if dirty and not overlap:
+    # an install's options sit next to 导入仓库's safety line, which says this; the kit update's picker has none
+    if upgrade and dirty and not overlap:
         line += "；只提交安装写的文件，你自己没提交的改动不动"
-    base = "origin/" + d if origin is not None and d else tgt
+    start = ("从远端的 %s 建新分支" if origin is not None else "从本机的 %s 建新分支") % d if d else "从默认分支建新分支"
     options = [{"mode": "inplace", "title": "直接%s在 %s" % (verb, cur) if cur else "直接%s在当前分支" % verb,
                 "line": line, "ok": not why, "why": why}]
     if origin is not None or dirty or why:
         options.append({"mode": "branch",
                         "title": ("%s新分支，开 MR 给团队看" % ("更新到" if upgrade else "装到")) if origin is not None else
                         ("%s新分支" % ("更新到" if upgrade else "装到")),
-                        "line": "从 %s 建新分支，放在单独的工作目录里，不动你的检出；%s" % (
-                            base, ("推送、开 MR 给团队看，MR 合进 %s 以后%s" % (tgt, "才生效" if upgrade else "才能开需求"))
+                        "line": "%s，放在单独的工作目录里，不动你的检出；%s" % (
+                            start, ("推送、开 MR 给团队看，MR 合进 %s 以后%s" % (tgt, "才生效" if upgrade else "才能开需求"))
                             if origin is not None else "在本机合进 %s 以后%s（「合并到 %s」）" % (
                                 tgt, "才生效" if upgrade else "才能开需求", tgt)),
                         "ok": True, "why": ""})
@@ -875,7 +884,7 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
     cur = g.out("symbolic-ref", "-q", "--short", "HEAD")
     out["current_branch"] = cur or None
     checks.append(row("branch", "OK", "当前分支", "在 %s 上" % cur) if cur else
-                  row("branch", "WARN", "当前分支", "不在任何分支上（detached HEAD）", "不影响导入"))
+                  row("branch", "WARN", "当前分支", "不在任何分支上", "不影响导入"))
     d, how = default_branch(g)
     cfg, kit_err = None, ""
     has_kit = os.path.isfile(os.path.join(top, KIT))
@@ -885,31 +894,32 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
         except Exception as exc:  # noqa: BLE001 - brain-kit says what is wrong with it
             kit_err = str(exc).split("\n", 1)[0][:300]
     if cfg and d and cfg.get("default_branch") != d:
-        checks.append(row("default", "WARN", "默认分支", "kit.json 写的是 %s，git 看是 %s（%s）" % (
-            cfg.get("default_branch"), d, how), "app 按 kit.json 的来：不对就改 kit.json"))
+        checks.append(row("default", "WARN", "默认分支", "brain-kit 设置写的是 %s，git 看是 %s（%s）" % (
+            cfg.get("default_branch"), d, how), "app 按 brain-kit 设置的来：不对就改它（%s 里的默认分支）" % KIT))
         d = str(cfg.get("default_branch"))
     elif cfg and not d:
         d = str(cfg.get("default_branch"))
-        checks.append(row("default", "OK", "默认分支", "%s（按 kit.json）" % d))
+        checks.append(row("default", "OK", "默认分支", "%s（按 brain-kit 设置）" % d))
     elif d:
         checks.append(row("default", "OK", "默认分支", "%s（%s）" % (d, how)))
     else:
-        checks.append(row("default", "FAIL", "默认分支", "找不到：没有 origin/HEAD，也没有 main 或 master",
+        checks.append(row("default", "FAIL", "默认分支", "找不到：远端没标默认分支，也没有叫 main 或 master 的分支",
                           "装的时候在表单里写默认分支"))
     out["default_branch"] = d
     origin = origin_of(g)
     out["origin"] = origin
     if origin is None:
-        checks.append(row("origin", "OK", "origin", "没有 origin：这个仓库只在本机做（要推送、开 MR 时再加远端）"))
+        checks.append(row("origin", "OK", "远端", "没有远端：这个仓库只在本机做（要推送、开 MR 时再加远端）"))
     elif origin["project"]:
-        checks.append(row("origin", "OK", "origin", "%s（GitLab %s，项目 %s）" % (origin["url"], origin["base"],
-                                                                              origin["project"])))
+        checks.append(row("origin", "OK", "远端", "%s（GitLab %s，项目 %s）" % (origin["url"], origin["base"],
+                                                                            origin["project"])))
     else:
-        checks.append(row("origin", "WARN", "origin", "%s：看不出 GitLab 项目" % origin["url"],
+        checks.append(row("origin", "WARN", "远端", "%s：看不出 GitLab 项目" % origin["url"],
                           "开 MR 要 GitLab：装的时候在表单里写 GitLab 地址和项目"))
     files, n = dirty_files(g)
     if files is None:
-        checks.append(row("clean", "WARN", "工作区", "看不出来（git status 没在 %d 秒内结束）" % STATUS_TIMEOUT_S, ""))
+        checks.append(row("clean", "WARN", "工作区", "看不出来（git 查了 %d 秒还没查完）" % STATUS_TIMEOUT_S,
+                          "过一会再点「再检查一遍」"))
     elif n:
         if has_kit:
             todo = "不影响导入"
@@ -926,23 +936,24 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
     on_default = bool(d) and any(has_at(g, r, KIT) for r in ("refs/remotes/origin/" + d, "refs/heads/" + d))
     if has_kit and not bk.ok():
         out["kit"]["state"] = "invalid"
-        checks.append(row("kit", "FAIL", "brain-kit", "有 .brain/kit.json，可 brain-kit 没装载，读不了它",
+        checks.append(row("kit", "FAIL", "brain-kit", "装了 brain-kit，可 app 现在没装载 brain-kit，读不了它的设置",
                           "先在设置里写对 brain-kit 的位置"))
     elif has_kit and kit_err:
         out["kit"]["state"] = "invalid"
-        checks.append(row("kit", "FAIL", "brain-kit", "装了，但 kit.json 有问题：%s" % kit_err, "改好 .brain/kit.json 再检查"))
+        checks.append(row("kit", "FAIL", "brain-kit", "装了，但 brain-kit 设置有问题：%s" % kit_err,
+                          "改好 brain-kit 设置（%s），再检查一遍" % KIT))
     elif has_kit:
         out["kit"] = {"state": "checkout", "values": kit_view(cfg or {})}
         tracked = has_at(g, "HEAD", KIT)
         changed = bool(g.out("-c", "core.fsmonitor=false", "status", "--porcelain", "--", KIT))
         if not tracked:
-            checks.append(row("kit", "WARN", "brain-kit", "装了，但 .brain/kit.json 还没提交",
+            checks.append(row("kit", "WARN", "brain-kit", "装了，但 brain-kit 设置还没提交",
                               "提交到 %s：app 给每个需求建的工作目录从默认分支来" % (d or "默认分支")))
         elif not on_default:
             checks.append(row("kit", "WARN", "brain-kit", "装了，已提交，但 %s 上还没有" % (d or "默认分支"),
                               "合并到 %s：app 给每个需求建的工作目录从那里来" % (d or "默认分支")))
         elif changed:
-            checks.append(row("kit", "WARN", "brain-kit", "装了，但 brain-kit 的设置有没提交的改动", "改完记得提交"))
+            checks.append(row("kit", "WARN", "brain-kit", "装了，但 brain-kit 设置有没提交的改动", "改完记得提交"))
         else:
             checks.append(row("kit", "OK", "brain-kit", "装了，已提交"))
     elif pend:
@@ -964,9 +975,9 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
             checks.append(row("links", "FAIL", "符号链接", "仓库里 %s 是符号链接：安装会顺着它写到别处" %
                               "、".join(links), "先把它换成普通的目录或文件，提交，再检查"))
     if has_kit:     # what brain install put in the checkout (before an install, or on its branch: the kit row says it)
-        todo = "重装 brain-kit 会补上：在「设置」的 KiroCrew 里点「%s」" % problems.FIX_BUTTON["kit"]
+        todo = "点下面 KiroCrew 里的「%s」：会补上（设置里也有这个按钮）" % problems.FIX_BUTTON["kit"]
         lean_ok = os.path.isfile(os.path.join(top, LEAN_SCRIPT)) and os.path.isfile(os.path.join(top, LEAN_CONFIG))
-        checks.append(row("lean", "OK", "AI-DLC Lean", "装了（%s）" % LEAN_SCRIPT) if lean_ok else
+        checks.append(row("lean", "OK", "AI-DLC Lean", "装了") if lean_ok else
                       row("lean", "FAIL", "AI-DLC Lean", "没装", todo))
         bdir = str((cfg or {}).get("brain_dir") or "brain")
         missing = [n for n in ((cfg or {}).get("brain_files") or BRAIN_FILES)
@@ -977,7 +988,7 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
                       row("agents", "FAIL", "AGENTS.md", "没有", todo))
     rid = listed_id(top, listed)
     out["listed"] = rid
-    checks.append(row("listed", "OK", "列表", "已经在列表里（%s）" % rid if rid else "还不在列表里"))
+    checks.append(row("listed", "OK", "列表", "已经在列表里" if rid else "还不在列表里"))
     # who brain-kit will say the person is here (kit.json's GitLab, or the form's guess before an install)
     base = ((out["kit"]["values"] or {}) if out["kit"]["state"] == "checkout" else form_defaults(top, origin, d)).get(
         "gitlab_base") or ""
@@ -1015,6 +1026,7 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
 # what `brain install` writes (brain-kit's kit/, Lean's install.sh, the kit config, the Brain, AGENTS.md, .gitignore):
 # a symlink committed at one of these would make it write somewhere else
 INSTALL_TARGETS = (".kiro", ".brain", "aidlc-docs", "brain", "AGENTS.md", ".gitignore")
+LINKS_REFUSED = "仓库里 %s 是符号链接：安装会顺着它写到别处，这里不装。先把它换成普通的目录或文件"
 
 
 def symlinks_on_targets(g: Git, sha: str) -> list[str]:
@@ -1050,7 +1062,7 @@ def check_url(raw: Any) -> str:
             raise ImportFail("这种地址不支持（%s://）：用 https://、ssh://、git@主机:组/仓库.git，或者本机的路径" % sp.scheme,
                              "invalid_url")
         if sp.password or (sp.username and sp.scheme in ("http", "https")):
-            raise ImportFail("地址里不要带用户名、密码或 token：用 SSH 地址，或者让 git 的凭据管理来登录", "credentials_in_url")
+            raise ImportFail("地址里不要带用户名、密码或令牌：用 SSH 地址，或者让 git 的凭据管理来登录", "credentials_in_url")
         if sp.scheme == "file":
             clean_dir(sp.path, "仓库地址（本机路径）")
         elif not sp.hostname:
@@ -1076,7 +1088,7 @@ def clone_plan(url_raw: Any, parent_raw: Any, name_raw: Any, work_root: str) -> 
     if not os.path.exists(parent):
         home = os.path.realpath(os.path.expanduser("~"))
         if not os.path.realpath(parent).startswith(home + os.sep):
-            raise ImportFail("找不到上级目录：%s（只会在你的 home 目录下面新建）" % parent, "not_found", 404)
+            raise ImportFail("找不到上级目录：%s（app 只在你的主目录 ~ 下面新建目录）" % parent, "not_found", 404)
     elif not os.path.isdir(parent):
         raise ImportFail("上级目录不是一个目录：%s" % parent, "not_a_directory")
     name = str(name_raw).strip() if isinstance(name_raw, str) and name_raw.strip() else name_from_url(url)

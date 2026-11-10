@@ -190,7 +190,7 @@ export function TypeLine({ line, sessionUrl, said }: { line: string; sessionUrl?
 
 /** The fix buttons' names (backend/core/problems.py FIX_BUTTON): a row's 做什么 names its button, 点「…」, and the button
  * shows that name (「装上 brain-dev」 when the file is not there at all); these when it names none. */
-const FIX_LABEL: Record<CrewFixBody['what'], string> = { agent: '补上 Lean 的 hook', engine: '把引擎换成 kas' }
+const FIX_LABEL: Record<CrewFixBody['what'], string> = { agent: '补上 Lean 的拦截', engine: '把引擎换成 kas' }
 export const KIT_FIX_LABEL = '重装 kit 文件'
 const FIX_NAMES: readonly string[] = [...Object.values(FIX_LABEL), KIT_FIX_LABEL, '装上 brain-dev']
 const fixName = (r: CheckRow, fallback: string): string => {
@@ -848,22 +848,24 @@ const shellWord = (p: string) => (/^[\w@%+=:,./~-]+$/.test(p) ? p : `'${p.replac
  * what to do: not there (write its place in 设置, or clone it first), too old (pull it), there but not importable (a
  * checkout that is not whole: pull it, else clone it again). *cmd* is the line to type in a terminal, shown with 复制;
  * the version brain-kit wants and the Python error are only in *raw*, for 细节. 设置's 保存 reads brain-kit again, so
- * every way ends there. The banner over every view and 设置's card both say these words.
+ * every way ends there. The banner over every view and 设置's card both say these words; *here*: on 设置 itself, whose
+ * card holds the field and its 保存 (no 「去设置」 there).
  */
-export function brainkitProblem(error: string, path = ''): { kind: 'missing' | 'old' | 'broken'; text: string; todo: string; cmd: string; raw: string } {
+export function brainkitProblem(error: string, path = '', here = false): { kind: 'missing' | 'old' | 'broken'; text: string; todo: string; cmd: string; raw: string } {
   const pull = path ? `git -C ${shellWord(path)} pull --ff-only` : ''
+  const reread = here ? '再点下面的「保存」重新读它' : '再到设置里点「保存」重新读它'
   if (/太旧/.test(error)) {
-    return { kind: 'old', text: 'brain-kit 太旧了（位置是对的）', todo: `在它的目录里拉取最新的代码${pull ? '（点「复制」拿命令）' : ''}，再到设置里点「保存」重新读它`, cmd: pull, raw: error }
+    return { kind: 'old', text: 'brain-kit 太旧了（位置是对的）', todo: `在它的目录里拉取最新的代码${pull ? '（点「复制」拿命令）' : ''}，${reread}`, cmd: pull, raw: error }
   }
   if (/导入失败/.test(error)) {
     return {
       kind: 'broken', text: 'brain-kit 读不进来（位置是对的）',
-      todo: `那个目录里的 brain-kit 不完整：拉取一遍${pull ? '（点「复制」拿命令）' : ''}，还不行就重新克隆一份；再到设置里点「保存」重新读它`, cmd: pull, raw: error,
+      todo: `那个目录里的 brain-kit 不完整：拉取一遍${pull ? '（点「复制」拿命令）' : ''}，还不行就重新克隆一份；${reread}`, cmd: pull, raw: error,
     }
   }
   return {
     kind: 'missing', text: '找不到 brain-kit',
-    todo: '在设置的「brain-kit 在哪」写上它的目录，点「保存」；这台机器上还没有的话，先在终端里克隆一份（点「复制」拿命令），再写它的位置', cmd: BRAINKIT_CLONE, raw: error,
+    todo: `在${here ? '下面' : '设置'}的「brain-kit 在哪」写上它的目录，点「保存」；这台机器上还没有的话，先在终端里克隆一份（点「复制」拿命令），再写它的位置`, cmd: BRAINKIT_CLONE, raw: error,
   }
 }
 

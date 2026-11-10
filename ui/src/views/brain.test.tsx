@@ -67,6 +67,9 @@ describe('Brain', () => {
     // the type filter: a chip per type the file has, with its count; the same chip again shows all
     const types = within(tech).getByRole('group', { name: '按类型筛' })
     expect(within(types).getAllByRole('button').map((b) => b.textContent)).toEqual(['全部 3', '决定 1', '准则 1', '坑 1'])
+    // plain words only, hover included: no 「按 id」, no brain-kit's type names (decision, guideline, …)
+    expect(screen.getByLabelText('按文字筛')).toHaveAttribute('placeholder', '按条目号、文字、来源筛')
+    expect([...tech.querySelectorAll('[title]')].map((e) => e.getAttribute('title')).filter((t) => /[a-z]{4,}/.test(t ?? ''))).toEqual([])
     await user.click(within(types).getByRole('button', { name: '准则 1' }))
     expect(within(types).getByRole('button', { name: '准则 1' })).toHaveAttribute('aria-pressed', 'true')
     expect(within(tech).getAllByRole('article').map((a) => a.dataset.entryId)).toEqual(['T-12'])
@@ -301,13 +304,16 @@ describe('Brain', () => {
   })
 
   test('a preview with problems (or nothing substantive) cannot be written', async () => {
-    const problem = 'TECH.md 的 T-PAY-2-1 在 brain/PAY-2-reflect-1 分支上也改了：先合并或关掉那个 MR'
-    const { user } = setup({ repo: 'r1' }, { [`POST ${API}/brain/reflect/preview`]: (): ReflectPreview => ({ ...fx.reflect(), problems: [problem] }) })
+    const problem = 'brain/TECH.md 第 20 行：来源「见群聊」不是引用'
+    const todo = '来源写成查得到的引用：需求文档的段落、材料、决定号、凭证号、运行号或条目号'
+    const { user } = setup({ repo: 'r1' }, { [`POST ${API}/brain/reflect/preview`]: (): ReflectPreview => ({ ...fx.reflect(), problems: [{ level: 'FAIL', text: problem, todo }] }) })
     const card = await screen.findByRole('region', { name: '回写' })
     await user.selectOptions(within(card).getByLabelText('选一个需求'), 'PAY-5')
     await user.click(within(card).getByRole('button', { name: '预览' }))
     const preview = await within(card).findByTestId('reflect-preview')
-    expect(within(within(preview).getByTestId('reflect-problems')).getByText(problem).closest('li')).toHaveAttribute('data-level', 'FAIL')
+    const row = within(within(preview).getByTestId('reflect-problems')).getByText(problem).closest('li')!
+    expect(row).toHaveAttribute('data-level', 'FAIL')
+    expect(within(row).getByText(todo, { exact: false })).toBeInTheDocument()
     expect(within(card).getByRole('list', { name: '回写的步骤' }).children[2]).toHaveAttribute('data-state', 'bad')
     expect(within(preview).getByRole('button', { name: '写入新分支' })).toBeDisabled()
     expect(within(preview).getByRole('button', { name: '写入并开 MR' })).toBeDisabled()

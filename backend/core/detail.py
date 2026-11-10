@@ -8,11 +8,18 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from . import bk, lean_view
+from . import bk, lean_view, problems
 from .deliveries import KIND_LABEL, park_waiting
 
 CITE_RE = re.compile(r"(?<![A-Za-z0-9-])([PTIJ]-[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,3})(?![0-9-])")
 VOUCHER_RE = re.compile(r"(?<![0-9A-Za-z])V-[0-9a-f]{10}(?![0-9a-f])")
+# a question the AI asked straight in the session, as decisions.md records its answer (「Q1 选 A」, 「Q2 答"按推荐"」)
+ASKED_RE = re.compile(r"(?<![A-Za-z0-9])Q([1-9][0-9]{0,2})(?![0-9A-Za-z])")
+
+
+def asked_in(*texts: Any) -> list[str]:
+    """The in-session questions (Q1 …) a decision row records the answer of, from its text and its why."""
+    return list(dict.fromkeys("Q" + n for t in texts if t for n in ASKED_RE.findall(str(t))))
 # decisions.md Who, in the runner's vocabulary (brainkit.trace.classify_who, brain-kit 9935b11), each optionally
 # followed by a note in brackets: agent | a kit bot user | brain <entry id>[, <id>] | check | <P-xxxx> <V-xxxxxxxxxx> |
 # owner. Anything else is "unclassified": not guessed, and not shown (it may be a real name).
@@ -22,17 +29,44 @@ WHO_WORD_RE = re.compile(r"^(?i:(agent|check))" + _NOTE + r"$")
 WHO_BRAIN_RE = re.compile(r"^(?i:brain)\s+(%s(?:\s*[,，、;；]\s*%s)*)" % (_ENTRY, _ENTRY) + _NOTE + r"$")
 WHO_PERSON_RE = re.compile(r"^(P-[0-9A-F]{4})\s+V-[0-9a-f]{10}" + _NOTE + r"$")
 WHO_OWNER_RE = re.compile(r"^(?i:owner)" + _NOTE + r"$")
-NO_TOKENS = "KiroCrew 只报 credits，input / output / cache token 都是 0"
+NO_TOKENS = "KiroCrew 只报 credits，没有别的用量数"
 # brainkit.trace's outcome.merged_at.how (72b278e: docs/eval.md section 2, rules M1-M6), in words; another value as is
 MERGE_HOW = {
     "merge commit": "合并提交",
-    "squash and merge commit (the branch is still here)": "squash 加合并提交（分支还在）",
+    "squash and merge commit (the branch is still here)": "压缩成一个提交，再用合并提交（分支还在）",
     "fast-forward": "快进",
-    "rebase merge (the branch is still here)": "rebase 合并（分支还在）",
-    "squash merge (the branch is still here)": "squash 合并（分支还在）",
-    "squash merge (the branch is gone): the commit that brought run.json": "squash 合并（分支已删）：带来 run.json 的提交",
-    "fast-forward or rebase merge (the branch is gone): the last run commit": "快进或 rebase 合并（分支已删）：run 的最后一个提交",
+    "rebase merge (the branch is still here)": "变基后合并（分支还在）",
+    "squash merge (the branch is still here)": "压缩成一个提交合并（分支还在）",
+    "squash merge (the branch is gone): the commit that brought run.json": "压缩成一个提交合并（分支已删）：带来开工记录的那个提交",
+    "fast-forward or rebase merge (the branch is gone): the last run commit": "快进或变基后合并（分支已删）：需求分支的最后一个提交",
 }
+# brainkit.trace's merged_at.note (landing, _same_changes), in words; the bridge's "merged, not here" is the label's
+MERGE_NOTE = (
+    (re.compile(r"^the squash commit carries exactly the branch's changes$"), lambda m: "压缩出来的提交正好是分支的全部改动"),
+    (re.compile(r"^the squash commit differs from the branch's changes"),
+     lambda m: "压缩出来的提交和分支的改动不一样（解决过冲突，或者分支后来又有提交）"),
+    (re.compile(r"^(\d+) of the commits on (\S+) are copies of the branch's$"),
+     lambda m: "%s上有 %s 个提交是分支上提交的副本" % (_ref_said(m.group(2)), m.group(1))),
+    (re.compile(r"^the bridge ledger says the MR was merged"), lambda m: None),
+)
+CHOICE_SAID = {"approve": "通过", "reject": "退回"}   # an answer on the MR without options
+
+
+def _ref_said(ref: str) -> str:
+    """refs/remotes/origin/main, origin/main: 远端的 main; a local branch by its name."""
+    name = re.sub(r"^refs/(?:heads|remotes)/", "", ref)
+    return "远端的 %s " % name[len("origin/"):] if name.startswith("origin/") else "%s " % name
+
+
+def merge_note(note: Any) -> str | None:
+    """A merged_at.note in words (one brain-kit has no words for here is shown as it is)."""
+    if not isinstance(note, str) or not note.strip():
+        return None
+    for rx, say in MERGE_NOTE:
+        m = rx.match(note.strip())
+        if m:
+            return say(m)
+    return note[:300]
 
 
 # ---------------------------------------------------------------- decisions
@@ -79,7 +113,8 @@ def decisions(text: str | None, path: str, bot_users: list[str]) -> list[dict[st
                 rows.append({"id": str(d.get("id")), "date": d.get("at"), "stage": d.get("stage"),
                              "text": str(d.get("text") or "")[:1000], "why": (str(d["why"])[:500] if d.get("why") else None),
                              "who": d.get("who"), "by": d.get("by"), "cites": list(d.get("cites") or []),
-                             "vouchers": list((d.get("refs") or {}).get("vouchers") or []), "src": str(d.get("src") or path)})
+                             "vouchers": list((d.get("refs") or {}).get("vouchers") or []), "src": str(d.get("src") or path),
+                             "asked": asked_in(d.get("text"), d.get("why"))})
             return rows
         except Exception:  # noqa: BLE001 - fall back to the small reader
             rows = []
@@ -109,7 +144,7 @@ def decisions(text: str | None, path: str, bot_users: list[str]) -> list[dict[st
                      else None, "stage": row.get("stage") or None, "text": dec[:1000], "why": row.get("why") or None,
                      "who": who, "by": by,
                      "cites": sorted(set(CITE_RE.findall(whole))), "vouchers": sorted(set(VOUCHER_RE.findall(whole))),
-                     "src": "%s:%d" % (path, n)})
+                     "src": "%s:%d" % (path, n), "asked": asked_in(dec, row.get("why"))})
     return rows
 
 
@@ -167,16 +202,21 @@ def _human_label(h: dict[str, Any]) -> str:
     if kind == "approval":
         return "批准%s" % name
     if kind == "rejection":
-        return "驳回%s" % name
+        return "退回%s" % name
     if kind == "answer":
-        return "回答 %s：%s" % (h.get("decision") or "", choice or "")
+        did, said = h.get("decision"), CHOICE_SAID.get(str(choice), choice)
+        if did or said:
+            return "回答%s%s" % (" %s" % did if did else "", "：%s" % said if said else "")
+        return "回答了%s问题" % (name or "一个")
     if kind == "approval_refused":
-        return "审批口令没被接受（%s）" % (h.get("check") or name)
+        return "%s（%s）" % (lean_view.REFUSED, name) if name else lean_view.REFUSED
     if kind == "push_after_handover":
         return "交接后有人推了代码" if what == "code" else "交接后有人改了记录"
     if kind == "allow_test_change":
         return "允许改验收测试"
-    return str(kind or "人")
+    if str(kind or "").startswith("platform_"):   # brainkit.trace: a manual act KiroCrew reported
+        return "在 KiroCrew 上手动操作了一次"
+    return "人介入了一次"
 
 
 # brainkit.trace's hand-over records and the bridge's question states, said as the board says them
@@ -187,8 +227,29 @@ DECISION_SAID = {"open": "%s 在 MR 上问人", "posting": "%s 等桥贴到 MR �
                  "refused": "%s 的回答签名服务不签", "void": "%s 作废了", "invalid": "%s 发不出去"}
 
 
+OWNER = "owner"   # an item's who when it was the requirement's owner (the page says 你 to the owner, else their name)
+
+
+def owner_marks(t: dict[str, Any]) -> set[str]:
+    """The pseudonyms the requirement's owner goes by in brainkit.trace's record, by the board's rule: what was done on
+    the owner's side before the hand-over is the owner's (an approval line typed in their own session: Lean's record,
+    channel local; the run branch's commits)."""
+    a = t.get("actions") or {}
+    mine = {h.get("who") for h in t.get("humans") or [] if isinstance(h, dict) and h.get("channel") in (None, "local")
+            and h.get("after_handover") is False and h.get("kind") != "push_after_handover"}
+    mine |= {c.get("who") for c in a.get("commits") or [] if isinstance(c, dict) and c.get("by") == "person"
+             and c.get("after_handover") is False}
+    return {str(w) for w in mine if w}
+
+
 def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
-    """Timeline items from brainkit.trace.build's record (who is a username, a pseudonym or a role, never an email)."""
+    """Timeline items from brainkit.trace.build's record (who is a username, a pseudonym or a role, never an email; the
+    owner's own acts are signed OWNER, so the page says 你 to them as 需求看板 does)."""
+    mine = owner_marks(t) | ({str(t["owner"])} if t.get("owner") else set())   # and the owner by their user name
+
+    def who(w: Any) -> Any:
+        return OWNER if w and str(w) in mine else w
+
     items = []
     for s in t.get("stages") or []:
         stage, _, unit = str(s.get("id", "")).partition("/")     # brainkit.trace: <stage>/<unit> for a unit's stage
@@ -196,10 +257,12 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                       "label": "%s：%s" % (lean_view.STAGE_LABEL.get(stage, stage),
                                           {"started": "开始", "done": "完成", "skipped": "跳过"}.get(s.get("state"), s.get("state")))
                       + ("（%s）" % unit if unit else ""),
-                      "detail": s.get("note"), "who": None, "src": s.get("src")})
+                      "detail": lean_view.say_note(s.get("note")), "who": None, "src": s.get("src")})
     for h in t.get("humans") or []:
-        items.append({"at": h.get("at"), "kind": "human", "label": _human_label(h), "detail": h.get("voucher_id"),
-                      "who": h.get("who"), "src": ", ".join(h.get("src") or [])[:200] or None})
+        detail = lean_view.refused_why(h.get("check")) if h.get("kind") == "approval_refused" else \
+            "凭证 %s" % h["voucher_id"] if h.get("voucher_id") else None
+        items.append({"at": h.get("at"), "kind": "human", "label": _human_label(h), "detail": detail,
+                      "who": who(h.get("who")), "src": ", ".join(h.get("src") or [])[:200] or None})
     a = t.get("actions") or {}
     for c in a.get("commits") or []:
         # brain-kit 72b278e: "at" is the author date; committed_at the committer date (later: rebased or amended)
@@ -208,25 +271,28 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
             detail += " · 提交于 %s" % _iso_minute(c["committed_at"])
         items.append({"at": c.get("at"), "kind": "commit",
                       "label": ("运行机提交" if c.get("by") == "bot" else "提交") + ("（只改记录）" if c.get("records_only") else ""),
-                      "detail": detail, "who": c.get("who"), "src": c.get("src")})
+                      "detail": detail, "who": who(c.get("who")), "src": c.get("src")})
     for b in a.get("blocked") or []:
         items.append({"at": b.get("at"), "kind": "blocked", "label": "%s：%s" % (lean_view.BLOCKED, lean_view.block_rule(b.get("gate"))),
-                      "detail": b.get("path") or b.get("tool"), "who": None, "src": b.get("src")})
+                      "detail": lean_view.block_what(b.get("path"), b.get("tool")), "who": None, "src": b.get("src")})
     for h in a.get("handovers") or []:
         label = HANDOVER_LABEL.get(str(h.get("kind")), "桥记下了这次交接")
+        why = problems.reasons_text(str(h.get("reason") or "").split("; "), 200)[0]   # the bridge's English, as the MR's
         items.append({"at": h.get("at"), "kind": "handover", "label": label,
-                      "detail": h.get("run_id") or h.get("reason") or str(h.get("commit") or "")[:12] or None, "who": h.get("by"),
+                      "detail": h.get("run_id") or why or str(h.get("commit") or "")[:12] or None, "who": who(h.get("by")),
                       "src": h.get("src")})
     for q in a.get("questions") or []:
         what = KIND_LABEL.get(str(q.get("kind")), "问题")
+        lean = str(q.get("lean_request") or "").split(" ")[0]
         items.append({"at": q.get("at"), "kind": "question",
                       "label": "%s的问题回答了，接着做" % what if q.get("status") == "answered" else "停下问人：%s" % what,
-                      "detail": q.get("lean_request"), "who": None, "src": q.get("src")})
+                      "detail": "要批准%s" % lean_view.KIND_LABEL.get(lean, lean) if lean else None, "who": None,
+                      "src": q.get("src")})
     for d in t.get("decisions") or []:
         if d.get("source") == "bridge":
             items.append({"at": d.get("at") or d.get("asked_at"), "kind": "decision",
                           "label": DECISION_SAID.get(str(d.get("state")), "%s 在 MR 上问人") % d.get("id"),
-                          "detail": d.get("choice"),
+                          "detail": CHOICE_SAID.get(str(d.get("choice")), d.get("choice")),
                           "who": d.get("who"), "src": ", ".join(d.get("src") or [])[:200] or None})
     for r in (t.get("checks") or {}).get("verify") or []:
         items.append({"at": r.get("at"), "kind": "verify", "label": "自动检查%s" % ("通过" if r.get("ok") else "没过"),
@@ -235,13 +301,13 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
     if m.get("value"):
         how = MERGE_HOW.get(str(m.get("how") or ""), str(m.get("how") or ""))
         detail = " ".join(x for x in (str(m.get("commit") or "")[:12], "（%s）" % how if how else "",
-                                      str(m.get("note") or "")[:300]) if x)
+                                      merge_note(m.get("note")) or "") if x)
         items.append({"at": m.get("value"), "kind": "merge", "label": "合并进默认分支", "detail": detail or None,
                       "who": None, "src": m.get("src")})
     elif m.get("note"):   # e.g. the bridge ledger says merged (bridge_state) but this clone has no merge of it
         items.append({"at": None, "kind": "merge", "label": "桥的账本说已合并，这里看不到合并（要先取最新？）"
                       if "merged" in (m.get("bridge_state") or []) else "合并：看不清",
-                      "detail": str(m["note"])[:300], "who": None, "src": m.get("src")})
+                      "detail": merge_note(m["note"]), "who": None, "src": m.get("src")})
     items.sort(key=lambda x: (x["at"] or "", x["kind"]))
     return items
 
@@ -266,10 +332,12 @@ def timeline(repo_path: str, cfg: dict[str, Any], key: str, *, ref: str | None, 
                       vouchers_dir=vouchers_dir, credits=credits, allowed_signers=allowed_signers)
             out.update(source="trace", items=trace_timeline(t), missing=[str(x)[:200] for x in t.get("missing") or []],
                        brain=t.get("brain"), cost=t.get("cost"), trace=t)
-        except Exception:  # noqa: BLE001 - said in Chinese; the Lean ledger's items stand in
-            out["error"] = "brain-kit 读不出这个需求的完整记录：下面只有 Lean 自己记下的事"
+        except Exception as exc:  # noqa: BLE001 - the Lean ledger's items stand in; brain-kit's words for 细节
+            out["error"] = "brain-kit 读不出这个需求的完整记录：这里只有 Lean 自己记下的事。brain-kit 的原话：%s" % (
+                str(exc).split("\n", 1)[0][:300])
     elif has_run:
-        out["error"] = "brain-kit 还没有 trace 模块：时间线只有 Lean 的记录（在设置里换新一点的 brain-kit）"
+        out["error"] = "这个 brain-kit 读不出完整的运行记录（它太旧，或者没装好）：这里只有 Lean 自己记下的事。" \
+                       "在设置里换新一点的 brain-kit"
     if out["source"] == "app":
         out["items"] = lean_view.stage_events(events)
     out["items"] += app_events or []

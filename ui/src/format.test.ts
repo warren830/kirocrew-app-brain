@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ago, fmtAgo, fmtCredits, fmtIso, fmtRate, fmtSpan, isoDay, lines, splitPaths } from './format'
+import { ago, fmtAgo, fmtCredits, fmtIso, fmtRate, fmtSpan, isoDay, lines, spaced, splitPaths } from './format'
 import { errorRaw, errorStatus, errorText, httpProblem } from './api'
 
 describe('format', () => {
@@ -14,6 +14,15 @@ describe('format', () => {
     expect(fmtAgo(3 * 86400)).toBe('3 天前')
     expect(ago(1000, 1360)).toBe('6 分钟前')
     expect(ago(null)).toBe('—')
+  })
+
+  it('joins a sentence with a space where Chinese meets a Latin name, and nowhere else', () => {
+    expect(spaced('读的是', 'demo 的 main 分支、oms-brain 的 master 分支')).toBe('读的是 demo 的 main 分支、oms-brain 的 master 分支')
+    expect(spaced('读的是', '远端的 main 分支')).toBe('读的是远端的 main 分支')
+    expect(spaced('main 分支', '上')).toBe('main 分支上')
+    expect(spaced('等', 'carol', '在 MR 上回答')).toBe('等 carol 在 MR 上回答')
+    expect(spaced('等', 'carol', '：')).toBe('等 carol：')
+    expect(spaced('main', '（远端）')).toBe('main（远端）')
   })
 
   it('formats credits and rates', () => {
@@ -43,7 +52,7 @@ describe('format', () => {
 describe('errorText: the SDK rejects with `API <status>: <body>`', () => {
   it('says the backend’s own Chinese words, or what the status means; never English', () => {
     expect(errorText(new Error('API 409: {"error": "PAY-3 已经有人认领了", "code": "claimed"}'))).toBe('PAY-3 已经有人认领了（409）')
-    expect(errorText(new Error('API 403: {"error": "这些接口只接受 dashboard 主人本人的请求", "code": "owner_only"}'))).toBe('这些接口只接受 dashboard 主人本人的请求（403）')
+    expect(errorText(new Error('API 403: {"error": "只有 KiroCrew 仪表盘的主人本人能用这个 app：用主人的账号登录仪表盘", "code": "owner_only"}'))).toBe('只有 KiroCrew 仪表盘的主人本人能用这个 app：用主人的账号登录仪表盘（403）')
     // KiroCrew's host when the dashboard login is gone
     expect(errorText(new Error('API 403: {"error": "Token required"}'))).toBe('登录过期了（403）')
     expect(errorText(new Error('API 401: '))).toBe('登录过期了（401）')

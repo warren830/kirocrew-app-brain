@@ -22,19 +22,20 @@
       "skipped_n": 6,
       "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
       "who": "nobody",
       "text": "已合并，在观察合并后的 14 天（到 11-17）",
       "line": null,
       "raw": "",
       "do": "watch",
+      "todo": "",
       "since": 1793661540.0,
       "where": null,
       "review": false
     },
     "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
-    "credits": 22.7,
+    "credits": 8.3,
     "updated_at": 1793663640,
     "mr": {
       "iid": 37,
@@ -52,7 +53,8 @@
       "src/refund/id.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-2-1c4e"
+    "session_url": "/chat?sid=brain-PAY-2-1c4e",
+    "home": null
   },
   "branch": "ai/alice/PAY-2-refund-id",
   "base": "main",
@@ -63,7 +65,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
   },
   "actors": [
     {
@@ -423,17 +426,17 @@
         {
           "at": 1793639460.0,
           "kind": "accepted",
-          "title": "桥接手了 !37"
+          "title": "桥接手了（MR !37）"
         },
         {
           "at": 1793648040.0,
           "kind": "question",
-          "title": "D-1 在 MR 上问人：澄清"
+          "title": "D-1 在 MR 上问你：澄清"
         },
         {
           "at": 1793656440.0,
           "kind": "question",
-          "title": "D-2 在 MR 上问人：验收"
+          "title": "D-2 在 MR 上问产品：验收"
         }
       ],
       "facts": [
@@ -464,7 +467,7 @@
         {
           "at": 1793639480.0,
           "kind": "signed",
-          "title": "签名服务签了接手合同（RUN-PAY-2-1）"
+          "title": "签名服务签了接手合同（第 1 次运行）"
         },
         {
           "at": 1793650501.0,
@@ -508,14 +511,14 @@
         {
           "at": 1793647980.0,
           "status": "awaiting_approval",
-          "doing": "停下问人：澄清",
-          "who": "people"
+          "doing": "停下问你：澄清",
+          "who": "you"
         },
         {
           "at": 1793648040.0,
           "status": "awaiting_approval",
-          "doing": "停下问人：澄清（D-1）",
-          "who": "people"
+          "doing": "停下问你：澄清（D-1）",
+          "who": "you"
         },
         {
           "at": 1793650500.0,
@@ -550,19 +553,19 @@
         {
           "at": 1793655180,
           "status": "done",
-          "doing": "交给人批准发布",
+          "doing": "交给产品批准发布",
           "who": null
         },
         {
           "at": 1793655240.0,
           "status": "awaiting_approval",
-          "doing": "停下问人：验收",
+          "doing": "停下问产品：验收",
           "who": "product"
         },
         {
           "at": 1793656440.0,
           "status": "awaiting_approval",
-          "doing": "停下问人：验收（D-2）",
+          "doing": "停下问产品：验收（D-2）",
           "who": "product"
         },
         {
@@ -635,12 +638,12 @@
         {
           "at": 1793647980.0,
           "kind": "question",
-          "title": "停下问人：澄清"
+          "title": "停下问你：澄清"
         },
         {
           "at": 1793648040.0,
           "kind": "question",
-          "title": "D-1 在 MR 上问人：澄清"
+          "title": "D-1 在 MR 上问你：澄清"
         },
         {
           "at": 1793650500.0,
@@ -670,12 +673,12 @@
         {
           "at": 1793655240.0,
           "kind": "question",
-          "title": "停下问人：验收"
+          "title": "停下问产品：验收"
         },
         {
           "at": 1793656440.0,
           "kind": "question",
-          "title": "D-2 在 MR 上问人：验收"
+          "title": "D-2 在 MR 上问产品：验收"
         },
         {
           "at": 1793659440.0,
@@ -691,14 +694,10 @@
       "facts": [
         "提交 6 次",
         "停下问人 4 次",
-        "RUN-PAY-2-1"
+        "第 1 次运行"
       ],
-      "credits": 14.4,
-      "session": {
-        "slot": "brain-run-RUN-PAY-2-1",
-        "url": "/chat?sid=brain-run-RUN-PAY-2-1",
-        "busy": false
-      },
+      "credits": null,
+      "session": null,
       "line": null
     },
     {
@@ -780,7 +779,7 @@
         {
           "at": 1793655180,
           "status": "awaiting_approval",
-          "doing": "等人在 MR 上批准发布",
+          "doing": "等产品在 MR 上批准发布",
           "who": "product"
         },
         {
@@ -801,7 +800,7 @@
         {
           "at": 1793655180,
           "kind": "request",
-          "title": "请人在 MR 上批准发布"
+          "title": "请产品在 MR 上批准发布"
         },
         {
           "at": 1793659500,
@@ -906,7 +905,7 @@
       "to": "person",
       "text": "认领 PAY-2：退款单号校验",
       "detail": false,
-      "src": "claim/PAY-2"
+      "src": "认领记录 claim/PAY-2"
     },
     {
       "seq": 2,
@@ -916,7 +915,7 @@
       "to": "local",
       "text": "开工：在它自己的工作目录里",
       "detail": false,
-      "src": "runs/PAY-2/run.json"
+      "src": "开工记录 runs/PAY-2/run.json"
     },
     {
       "seq": 3,
@@ -1104,7 +1103,7 @@
       "kind": "accepted",
       "from": "handover",
       "to": "bridge",
-      "text": "桥接手了 !37",
+      "text": "桥接手了（MR !37）",
       "detail": false,
       "src": null
     },
@@ -1114,9 +1113,9 @@
       "kind": "signed",
       "from": "bridge",
       "to": "signer",
-      "text": "签名服务签了接手合同（RUN-PAY-2-1）",
+      "text": "签名服务签了接手合同（第 1 次运行）",
       "detail": false,
-      "src": null
+      "src": "运行号 RUN-PAY-2-1"
     },
     {
       "seq": 23,
@@ -1174,7 +1173,7 @@
       "kind": "question",
       "from": "runner",
       "to": "person",
-      "text": "停下问人：澄清",
+      "text": "停下问你：澄清",
       "detail": false,
       "src": null
     },
@@ -1184,7 +1183,7 @@
       "kind": "question",
       "from": "bridge",
       "to": "person",
-      "text": "D-1 在 MR 上问人：澄清",
+      "text": "D-1 在 MR 上问你：澄清",
       "detail": false,
       "src": null
     },
@@ -1304,7 +1303,7 @@
       "kind": "request",
       "from": "runner",
       "to": "release",
-      "text": "请人在 MR 上批准发布",
+      "text": "请产品在 MR 上批准发布",
       "detail": false,
       "src": null
     },
@@ -1314,7 +1313,7 @@
       "kind": "question",
       "from": "runner",
       "to": "person",
-      "text": "停下问人：验收",
+      "text": "停下问产品：验收",
       "detail": false,
       "src": null
     },
@@ -1324,7 +1323,7 @@
       "kind": "question",
       "from": "bridge",
       "to": "person",
-      "text": "D-2 在 MR 上问人：验收",
+      "text": "D-2 在 MR 上问产品：验收",
       "detail": false,
       "src": null
     },
@@ -1862,7 +1861,8 @@
       "vouchers": [
         "V-ec134a89e2"
       ],
-      "src": "aidlc-docs/261102-refund-id/decisions.md#L8"
+      "src": "aidlc-docs/261102-refund-id/decisions.md#L8",
+      "asked": []
     },
     {
       "id": "D-2",
@@ -1876,7 +1876,8 @@
         "T-12"
       ],
       "vouchers": [],
-      "src": "aidlc-docs/261102-refund-id/decisions.md#L9"
+      "src": "aidlc-docs/261102-refund-id/decisions.md#L9",
+      "asked": []
     },
     {
       "id": "D-3",
@@ -1890,7 +1891,8 @@
         "P-7"
       ],
       "vouchers": [],
-      "src": "aidlc-docs/261102-refund-id/decisions.md#L10"
+      "src": "aidlc-docs/261102-refund-id/decisions.md#L10",
+      "asked": []
     }
   ],
   "questions": [],
@@ -1918,26 +1920,11 @@
       "project": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
       "url": "/chat?sid=brain-PAY-2-1c4e",
       "error": null
-    },
-    {
-      "slot": "brain-run-RUN-PAY-2-1",
-      "title": "RUN-PAY-2-1",
-      "agent": "brain-run",
-      "kind": "runner",
-      "credits": 14.4,
-      "turns": 41,
-      "busy": false,
-      "awaiting": false,
-      "last_activity": 1793661540,
-      "opened_at": 1794038400,
-      "project": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
-      "url": "/chat?sid=brain-run-RUN-PAY-2-1",
-      "error": null
     }
   ],
   "credits": {
-    "total": 22.7,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "total": 8.3,
+    "note": "KiroCrew 只报 credits，没有别的用量数"
   },
   "source": "trace",
   "error": "",

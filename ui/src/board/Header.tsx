@@ -7,10 +7,10 @@
  */
 import type { ReqBoard } from '../types'
 import { StateChip } from '../ui'
-import { ACT, leanProgress } from '../vocab'
-import { WORKING, actorLabel, actorMeta, boardWho, checksSay, fmtCredits, fmtWhen, leanOf, localOnly, waitsOnMe } from './format'
+import { ACT, DO_NAME, leanProgress } from '../vocab'
+import { WORKING, actorLabel, actorMeta, boardWho, checksSay, fmtCredits, fmtWhen, leanOf, localOnly, runnerBlind, titleOf, waitsOnMe } from './format'
 import { useChangeCount, useTween } from './hooks'
-import { nextOf } from './next'
+import { waitCount } from './next'
 import { RoleIcon } from './RoleIcon'
 
 export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail, onSession, onStart }: {
@@ -31,7 +31,7 @@ export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail,
   return (
     <header className="kt-top">
       <div className="kt-title">
-        {onDetail ? (
+        {!titleOf(r) ? null : onDetail ? (
           <button type="button" className="kt-run-title kt-run-link" onClick={onDetail} title="需求详情：周期、时间花在哪、成本、检查、决定和问题">{r.title}</button>
         ) : (
           <span className="kt-run-title">{r.title}</span>
@@ -43,7 +43,7 @@ export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail,
           <span className="kt-pill tone-idle" data-testid="br-local-only" title="这个仓库没有远端：不交给运行机，没有 MR，在本机做完、在本机合并">这个仓库只在本机做</span>
         )}
         <span className="kt-run-meta kt-mono" title={r.worktree ?? undefined}>
-          {board.branch ? `${board.branch} ← ${board.base}` : `还没有运行分支（${board.base}）`}{r.owner ? ` · ${r.owner}` : ''}
+          {board.branch ? `${board.branch} ← ${board.base}` : runnerBlind(board) ? '运行分支还读不到：运行机还没建工作区' : `还没有运行分支（${board.base}）`}{r.owner ? ` · ${r.owner}` : ''}
         </span>
       </div>
       <div className="kt-actions">
@@ -59,7 +59,7 @@ export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail,
           <button type="button" className="kt-btn" onClick={() => onSession(runner.url)} title="打开运行机上的 brain-run 会话">{ACT.openSession}（运行机）</button>
         )}
         {!replaying && onStart && r.state === 'claimed' && (
-          <button type="button" className="kt-btn is-primary" onClick={onStart}>{ACT.start} {r.key}</button>
+          <button type="button" className="kt-btn is-primary" onClick={onStart}>{DO_NAME.start} {r.key}</button>
         )}
         <button type="button" className="kt-btn" aria-pressed={follow} onClick={onFollow} title="自动滚到正在动的那一环">跟随</button>
         {onDetail && <button type="button" className="kt-btn" onClick={onDetail}>需求详情 ↗</button>}
@@ -109,9 +109,10 @@ function LeanKpi({ board }: { board: ReqBoard }) {
   const approved = board.events.filter((e) => e.kind === 'approve').length
   const back = board.events.filter((e) => e.kind === 'reject').length
   const blocked = board.events.filter((e) => e.kind === 'blocked').length
-  const seg = (i: number) => (i < ln.done_n ? 'is-pass' : i < through ? 'is-skip' : ln.next && i === ln.next.n - 1 ? (ln.started ? 'is-run' : 'is-next') : '')
+  const blind = runnerBlind(board)
+  const seg = (i: number) => (i < ln.done_n ? 'is-pass' : i < through ? 'is-skip' : !blind && ln.next && i === ln.next.n - 1 ? (ln.started ? 'is-run' : 'is-next') : '')
   return (
-    <div className="kt-kpi kt-kpi-gates br-kpi-lean" aria-label={`AI-DLC Lean：${leanProgress(ln)}`}>
+    <div className="kt-kpi kt-kpi-gates br-kpi-lean" aria-label={`AI-DLC Lean：${blind ? '运行机还读不到 Lean 的记录' : leanProgress(ln)}`}>
       <div className="kt-kpi-label">AI-DLC Lean</div>
       <div className="kt-kpi-value" data-testid="br-lean-counter">
         <span className="kt-kpi-big">{ln.done_n}</span>
@@ -120,7 +121,7 @@ function LeanKpi({ board }: { board: ReqBoard }) {
       <div className="kt-segs" aria-hidden="true">
         {Array.from({ length: ln.total }, (_, i) => <i key={i} className={seg(i)} />)}
       </div>
-      <div className="kt-kpi-note br-lean-next">{ln.next ? <>{ln.started ? '在做' : '下一步'}：<b>{ln.next.label}</b></> : through ? '全部做完' : '还没开始'}</div>
+      <div className="kt-kpi-note br-lean-next">{blind ? '运行机还读不到 Lean 的记录' : ln.next ? <>{ln.started ? '在做' : '下一步'}：<b>{ln.next.label}</b></> : through ? '全部做完' : '还没开始'}</div>
       <div className="kt-gates-rows">
         <span>批准 <b>{approved}</b></span>
         <span className={back ? 'is-hit' : ''}>退回 <b>{back}</b></span>
@@ -168,9 +169,7 @@ function StepsKpi({ board, onActor, replaying }: { board: ReqBoard; onActor?: (k
   const done = on.filter((a) => a.status === 'merged' || a.status === 'done').length
   const working = on.filter((a) => WORKING.has(a.status)).length
   const mine = waitsOnMe(board)
-  // what waits on the person looking is what 你要做的一步 lists (a stalled hand-over to label too); on someone else, the
-  // actors that wait for them
-  const waiting = mine && !replaying ? nextOf(board).steps.length : on.filter((a) => a.status === 'awaiting_approval').length
+  const waiting = waitCount(board, replaying)
   return (
     <div className="kt-kpi kt-kpi-roles">
       <div className="kt-kpi-label">这条路走到哪了</div>
@@ -207,16 +206,19 @@ function CreditsKpi({ board, reducedMotion, replaying }: { board: ReqBoard; redu
     <div className="kt-kpi kt-kpi-credits">
       <div className="kt-kpi-label">credits</div>
       <div className="kt-kpi-value"><span className="kt-kpi-big">{c === null ? '—' : fmtCredits(shown)}</span></div>
-      <div className="kt-kpi-note">{replaying ? '回放时不算' : c === null ? '这个 app 开的会话还没报' : n ? `${n} 个会话合计` : '运行记录里的合计'}</div>
+      <div className="kt-kpi-note">{replaying ? '回放时不算' : c === null ? (n ? '这个 app 开的会话还没报' : '还没开过会话') : n ? `${n} 个会话合计` : '运行记录里的合计'}</div>
     </div>
   )
 }
 
 type Way = { phase: string; title: string; steps: { icon: string; title: string; does: string }[][] }[]
 
-/** The way a requirement goes, before its run started (the sample's empty-state introduction of the team). */
+/** 0 认领: the one who claimed it, 你 only to them (BOARD-11). */
+const claimPhase = (who: string): Way[number] => ({ phase: '0 认领', title: '一个需求号，文档过五关', steps: [[{ icon: 'person', title: who, does: '认领、交文档、开工' }]] })
+
+/** The way a requirement goes after its claim, before its run started (the sample's empty-state introduction of the
+ * team). */
 const WAY: Way = [
-  { phase: '0 认领', title: '一个需求号，文档过五关', steps: [[{ icon: 'person', title: '你', does: '认领、交文档、开工' }]] },
   { phase: '1 本机 · Lean', title: 'brain-dev 会话带着 Lean 推进', steps: [
     [{ icon: 'laptop', title: '本机会话', does: '读需求、读 Brain、写文档' }],
     [{ icon: 'req', title: '需求审批', does: '会话里打一行' }, { icon: 'design', title: '设计审批', does: '会话里打一行' }],
@@ -233,15 +235,15 @@ const WAY: Way = [
 /** A repo done only on this machine: no runner, no MR; the release is approved in the session too. */
 const LOCAL_WAY: Way = [
   WAY[0],
-  WAY[1],
   { phase: '2 检查 · 发布', title: '机器检查，你批准发布', steps: [[{ icon: 'ci', title: 'CI 检查', does: '跑自动检查' }, { icon: 'release', title: '发布审批', does: '会话里打一行' }]] },
   { phase: '3 回写', title: '学到的写回 Brain', steps: [[{ icon: 'brain', title: '回写 Brain', does: '学到的写回去' }]] },
 ]
 
+/** *onStart*: the one looking is the owner (only they start it): the way speaks to them as 你, else it names the owner. */
 export function Intro({ board, onStart }: { board: ReqBoard; onStart?: () => void }) {
   const only = localOnly(board)
-  const way = only ? LOCAL_WAY : WAY
   const owner = board.person.owner
+  const way = [claimPhase(onStart ? '你' : owner ?? '负责人'), ...(only ? LOCAL_WAY : WAY)]
   const who = onStart ? '你' : owner ? ` ${owner} ` : '负责人'
   return (
     <section className="kt-empty" data-testid="br-board-intro" aria-label="这个需求还没开工">
@@ -256,7 +258,7 @@ export function Intro({ board, onStart }: { board: ReqBoard; onStart?: () => voi
             开工以后，这里一屏看完它怎么走：本机的 brain-dev 会话带着 AI-DLC Lean 推进，需求和设计由{who}在会话里自己批准；交给运行机以后，桥核对交接，签名服务签合同，运行机无人值守地做，有问题停下来在 MR 上问人；检查过了，产品在 MR 上验收；合并以后，学到的东西写回 Brain。
           </p>
         )}
-        <p className="kt-empty-punch">人只在判断点上出手：批准、回答、验收。</p>
+        <p className="kt-empty-punch">{only ? '人只在判断点上出手：批准需求、设计和发布，回答问题。' : '人只在判断点上出手：批准、回答、验收。'}</p>
       </div>
       <ol className={`kt-team-intro is-phased br-way${only ? ' is-local' : ''}`} aria-label="一个需求的路，从左到右">
         {way.map((ph) => (
@@ -284,7 +286,7 @@ export function Intro({ board, onStart }: { board: ReqBoard; onStart?: () => voi
       <div className="br-hero-acts" data-testid="br-intro-start">
         {onStart ? (
           <>
-            <button type="button" className="kt-btn is-primary br-btn-big" onClick={onStart}>{ACT.start} {board.row.key}</button>
+            <button type="button" className="kt-btn is-primary br-btn-big" onClick={onStart}>{DO_NAME.start} {board.row.key}</button>
             <span className="kt-dim">在开需求里接着填：需求号 {board.row.key} 和标题已经带过去了 · 认领于 {fmtWhen(board.started_at)}</span>
           </>
         ) : owner ? (

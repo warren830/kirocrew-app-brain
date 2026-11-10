@@ -129,17 +129,20 @@ describe('replayClock', () => {
 })
 
 describe('replayAt', () => {
-  it('at the start nothing has happened yet but the claim', () => {
+  it('at the start nothing has happened yet but the claim, and it looks as a live claim of that owner does', () => {
     const b = fx.boardMerged()
     const r = replayAt(b, START)
     expect(r.events.map((e) => [e.seq, e.kind])).toEqual([[1, 'claim']])
     expect(r.belt).toEqual([])
     for (const a of r.actors)
       expect({ key: a.key, status: a.status, doing: a.doing, since: a.since, spans: a.spans, marks: a.marks })
-        .toEqual({ key: a.key, status: 'waiting', doing: '还没轮到', since: null, spans: [], marks: [] })
+        .toEqual({ key: a.key, status: 'waiting', doing: a.key === 'local' ? '认领了，还没开工' : '还没轮到', since: null, spans: [], marks: [] })
     expect(r.checks.cells.map((c) => [c.status, c.at, c.detail])).toEqual(b.checks.cells.map(() => ['skip', null, '还没到这一步']))
     expect(r.checks).toMatchObject({ passed: 0, failed: 0, total: 0, at: null, history: [] })
-    expect(r.person).toMatchObject({ status: 'waiting', doing: '没有等你的事' })
+    // no run branch and no working directory before 开工; it waits on its owner (alice, looking) to start it
+    expect([r.branch, r.row.branch, r.row.worktree]).toEqual([null, null, null])
+    expect(r.row.waits).toMatchObject({ who: 'you', do: 'start', text: '已认领，还没开工', since: START })
+    expect(r.person).toMatchObject({ status: 'awaiting_approval', doing: '已认领，还没开工' })
     expect(r.live).toBe(false)
     expect(r.ended_at).toBeNull()
     expect(r.accept.state).toBe('not_yet')
@@ -151,7 +154,20 @@ describe('replayAt', () => {
     const still = b.actors.filter((a) => a.status === 'waiting')
     expect(still.map((a) => a.key)).toEqual(['handover', 'bridge', 'signer', 'runner', 'ci', 'release', 'reflect'])
     for (const a of still) expect(r.actors.find((x) => x.key === a.key)).toMatchObject({ status: 'waiting', doing: a.doing, since: null })
-    for (const a of b.actors.filter((x) => x.status !== 'waiting')) expect(r.actors.find((x) => x.key === a.key)).toMatchObject({ status: 'waiting', doing: '还没轮到', since: null })
+    for (const a of b.actors.filter((x) => x.status !== 'waiting' && x.key !== 'local')) expect(r.actors.find((x) => x.key === a.key)).toMatchObject({ status: 'waiting', doing: '还没轮到', since: null })
+    expect(r.actors.find((x) => x.key === 'local')).toMatchObject({ status: 'waiting', doing: '认领了，还没开工', since: null })
+  })
+
+  it('someone else’s claim, replayed, waits on them as their live claim does (等 erin 开工), with no run branch yet', () => {
+    const b = fx.boardMerged()
+    b.person = { ...b.person, owner: 'erin', me: false, you: false }
+    const r = replayAt(b, START + 1)
+    expect(r.row.state).toBe('claimed')
+    expect(r.branch).toBeNull()
+    expect(r.row.waits).toMatchObject({ who: 'people', do: 'start', text: '等 erin 开工' })
+    expect(r.person).toMatchObject({ status: 'waiting', doing: '等 erin 开工' })
+    // once it is started the branch is there again
+    expect(replayAt(b, BEGIN + 1).branch).toBe(b.branch)
   })
 
   it('before the start not even the claim is there', () => {
@@ -225,9 +241,9 @@ describe('replayAt', () => {
 
   it('while 发布 waits for the product’s approval, it waits on the product (not 等你), the person is told, and 验收 waits too', () => {
     const r = replayAt(fx.boardMerged(), RELEASE_ASKED + 20)
-    expect(r.actors.find((a) => a.key === 'release')).toMatchObject({ status: 'awaiting_approval', doing: '等人在 MR 上批准发布', since: RELEASE_ASKED })
-    expect(r.row.waits).toMatchObject({ who: 'product', text: '等人在 MR 上批准发布' })
-    expect(r.person).toMatchObject({ status: 'waiting', doing: '等人在 MR 上批准发布' })
+    expect(r.actors.find((a) => a.key === 'release')).toMatchObject({ status: 'awaiting_approval', doing: '等产品在 MR 上批准发布', since: RELEASE_ASKED })
+    expect(r.row.waits).toMatchObject({ who: 'product', text: '等产品在 MR 上批准发布' })
+    expect(r.person).toMatchObject({ status: 'waiting', doing: '等产品在 MR 上批准发布' })
     expect(r.accept.state).toBe('waiting')
   })
 

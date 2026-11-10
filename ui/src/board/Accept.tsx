@@ -1,5 +1,5 @@
 /**
- * 验收 (the sample team board's 签字单): everything a person needs to accept the requirement on one card — the
+ * 验收 (the sample team board's 签字单; 发布审批 for a repo done only here): everything a person needs to accept the requirement on one card — the
  * requirement, its 变更说明 (the first line, the whole text folded, 复制 for the MR), the decisions and who made them,
  * what the checks say, what it cost, and how it ended. The step a person takes now is the strip at the top of the board
  * (NextStep.tsx); the app takes none of these steps for them.
@@ -8,16 +8,14 @@ import type { ReactNode } from 'react'
 import type { ReqBoard } from '../types'
 import { Icon } from '../ui'
 import { useCopy } from '../views/Question'
-import { checksSay, fmtCredits, fmtWhen } from './format'
+import { boardWho, checksSay, fmtCredits, fmtWhen, localOnly, titleOf, whoThen } from './format'
 import { RoleIcon } from './RoleIcon'
 
-const STATE: Record<ReqBoard['accept']['state'], { label: string; tone: string }> = {
-  not_yet: { label: '还没到验收', tone: 'idle' },
-  waiting: { label: '等验收', tone: 'approve' },
-  accepted: { label: '验收过了', tone: 'ok' },
-  rejected: { label: '验收被退回', tone: 'bad' },
-  merged: { label: '已合并', tone: 'ok' },
-}
+type AcceptState = ReqBoard['accept']['state']
+const TONE: Record<AcceptState, string> = { not_yet: 'idle', waiting: 'approve', accepted: 'ok', rejected: 'bad', merged: 'ok' }
+const STATE: Record<AcceptState, string> = { not_yet: '还没到验收', waiting: '等验收', accepted: '验收过了', rejected: '验收被退回', merged: '已合并' }
+/** A repo done only here has no 验收 on an MR: the step before its merge is Lean's 发布审批, in the session. */
+const LOCAL_STATE: Record<AcceptState, string> = { not_yet: '还没到发布审批', waiting: '批准发布', accepted: '发布批准了', rejected: '发布被退回', merged: '已合并' }
 
 /** who settled the decisions, in words (decisions.md's Who column is never named to a person) */
 const BY_WORD: Record<string, string> = { unclassified: '没归类（「谁定的」没按规定写）' }
@@ -48,7 +46,9 @@ export function Accept({ board, onDetail, quiet = false }: { board: ReqBoard; on
   const ac = board.accept
   const m = board.mr_desc
   const { copied, copy } = useCopy(m.text)
-  const st = STATE[ac.state]
+  const local = localOnly(board)
+  const title = local ? '发布审批' : '验收'
+  const label = local && ac.state === 'waiting' ? whoThen(boardWho(board), LOCAL_STATE.waiting) : (local ? LOCAL_STATE : STATE)[ac.state]
   const owner = board.person.owner
   const people = board.decisions.filter((d) => d.by === 'person')
   const total = ac.by.reduce((n, x) => n + x.count, 0)
@@ -56,16 +56,16 @@ export function Accept({ board, onDetail, quiet = false }: { board: ReqBoard; on
   const say = checksSay(board.checks, board)
   const sessions = board.sessions.length
   return (
-    <section id="br-accept" className={`kt-sign${signed ? ' is-signed' : ''}${ac.state === 'not_yet' ? ' is-idle' : ''}`} aria-label="验收" data-testid="br-accept">
+    <section id="br-accept" className={`kt-sign${signed ? ' is-signed' : ''}${ac.state === 'not_yet' ? ' is-idle' : ''}`} aria-label={title} data-testid="br-accept">
       <header className="kt-sign-head">
-        <h2>验收</h2>
-        <span className={`kt-pill tone-${st.tone}`}>{st.label}</span>
+        <h2>{title}</h2>
+        <span className={`kt-pill tone-${TONE[ac.state]}`}>{label}</span>
         <p className="kt-dim">合并前由人确认：变更、决定、检查</p>
       </header>
       <dl className="kt-sign-grid">
         <div>
           <dt>需求</dt>
-          <dd><b className="br-strong">{board.row.key}</b> {board.row.title}</dd>
+          <dd><b className="br-strong">{board.row.key}</b> {titleOf(board.row)}</dd>
         </div>
         <div className="br-accept-desc">
           <dt>变更说明 {m.text && <button type="button" className="br-link br-small br-copy" onClick={() => void copy()}><Icon name="Copy" size={12} />复制</button>}

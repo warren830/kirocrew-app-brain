@@ -92,7 +92,8 @@ def test_a_bad_proposal_is_a_problem_in_the_preview(tmp_path, home):
             await svc.stop()
 
     prev = run(go())
-    assert prev["problems"] and prev["problems"][0].startswith("第 ") and "类型不对：技术只收 原则、" in prev["problems"][0], prev
+    assert prev["problems"] and prev["problems"][0]["text"].startswith("第 ") and \
+        "类型不对：技术只收 原则、" in prev["problems"][0]["text"] and prev["problems"][0]["level"] == "FAIL", prev
     assert "fantasy" in prev["raw"][-1]
 
 
@@ -104,6 +105,22 @@ def test_reflect_says_brainkit_in_chinese_and_any_other_english_points_to_the_de
         "D-3 被否了（凭证 V-1a2b），可是没有一条纠正或「又出现」的提议提到它"
     assert bv.reflect_says("T-PAY-2-1 只加来源，不改文字") == "T-PAY-2-1 只加来源，不改文字"
     assert bv.reflect_says("a sentence nobody translated") == "brain-kit 说了一句这里还没翻译的话：原话在「细节」里"
+
+
+def test_a_lint_line_in_the_reflect_dry_run_says_what_the_brain_check_card_says():
+    """REST-4: brain-kit's dry run lints the Brain with the proposals written; its English line quotes a Chinese word
+    and is said the way the Brain 检查 card says it (one rule for both), 做什么 included; English quoting Chinese is
+    not a Chinese sentence."""
+    bv, pr = mod("brainview"), mod("problems")
+    line = ("TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, "
+            "an intent, a key)")
+    row, card = bv.reflect_row(line), pr.lint("FAIL", line)
+    assert (row["level"], row["text"], row["todo"]) == ("FAIL", "brain/TECH.md 第 20 行：来源「见群聊」不是引用", card["todo"])
+    assert card["text"] == row["text"] and card["todo"].startswith("来源写成查得到的引用")
+    assert bv.reflect_row(line, brain_dir="docs/brain")["text"].startswith("docs/brain/TECH.md 第 20 行")
+    assert bv.reflect_row("proposal at line 27: looks like a secret (AKIA…)")["text"] == "第 27 行的提议：像是有密钥或密码"
+    assert bv.reflect_says("TECH.md:3: 见群聊 is wrong here") == bv.UNTRANSLATED
+    assert bv.reflect_says("T-PAY-2-1 只加来源，不改文字") == "T-PAY-2-1 只加来源，不改文字"
 
 
 def test_brain_kit_failing_to_read_the_use_is_said_in_words_its_own_in_raw(tmp_path, home, monkeypatch):

@@ -136,7 +136,7 @@ def test_without_gitlab_the_old_brainkit_asks_for_a_name_and_the_start_says_why(
     me = st["repos"][0]["me"]
     assert me["ask"] and me["name"] is None and me["label"] == "你的名字" and me["suggest"] == login
     assert me["why"] == identity.WHY_OLD and me["gitlab"] == ""
-    assert st["me"] == {"user": None, "token": False, "how": "GitLab token（没有）"}
+    assert st["me"] == {"user": None, "token": False, "how": "GitLab 令牌（没有）"}
     assert first["ok"] is False and "who are you?" in first["output"]
     p = first["problem"]
     assert p["fix"] == "me" and p["text"] == "brain-kit 不知道你是谁" and p["repo"] == str(repo)
@@ -165,7 +165,7 @@ def test_without_gitlab_the_new_brainkit_uses_the_login_name_and_no_input(tmp_pa
         me = st["repos"][0]["me"]
         assert me == dict(me, name=login, source="login", ask=False, error="")
         assert me["text"] == "%s（这台机器的登录名：这个仓库不用 GitLab）" % login
-        assert st["me"] == {"user": login, "token": False, "how": "GitLab token（没有）；" + me["text"]}
+        assert st["me"] == {"user": login, "token": False, "how": "GitLab 令牌（没有）；" + me["text"]}
         row = next(c for c in got["checks"] if c["id"] == "me")
         assert row["level"] == "OK" and row["why"] == me["text"] and got["me"]["name"] == login
         assert out["ok"] and out["branch"] == "ai/%s/PAY-1-refund" % login        # brain-kit used it too

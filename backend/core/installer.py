@@ -39,9 +39,10 @@ from urllib.parse import quote
 from . import bk
 from . import problems
 from .constants import GIT_BIN
-from .importer import (CTRL_RE, DEFAULT_BRANCH, GIT_TIMEOUT_S, KIT, PREFIX_RE, PROJECT_RE, STATUS_TIMEOUT_S, ImportFail,
-                       Records, _status_rows, base_ref, default_branch, git_failure, has_at, last_lines, origin_of,
-                       planted_link, quiet_env, run_quiet, short_ref, symlinks_on_targets, tail)
+from .importer import (CTRL_RE, DEFAULT_BRANCH, GIT_TIMEOUT_S, KIT, LINKS_REFUSED, PREFIX_RE, PROJECT_RE,
+                       STATUS_TIMEOUT_S, ImportFail, Records, _status_rows, base_ref, default_branch, git_failure, has_at,
+                       last_lines, origin_of, planted_link, quiet_env, ref_word, run_quiet, short_ref,
+                       symlinks_on_targets, tail)
 from .intake import brain_cmd
 from .repo import Git
 
@@ -60,6 +61,9 @@ UPGRADE_BRANCH = "brain/upgrade-kit"
 UPGRADE_STEPS = (("branch", "建分支和工作目录"), ("install", "更新 kit 文件"), ("doctor", "自检"), ("commit", "提交"))
 PURPOSES = ("install", "upgrade")
 UP_TO_DATE = "已经是最新的：没有要提交的改动"
+FORM_FIELD = {"req_prefix": "需求号前缀", "tracker": "跟踪方式", "jira_base": "Jira 地址", "gitlab_base": "GitLab 地址",
+              "gitlab_project": "GitLab 项目", "default_branch": "默认分支", "team": "团队"}
+KIT_LINK = "brain-kit 设置（%s）是符号链接：不往里写，先把它换成普通文件" % KIT
 # Lean's install.sh starts a new audit file (one INIT event) each time it runs: a reinstall that adds nothing else
 # changed nothing. When something else changed, it is committed with the rest, as `brain install` + `git add -A` would.
 LEAN_AUDIT = "aidlc-docs/audit/"
@@ -80,13 +84,13 @@ def check_branch(raw: Any, default: str = DEFAULT_BRANCH) -> str:
 def check_kit(raw: Any) -> dict[str, str]:
     """The install form's kit.json values, checked (plain Chinese), then by brain-kit's own config.validate."""
     if not isinstance(raw, dict):
-        raise ImportFail("kit 要是一个对象（需求号前缀、跟踪方式、GitLab、默认分支、团队）", "invalid_kit")
+        raise ImportFail("装的表单不完整（要有需求号前缀、跟踪方式、GitLab、默认分支、团队）：刷新页面再填一次", "invalid_kit")
 
     def s(k: str, limit: int = 200) -> str:
         v = raw.get(k)
         v = v.strip() if isinstance(v, str) else ""
         if len(v) > limit or CTRL_RE.search(v):
-            raise ImportFail("%s 太长或有不该有的字符" % k, "invalid_kit")
+            raise ImportFail("「%s」太长或有不该有的字符" % FORM_FIELD.get(k, k), "invalid_kit")
         return v
 
     prefix = s("req_prefix", 10).upper()
@@ -94,7 +98,8 @@ def check_kit(raw: Any) -> dict[str, str]:
         raise ImportFail("需求号前缀要像 PAY：大写字母开头，后面是大写字母或数字，最多 10 个", "invalid_kit")
     tracker = s("tracker", 10) or "none"
     if tracker not in ("none", "jira"):
-        raise ImportFail("跟踪方式只能是 none（不用 Jira）或 jira", "invalid_kit")
+        raise ImportFail("跟踪方式只能选「%s」或「%s」" % (problems.TRACKER_NAME["none"], problems.TRACKER_NAME["jira"]),
+                         "invalid_kit")
     jira = s("jira_base").rstrip("/")
     if tracker == "jira" and not BASE_RE.match(jira):
         raise ImportFail("用 Jira 要写 Jira 的地址，比如 https://jira.example.com", "invalid_kit")
@@ -212,20 +217,19 @@ def install(top: str, kit: dict[str, str], branch: str, work_root: str, records:
     if g.ok("rev-parse", "-q", "--verify", "refs/heads/" + branch):
         raise ImportFail("已经有 %s 分支了：先看看「检查」里它的状态，或者换个分支名" % branch, "branch_exists", 409, res)
     if g.ok("rev-parse", "-q", "--verify", "refs/remotes/origin/" + branch):
-        raise ImportFail("origin 上已经有 %s 分支：换个分支名" % branch, "branch_exists", 409, res)
+        raise ImportFail("远端已经有 %s 分支：换个分支名" % branch, "branch_exists", 409, res)
     got = base_ref(g, kit["default_branch"])
     if not got:
-        raise ImportFail("找不到默认分支 %s（origin 上和本机都没有）：改一下表单里的默认分支" % kit["default_branch"],
+        raise ImportFail("找不到默认分支 %s（远端和本机都没有）：改一下表单里的默认分支" % kit["default_branch"],
                          "no_default_branch", 400, res)
     ref, sha = got
     res.update(base=short_ref(ref), base_sha=sha)
     if has_at(g, sha, KIT):
         raise ImportFail("%s 上已经装好 brain-kit 了：在这个目录里切到 %s、拉取最新的就行，不用再装" % (
-            short_ref(ref), kit["default_branch"]), "installed", 409, res)
+            ref_word(ref), kit["default_branch"]), "installed", 409, res)
     links = symlinks_on_targets(g, sha)
     if links:
-        raise ImportFail("仓库里 %s 是符号链接：brain install 会顺着它写到别处，这里不装。先把它换成普通的目录或文件" %
-                         "、".join(links), "symlink", 409, res)
+        raise ImportFail(LINKS_REFUSED % "、".join(links), "symlink", 409, res)
     if not work_root:
         raise ImportFail("设置里没有「每个需求的工作目录」", "no_work_root", 409, res)
     wr = os.path.realpath(os.path.expanduser(work_root))
@@ -244,7 +248,7 @@ def install(top: str, kit: dict[str, str], branch: str, work_root: str, records:
         raise ImportFail(text, "worktree_failed", 500, res)
     res["worktree"] = os.path.realpath(wt)
     wt = res["worktree"]
-    step("branch", "ok", "%s，从 %s（%s）建的，在 %s" % (branch, short_ref(ref), sha[:8], wt))
+    step("branch", "ok", "%s，从%s（%s）建的，在 %s" % (branch, ref_word(ref), sha[:8], wt))
 
     step("install", "running")
     args = ["install", wt, "--prefix", kit["req_prefix"]] + (["--team", kit["team"]] if kit["team"] else [])
@@ -253,7 +257,8 @@ def install(top: str, kit: dict[str, str], branch: str, work_root: str, records:
     if p.returncode != 0 or not os.path.isfile(os.path.join(wt, KIT)):
         _drop(top, wt, branch, sha)
         res["worktree"] = None
-        text = "brain install 没成功（退出码 %d），装了一半的分支和工作目录已经删掉：\n%s" % (p.returncode, last_lines(res["output"], 12))
+        text = "brain-kit 没装成（退出码 %d），装了一半的分支和工作目录已经删掉。它说：\n%s" % (
+            p.returncode, last_lines(res["output"], 12))
         step("install", "fail", text)
         raise ImportFail(text, "install_failed", 500, res)
     step("install", "ok", "brain-kit %s" % (bk.info().get("version") or ""))
@@ -262,7 +267,7 @@ def install(top: str, kit: dict[str, str], branch: str, work_root: str, records:
     try:
         path = os.path.join(wt, KIT)
         if os.path.islink(path) or os.path.islink(os.path.dirname(path)):
-            raise ImportFail("%s 是符号链接：不写" % KIT, "symlink")
+            raise ImportFail(KIT_LINK, "symlink")
         C = bk.m("common")
         data = kit_data(C.load_json(path), kit)
         cm = bk.m("config")
@@ -278,7 +283,7 @@ def install(top: str, kit: dict[str, str], branch: str, work_root: str, records:
     except (OSError, ValueError) as exc:
         _drop(top, wt, branch, sha)
         res["worktree"] = None
-        text = "写不了 kit.json：%s" % str(exc)[:200]
+        text = "写不了 brain-kit 设置：%s" % str(exc)[:200]
         step("kit", "fail", text)
         raise ImportFail(text, "kit_failed", 500, res)
     step("kit", "ok", kit_line(kit))
@@ -370,16 +375,15 @@ def upgrade(top: str, branch: str, work_root: str, records: Records, step: Calla
     res["remote_url"] = (origin or {}).get("url") or ""
     got = base_ref(g, d) if d else None
     if not got:
-        raise ImportFail("找不到默认分支%s（origin 上和本机都没有）" % (" " + d if d else ""), "no_default_branch", 409, res)
+        raise ImportFail("找不到默认分支%s（远端和本机都没有）：看看 brain-kit 设置里写的默认分支对不对" % (
+            " " + d if d else ""), "no_default_branch", 409, res)
     ref, sha = got
     res.update(base=short_ref(ref), base_sha=sha, target=d)
     if not has_at(g, sha, KIT):
-        raise ImportFail("%s 上还没有 .brain/kit.json：先在「导入仓库」里装上 brain-kit" % short_ref(ref),
-                         "not_installed", 409, res)
+        raise ImportFail("%s 上还没有 brain-kit：先在「导入仓库」里装上它" % ref_word(ref), "not_installed", 409, res)
     links = symlinks_on_targets(g, sha)
     if links:
-        raise ImportFail("仓库里 %s 是符号链接：brain install 会顺着它写到别处，这里不装。先把它换成普通的目录或文件" %
-                         "、".join(links), "symlink", 409, res)
+        raise ImportFail(LINKS_REFUSED % "、".join(links), "symlink", 409, res)
     if not work_root:
         raise ImportFail("设置里没有「每个需求的工作目录」", "no_work_root", 409, res)
     wr = os.path.realpath(os.path.expanduser(work_root))
@@ -402,16 +406,17 @@ def upgrade(top: str, branch: str, work_root: str, records: Records, step: Calla
         raise ImportFail(text, "worktree_failed", 500, res)
     wt = os.path.realpath(wt)
     res["worktree"] = wt
-    step("branch", "ok", "%s，从 %s（%s）建的，在 %s" % (branch, short_ref(ref), sha[:8], wt))
+    step("branch", "ok", "%s，从%s（%s）建的，在 %s" % (branch, ref_word(ref), sha[:8], wt))
     try:
         step("install", "running")
         p = run_quiet(brain_cmd() + ["install", wt], wt, INSTALL_TIMEOUT_S, brain_env())
         res["output"] = tail(p)
         wcfg = _kit_of(wt) if p.returncode == 0 else None
         if wcfg is None:
-            text = ("brain install 没成功（退出码 %d），新建的分支和工作目录已经删掉：\n%s" % (
+            text = ("brain-kit 没装成（退出码 %d），新建的分支和工作目录已经删掉。它说：\n%s" % (
                 p.returncode, last_lines(res["output"], 12)) if p.returncode != 0 else
-                "brain install 跑完了，可读不了 .brain/kit.json（默认分支上的它就有问题？）：新建的分支和工作目录已经删掉")
+                "brain-kit 装完了，可读不了这个仓库的 brain-kit 设置（默认分支上的它就有问题？）：新建的分支和工作目录"
+                "已经删掉。先在「导入仓库」里检查这个仓库")
             step("install", "fail", text)
             raise ImportFail(text, "install_failed", 500, res)
         step("install", "ok", "brain-kit %s" % (bk.info().get("version") or ""))
@@ -473,11 +478,11 @@ def commit_failure(p: Any, where: str, purpose: str = "install") -> tuple[bool, 
     """(a hook said no, the plain words) for a `git commit` that did not go through."""
     low = ((p.stderr or "") + (p.stdout or "")).lower()
     if "please tell me who you are" in low or "empty ident" in low or "unable to auto-detect email" in low:
-        return False, ("git 不知道你是谁：在终端里设好 git config --global user.name 和 user.email（这里不替你填），"
-                       "再点「再提交一次」")
+        return False, ("git 不知道你是谁：在终端里设好你在 git 里的名字和邮箱（git config --global user.name 和 user.email，"
+                       "这里不替你填），再点「再提交一次」")
     if "nothing to commit" in low or "nothing added to commit" in low or "no changes added to commit" in low:
-        return False, (UP_TO_DATE if purpose == "upgrade" else "没有可提交的改动：brain install 什么也没写？看看 %s" % where)
-    return True, "提交被拦下了（多半是 git hook），它说：\n%s\n\n改动还在 %s 里：处理好以后点「再提交一次」。" % (
+        return False, (UP_TO_DATE if purpose == "upgrade" else "没有可提交的改动：安装什么也没写？看看 %s" % where)
+    return True, "提交被拦下了（多半是提交时跑的 git 检查），它说：\n%s\n\n改动还在 %s 里：处理好以后点「再提交一次」。" % (
         last_lines(tail(p), 15) or "（什么也没说，退出码 %d）" % p.returncode, where)
 
 
@@ -506,7 +511,7 @@ def commit(top: str, records: Records, step: Callable[..., None] | None = None, 
         return out
     p = run_quiet([GIT_BIN, "-C", wt, "add", "-A"], wt, GIT_TIMEOUT_S * 2, brain_env())
     if p.returncode != 0:
-        out.update(text="git add 没成功：%s" % last_lines(tail(p)), output=tail(p))
+        out.update(text="改动没能加进提交，git 说：%s" % last_lines(tail(p)), output=tail(p))
         step("commit", "fail", out["text"])
         return out
     subject, body = commit_message(rec.get("kit") or {}, purpose, rec.get("brainkit"))
@@ -531,7 +536,7 @@ def mr_title(purpose: str = "install") -> str:
 
 
 FILE_GROUPS = (
-    (".kiro/aidlc-lean/", "AI-DLC Lean 本体"), (".kiro/hooks/", "Lean 的 hook"), (".kiro/brain/", "KiroCrew 的 Lean hook 适配"),
+    (".kiro/aidlc-lean/", "AI-DLC Lean 本体"), (".kiro/hooks/", "Lean 的拦截"), (".kiro/brain/", "KiroCrew 里接上 Lean 拦截的那一层"),
     (".kiro/agents/", "brain-dev agent"), (".kiro/skills/", "skills（Lean 的和 brain 的）"),
     (".kiro/steering/", "steering"), ("aidlc-docs/", "Lean 的配置和记录（lean.json 的 fingerprint_exclude 加了 runs/**）"),
     (".brain/", "brain-kit 的配置 kit.json"), ("brain/", "Brain：PRODUCT、TECH、IMPROVEMENT、PROJECT"),
@@ -620,7 +625,7 @@ def publish(top: str, records: Records, confirm: dict[str, Any], *, transport: A
         raise ImportFail("分支 %s 不在了" % branch, "no_branch", 409)
     origin = origin_of(g)
     if origin is None:
-        raise ImportFail("没有 origin：推不了。先 git remote add origin <地址>", "no_origin", 409)
+        raise ImportFail("没有远端：推不了。先在终端里给它加上远端（git remote add origin <地址>）", "no_origin", 409)
     if (confirm.get("branch"), confirm.get("target"), confirm.get("remote_url")) != (branch, target, origin["url"]):
         raise ImportFail("页面上的信息过期了：重新检查一下，再确认", "stale_confirm", 409)
     base = kit.get("gitlab_base") or origin["base"]
@@ -640,18 +645,18 @@ def publish(top: str, records: Records, confirm: dict[str, Any], *, transport: A
     out["pushed"] = True
     records.update(top, pushed=True, pushed_at=time.time(), pushed_sha=sha)
     if not base or not project:
-        out.update(ok=True, text="推上去了。kit.json 里没写 GitLab 项目，MR 要你自己开：用下面的命令或链接。")
+        out.update(ok=True, text="推上去了。brain-kit 设置里没写 GitLab 项目，MR 要你自己开：用下面的命令或链接。")
         return out
     rest = bk.m("rest")
     try:
         tok = rest.read_token()
     except Exception as exc:  # noqa: BLE001 - a token file others can read is refused, as brain-kit does
-        out.update(ok=True, text="推上去了。GitLab token 读不了（%s），MR 要你自己开：用下面的命令或链接。" %
+        out.update(ok=True, text="推上去了。GitLab 令牌读不了（%s），MR 要你自己开：用下面的命令或链接。" %
                    str(exc).split("\n", 1)[0][:200])
         return out
     if not tok:
-        out.update(ok=True, text="推上去了。这台机器上没有 GitLab token（$GITLAB_TOKEN 或 ~/.brain/gitlab-token），MR "
-                                 "要你自己开：用下面的命令或链接。")
+        out.update(ok=True, text="推上去了。这台机器上没有 GitLab 令牌（放在 ~/.brain/gitlab-token 或环境变量 GITLAB_TOKEN "
+                                 "里，app 就能自己开 MR），MR 这次要你自己开：用下面的命令或链接。")
         return out
     try:
         gl = rest.GitLab(base, tok, transport)

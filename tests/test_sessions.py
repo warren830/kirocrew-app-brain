@@ -3,6 +3,7 @@
 import asyncio
 import itertools
 import logging
+from types import SimpleNamespace
 
 from appkit import FakeGateway, GatewayError, mod
 
@@ -120,7 +121,7 @@ def test_a_fix_round_continues_the_same_session_and_a_deleted_session_fails_the_
             await mgr.poll()
         assert fix.done and "找不到这个会话" in fix.error
         gone = await mgr.continue_conversation_async("s-nope", "x", parent_session_key="aidlc-team:r3", cwd="", model=None)
-        assert gone.done and gone.error.startswith("conversation_gone")
+        assert gone.done and gone.error == "找不到这个会话了：先点「打开会话」，再试一次"
 
     asyncio.run(go())
 
@@ -200,6 +201,38 @@ def test_a_strict_session_boots_exactly_its_template_or_fails(tmp_path):
     asyncio.run(go())
 
 
+def test_what_a_person_reads_when_kirocrew_fails_says_what_happened_and_what_to_do(tmp_path):
+    """REST-29: a session that will not open, a turn that is not sent: what happened and what to do in words (再试一次,
+    打开会话), never the HTTP line or the exception (the log keeps those)."""
+    async def go():
+        gw, mgr = make(tmp_path)
+        folders = gw.folders
+
+        async def down():
+            raise GatewayError(0, "gateway unreachable (ClientConnectorError)", "unreachable", "/api/chat/folders")
+
+        gw.folders = down
+        info = await mgr.open_session("开工", parent_session_key="brain:r1-PAY-1", cwd=str(tmp_path), title="t",
+                                      folder="PAY-1 · x", agent="brain-dev", strict_agent=True, project_dir=str(tmp_path),
+                                      kind="local", key="r1-PAY-1")
+        assert info.error == "开不了 KiroCrew 会话：连不上 KiroCrew：看它是不是还开着，再试一次"
+        gw.folders, gw.templates = folders, set()
+        info = await mgr.open_session("开工", parent_session_key="brain:r1-PAY-2", cwd=str(tmp_path), title="t",
+                                      folder="PAY-2 · x", agent="brain-dev", strict_agent=True, project_dir=str(tmp_path),
+                                      kind="local", key="r1-PAY-2")
+        assert info.error == "开不了 KiroCrew 会话：KiroCrew 里没有 brain-dev：在设置里点「装上 brain-dev」，再试一次"
+        gw.templates = {"brain-dev"}
+        ok = await mgr.open_session("开工", parent_session_key="brain:r1-PAY-3", cwd=str(tmp_path), title="t",
+                                    folder="PAY-3 · x", agent="brain-dev", strict_agent=True, project_dir=str(tmp_path),
+                                    kind="local", key="r1-PAY-3")
+        await settle(mgr, gw, ok.slot)
+        gw.fail_send = True
+        turn = await mgr.continue_conversation_async(ok.id, "A", parent_session_key="brain:r1-PAY-3")
+        assert turn.error == "没送进会话：KiroCrew 没答应：等一会儿再试一次；一直这样，在 KiroCrew 里看一下它"
+
+    asyncio.run(go())
+
+
 def test_the_bridge_surface_keeps_its_slot_name_and_send_id_and_never_resends(tmp_path):
     async def go():
         gw, mgr = make(tmp_path)
@@ -244,5 +277,30 @@ def test_slot_stats_sum_credits_over_the_whole_transcript(tmp_path):
         st = mgr.slot_stats(info.slot)
         assert st["credits"] == 3.5 and st["turns"] == 3 and st["busy"] is False
         assert mgr.credits_by_key() == {"r1-PAY-1": 3.5}
+
+    asyncio.run(go())
+
+
+def test_a_session_row_shows_the_credits_its_requirement_total_adds_up(tmp_path):
+    """需求详情's 成本 and 会话 card (DETAIL 待确认): before a slot's whole transcript is read, a session the bridge sent
+    two turns to has one number, the same in its row and in the total (the row once said the first turn's 24.2 under
+    a total of 31.0)."""
+    async def go():
+        gw, mgr = make(tmp_path)
+        await mgr.adapter_create("run-pay-5-1", agent="brain-run", model="", memory_mode="incognito", title="RUN-PAY-5-1",
+                                 folder="RUN-PAY-5-1", parent="brain-run:RUN-PAY-5-1", key="RUN-PAY-5-1",
+                                 root_folder="Brain 运行机")
+        await mgr.adapter_send("run-pay-5-1", "接手合同", "V-1")
+        await mgr.adapter_send("run-pay-5-1", "D-3 的回答", "V-2")
+        turns = [i for i in mgr._infos.values() if i.slot == "run-pay-5-1" and i.conv_root != i.id]
+        turns[0].credits, turns[1].credits = 24.2, 6.8
+        root = mgr.by_slot("run-pay-5-1")
+        assert mgr.slot_stats("run-pay-5-1")["credits"] is None          # its whole transcript not read yet
+        assert mgr.slot_credits(root.slot) == 31.0 == mgr.credits_by_key()["RUN-PAY-5-1"]
+        assert [i.slot for i in mgr.roots(key="RUN-PAY-5-1")] == ["run-pay-5-1"]   # one row for the one session
+        assert mgr.slot_credits(None) is None and mgr.slot_credits("nobody") is None
+        # what the page gets (service._sessions_snapshot): the row's credits are the total's
+        snap = mod("service").Service._sessions_snapshot(SimpleNamespace(sessions=mgr))
+        assert [r["credits"] for r in snap["by"]["RUN-PAY-5-1"]] == [31.0] and snap["credits"]["RUN-PAY-5-1"] == 31.0
 
     asyncio.run(go())

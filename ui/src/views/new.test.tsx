@@ -70,7 +70,7 @@ describe('开需求', () => {
     expect(d01).toHaveTextContent('结算周报需求.docx')
     expect(within(d01).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['电话 2 处：已打码', '金额 4 处：原样保留'])
     // why a file was not taken is its own line under a 没收 chip (no 「没收：…不收」 chain)
-    expect(files.querySelector('[data-file="D04"] .nr-file-no')).toHaveTextContent(/^没收图片文件不收/)
+    expect(files.querySelector('[data-file="D04"] .nr-file-no')).toHaveTextContent(/^没收图片里的字读不出来：/)
     expect(files).not.toHaveTextContent('phone×2')                                      // no code labels, no Markdown
     expect(files).not.toHaveTextContent('**')
     const pkg = screen.getByTestId('check-summary')
@@ -156,8 +156,8 @@ describe('开需求', () => {
   })
 
   test('a check a gate stops says what to do on this page: the gate goes red, the field it names is marked, 开工 stays off', async () => {
-    const blocking = '第 2 关：这个仓库不收机密材料（D03 合作方接口说明.pdf 标着机密）。请产品写一份脱敏摘要再交，或者把这份写进「不收这些文件」'
-    const raw = '门 2：材料按机密处理（D03 合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。'
+    const blocking = '第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」'
+    const raw = '门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。'
     const { user } = setup({
       [`POST ${API}/intake/check`]: (): IntakeCheck => ({ ...fx.intakeCheck(), ok: false, classification: 'confidential', blocking: [blocking], blocking_raw: [raw] }),
     })
@@ -174,6 +174,22 @@ describe('开需求', () => {
     expect(screen.getByTestId('gate-2')).toHaveAttribute('data-state', 'bad')
     expect(screen.getByTestId('gate-1')).toHaveAttribute('data-state', 'ok')
     expect(flowStates()).toEqual(['done', 'bad', undefined, undefined, undefined])
+  })
+
+  test('gate 2 refusing the person\'s own pick points at the pick, not at 不收这些文件: no file is the cause', async () => {
+    const blocking = '第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要'
+    const raw = '门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。'
+    const { user } = setup({
+      [`POST ${API}/intake/check`]: (): IntakeCheck => ({ ...fx.intakeCheck(), ok: false, classification: 'confidential', blocking: [blocking], blocking_raw: [raw] }),
+    })
+    await fillBasics(user)
+    await fillGates(user)
+    await user.click(checkBtn())
+    const stops = await screen.findByTestId('blocking')
+    expect(stops).toHaveTextContent(blocking)
+    expect(stops).not.toHaveTextContent('不收这些文件')
+    expect(screen.getByLabelText(EXCLUDE).closest('.br-field')).not.toHaveAttribute('data-marked')
+    expect(screen.getByTestId('gate-2')).toHaveAttribute('data-state', 'bad')
   })
 
   test('gate 2 says up front that this repo takes no confidential material; picking it stops at once', async () => {
@@ -316,7 +332,7 @@ describe('开需求', () => {
   })
 
   test('KiroCrew cannot open the session (a ✗): 开工 is off and names the fix button; without a session it may start', async () => {
-    const bad: CheckRow = { level: 'FAIL', text: '没有 ~/.kiro/agents/brain-dev.json', todo: '点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的 hook 在 KiroCrew 里不会跑', fix: 'agent', repo: null, raw: '' }
+    const bad: CheckRow = { level: 'FAIL', text: 'KiroCrew 里还没有 brain-dev', todo: '点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的拦截在 KiroCrew 里不会跑', fix: 'agent', repo: null, raw: '没有 ~/.kiro/agents/brain-dev.json' }
     const crew = { ...fx.crew(), rows: [bad] }
     const status = calmStatus()
     status.crew = { ...status.crew, rows: [bad] }
@@ -336,13 +352,13 @@ describe('开需求', () => {
     const slow = new Promise<void>((r) => { answer = r })
     const { user, props } = setup({
       [`GET ${API}/crew`]: async () => { await slow; return fx.crew() },
-      [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了：~/.kiro/agents/brain-dev.json', rows: fx.crew().rows.map((r) => ({ ...r, level: 'OK' })) }),
+      [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '给 brain-dev 的设置补上了 Lean 的拦截：调用工具前。别的都没动；改之前的那份留作备份：brain-dev.json.bak-20261110-091500。新开的会话才会用上。', rows: fx.crew().rows.map((r) => ({ ...r, level: 'OK' })) }),
     }, fx.status())
     const card = screen.getByRole('region', { name: 'KiroCrew 的检查' })            // before /crew answered: no jump later
     for (const r of fx.status().crew.rows.filter((x) => x.level !== 'OK')) expect(card).toHaveTextContent(r.text)
     answer()
     expect(card).not.toHaveTextContent('KiroCrew 引擎：kas') // OK rows are not listed here
-    await user.click(within(card).getByRole('button', { name: '补上 Lean 的 hook' }))
+    await user.click(within(card).getByRole('button', { name: '补上 Lean 的拦截' }))
     await waitFor(() => expect(apiCalls.find((c) => c.path === `${API}/crew/fix`)?.body).toEqual({ what: 'agent' }))
     expect(await screen.findByText(CREW_OK)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'KiroCrew 的检查' })).toBeNull()
@@ -420,7 +436,7 @@ describe('开需求', () => {
     status.crew = { ...status.crew, rows: [fail, other] }
     const { user } = setup({
       [`GET ${API}/crew`]: () => ({ ...fx.crew(), rows: [fail, other] }),
-      [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了：~/.kiro/agents/brain-dev.json', rows: [{ ...fail, level: 'OK', text: 'brain-dev.json 的 Lean hook 都在', todo: '', fix: null }, other] }),
+      [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了：~/.kiro/agents/brain-dev.json', rows: [{ ...fail, level: 'OK', text: 'brain-dev.json 的 Lean 的拦截都在', todo: '', fix: null }, other] }),
     }, status)
     const card = await screen.findByRole('region', { name: 'KiroCrew 的检查' })
     expect(card).not.toHaveTextContent('lean-hook.py')                                  // shop-tools' row: not this requirement's

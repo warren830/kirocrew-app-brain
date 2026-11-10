@@ -41,7 +41,7 @@ from collections import deque
 from datetime import timedelta
 from typing import Any
 
-from .. import bk
+from .. import bk, problems
 from .crewadapter import KiroCrewAdapter
 
 REQ_RE = re.compile(r"^[a-z]+-[A-Za-z0-9-]{1,80}-[0-9a-f]{12}\.json$")
@@ -306,8 +306,10 @@ class TeamRuntime:
 
     def status(self) -> dict[str, Any]:
         sig = self.signer_view()
+        why = problems.team_start(self.error)   # the start error in words; as it was (file names, keys) for 细节
         return {"enabled": bool(self.team.get("enabled")), "ok": self.host is not None and not self.error,
-                "error": self.error, "last_loop_at": self.last_loop_at, "loop_error": self.loop_error,
+                "error": why["text"], "error_todo": why["todo"], "error_raw": why["raw"],
+                "last_loop_at": self.last_loop_at, "loop_error": self.loop_error,
                 "same_user": self.same_user,
                 "signer": {"pending": len(sig["pending"]), "refused": len(sig["refused"])}}
 

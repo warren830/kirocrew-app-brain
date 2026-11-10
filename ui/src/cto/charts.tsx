@@ -160,7 +160,7 @@ export function MiniPeople({ c }: { c: CtoNumbers }) {
               {v > 0 ? <BarEnd x={L} y={y0} w={Math.max(w, 1)} h={bh} fill={fill} /> : <rect x={L} y={y0} width={pw} height={bh} rx={4} fill="var(--cto-glass)" />}
               <text x={L + (v > 0 ? w : 0) + 8} y={y0 + bh / 2 + 4} className={r === 0 ? 'is-strong' : undefined}>{fmt(v)} 次</text>
               <Hit x={L - 4} y={y0 - 3} w={Math.max(w, pw * 0.3) + 8} h={bh + 6} onTip={onTip}
-                rows={[[fmt(v), point ? '判断点上（批准、驳回、回答）' : '判断点之外'], ...ks.map((k) => [fmt(k.n), k.label] as TipRow)]} />
+                rows={[[fmt(v), point ? '判断点上（批准、退回、回答）' : '判断点之外'], ...ks.map((k) => [fmt(k.n), k.label] as TipRow)]} />
             </g>
           )
         })

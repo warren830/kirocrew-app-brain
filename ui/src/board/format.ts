@@ -51,7 +51,7 @@ export const EVENT_META: Record<BoardEventKind, { icon: string; label: string; t
   request: { icon: '✋', label: '请求批准', tone: 'approve' },
   approve: { icon: '👍', label: '批准', tone: 'ok' },
   reject: { icon: '↩️', label: '退回', tone: 'bad' },
-  refused: { icon: '🚫', label: '口令没被接受', tone: 'warn' },
+  refused: { icon: '🚫', label: '批准的那一行没被接受', tone: 'warn' },
   blocked: { icon: '🛑', label: 'Lean 拦下', tone: 'warn' },
   commit: { icon: '📝', label: '提交', tone: 'info' },
   handover: { icon: '📨', label: '交接', tone: 'handoff' },
@@ -203,8 +203,33 @@ export function waitedOn(a: Pick<Actor, 'history'>, t: number): WaitWho | null {
   return h?.who ?? null
 }
 
+/** Whom a wait span of *a* was on: the requirement's wait now for one that goes on, its own history for one that is
+ * over (an older backend did not say: the wait now) — every wait in a lane said by the one rule (boardWho). */
+export function spanWho(a: Pick<Actor, 'status' | 'history'>, board: Pick<ReqBoard, 'row'>, s: { a: number; b: number | null }): WaitWho {
+  if (s.b === null && a.status === 'awaiting_approval') return board.row.waits.who
+  return waitedOn(a, s.a) ?? board.row.waits.who
+}
+
+/** The waits on someone other than the person looking that this board shows (a lane's wait span, a node or lane pill
+ * that waits), in the words they are said there: 「等产品」, 「等 carol」. */
+export function otherWaits(b: Pick<ReqBoard, 'row' | 'person' | 'actors'>): string[] {
+  const words = new Set<string>()
+  for (const a of b.actors) {
+    if (a.status === 'awaiting_approval' && !waitsOnMe(b)) words.add(boardWho(b))
+    for (const s of a.spans) {
+      const who = s.kind === 'wait' ? spanWho(a, b, s) : 'you'
+      if (who !== 'you') words.add(boardWho(b, who))
+    }
+  }
+  return [...words]
+}
+
 /** The ones a requirement may wait on that are people. */
 export const PERSON: ReadonlySet<WaitWho> = new Set<WaitWho>(['you', 'product', 'people', 'builder'])
+
+/** The board calls the requirement's owner 你 (the backend's person.you; an older backend: the owner looking, or no owner
+ * known). */
+export const ownerIsYou = (b: Pick<ReqBoard, 'person'>): boolean => b.person.you ?? (b.person.me || !b.person.owner)
 
 /** The board waits on the person looking at it. */
 export const waitsOnMe = (b: Pick<ReqBoard, 'row'>) => b.row.waits.who === 'you'
@@ -216,6 +241,14 @@ export function localOnly(b: Pick<ReqBoard, 'row' | 'actors' | 'direct'>): boole
   return b.direct || (runner.length > 0 && runner.every((a) => a.status === 'skipped'))
 }
 export const RUNNER_PART: ReadonlySet<string> = new Set(['handover', 'bridge', 'signer', 'runner'])
+
+/** The team runner's page of a requirement it has no working directory for yet (the bridge took it; the signer signs, or
+ * the runner prepares): nothing of its records is readable here, nor its branch (backend board.runner_blind). */
+export const runnerBlind = (b: Pick<ReqBoard, 'row'>): boolean =>
+  b.row.where === 'runner' && !b.row.worktree && !['claimed', 'merged', 'closed'].includes(b.row.state)
+
+/** The requirement's title when it has one of its own (one whose claim is not read yet is called by its key only). */
+export const titleOf = (r: Pick<ReqBoard['row'], 'key' | 'title'>): string => (r.title && r.title !== r.key ? r.title : '')
 
 /** *started*: the next stage is the one being worked on (「在做」), not one still to do; *stage_state* says the same in
  * LeanSummary's word, for vocab.leanProgress */

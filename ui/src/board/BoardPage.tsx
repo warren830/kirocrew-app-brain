@@ -19,7 +19,7 @@ import type { ReqBoard, WaitDo } from '../types'
 import { LoadState } from '../ui'
 import { QuestionCard } from '../views/Question'
 import type { ViewProps } from '../views/props'
-import { NotFound, ReqSwitch } from '../views/ReqSwitch'
+import { NotFound, OnRunner, ReqSwitch, useOnRunner } from '../views/ReqSwitch'
 import { Accept } from './Accept'
 import { ActorGraph, rosterRows, type FlashMap } from './ActorGraph'
 import { CheckWall } from './CheckWall'
@@ -34,7 +34,7 @@ import { openHere, reviewNext } from './next'
 import { Intro, Kpis, TopBar } from './Header'
 import { ClockContext, useReducedMotion, type SnapshotClock } from './hooks'
 import { Lanes } from './Lanes'
-import { SLOTS, edgesOf, foldedPhases, graphWidth, layoutGraph } from './layout'
+import { SLOTS, edgesOf, foldedPhases, graphShape, layoutGraph } from './layout'
 import { ReplayBar, useReplay } from './Replay'
 import { RoleIcon } from './RoleIcon'
 import { useBoard } from './useBoard'
@@ -103,6 +103,8 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
   const onDiff = useCallback((d: BoardDiff) => void (replaying.current || animate(d)), [animate])
   const live = useBoard(api, { repo: entry.repo, reqKey: entry.key, pollMs, onDiff })
   const gone = live.missing && !live.board
+  const onRunner = useOnRunner(entry.repo, entry.key, status, pollMs)
+  const pick = onSwitch ?? ((repo: string, key: string) => go({ kind: 'board', repo, key }))
   useEffect(() => {
     if (gone || live.board) onMissing?.(gone)
   }, [gone, !!live.board]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -134,7 +136,7 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
   }, [live.board]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // the live board's shape: a replay moves through the same picture; the graph's width is the app's (its text keeps
-  // its size: layout.ts graphWidth)
+  // its size: layout.ts graphShape, one column per phase when six do not fit)
   const shape = live.board
   const structure = shape ? structureKey(shape) : ''
   const [graphW, setGraphW] = useState<number | null>(null)
@@ -156,7 +158,8 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
     if (!shape) return null
     const fold = foldedPhases(shape.actors)
     const keys = shape.actors.map((a) => a.key).filter((k) => !fold.includes(SLOTS[k]?.phase ?? ''))
-    return layoutGraph(keys, edgesOf(new Set(keys), shape.direct), rosterRows(shape), fold, graphWidth(graphW, fold))
+    const g = graphShape(graphW, fold)
+    return layoutGraph(keys, edgesOf(new Set(keys), shape.direct, g.compact), rosterRows(shape), fold, g.width, g.compact)
   }, [structure, graphW]) // eslint-disable-line react-hooks/exhaustive-deps
   const liveClock: SnapshotClock = useMemo(() => ({ at: live.board?.at ?? Date.now() / 1000, receivedAt: live.receivedAt || Date.now() }), [live.board?.at, live.receivedAt])
   const clock = rp.clock ?? liveClock
@@ -176,9 +179,10 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
   // the crumb's first step and ← 返回 name the view it was opened from (the way back)
   const fromName = VIEW_NAME[entry.from ?? 'overview']
   const toBrain = () => go({ kind: 'brain', repo: entry.repo, reflect: entry.key })
-  // 开工 the requirement claimed already: 开需求 with its key (fixed there) and title; only its owner starts it
+  // 开工 the requirement claimed already: 开需求 with its key (fixed there) and title; only its owner starts it: the one
+  // the board calls 你 (an older backend did not say: the owner, or anyone while it is not known who is looking)
   const me = status?.repos.find((r) => r.id === entry.repo)?.me?.name ?? null
-  const startable = !!board && entry.repo !== 'runner' && (board.person.me || !board.person.owner || !me)
+  const startable = !!board && entry.repo !== 'runner' && (board.person.you ?? (board.person.me || !board.person.owner || !me))
   const toStart = () => go({ kind: 'new', repo: entry.repo, key: entry.key, ...(board?.row.title ? { title: board.row.title } : {}) })
   // a node that waits for the person: the session for what is said or approved there, the step strip for the rest (a
   // review is not said in the session that wrote the code: the strip has 开审查会话)
@@ -206,17 +210,18 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
           <nav className="kit-crumb kt-where" aria-label="位置" data-testid="kt-where">
             <button type="button" onClick={onBack ?? (() => go({ kind: 'overview' }))}>{fromName}</button>
             <span aria-hidden="true">›</span>
-            <button type="button" onClick={toDetail} title="需求详情">{entry.key}</button>
+            {/* a key the repo does not have has no 需求详情 to go to: said, not linked */}
+            {gone ? <span data-testid="kt-where-key">{entry.key}</span> : <button type="button" onClick={toDetail} title="需求详情">{entry.key}</button>}
             <span aria-hidden="true">›</span>
             <b>需求看板{focus && board ? ` · ${board.actors.find((a) => a.key === focus)?.title ?? ''}` : ''}{rp.on ? ' · 回放' : ''}</b>
           </nav>
           <span className="cto-grow" />
-          {!rp.on && <ReqSwitch repo={entry.repo} reqKey={entry.key} status={status} pollMs={pollMs}
-            onPick={onSwitch ?? ((repo, key) => go({ kind: 'board', repo, key }))} />}
+          {!rp.on && <ReqSwitch repo={entry.repo} reqKey={entry.key} status={status} pollMs={pollMs} onPick={pick} />}
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{fromName}</button>}
         </div>
+        {onRunner && !rp.on && <OnRunner reqKey={entry.key} what="需求看板" onOpen={() => pick('runner', entry.key)} />}
         {live.missing && !board
-          ? <NotFound repoName={status?.repos.find((r) => r.id === entry.repo)?.name ?? (entry.repo === 'runner' ? '运行机' : null)} reqKey={entry.key}
+          ? !onRunner && <NotFound repoName={status?.repos.find((r) => r.id === entry.repo)?.name ?? (entry.repo === 'runner' ? '运行机' : null)} reqKey={entry.key}
               backName={onBack ? fromName : VIEW_NAME.overview} onBack={onBack ?? (() => go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) }))}
               testId="br-board-missing" />
           : <LoadState loading={live.loading} error={live.error} has={!!board} />}

@@ -25,13 +25,14 @@
         "n": 9
       }
     },
-    "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+    "stage": "做完 4 · 跳过 4 · 在做：代码生成",
     "waits": {
       "who": "you",
       "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
       "line": "approve PLAN 5d1e7a90",
       "raw": "",
       "do": "approve",
+      "todo": "",
       "since": 1794146040.0,
       "where": "session",
       "review": false
@@ -52,7 +53,8 @@
       "src/export/csv.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-3-7f3a"
+    "session_url": "/chat?sid=brain-PAY-3-7f3a",
+    "home": null
   },
   "where_label": "本机的工作目录",
   "run": {
@@ -268,7 +270,8 @@
         "P-PAY-2-1"
       ],
       "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L8"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L8",
+      "asked": []
     },
     {
       "id": "D-2",
@@ -283,7 +286,8 @@
         "T-12"
       ],
       "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L9"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L9",
+      "asked": []
     },
     {
       "id": "D-3",
@@ -297,7 +301,8 @@
       "vouchers": [
         "V-1a2b3c4d5e"
       ],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L10"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L10",
+      "asked": []
     },
     {
       "id": "D-4",
@@ -309,7 +314,8 @@
       "by": "unclassified",
       "cites": [],
       "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L11"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L11",
+      "asked": []
     }
   ],
   "questions": [
@@ -425,7 +431,7 @@
         "kind": "commit",
         "label": "提交（只改记录）",
         "detail": "e7e3cc104242",
-        "who": "G-3F2A1C",
+        "who": "owner",
         "src": null
       },
       {
@@ -433,7 +439,7 @@
         "kind": "human",
         "label": "批准需求",
         "detail": null,
-        "who": "P-1A2B",
+        "who": "owner",
         "src": null
       },
       {
@@ -465,7 +471,7 @@
         "kind": "human",
         "label": "批准设计",
         "detail": null,
-        "who": "P-1A2B",
+        "who": "owner",
         "src": null
       },
       {
@@ -537,7 +543,7 @@
         "kind": "human",
         "label": "批准代码生成计划",
         "detail": null,
-        "who": "P-1A2B",
+        "who": "owner",
         "src": null
       },
       {
@@ -545,7 +551,7 @@
         "kind": "commit",
         "label": "提交",
         "detail": "93b2dea57790",
-        "who": "G-3F2A1C",
+        "who": "owner",
         "src": null
       },
       {
@@ -553,7 +559,7 @@
         "kind": "commit",
         "label": "提交",
         "detail": "193239b77a5f",
-        "who": "G-3F2A1C",
+        "who": "owner",
         "src": null
       },
       {
@@ -577,7 +583,7 @@
         "kind": "commit",
         "label": "提交（只改记录）",
         "detail": "61ddbc3019ed",
-        "who": "G-3F2A1C",
+        "who": "owner",
         "src": null
       },
       {

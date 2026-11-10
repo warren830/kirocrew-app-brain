@@ -3,7 +3,7 @@ merged; overlaps; the approval line is shown, never sent."""
 
 import json
 
-from brainfix import (install_brain_dev, lean, make_project, make_service, needs_brainkit, request_requirements, run,
+from brainfix import (filled_notes, install_brain_dev, lean, make_project, make_service, needs_brainkit, request_requirements, run,
                       sh, start_in_worktree, brain)
 
 pytestmark = needs_brainkit
@@ -40,7 +40,7 @@ def test_every_requirement_shows_where_it_is_and_what_it_waits_on(tmp_path, home
     assert one["waits"]["who"] == "you" and one["waits"]["line"] == line and line.startswith("approve REQUIREMENTS ")
     assert one["lean"]["stage"] == "requirements" and one["lean"]["stage_label"] == "需求分析" and one["lean"]["total"] == 11
     assert one["lean"]["stage_n"] == 2 and one["lean"]["stage_state"] == "started"
-    assert one["stage"] == "做完 0 · 跳过 1 · 下一步：需求分析" and one["lean"]["next"]["label"] == "需求分析"
+    assert one["stage"] == "做完 0 · 跳过 1 · 在做：需求分析" and one["lean"]["next"]["label"] == "需求分析"
     assert (one["waits"]["do"], one["waits"]["where"]) == ("approve", "session") and one["waits"]["since"]
     assert rows["PAY-2"]["state"] == "local" and rows["PAY-2"]["waits"]["line"] is None
     assert rows["PAY-3"]["state"] == "claimed" and rows["PAY-3"]["title"] == "只认领"
@@ -62,7 +62,7 @@ def test_a_handed_over_run_and_a_merged_one(tmp_path, home):
     wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "refund", "refund", "退款")
     intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
     state = wt / "aidlc-docs" / intent / "aidlc-state.md"
-    state.write_text(state.read_text().replace("Status: Inception: starting", "Status: Construction step 2 of 4"))
+    state.write_text(filled_notes(state.read_text(), "Status: Construction step 2 of 4"))
     sh("git", "-C", wt, "commit", "-qam", "notes")
     brain(wt, "handoff", "--no-push")
     wt2 = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "done", "done", "做完了")
@@ -158,3 +158,104 @@ def test_lean_approval_by_inception_answers_the_requirements_request(tmp_path, h
 
 def test_unused_imports_are_fine():
     assert lean and install_brain_dev
+
+
+def test_team_mode_lists_each_requirement_once_the_runners_facts_winning(tmp_path, home):
+    """Team mode: a requirement handed over is listed once, as the runner's; one the runner has only is the runner's;
+    a merge by both counts stays its repo's (the merge, the 14 days and the write-back are read there); 待办 too."""
+    from types import SimpleNamespace
+    repo = make_project(tmp_path, kit={"gitlab": {"base": "https://gitlab.example.com", "project": "shop/pay"}})
+    wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "refund", "refund", "退款")
+    intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
+    state = wt / "aidlc-docs" / intent / "aidlc-state.md"
+    state.write_text(filled_notes(state.read_text(), "Status: Construction step 2 of 4"))
+    sh("git", "-C", wt, "commit", "-qam", "notes")
+    brain(wt, "handoff", "--no-push")
+    wt2 = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "done", "done", "做完了")
+    sh("git", "-C", repo, "merge", "-q", "--no-ff", "-m", "merge PAY-2", "ai/alice/PAY-2-done")
+    sh("git", "-C", repo, "worktree", "remove", "--force", wt2)
+    start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "local", "local", "本地")
+    svc = make_service(tmp_path, [repo])
+    deliveries = __import__("appkit").mod("deliveries")
+
+    def runner_row(key, state, text, project="shop/pay"):
+        row = deliveries.base_row("runner", {"key": key, "where": "runner"})
+        row.update(where="runner", state=state, state_label=deliveries.STATE_LABEL[state],
+                   waits=deliveries.waits("product" if state == "parked" else "nobody", "none", text))
+        return row, {"key": key, "project": project, "decisions_text": None}, []
+
+    async def go():
+        await svc.start()
+        try:
+            svc.team = SimpleNamespace(host=object())
+            svc._team_rows = lambda snap: [runner_row("PAY-1", "parked", "等产品在 MR 上回答 D-1"),
+                                           runner_row("PAY-2", "merged", "MR 已合并，运行结束"),
+                                           runner_row("PAY-3", "running", "运行机在跑"),
+                                           runner_row("PAY-9", "running", "运行机在跑"),
+                                           runner_row("WEB-1", "running", "运行机在跑", project="shop/web")]
+            return await svc.overview("all"), await svc.overview("r1"), await svc.overview("runner"), await svc.todo()
+        finally:
+            svc.team = None
+            await svc.stop()
+
+    every, r1, runner, todo = run(go())
+    ids = sorted((r["repo"], r["key"]) for r in every["rows"])
+    # PAY-1 handed over: the runner's; PAY-2 merged by both: r1's; PAY-3 never handed over here: r1's; PAY-9 the runner's
+    assert ids == [("r1", "PAY-2"), ("r1", "PAY-3"), ("runner", "PAY-1"), ("runner", "PAY-9"), ("runner", "WEB-1")], ids
+    # r1's view has what the runner does for r1's project (shop/pay), each row saying its repo; a project this machine
+    # does not list (shop/web) is in 全部 and the runner's view only
+    assert sorted((r["repo"], r["key"]) for r in r1["rows"]) == [("r1", "PAY-2"), ("r1", "PAY-3"), ("runner", "PAY-1"),
+                                                                 ("runner", "PAY-9")]
+    assert {r["key"]: r["home"] for r in every["rows"]} == {"PAY-1": "r1", "PAY-2": None, "PAY-3": None, "PAY-9": "r1",
+                                                            "WEB-1": None}
+    assert next(r for r in r1["rows"] if r["key"] == "PAY-1")["state"] == "parked"
+    assert sorted(r["key"] for r in runner["rows"]) == ["PAY-1", "PAY-9", "WEB-1"]
+    assert sum(every["counts"].values()) == len(every["rows"]) == len(r1["rows"]) + 1
+    assert next(r for r in every["rows"] if r["key"] == "PAY-1")["state"] == "parked"
+    assert not any(i["key"] == "PAY-1" and i["repo"] == "r1" for i in todo["items"]), todo["items"]
+
+
+def test_the_numbers_say_they_are_being_worked_out_until_evaluate_is_done(tmp_path, home):
+    """Overview 待确认-2: while brainkit.evaluate computes a repo's numbers the page is told so (正在算), then not."""
+    import asyncio
+    repo = make_project(tmp_path)
+    svc = make_service(tmp_path, [repo])
+
+    async def go():
+        await svc.start()
+        try:
+            first = await svc.overview("r1")
+            for _ in range(300):
+                later = await svc.overview("r1")
+                if not later["eval"].get("computing"):
+                    return first, later
+                await asyncio.sleep(0.1)
+            return first, later
+        finally:
+            await svc.stop()
+
+    first, later = run(go())
+    assert first["eval"]["computing"] is True and first["eval"]["available"] is False
+    assert later["eval"]["computing"] is False
+
+
+def test_a_repo_that_cannot_be_read_is_said_in_words_with_the_original_under_details(tmp_path, home):
+    """Overview 待确认-1: an exception while reading a repo's requirements is not shown; the banner says what to do."""
+    repo = make_project(tmp_path)
+    svc = make_service(tmp_path, [repo])
+
+    async def go():
+        await svc.start()
+        try:
+            def broken(*a, **k):
+                raise OSError("[Errno 13] Permission denied: '.git/refs/heads/claim'")
+            svc.repos["r1"].scan = broken
+            return await svc.overview("all")
+        finally:
+            await svc.stop()
+
+    view = run(go())
+    (e,) = view["errors"]
+    assert e["error"] == "读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对"
+    assert e["raw"].startswith("[Errno 13] Permission denied")
+    assert (e["name"], e["path"]) == (repo.name, str(repo.resolve()))

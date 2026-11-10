@@ -19,8 +19,8 @@ import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, useAction, usePoll } from '../api'
 import { RoleIcon } from '../board/RoleIcon'
 import { HOW, HOW_LABEL, HOW_VAR, MiniCredits, MiniPeople, MiniUnattended, MiniWho, WHO_VAR, WeeklyChart, fmt, slash } from '../cto/charts'
-import { COL_NAME, Flow, LANE_NAME, StepButton, colOf, laneOf, stepOf, waitedText, type Col, type Lane } from '../cto/Flow'
-import { ago, fmtCredits } from '../format'
+import { COL_NAME, Flow, LANE_NAME, StepButton, colOf, homeOf, laneOf, stepOf, waitedText, type Col, type Lane } from '../cto/Flow'
+import { ago, fmtCredits, spaced } from '../format'
 import type { OverviewEntry, View } from '../nav'
 import type { CtoNumbers, CtoRun, EvalMetric, EvalView, Funnel, Overview, RefreshResult, ReqState, RepoInfo, Requirement } from '../types'
 import { STATE_LABEL } from '../types'
@@ -126,6 +126,7 @@ export const OV_CSS = `
   .br-ov .cto-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .br-ov .br-ledger { font-size: 13px; }
   .br-ov .br-ledger th, .br-ov .br-ledger td { padding: 8px 6px; }
+  .br-ov .br-ledger .br-acts { flex-direction: column; align-items: stretch; }
 }
 @container brov (max-width: 900px) {
   .br-ov .br-kanban { grid-template-columns: minmax(0, 1fr) !important; }
@@ -140,21 +141,17 @@ type LedgerPick = { id: string; label: string; keep: (r: Requirement, run: CtoRu
 type RepoCount = { open: number; you: number }
 
 const isOpen = (r: Requirement) => r.state !== 'merged' && r.state !== 'closed'
+/** the runner's rows of projects this machine does not list: no repo pill holds them, so one more pill does */
+const ELSEWHERE: LedgerPick = { id: 'elsewhere', label: '没导入的项目', keep: (r) => homeOf(r) === 'runner' }
 const idOf = (r: { repo: string; key: string }) => `${r.repo}/${r.key}`
 
-/** What the backend's EvalView carries beyond this branch's types.ts (the backend fixer's, optional): computing while
- * brain-kit works the numbers out, each note with 做什么 and its own words, a skipped run's own words. Without them the
- * old words stand. */
-type EvalMore = Omit<EvalView, 'skipped'> & { computing?: boolean; note_rows?: { text: string; todo: string; raw: string }[]; skipped: { key: string; why: string; raw?: string }[] }
-const more = (ev: EvalView): EvalMore => ev
-const isComputing = (ev: EvalView): boolean => more(ev).computing === true
-
 /** A repo pill's counts: its requirements in progress, and those that wait on you (a merge to write back into the
- * Brain too, as 轮到你 lists them); 'all' among *ids*: every row. */
+ * Brain too, as 轮到你 lists them), a row on the runner under its repo (homeOf; 'runner': a project not listed here);
+ * 'all' among *ids*: every row. */
 function repoCounts(rows: Requirement[], ids: string[]): Record<string, RepoCount> {
   const counts: Record<string, RepoCount> = Object.fromEntries(ids.map((id) => [id, { open: 0, you: 0 }]))
   for (const r of rows) {
-    for (const id of ids.includes('all') ? [r.repo, 'all'] : [r.repo]) {
+    for (const id of ids.includes('all') ? [homeOf(r), 'all'] : [homeOf(r)]) {
       const c = (counts[id] ??= { open: 0, you: 0 })
       if (isOpen(r)) c.open += 1
       if (r.waits.who === 'you' && r.state !== 'closed') c.you += 1
@@ -227,9 +224,15 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
     if (r) go({ kind: 'item', repo: r, key, from: 'overview', decision: id })
   }
   const repoName = (id: string) => repos.find((x) => x.id === id)?.name
+  const elsewhere = pillCounts.runner
   const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
+  // opened at a repo the app cannot read (an old link: brain-kit not installed there, not listed any more): its way in
+  // is 导入仓库 (or its brain-kit on the way: PendingRepo's banner), not 开需求
+  const picked = repo !== 'all' ? repos.find((r) => r.id === repo) : undefined
+  const unreadable = !!status && repo !== 'all' && !noKit && (!picked || !picked.ok)
+  const readable = scope.filter((r) => r.ok)
   // nothing here can be handed over: no origin to push to, or no GitLab for the bridge (the backend's local_only rule)
-  const localOnly = scope.length > 0 && scope.every((r) => r.remote === false || !(r.kit?.gitlab_base && r.kit?.gitlab_project))
+  const localOnly = readable.length > 0 && readable.every((r) => r.remote === false || !(r.kit?.gitlab_base && r.kit?.gitlab_project))
   const manyRepos = repo === 'all' && repos.length > 1
   const team = !!status && (status.app.team || status.team.enabled)
   const newReq = () => go({ kind: 'new', ...(repo !== 'all' ? { repo } : {}) })
@@ -242,7 +245,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
     )
   }
   const c = data?.cto
-  const computing = !!data && !data.cto.available && isComputing(data.eval)
+  const computing = !!data && !data.cto.available && !!data.eval.computing
   const empty = !!data && data.rows.length === 0
   const credits = (data?.rows ?? []).filter((r) => r.credits !== null && r.credits > 0).map((r) => ({ key: r.key, credits: r.credits as number }))
   const yours = (data?.rows ?? []).filter((r) => r.waits.who === 'you' && r.state !== 'closed')
@@ -254,26 +257,28 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
       <header className="cto-top">
         {localOnly && <span className="cto-tag" data-testid="ov-local-tag" title="没有远端：需求只在这台机器上做，不交给运行机">只在本机</span>}
         {team && <span className="cto-tag is-real" title="交给运行机的需求由团队的运行机接手">团队模式</span>}
-        <span className="cto-org">{noKit ? `${repos.length} 个仓库 · 现在一个都读不了`
+        <span className="cto-org">{noKit ? `${repos.length} 个仓库 · 现在一个都读不了` : unreadable ? (picked ? `${picked.name} 还读不了` : '这个仓库不在列表里')
           : [status ? `${scope.length} 个仓库` : '', data ? `${data.rows.length} 个需求` : '…'].filter(Boolean).join(' · ')}</span>
         <span className="cto-grow" />
-        <RefreshButton repos={scope.filter((r) => r.remote !== false)} onDone={ov.reload} />
+        <RefreshButton repos={readable.filter((r) => r.remote !== false)} onDone={ov.reload} />
       </header>
       {repos.filter((r) => r.pending && (repo === 'all' || r.id === repo)).map((r) => (
         <PendingRepo key={r.id} repo={r} banner onOpen={() => go({ kind: 'import', path: r.path })} onDone={reloadStatus} />
       ))}
       <LoadState loading={ov.loading} error={ov.error} has={!!data} />
-      {!noKit && data?.errors.map((e) => {
+      {!noKit && data?.errors.filter((e) => !(unreadable && e.repo === repo)).map((e) => {
         const r = repos.find((x) => x.id === e.repo)
-        // the backend's words when it said them; an error it passed on as it came (a scan that threw) is folded
+        // the backend's words when it said them; an error it passed on as it came (a scan that threw) is folded. Its
+        // name and path are the backend's too, for when /status could not be read
         const plain = /[\u3400-\u9fff]/.test(e.error)
+        const path = r?.path ?? e.path
         return (
           <div key={e.repo} className="br-banner" role="status" data-testid="repo-error">
             <div className="br-row">
-              <span><b className="br-strong">{r?.name ?? e.repo}：</b>{plain ? e.error : '这次没读出来'}</span>
+              <span><b className="br-strong">{r?.name ?? e.name ?? '这个仓库'}：</b>{plain ? e.error : '这次没读出来'}</span>
               {!plain && <span className="br-dim">做什么：看看这个仓库的目录还在不在、能不能读，再去导入仓库检查它</span>}
-              {r && <button type="button" className="br-btn is-small" onClick={() => go({ kind: 'import', path: r.path })}>去导入仓库</button>}
-              {!plain && <details className="br-raw"><summary>细节</summary><pre>{e.error}</pre></details>}
+              {path && <button type="button" className="br-btn is-small" onClick={() => go({ kind: 'import', path })}>去导入仓库</button>}
+              {(plain ? e.raw : e.error) && <details className="br-raw"><summary>细节</summary><pre>{plain ? e.raw : e.error}</pre></details>}
             </div>
           </div>
         )
@@ -284,7 +289,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
           <h2>{c.sentence}</h2>
           <p>
             {c.available
-              ? `数字来自 brain-kit 的评估（读的是${c.ref || '默认分支'}）和这个 app 开的会话`
+              ? `数字来自 brain-kit 的评估（${spaced('读的是', c.ref || '默认分支')}）和这个 app 开的会话`
               : computing ? 'brain-kit 正在算评估的数字，算好就出来：下面先看 credits 和合并' : 'brain-kit 的评估还没给出数字：下面先看 credits 和合并'}
             {' · '}口径见末尾
             {!c.available && status?.brainkit.modules.evaluate === false && (
@@ -307,13 +312,23 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
               </button>
             )
           })}
+          {elsewhere && elsewhere.open + elsewhere.you > 0 && (
+            <button type="button" aria-pressed={pick?.id === ELSEWHERE.id} data-testid="pill-elsewhere" title="运行机在做的、这台机器没导入的项目：点一下在全部的交付清单里看它们"
+              onClick={() => { if (repo !== 'all') pickRepo('all'); filterTo(ELSEWHERE) }}>
+              <b>{ELSEWHERE.label}</b>
+              <span>进行中 {elsewhere.open}{elsewhere.you > 0 && <span className="is-you"> · 轮到你 {elsewhere.you}</span>}</span>
+            </button>
+          )}
         </nav>
       )}
 
       {empty && noKit && (
         <section className="cto-card" data-testid="ov-nokit"><p className="cto-was">brain-kit 读不到，这里的需求和数字要等它能读了才有：照最上面那条提示修。</p></section>
       )}
-      {empty && !noKit && (
+      {data && unreadable && !picked?.pending && (
+        <Unreadable repo={picked} error={data.errors.find((e) => e.repo === repo)} onImport={(path) => go({ kind: 'import', ...(path ? { path } : {}) })} onAll={() => pickRepo('all')} />
+      )}
+      {empty && !noKit && !unreadable && (
         <EmptyHero title="还没有需求" text={[`${where}还没有需求。认领一个需求，交它的文档过五关，开工：它会在这里一路走到合并——在哪一步、等谁、花了多少。`]}
           punch="人只在判断点上出手：批准、回答、验收。"
           flow={localOnly
@@ -349,7 +364,8 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
                 </>
               )}
             </article>
-            <FunnelCard f={data.funnel} team={team} steppedIn={c.stepped_in ? c.stepped_in.at_points + c.stepped_in.outside : null} onDecision={openDecision} />
+            <FunnelCard f={data.funnel} team={team} steppedIn={c.stepped_in ? c.stepped_in.at_points + c.stepped_in.outside : null} onDecision={openDecision}
+              computing={!!data.eval.computing && data.funnel.source !== 'evaluate'} />
           </section>
 
           <WeeklyChart weeks={c.weekly} onWeek={(w) => filterTo({ id: `week:${w}`, label: `${slash(w)} 起的一周合并的`, keep: (r, run) => weekOf(r, run) === w })} />
@@ -379,7 +395,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
                     </td></tr>
                   )}
                   {rows.slice(0, limit).map((r) => (
-                    <Row key={idOf(r)} r={r} at={data.at} run={runsBy.get(idOf(r))} ev={data.eval} repoName={manyRepos ? repoName(r.repo) : undefined}
+                    <Row key={idOf(r)} r={r} at={data.at} run={runsBy.get(idOf(r))} ev={data.eval} repoName={manyRepos ? repoName(homeOf(r)) : undefined}
                       onOpen={() => toBoard(r)} onItem={() => toItem(r)} onReplay={() => toBoard(r, true)} onGo={go} />
                   ))}
                 </tbody>
@@ -397,7 +413,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
           <summary>口径</summary>
           <ul>
             <li>无人值守：brain-kit 评估里的「自主度」。交给运行机以后，除了必经的审批（需求、设计、计划、发布、验收），没有人做过任何事，而且交付正确（一次通过验收，合并后 14 天没有回滚、热修或缺陷）；14 天没满的、还没合并的算「还没评」，不算进分母。只在本机做的需求不交给运行机，也不算进分母。</li>
-            <li>人介入：人在判断点上的动作是 Lean 的审批口令（批准、驳回、没被接受的口令）和等人回答的问题；交接后又推了代码、允许改验收测试、平台上的手动操作，都算判断点之外。本机做的和交给运行机的需求都算。</li>
+            <li>人介入：人在判断点上的动作是 Lean 的审批（批准、退回，打了批准那一行却没被接受的也算）和等人回答的问题；交接后又推了代码、允许改验收测试、平台上的手动操作，都算判断点之外。本机做的和交给运行机的需求都算。</li>
             <li>每个需求的 credits：这个 app 给需求开的 Kiro Crew 会话报的 credits 合计 ÷ 有 credits 的需求数。KiroCrew 只报 credits，没有别的用量数。</li>
             <li>决定 · 谁定的：<WhoSyntax />。每个决定只算一次，写了别的就算「没归类」，列出在哪一行，不猜是谁。还在分支上、没合并的需求也算；评估里的「知识有用率」只看默认分支上的引用，所以两个数的范围不一样。</li>
             <li>每周合并：合并进默认分支的那一周（周一起）；交付方式同上，没评估过的合并算「还没评」。</li>
@@ -406,6 +422,25 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
         </details>
       )}
     </main>
+  )
+}
+
+/** The page opened at a repo the app cannot read: why, in the backend's words when it said them (else /status's), with
+ * the way in, 导入仓库 for that path; one not listed any more says so. Its own words (a scan that threw) under 细节. */
+function Unreadable({ repo, error, onImport, onAll }: {
+  repo?: RepoInfo; error?: Overview['errors'][number]; onImport: (path?: string) => void; onAll: () => void
+}) {
+  const said = error?.error || repo?.error || ''
+  const plain = /[\u3400-\u9fff]/.test(said)
+  const raw = plain ? error?.raw : said
+  return (
+    <EmptyHero testid="ov-unreadable" title={repo ? `${repo.name} 还读不了` : '这个仓库不在列表里'}
+      text={[repo ? (plain ? said : '这次没读出来：看看这个仓库的目录还在不在、能不能读，再去导入仓库检查它') : '这个链接里的仓库已经不在这台机器的仓库列表里了：要看它就去导入仓库把它加回来。']}
+      punch="能读了，它的需求、数字和交付清单就都在这里。">
+      <button type="button" className="br-btn is-primary is-big" onClick={() => onImport(repo?.path)}><RoleIcon role="import" size={17} />去导入仓库</button>
+      <button type="button" className="br-btn" onClick={onAll}>看全部</button>
+      {raw && <details className="br-raw"><summary>细节</summary><pre>{raw}</pre></details>}
+    </EmptyHero>
   )
 }
 
@@ -454,7 +489,7 @@ function YourTurn({ rows, at, repoName, onGo, onOpen, onAll }: {
         {rows.slice(0, SHOWN).map((r) => {
           const step = stepOf(r)
           const waited = waitedText(r, at)
-          const name = repoName(r.repo)
+          const name = repoName(homeOf(r))
           return (
             <li key={idOf(r)} data-key={r.key}>
               {step && <StepButton step={step} onGo={onGo} />}
@@ -553,12 +588,12 @@ function PeopleCard({ c, computing, onPick }: { c: CtoNumbers; computing: boolea
       {!s ? (
         <NotYet testid="ov-people" computing={computing} why="brain-kit 的评估给出数字以后才有" />
       ) : n === 0 ? (
-        <NotYet testid="ov-people" why="人在判断点上批准、驳回、回答以后才有" />
+        <NotYet testid="ov-people" why="人在判断点上批准、退回、回答以后才有" />
       ) : (
         <>
           <button type="button" className="cto-value cto-link-value" data-testid="ov-people" title="在交付清单里看人介入过的需求"
             onClick={() => onPick({ id: 'people', label: '人介入过的需求', keep: (_r, run) => !!run && run.at_points + run.outside > 0 })}>{n}<span className="cto-of">次</span></button>
-          <div className="cto-desc">{s.at_points} 次落在判断点上（批准、驳回、回答），{s.outside} 次在判断点之外 · 本机做的也算</div>
+          <div className="cto-desc">{s.at_points} 次落在判断点上（批准、退回、回答），{s.outside} 次在判断点之外 · 本机做的也算</div>
           <MiniPeople c={c} />
           {s.outside > 0 && (
             <div className="cto-foot"><span className="br-warn-text">判断点之外：{s.kinds.filter((k) => !k.point).map((k) => `${k.label} ${k.n}`).join('、')}</span></div>
@@ -569,16 +604,17 @@ function PeopleCard({ c, computing, onPick }: { c: CtoNumbers; computing: boolea
   )
 }
 
-/** *steppedIn*: 人介入's count, beside which 人定了 N 个 counts something else (said when the two differ). */
-function FunnelCard({ f, team, steppedIn, onDecision }: { f: Funnel; team: boolean; steppedIn: number | null; onDecision: (key: string, id: string) => void }) {
+/** *steppedIn*: 人介入's count, beside which 人定了 N 个 counts something else (said when the two differ). *computing*: the
+ * app's own count stands in while brain-kit evaluates, and brain-kit's comes out different: 正在算, not a number that jumps. */
+function FunnelCard({ f, team, steppedIn, onDecision, computing }: { f: Funnel; team: boolean; steppedIn: number | null; onDecision: (key: string, id: string) => void; computing: boolean }) {
   const people = f.rows.find((r) => r.id === 'person')?.count ?? 0
   // the app's words for who decided (需求详情's decisions say the same), not brain-kit's labels with agent / Who in them
   const rows = f.rows.map((r) => ({ ...r, label: DECIDED_BY[r.id] ?? r.label }))
   return (
     <article className={`cto-card${f.unclassified.length ? ' is-warn' : ''}`} aria-label="决定 · 谁定的" data-testid="funnel-card">
       <div className="cto-eyebrow">决定 · 谁定的</div>
-      {f.total === 0 ? (
-        <NotYet testid="funnel-total" why="需求的决定表里有了决定以后才有" />
+      {computing || f.total === 0 ? (
+        <NotYet testid="funnel-total" computing={computing} why="需求的决定表里有了决定以后才有" />
       ) : (
         <>
           <div className="cto-value" data-testid="funnel-total">{f.total}<span className="cto-of">个决定</span></div>
@@ -588,7 +624,7 @@ function FunnelCard({ f, team, steppedIn, onDecision }: { f: Funnel; team: boole
             {rows.filter((r) => r.count > 0).map((r) => <span key={r.id} data-row={r.id}><i className="cto-sw" style={{ background: WHO_VAR[r.id] ?? 'var(--ov-ink-3)' }} />{r.label}<b>{r.count}</b></span>)}
           </div>
           {steppedIn !== null && steppedIn > 0 && steppedIn !== people && (
-            <div className="cto-was br-funnel-vs" data-testid="funnel-vs-people">人定的 {people} 个是决定表里的条数；「人介入 {steppedIn} 次」数的是人做的动作（批准、驳回、回答），所以两个数不一样</div>
+            <div className="cto-was br-funnel-vs" data-testid="funnel-vs-people">人定的 {people} 个是决定表里的条数；「人介入 {steppedIn} 次」数的是人做的动作（批准、退回、回答），所以两个数不一样</div>
           )}
         </>
       )}
@@ -741,7 +777,7 @@ function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
 const METRIC_SHORT: Record<string, string> = {
   autonomy: '交接以后没人插手、交付也正确的',
   delivery: '一次过验收、合并后 14 天没出问题的',
-  judgment: '人做的事里，落在批准、驳回、回答上的',
+  judgment: '人做的事里，落在批准、退回、回答上的',
   repeat_rate: '同一个纠正又出现的（越低越好）',
   useful: 'Brain 条目里被引用过的（只看默认分支）',
   staleness: '过时的引用、同名术语、覆盖或撤回的',
@@ -752,7 +788,7 @@ const METRIC_SHORT: Record<string, string> = {
 const METRIC_RULE: Record<string, string> = {
   autonomy: '交接以后，除了必经的审批（需求、设计、计划、发布审批和验收），没有人做过任何事，而且交付正确',
   delivery: '一次通过验收，合并后 14 天内没有回滚、修复提交，也没有新认领的缺陷',
-  judgment: '判断点是 Lean 的审批口令和等人回答的问题（本机会话里的、MR 上的）',
+  judgment: '判断点是 Lean 的审批（批准、退回）和等人回答的问题（本机会话里的、MR 上的）',
   repeat_rate: '同一条纠正又被提出的次数 ÷ 全部纠正（越低越好）',
   useful: '被引用过的 Brain 条目 ÷ 现有的条目',
   staleness: '过时的引用 + 同名的术语 + 这一期被覆盖或撤回的条目',
@@ -771,16 +807,16 @@ function metricValue(v: EvalMetric['value']): string | null {
 function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
   ev: EvalView; noModule: boolean; onBoard: (k: string) => void; onItem: (k: string) => void; onSettings: () => void
 }) {
-  const computing = !ev.available && isComputing(ev)
+  const computing = !ev.available && !!ev.computing
   const missing = !computing && (noModule || !ev.error)
-  const notes = more(ev).note_rows
+  const notes = ev.note_rows
   // brain-kit's own words; a backend older than EvalView.raw put them in the error of a missing module
   const folded = ev.raw ?? (missing ? ev.error : '')
   return (
     <section className="cto-card br-eval" aria-label="brain-kit 的评估" data-testid="eval-batch">
       <div className="cto-chart-head">
         <h3>brain-kit 的评估</h3>
-        <span className="cto-dim">{ev.available ? `这一批：${ev.ref || '默认分支'}上已经有记录的需求 · 不跟着交付清单的筛选变` : ''}</span>
+        <span className="cto-dim">{ev.available ? `这一批：${spaced(ev.ref || '默认分支', '上已经有记录的需求')} · 不跟着交付清单的筛选变` : ''}</span>
       </div>
       {!ev.available ? (
         <div className="br-note" style={{ marginTop: 6 }}>
@@ -813,9 +849,10 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
                   <span className="kt-pill tone-warn">要复看</span>
                   <button type="button" className="br-link br-key" onClick={() => onBoard(q.key)}>{q.key} ↗</button>
                   <span>{q.reasons.join('；')}</span>
+                  {q.todo && <span className="cto-was">做什么：{q.todo}</span>}
                 </li>
               ))}
-              {more(ev).skipped.map((x) => (
+              {ev.skipped.map((x) => (
                 <li key={`s-${x.key}`} data-testid="eval-skipped">
                   <span className="kt-pill tone-idle">跳过</span>
                   <button type="button" className="br-link br-key" onClick={() => onItem(x.key)}>{x.key} ↗</button>

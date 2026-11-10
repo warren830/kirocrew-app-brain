@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -125,3 +126,11 @@ def install_brain_dev(home: Path) -> Path:
 
 __all__ = ["needs_brainkit", "brain", "lean", "make_project", "start_in_worktree", "request_requirements",
            "make_service", "run", "home", "install_brain_dev", "FakeGateway", "commit_file", "sh", "mod"]
+
+
+def filled_notes(text: str, status: str, nxt: str = "把这一单元剩下的步骤写完，再跑一次自动检查") -> str:
+    """aidlc-state.md as a session leaves it: its Status, and a real '### Next' item. brain-kit R1-28 (8df9556) refuses a
+    hand-over whose Next is still Lean's template."""
+    text = text.replace("Status: Inception: starting", status)
+    return re.sub(r"(^### Next[ \t]*\n)(.*?)(?=^### |\Z)", lambda m: m.group(1) + "1. " + nxt + "\n\n", text, count=1,
+                  flags=re.M | re.S)

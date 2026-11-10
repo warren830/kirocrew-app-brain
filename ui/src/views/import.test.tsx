@@ -147,7 +147,7 @@ describe('导入仓库', () => {
     expect(within(out).getByText('改了 14 个文件').closest('details')).not.toHaveAttribute('open')  // folded
     const doctor = fx.importJob().result!.doctor.rows
     expect(within(out).getByTestId('doctor')).toHaveTextContent('自检')
-    expect(within(out).getByTestId('doctor')).not.toHaveTextContent('没有 ~/.kiro/agents/brain-dev.json')  // the KiroCrew block's, once
+    expect(within(out).getByTestId('doctor')).not.toHaveTextContent('KiroCrew 里还没有 brain-dev')  // the KiroCrew block's, once
     expect(within(out).getByText(`${doctor.length} 项都正常`)).toBeInTheDocument()
     expect(within(out).getByTestId('commit-ok')).toHaveTextContent('提交了 eb43199f（作者 Alice Example <alice@example.com>）')
     expect(props.reloadStatus).toHaveBeenCalled()
@@ -193,13 +193,13 @@ describe('导入仓库', () => {
   test('when the app cannot open the MR: the link and the exact commands, with 复制', async () => {
     const p = fx.importPublish()
     p.mr = null
-    p.text = '推上去了。这台机器上没有 GitLab token（$GITLAB_TOKEN 或 ~/.brain/gitlab-token），MR 要你自己开：用下面的命令或链接。'
+    p.text = '推上去了。这台机器上没有 GitLab 令牌（放在 ~/.brain/gitlab-token 或环境变量 GITLAB_TOKEN 里，app 就能自己开 MR），MR 这次要你自己开：用下面的命令或链接。'
     const pend = fx.importInspectPending()
     pend.pending!.can_open_mr = false
     const { user } = setup({ [`POST ${API}/import/inspect`]: () => pend, [`POST ${API}/import/publish`]: () => p })
     await inspectPath(user)
     await user.click(await screen.findByRole('button', { name: '推送并开 MR' }))
-    expect(screen.getByTestId('publish-confirm')).toHaveTextContent('这台机器上没有 GitLab token：只推送，MR 用给出的命令或链接自己开。')
+    expect(screen.getByTestId('publish-confirm')).toHaveTextContent('这台机器上没有 GitLab 令牌：只推送，MR 用给出的命令或链接自己开。')
     await user.click(screen.getByRole('button', { name: '确定推送' }))
     const out = await screen.findByTestId('publish-result')
     expect(within(out).getByRole('link', { name: /在 GitLab 上开 MR/ })).toHaveAttribute('href', p.new_mr_url as string)
@@ -214,7 +214,7 @@ describe('导入仓库', () => {
 
   test('a hook that says no: what it said, then 再提交一次', async () => {
     const blocked = fx.importJob()
-    blocked.result!.commit = { ok: false, sha: null, blocked: true, output: '扫描到可疑的 token', text: '提交被拦下了（多半是 git hook），它说：\n扫描到可疑的 token\n\n改动还在 /Users/alice/workplace/brain-app/refund/_brain-install 里：处理好以后点「再提交一次」。' }
+    blocked.result!.commit = { ok: false, sha: null, blocked: true, output: '扫描到可疑的 token', text: '提交被拦下了（多半是提交时跑的 git 检查），它说：\n扫描到可疑的 token\n\n改动还在 /Users/alice/workplace/brain-app/refund/_brain-install 里：处理好以后点「再提交一次」。' }
     blocked.steps[4] = { ...blocked.steps[4], state: 'fail', detail: blocked.result!.commit.text }
     let inspected = 0
     const { user } = setup({
@@ -259,7 +259,7 @@ describe('导入仓库', () => {
     expect(screen.getByLabelText('目录名（可不填）')).toHaveAttribute('placeholder', 'refund')
     await user.click(screen.getByRole('button', { name: '克隆' }))
     expect(apiCalls.find((c) => c.path === `${API}/import/clone`)?.body).toEqual({ url: 'git@gitlab.example.com:shop/refund.git', parent: '/Users/alice/workplace', name: '' })
-    expect(await screen.findByText(/刷新你的 SSH 登录凭证/, { selector: '[role="alert"]' })).toBeInTheDocument()
+    expect(await screen.findByText(/刷新你的 SSH 凭据/, { selector: '[role="alert"]' })).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: '克隆的进度' })).getByText('克隆没成')).toBeInTheDocument()
     expect(apiCalls.some((c) => c.path === `${API}/import/inspect`)).toBe(false)
     await user.click(screen.getByRole('button', { name: '克隆' }))
@@ -359,7 +359,7 @@ describe('导入仓库', () => {
     const inplace = within(modes).getByLabelText(/直接装在 main/)
     expect(inplace).toBeChecked()
     expect(within(modes).getByText('推荐').closest('label')).toHaveAttribute('data-mode', 'inplace')
-    expect(inplace.closest('label')).toHaveTextContent('推送到 origin 以后就能开需求（这会直接改团队的 main，没有 MR 评审）')
+    expect(inplace.closest('label')).toHaveTextContent('推送到远端以后就能开需求（这会直接改团队的 main，没有 MR 评审）')
     const form = screen.getByRole('form', { name: '这个仓库的 brain-kit 设置' })
     expect(within(form).queryByLabelText('新分支名')).toBeNull()                         // no branch to name
     expect(within(form).queryByLabelText('提交在哪')).toBeNull()                        // the picked way's line says it
@@ -400,7 +400,7 @@ describe('导入仓库', () => {
     expect(within(box).getByTestId('push-team')).toHaveTextContent('这会直接改团队的 main，没有 MR 评审；main 受保护时推不上去，就改用「装到新分支，开 MR 给团队看」')
     expect(apiCalls.some((c) => c.path === `${API}/import/push`)).toBe(false)
     await user.click(within(box).getByRole('button', { name: '确定推送' }))
-    expect(await within(box).findByText('推上去了：main → origin')).toBeInTheDocument()
+    expect(await within(box).findByText('推上去了：main → 远端')).toBeInTheDocument()
     expect(apiCalls.find((c) => c.path === `${API}/import/push`)?.body).toEqual({
       path: REPO, branch: 'main', remote_url: 'git@gitlab.example.com:shop/refund.git', confirm: true,
     })
@@ -441,7 +441,7 @@ describe('导入仓库', () => {
     moved.pending!.merge = { ok: false, why: 'main 在装完以后又有了新提交（装时 04174d9a，现在 9e8d7c6b），这个安装分支合不进去了：在「导入仓库」里改成直接装在 main 上', confirm: false }
     moved.install = { ...fx.importInspect().install!, remote_url: '', recommend: 'inplace', options: [{ mode: 'inplace', title: '直接装在 main', line: '装在你现在的检出里，提交在 main 上，马上能开需求', ok: true, why: '' }] }
     const merged = fx.importInspectPending()
-    merged.pending = { ...merged.pending!, state: 'merged', branch: 'origin/main', word: '要拉取', text: '已经合进 origin/main，这个目录还没更新',
+    merged.pending = { ...merged.pending!, state: 'merged', branch: 'origin/main', word: '要拉取', text: '已经合进远端的 main，这个目录还没更新',
       next: '点「拉取」更新这个目录（git pull --ff-only）', merge: null, pull: { ok: true, why: '' } }
     const seq = [local, installed(), moved, merged, installed()]
     let n = 0

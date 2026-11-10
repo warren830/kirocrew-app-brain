@@ -26,13 +26,14 @@ import type {
 } from '../types'
 import { APPROVAL_META, Icon, LoadState, MrLink, STAGE_META, StateChip, TYPE_IT_YOURSELF, isOpenQuestion } from '../ui'
 import {
-  ACT, CHECK_GROUP_NAME, DECIDED_BY, DO_NAME, WHERE_NAME, approvalName, leanProgress, missingSourceName, sourceName, stageName,
+  ACT, CHECK_GROUP_NAME, DECIDED_BY, DO_NAME, WHERE_NAME, approvalName, leanProgress, missingSourceName, sourceName, stageName, waitsOn,
 } from '../vocab'
-import { Inline } from './Markdown'
+import { Inline, Paths, pathPieces } from './Markdown'
 import type { ViewProps } from './props'
 import { EntryChip, MrDescCard, QuestionCard, ReviewButton, ReviewSay, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
-import { NotFound, ReqSwitch } from './ReqSwitch'
+import { NotFound, OnRunner, ReqSwitch, useOnRunner } from './ReqSwitch'
+import { runWords } from './Team'
 
 export { EntryChip, MR_DESC_COPY_HINT, MrDescCard, QuestionCard, mrDescSource } from './Question'
 export { PART_LABEL, PART_VAR, valueStream, type Part, type StreamSeg } from './Stream'
@@ -90,6 +91,7 @@ export const DETAIL_CSS = `
 .br-detail .br-detail-facts dt { font-size: .86em; }
 .br-detail .br-detail-facts dd { overflow-wrap: anywhere; }
 .br-detail :is(.br-path > span, .br-nowrap) { white-space: nowrap; }
+.br-detail .br-phrase { display: inline-block; max-width: 100%; }
 .br-detail .br-rawlist { margin: 6px 0 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; }
 .br-detail .br-rawlist dd { margin: 0; overflow-wrap: anywhere; }
 .br-detail .br-stagecells { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; list-style: none; margin: 0; padding: 0; }
@@ -280,6 +282,8 @@ export function DetailView({ entry, onBack, onSwitch, onMissing, ...props }: {
   const x = d.data
   const board = b.data
   const missing = !x && d.status === 404
+  const onRunner = useOnRunner(entry.repo, entry.key, props.status, props.pollMs)
+  const pick = onSwitch ?? ((repo: string, key: string) => props.go({ kind: 'item', repo, key }))
   useEffect(() => {
     if (missing || x) onMissing?.(missing)
   }, [missing, !!x]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -298,15 +302,15 @@ export function DetailView({ entry, onBack, onSwitch, onMissing, ...props }: {
           <b>{entry.key}</b>
         </nav>
         <span className="cto-grow" />
-        <ReqSwitch repo={entry.repo} reqKey={entry.key} status={props.status} pollMs={props.pollMs}
-          onPick={onSwitch ?? ((repo, key) => props.go({ kind: 'item', repo, key }))} />
+        <ReqSwitch repo={entry.repo} reqKey={entry.key} status={props.status} pollMs={props.pollMs} onPick={pick} />
         <div className="cto-item-act">
           {x && <button type="button" className="kt-btn is-primary" onClick={() => toBoard()}>需求看板 ↗</button>}
           {x && x.row.state === 'merged' && <button type="button" className="kt-btn" onClick={() => toBoard({ replay: true })}>▶ 回放 ↗</button>}
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{from}</button>}
         </div>
       </div>
-      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} backName={back.name} onBack={back.go} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
+      {onRunner && <OnRunner reqKey={entry.key} what="需求详情" onOpen={() => pick('runner', entry.key)} />}
+      {missing ? !onRunner && <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} backName={back.name} onBack={back.go} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
       {x && (
         <Page x={x} board={board} live={live} entry={entry} props={props} opened={opened} localOnly={x.row.local_only ?? repoInfo?.remote === false}
           onOpened={(r) => { setOpened(r); after() }} after={after} toBoard={toBoard} />
@@ -370,7 +374,7 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
           <NotesCard x={x} />
           <SessionsCard sessions={x.sessions} total={x.credits.total} note={x.credits.note} replying={now.do === 'reply'} at={at} />
           <BrainUseCard x={x} board={board} repo={entry.repo} reqKey={entry.key} go={props.go} />
-          <TimelineCard x={x} showMissing={handedOver(x) && !localOnly} />
+          <TimelineCard x={x} showMissing={handedOver(x) && !localOnly} me={board?.person.me ?? false} />
         </div>
       </div>
     </>
@@ -392,16 +396,9 @@ function Header({ x, localOnly }: { x: RequirementDetail; localOnly: boolean }) 
   )
 }
 
-/** A path that breaks only after a 「/」, never inside a name. */
+/** A path that breaks only next to a 「/」, never inside a name. */
 function PathText({ path }: { path: string }) {
-  const parts = path.split('/').map((p, i) => (i ? `/${p}` : p))
-  // a folder's trailing 「/」 stays with its name
-  if (parts.length > 1 && parts[parts.length - 1] === '/') parts.splice(-2, 2, `${parts[parts.length - 2]}/`)
-  return (
-    <code className="br-path" title={path}>
-      {parts.map((p, i) => <span key={i}><span>{p}</span><wbr /></span>)}
-    </code>
-  )
+  return <code className="br-path" title={path}>{pathPieces(path).map((p, i) => <span key={i}><span>{p}</span><wbr /></span>)}</code>
 }
 
 function Facts({ x, start, localOnly }: { x: RequirementDetail; start: number | null; localOnly: boolean }) {
@@ -450,7 +447,7 @@ function Facts({ x, start, localOnly }: { x: RequirementDetail; start: number | 
       {raw.length > 0 && (
         <details className="br-raw">
           <summary>细节</summary>
-          <dl className="br-rawlist">{raw.map(([k, v]) => <div key={k} style={{ display: 'contents' }}><dt>{k}</dt><dd><code>{v}</code></dd></div>)}</dl>
+          <dl className="br-rawlist">{raw.map(([k, v]) => <div key={k} style={{ display: 'contents' }}><dt>{k}</dt><dd><code><Paths text={v} /></code></dd></div>)}</dl>
         </details>
       )}
     </dl>
@@ -484,7 +481,7 @@ function Claimed({ x, now, at, onStart }: { x: RequirementDetail; now: Now; at: 
       </p>
       {mine && (
         <div className="br-row br-now-act">
-          <button type="button" className="kt-btn is-primary" onClick={onStart}>{ACT.start}</button>
+          <button type="button" className="kt-btn is-primary" onClick={onStart}>{DO_NAME.start}</button>
           <span className="br-hint">在「开需求」里开工，需求号和标题已经带过去了</span>
         </div>
       )}
@@ -583,7 +580,7 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
       acts = now.mrUrl ? <a className="kt-btn is-primary" href={now.mrUrl} target="_blank" rel="noopener noreferrer">{DO_NAME.label_handoff} <Icon name="ExternalLink" size={12} /></a> : null
       break
     case 'start':
-      acts = mine ? <button type="button" className="kt-btn is-primary" onClick={onStart}>{ACT.start}</button> : null
+      acts = mine ? <button type="button" className="kt-btn is-primary" onClick={onStart}>{DO_NAME.start}</button> : null
       break
     case 'write_back':
       acts = <button type="button" className="kt-btn is-primary" onClick={onBrain}>{ACT.writeBack} ↗</button>
@@ -703,7 +700,7 @@ function Cards({ x, board, at, localOnly, replying, onBoard, onSessions }: {
           </div>
         )}
       </article>
-      <CostCard x={x} replying={replying} onSessions={onSessions} />
+      <CostCard x={x} replying={replying} me={board?.person.me ?? false} onSessions={onSessions} />
       <ChecksCard board={board} localOnly={localOnly} sent={sent} blocked={blocked} onBoard={onBoard} />
     </section>
   )
@@ -712,14 +709,24 @@ function Cards({ x, board, at, localOnly, replying, onBoard, onSessions }: {
 /** a session chip of the cost card by its state's tone: its look, its legend word and swatch */
 const CHIP: Record<string, { cls: string; label: string; sw: string }> = {
   bad: { cls: ' is-back', label: '出错', sw: 'var(--vs-rework)' },
-  wait: { cls: ' is-wait', label: '等人', sw: 'var(--vs-person)' },
+  wait: { cls: ' is-wait', label: '等人', sw: 'var(--vs-person)' },   // the legend says whom (sessionWaits)
   run: { cls: '', label: '在做', sw: 'var(--kt-ok-solid)' },
   idle: { cls: ' is-idle', label: '空着', sw: 'var(--border-strong)' },
 }
 
-function CostCard({ x, replying, onSessions }: { x: RequirementDetail; replying: boolean; onSessions: () => void }) {
+/** Whom a waiting session waits on, by waitsOn's rule: a session on this machine waits on the person at it (等你); the
+ * runner's on whom the requirement waits. */
+function sessionWaits(s: SessionRow, x: RequirementDetail, me: boolean): string {
+  return s.kind === 'local' ? waitsOn('you') : whoWord(x.row.waits.who, x.row.owner, me)
+}
+
+function CostCard({ x, replying, me, onSessions }: { x: RequirementDetail; replying: boolean; me: boolean; onSessions: () => void }) {
   const ss = x.sessions
-  const tones = [...new Set(ss.map((s) => sessionState(s, replying).tone))]
+  const legend = [...new Map(ss.map((s) => {
+    const { tone } = sessionState(s, replying)
+    const label = tone === 'wait' ? sessionWaits(s, x, me) : CHIP[tone].label
+    return [label, { label, sw: CHIP[tone].sw }] as const
+  })).values()]
   return (
     <article className="cto-card" aria-label="成本">
       <div className="cto-eyebrow">成本</div>
@@ -731,14 +738,14 @@ function CostCard({ x, replying, onSessions }: { x: RequirementDetail; replying:
             {ss.map((s) => {
               const st = sessionState(s, replying)
               return (
-                <button type="button" key={s.slot} className={`cto-chip${CHIP[st.tone].cls}`} title={`${s.title} · ${st.label} · ${fmtCredits(s.credits)} credits`} onClick={onSessions}>
+                <button type="button" key={s.slot} className={`cto-chip${CHIP[st.tone].cls}`} title={`${sessionName(s)} · ${st.label} · ${fmtCredits(s.credits)} credits`} onClick={onSessions}>
                   <RoleIcon role={s.kind === 'runner' ? 'runner' : 'laptop'} size={16} />
                 </button>
               )
             })}
           </div>
           <div className="cto-legend">
-            {tones.map((t) => <span key={t}><i className="cto-dot" style={{ background: CHIP[t].sw }} />{CHIP[t].label}</span>)}
+            {legend.map((l) => <span key={l.label}><i className="cto-dot" style={{ background: l.sw }} />{l.label}</span>)}
           </div>
           <div className="cto-foot"><button type="button" className="cto-link" onClick={onSessions}>看每个会话的用量 ↓</button></div>
         </>
@@ -789,9 +796,20 @@ function ChecksCard({ board, localOnly, sent, blocked, onBoard }: {
   )
 }
 
-/** A sentence of names (「还剩 发布审批、签接手合同」) that wraps between its names, never inside one. */
-function Phrases({ text }: { text: string }) {
-  return <>{text.split(/(?<=[、 ])/).map((w, i) => <span key={i} className="br-nowrap">{w}</span>)}</>
+/** A sentence of names (「等你：代码生成计划审批 · 还剩 发布审批、签接手合同」) that wraps between its pieces (after 「、」,
+ * 「：」, 「 · 」), never inside one; a piece longer than the whole line wraps inside itself instead of running past the
+ * card's edge. */
+export function Phrases({ text }: { text: string }) {
+  const pieces = text.match(/.+?(?:、|：| · |$)/g) ?? []
+  return (
+    <>
+      {pieces.map((p, i) => (
+        <span key={i}>
+          <span className="br-phrase">{p.endsWith(' · ') ? p.slice(0, -1) : p}</span>{p.endsWith(' · ') ? ' ' : ''}
+        </span>
+      ))}
+    </>
+  )
 }
 
 function SplitBar({ split }: { split: { p: Part; s: number }[] }) {
@@ -853,7 +871,7 @@ function LeanCard({ x, sessionUrl, mrUrl, waiter }: { x: RequirementDetail; sess
                   {a.at !== null && <span className="br-dim br-small">{fmtTime(a.at)}</span>}
                   <details className="br-raw">
                     <summary>细节</summary>
-                    <code>{[a.kind, a.sha8, a.path].filter(Boolean).join(' · ')}</code>
+                    <code><Paths text={[a.kind, a.sha8, a.path].filter(Boolean).join(' · ')} /></code>
                   </details>
                 </div>
                 {a.state === 'pending' && (onMr
@@ -1003,21 +1021,25 @@ function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt, picked }:
 
 function QuestionsCard({ x, repo, reqKey, onAnswered, waiter }: { x: RequirementDetail; repo: string; reqKey: string; onAnswered: () => void; waiter: string | null }) {
   // questions asked straight in the session (「Q1 选 A」 in decisions.md) are not park.json's or the MR's
-  const asked = x.decisions.flatMap((d) => [...d.text.matchAll(/\bQ(\d+)\b/g)].map((m) => ({ q: `Q${m[1]}`, d: d.id })))
+  const asked = x.decisions.flatMap((d) => (d.asked ?? []).map((q) => ({ q, d: d.id })))
   const qs = [...new Set(asked.map((a) => a.q))]
   const ds = [...new Set(asked.map((a) => a.d))]
+  const inSession = `会话里直接问的（${qs.join('、')}），回答记在决定 ${ds.join('、')} 里。`
   return (
     <section className="cto-card" aria-label="问题和回答">
-      <div className="cto-chart-head"><h3>问题和回答</h3><span className="cto-dim">{x.questions.length} 个 · 能在这里回答的才有回答框</span></div>
+      <div className="cto-chart-head">
+        <h3>问题和回答</h3>
+        {/* the count is every question asked, those asked straight in the session too (DETAIL-16) */}
+        <span className="cto-dim">{x.questions.length + qs.length} 个 · 能在这里回答的才有回答框</span>
+      </div>
       {x.questions.length === 0 ? (
         <p className="br-empty">
-          {qs.length
-            ? `问题都是在会话里直接问的（${qs.join('、')}），回答记在决定 ${ds.join('、')} 里。这里只列停下来等回答的和 MR 上的问题。`
-            : '没有停下来问过人。'}
+          {qs.length ? `问题都是${inSession}这里只列停下来等回答的和 MR 上的问题。` : '没有停下来问过人。'}
         </p>
       ) : (
         <div className="br-stack">
           {x.questions.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={repo} reqKey={reqKey} onAnswered={onAnswered} waiter={waiter} />)}
+          {qs.length > 0 && <p className="cto-dim" style={{ margin: 0 }}>另有{inSession}</p>}
         </div>
       )}
     </section>
@@ -1048,6 +1070,13 @@ function NotesCard({ x }: { x: RequirementDetail }) {
 
 // ------------------------------------------------------------------ sessions, the Brain, the timeline
 
+const RUN_ID = /^RUN-.+-\d+$/
+
+/** A session by its name in words: the runner's (named after its run id by the bridge) is 「第 1 次运行」, the id on hover. */
+function sessionName(s: SessionRow): string {
+  return RUN_ID.test(s.title) ? runWords(s.title, false) : s.title
+}
+
 function sessionState(s: SessionRow, replying: boolean): { label: string; tone: string } {
   if (s.error) return { label: '出错', tone: 'bad' }
   if (s.awaiting) return { label: '等批准', tone: 'wait' }
@@ -1076,7 +1105,7 @@ function SessionsCard({ sessions, total, note, replying, at }: { sessions: Sessi
                 <RoleIcon role={s.kind === 'runner' ? 'runner' : 'laptop'} size={22} />
                 <div className="br-stack" style={{ gap: 2 }}>
                   <div className="br-row">
-                    <b className="br-strong">{s.title}</b>
+                    <b className="br-strong" title={RUN_ID.test(s.title) ? s.title : undefined}>{sessionName(s)}</b>
                     <span className={`br-chip tone-${st.tone}`}>{st.label}</span>
                     <span className="br-tag">{s.kind === 'local' ? '本机' : '运行机'}</span>
                   </div>
@@ -1116,8 +1145,8 @@ function BrainUseCard({ x, board, repo, reqKey, go }: { x: RequirementDetail; bo
       {b.proposals !== null && b.proposals > 0 && (
         <div className="br-row" data-testid="brain-proposals">
           <span>
-            提议 {b.proposals} 条新知识：{reflect === 'merged' ? <>已合进 Brain{branch && <span className="br-dim">（回写分支 <code>{branch}</code>）</span>}</>
-              : branch || reflect === 'done' ? <>已写到回写分支{branch && <> <code>{branch}</code></>}，等合并</> : '还没回写到 Brain'}
+            提议 {b.proposals} 条新知识：{reflect === 'merged' ? <>已合进 Brain{branch && <span className="br-dim">（回写分支 <PathText path={branch} />）</span>}</>
+              : branch || reflect === 'done' ? <>已写到回写分支{branch && <> <PathText path={branch} /></>}，等合并</> : '还没回写到 Brain'}
           </span>
           <button type="button" className="cto-link" onClick={toReflect}>在 Brain 里看 ↗</button>
         </div>
@@ -1157,6 +1186,9 @@ function itemText(it: TimelineItem): { label: string; detail: string | null; tit
   if (it.kind === 'app' && it.label.startsWith('回写 Brain') && it.detail) return { label: it.label, detail: `分支 ${it.detail}`, title: null }
   if (it.kind === 'commit' && it.detail && /^[0-9a-f]{7,40}$/.test(it.detail)) return { label: it.label, detail: it.detail.slice(0, 8), title: it.detail }
   if (it.detail && /^claim\/\S+ 推到 origin$/.test(it.detail)) return { label: it.label, detail: '认领推到了远端', title: it.detail }
+  // a hand-over names its run in words and keeps the run id and the commit for hover
+  if (it.kind === 'handover' && it.detail && RUN_ID.test(it.detail)) return { label: it.label, detail: runWords(it.detail, false), title: it.detail }
+  if (it.kind === 'handover' && it.detail && /^[0-9a-f]{7,40}$/.test(it.detail)) return { label: it.label, detail: null, title: `提交 ${it.detail}` }
   const label = it.label.replace(/\s*[:：]\s*$/, '')
   return { label, detail: it.detail ? it.detail.replace(/^工作区 /, '工作目录 ') : null, title: null }
 }
@@ -1176,7 +1208,15 @@ function TraceError({ error }: { error: string }) {
   )
 }
 
-function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: boolean }) {
+/** Who did a timeline item, in words: the owner's own acts (brain-kit's who 「owner」) are 你 to the owner and their
+ * name to anyone else, as 需求看板 signs them; another person's pseudonym is 一位组员 (its name on hover). */
+function itemWho(who: string | null, owner: string | null, me: boolean): string | null {
+  if (!who) return null
+  if (who === 'owner' || who === owner) return me ? '你' : owner ?? '负责人'
+  return PSEUDONYM.test(who) ? '一位组员' : who
+}
+
+function TimelineCard({ x, showMissing, me }: { x: RequirementDetail; showMissing: boolean; me: boolean }) {
   const t = x.timeline
   const items = [...t.items].sort((a, b) => (isoSec(b.at) ?? 0) - (isoSec(a.at) ?? 0))
   const days = new Map<string, TimelineItem[]>()
@@ -1203,14 +1243,14 @@ function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: b
                 const k = KIND_META[it.kind] ?? { icon: 'commit', label: it.kind }
                 const s = itemText(it)
                 const long = !!s.detail && s.detail.length > 60
-                const who = it.who ? (PSEUDONYM.test(it.who) ? '一位组员' : it.who) : null
+                const who = itemWho(it.who, x.row.owner, me)
                 return (
                   <li key={i} data-testid="tl-item" data-kind={it.kind} title={[s.title, it.who && PSEUDONYM.test(it.who) ? `化名 ${it.who}` : null].filter(Boolean).join(' · ') || undefined}>
                     <time>{clock(it.at)}</time>
                     <span title={k.label}><RoleIcon role={k.icon} size={16} /><span className="br-sr">{k.label}</span></span>
                     <span>
-                      <span className="br-strong">{s.label}</span>
-                      {s.detail && !long && <span className="br-dim"> · {s.detail}</span>}
+                      <span className="br-strong"><Paths text={s.label} /></span>
+                      {s.detail && !long && <span className="br-dim"> · <Paths text={s.detail} /></span>}
                       {who && <span className="br-dim br-small"> · {who}</span>}
                       {long && <details><summary className="br-small">看说明</summary><span className="br-dim br-small"><Inline text={s.detail} /></span></details>}
                     </span>

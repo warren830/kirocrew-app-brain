@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote
@@ -27,7 +28,26 @@ except ImportError:  # pragma: no cover
 class GatewayError(RuntimeError):
     def __init__(self, status: int, message: str, code: str = "", path: str = "") -> None:
         super().__init__(f"{path} → HTTP {status} {code} {message}".strip())
-        self.status, self.code, self.path = status, code, path
+        self.status, self.code, self.path, self.message = status, code, path, message
+
+
+# a failed call as a person reads it, with what to do; the HTTP details stay in the app's log
+RELOAD = "这个 app 和 KiroCrew 没接上：在 KiroCrew 里重启这个 app"
+SAID = {"unreachable": "连不上 KiroCrew：看它是不是还开着，再试一次",
+        "token_exchange": "KiroCrew 不认这个 app 了：在 KiroCrew 里重装这个 app",
+        "no_secret": "KiroCrew 不认这个 app 了：在 KiroCrew 里重装这个 app",
+        "no_port": RELOAD, "no_loopback": RELOAD, "no_aiohttp": RELOAD}
+SAID_ELSE = "KiroCrew 没答应：等一会儿再试一次；一直这样，在 KiroCrew 里看一下它"
+
+
+def said(exc: BaseException) -> str:
+    """What a failed call to KiroCrew means for a person: by its code, else the app's own Chinese message."""
+    if isinstance(exc, GatewayError):
+        if exc.code in SAID:
+            return SAID[exc.code]
+        if re.search(r"[\u4e00-\u9fff]", exc.message or ""):
+            return exc.message
+    return SAID_ELSE
 
 
 def base_url(env: Any = None) -> str:

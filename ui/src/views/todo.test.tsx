@@ -90,6 +90,8 @@ describe('待办', () => {
   })
 
   test('without the path (an older backend) the approval card has no 要读的', async () => {
+    const items = fx.todo().items.filter((i) => i.kind === 'lean_approval').map((i) => ({ ...i, path: null }))
+    installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items }) })
     renderTodo()
     const card = within(await screen.findByRole('region', { name: 'Lean 审批' })).getByTestId('todo-item')
     expect(within(card).queryByTestId('todo-read')).toBeNull()
@@ -148,7 +150,7 @@ describe('待办', () => {
     const crew = group('KiroCrew 的问题')
     expect(within(crew).queryByRole('button', { name: /^PAY-/ })).toBeNull()
     expect(within(crew).queryByRole('button', { name: '需求看板' })).toBeNull()
-    expect(crew).toHaveTextContent('brain-dev.json 缺 Lean 的 hook')
+    expect(crew).toHaveTextContent('brain-dev 的设置缺 Lean 的拦截')
   })
 
   test('team mode says the runner’s questions are answered on GitLab, on their group only', async () => {
@@ -184,11 +186,24 @@ describe('待办', () => {
     expect(within(g).getByRole('link', { name: '看 MR' })).toBeInTheDocument()
   })
 
+  test('REST-12: a refused hand-over says its reason’s own 做什么; the bridge’s words and 做法 are under 细节 right on the card', async () => {
+    const raw = "label 'ai-handoff' was added by bob, not by the branch owner alice; brain_commit 0123456789ab does not exist\n做法：git rebase <默认分支>"
+    const rejected: TodoItem = { ...fx.todo().items[4], text: '接手被拒：标签是 bob 打的，不是负责人 alice', todo: '让 alice 自己交接（交接时会打标签）', raw }
+    installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items: [rejected] }) })
+    renderTodo()
+    const g = await screen.findByRole('region', { name: '接手被拒' })
+    expect(within(g).getByTestId('todo-do')).toHaveTextContent('做什么让 alice 自己交接（交接时会打标签）')
+    const fold = within(g).getByText('细节').closest('details') as HTMLDetailsElement
+    expect(fold.open).toBe(false)
+    expect(fold).toHaveTextContent('做法：git rebase <默认分支>')
+    expect(fold).toHaveTextContent("label 'ai-handoff' was added by bob")
+  })
+
   test('a question on the runner links to its MR and has no answer form', async () => {
     renderTodo()
     await screen.findByRole('region', { name: '运行机上的问题' })
     const q = group('运行机上的问题')
-    expect(q).toHaveTextContent('D-2 等人在 MR 上回答')
+    expect(q).toHaveTextContent('等产品在 MR 上回答 D-2')
     expect(q).toHaveTextContent('对账单按商户拆分')     // the requirement's title, not its branch slug
     expect(q).toHaveTextContent('设计')                 // its kind in words
     expect(q).not.toHaveTextContent(/design|merchant split/)
@@ -247,7 +262,7 @@ describe('待办', () => {
     await screen.findByRole('region', { name: 'KiroCrew 的问题' })
     const crew = group('KiroCrew 的问题')
     expect(within(crew).queryByRole('button', { name: '把引擎换成 kas' })).toBeNull()
-    fireEvent.click(within(crew).getByRole('button', { name: '补上 Lean 的 hook' }))
+    fireEvent.click(within(crew).getByRole('button', { name: '补上 Lean 的拦截' }))
     expect(await within(crew).findByText('已重装 brain-dev agent')).toBeInTheDocument()
     expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/crew/fix`, body: { what: 'agent' } })
     expect(reloadStatus).toHaveBeenCalled()
@@ -257,7 +272,7 @@ describe('待办', () => {
     renderTodo()
     const crew = await screen.findByRole('region', { name: 'KiroCrew 的问题' })
     expect(within(crew).getAllByRole('listitem').map((li) => li.dataset.level)).toEqual(['FAIL'])
-    expect(crew).not.toHaveTextContent('lean-hook.py 是旧版')
+    expect(crew).not.toHaveTextContent('适配文件是旧版')
   })
 
   test('重装 kit 文件 in place on a team repo: its group stays while 推送 waits, even when the list no longer has the problem', async () => {

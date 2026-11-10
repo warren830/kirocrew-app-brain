@@ -61,16 +61,16 @@
     "rows": [
       {
         "level": "FAIL",
-        "text": "brain-dev.json 缺 Lean 的 hook：调用工具前",
-        "todo": "点「补上 Lean 的 hook」：只补上缺的（调用工具前），别的 hook 和设置都不动",
+        "text": "brain-dev 的设置缺 Lean 的拦截：调用工具前",
+        "todo": "点「补上 Lean 的拦截」：只补上缺的（调用工具前），别的都不动",
         "fix": "agent",
         "repo": null,
         "raw": "缺的 hook：preToolUse"
       },
       {
         "level": "WARN",
-        "text": ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）",
-        "todo": "运行机上的 run 停下来问人时写不了 park.json。点「重装 kit 文件」：重装 brain-kit 并提交（默认直接在当前分支上，团队仓库可以选新分支开 MR）",
+        "text": "Lean 的适配文件是旧版（第 0 版，要第 2 版）",
+        "todo": "本机会话里也一样：改了 kit 文件（Lean 的文件、brain-kit 设置、检查规则）以后，它不会拦下工具调用。点「重装 kit 文件」",
         "fix": "kit",
         "repo": "/Users/alice/workplace/shop-pay",
         "raw": ".kiro/brain/lean-hook.py is an older adapter (version 0, needs 2): the team runner could not write runs/<KEY>/park.json, its only way to ask a person, before the Lean approvals; run `brain install` and commit it on main through an MR"
@@ -93,12 +93,14 @@
   "me": {
     "user": "alice",
     "token": true,
-    "how": "GitLab token（有）；alice（你在这个仓库的名字）"
+    "how": "GitLab 令牌（有）；alice（你在这个仓库的名字）"
   },
   "team": {
     "enabled": false,
     "ok": false,
     "error": "",
+    "error_todo": "",
+    "error_raw": "",
     "last_loop_at": null,
     "loop_error": "",
     "same_user": false,
