@@ -481,7 +481,7 @@ function Claimed({ x, now, at, onStart }: { x: RequirementDetail; now: Now; at: 
       </p>
       {mine && (
         <div className="br-row br-now-act">
-          <button type="button" className="kt-btn is-primary" onClick={onStart}>{ACT.start}</button>
+          <button type="button" className="kt-btn is-primary" onClick={onStart}>{DO_NAME.start}</button>
           <span className="br-hint">在「开需求」里开工，需求号和标题已经带过去了</span>
         </div>
       )}
@@ -580,7 +580,7 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
       acts = now.mrUrl ? <a className="kt-btn is-primary" href={now.mrUrl} target="_blank" rel="noopener noreferrer">{DO_NAME.label_handoff} <Icon name="ExternalLink" size={12} /></a> : null
       break
     case 'start':
-      acts = mine ? <button type="button" className="kt-btn is-primary" onClick={onStart}>{ACT.start}</button> : null
+      acts = mine ? <button type="button" className="kt-btn is-primary" onClick={onStart}>{DO_NAME.start}</button> : null
       break
     case 'write_back':
       acts = <button type="button" className="kt-btn is-primary" onClick={onBrain}>{ACT.writeBack} ↗</button>

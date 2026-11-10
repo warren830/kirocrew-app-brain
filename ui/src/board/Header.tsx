@@ -7,7 +7,7 @@
  */
 import type { ReqBoard } from '../types'
 import { StateChip } from '../ui'
-import { ACT, leanProgress } from '../vocab'
+import { ACT, DO_NAME, leanProgress } from '../vocab'
 import { WORKING, actorLabel, actorMeta, boardWho, checksSay, fmtCredits, fmtWhen, leanOf, localOnly, runnerBlind, titleOf, waitsOnMe } from './format'
 import { useChangeCount, useTween } from './hooks'
 import { waitCount } from './next'
@@ -59,7 +59,7 @@ export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail,
           <button type="button" className="kt-btn" onClick={() => onSession(runner.url)} title="打开运行机上的 brain-run 会话">{ACT.openSession}（运行机）</button>
         )}
         {!replaying && onStart && r.state === 'claimed' && (
-          <button type="button" className="kt-btn is-primary" onClick={onStart}>{ACT.start} {r.key}</button>
+          <button type="button" className="kt-btn is-primary" onClick={onStart}>{DO_NAME.start} {r.key}</button>
         )}
         <button type="button" className="kt-btn" aria-pressed={follow} onClick={onFollow} title="自动滚到正在动的那一环">跟随</button>
         {onDetail && <button type="button" className="kt-btn" onClick={onDetail}>需求详情 ↗</button>}
@@ -286,7 +286,7 @@ export function Intro({ board, onStart }: { board: ReqBoard; onStart?: () => voi
       <div className="br-hero-acts" data-testid="br-intro-start">
         {onStart ? (
           <>
-            <button type="button" className="kt-btn is-primary br-btn-big" onClick={onStart}>{ACT.start} {board.row.key}</button>
+            <button type="button" className="kt-btn is-primary br-btn-big" onClick={onStart}>{DO_NAME.start} {board.row.key}</button>
             <span className="kt-dim">在开需求里接着填：需求号 {board.row.key} 和标题已经带过去了 · 认领于 {fmtWhen(board.started_at)}</span>
           </>
         ) : owner ? (

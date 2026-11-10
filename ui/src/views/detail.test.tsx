@@ -275,7 +275,7 @@ describe('需求详情', () => {
       const { go } = renderDetail()
       const bar = await screen.findByRole('region', { name: '此刻' })
       await waitFor(() => expect(bar).toHaveTextContent('认领了 12 小时，还没开工'))
-      fireEvent.click(within(bar).getByRole('button', { name: '开工' }))
+      fireEvent.click(within(bar).getByRole('button', { name: '去开工' }))
       expect(go).toHaveBeenLastCalledWith({ kind: 'new', repo: 'r1', key: 'PAY-3', title: '退款单导出 CSV' })
       for (const name of ['周期', '时间花在哪', '成本', '检查']) expect(screen.queryByRole('article', { name })).toBeNull()
       for (const name of ['价值流', 'Lean 进度', '时间线', '决定']) expect(screen.queryByRole('region', { name })).toBeNull()
@@ -292,7 +292,7 @@ describe('需求详情', () => {
       renderDetail()
       const bar = await screen.findByRole('region', { name: '此刻' })
       expect(bar).toHaveTextContent('等 alice 开工')
-      expect(within(bar).queryByRole('button', { name: '开工' })).toBeNull()
+      expect(within(bar).queryByRole('button', { name: '去开工' })).toBeNull()
     })
   })
 
