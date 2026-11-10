@@ -745,6 +745,12 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
             if A["local"]["status"] not in ("running", "fixing"):
                 fo.put("local", "running", "AI 在做", _first(s.get("last_activity"), now))
                 fo.open("local", "work", _first(s.get("last_activity"), now))
+        elif s and not pend and A["local"]["status"] in ("running", "fixing", "waiting", "done") and \
+                waits.get("do") == "none" and waits.get("who") not in (None, "you", "agent"):
+            # the requirement waits on others (a big one on its small ones, family.classify): its quiet session is
+            # nobody's turn, as the row says
+            quiet_down()
+            fo.put("local", "waiting", waits.get("text") or "没有等你的事", quiet)
         elif s and not pend and A["local"]["status"] in ("running", "fixing", "waiting", "done"):
             quiet_down()
             fo.put("local", "awaiting_approval", "会话空着：轮到%s回话" % you, quiet, _who(you))

@@ -289,6 +289,17 @@ def spent(b, kinds, end):
     return sum((s["b"] if s["b"] is not None else end) - s["a"] for a in b["actors"] for s in a["spans"] if s["kind"] in kinds)
 
 
+def test_a_big_requirement_waiting_on_its_small_ones_has_a_quiet_session_that_is_nobodys_turn():
+    """A big requirement whose small ones are being built (family.classify: people / none): its own session sits quiet,
+    and the board says what the row says, never 轮到你回话 beside it."""
+    last = T + 15 * M + 43
+    text = "等小需求合进来：已合并 1/3（1 个待认领，1 个在做）"
+    b = snapshot(facts(demo3_events()), row_of("local", "people", text, do="none"), sessions=[session(last)])
+    local = actor(b, "local")
+    assert (local["status"], local["doing"]) == ("waiting", text)
+    assert "轮到" not in local["doing"] and local["since"] == last
+
+
 def test_a_quiet_session_waits_for_the_person_from_its_last_message_not_works_on():
     """DEMO-3 (UI问题清单 #2): the AI worked about 15 minutes, then its session sat quiet for eleven hours. The board
     says the session waits for the person since its last message, and the hours are waiting, not AI work."""
