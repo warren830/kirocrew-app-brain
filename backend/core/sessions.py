@@ -396,21 +396,30 @@ class SessionManager:
         """{credits, turns, busy, awaiting, last_activity, missing, error} of a slot this app opened (None: unknown)."""
         return dict(self._stats[slot]) if slot and slot in self._stats else None
 
+    def slot_credits(self, slot: str | None) -> float | None:
+        """The credits of one session (slot): its whole transcript's (slot_stats) once read, else the sum of the turns
+        this app sent to it (each its own info); None while none of them has reported any. The one number a session's
+        row shows and its requirement's total adds up."""
+        if not slot:
+            return None
+        c = (self._stats.get(slot) or {}).get("credits")
+        if c is not None:
+            return round(float(c), 3)
+        got = [float(x.credits) for x in self._infos.values() if x.slot == slot and x.credits is not None]
+        return round(sum(got), 3) if got else None
+
     def credits_by_key(self) -> dict[str, float]:
-        """Credits per requirement key / run id over every slot this app opened for it (each slot counted once)."""
+        """Credits per requirement key / run id over every slot this app opened for it (each slot counted once, as
+        slot_credits says it)."""
         out: dict[str, float] = {}
         seen: set[str] = set()
         for i in self._infos.values():
             if not i.key or not i.slot or i.slot in seen:
                 continue
             seen.add(i.slot)
-            st = self._stats.get(i.slot) or {}
-            c = st.get("credits")
-            if c is None:
-                c = sum(float(x.credits) for x in self._infos.values() if x.slot == i.slot and x.credits is not None) \
-                    if any(x.credits is not None for x in self._infos.values() if x.slot == i.slot) else None
+            c = self.slot_credits(i.slot)
             if c is not None:
-                out[i.key] = round(out.get(i.key, 0.0) + float(c), 3)
+                out[i.key] = round(out.get(i.key, 0.0) + c, 3)
         return out
 
     # ---- opening, sending, watching -------------------------------------------------------------------- #

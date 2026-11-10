@@ -3,6 +3,7 @@
 import asyncio
 import itertools
 import logging
+from types import SimpleNamespace
 
 from appkit import FakeGateway, GatewayError, mod
 
@@ -276,5 +277,30 @@ def test_slot_stats_sum_credits_over_the_whole_transcript(tmp_path):
         st = mgr.slot_stats(info.slot)
         assert st["credits"] == 3.5 and st["turns"] == 3 and st["busy"] is False
         assert mgr.credits_by_key() == {"r1-PAY-1": 3.5}
+
+    asyncio.run(go())
+
+
+def test_a_session_row_shows_the_credits_its_requirement_total_adds_up(tmp_path):
+    """需求详情's 成本 and 会话 card (DETAIL 待确认): before a slot's whole transcript is read, a session the bridge sent
+    two turns to has one number, the same in its row and in the total (the row once said the first turn's 24.2 under
+    a total of 31.0)."""
+    async def go():
+        gw, mgr = make(tmp_path)
+        await mgr.adapter_create("run-pay-5-1", agent="brain-run", model="", memory_mode="incognito", title="RUN-PAY-5-1",
+                                 folder="RUN-PAY-5-1", parent="brain-run:RUN-PAY-5-1", key="RUN-PAY-5-1",
+                                 root_folder="Brain 运行机")
+        await mgr.adapter_send("run-pay-5-1", "接手合同", "V-1")
+        await mgr.adapter_send("run-pay-5-1", "D-3 的回答", "V-2")
+        turns = [i for i in mgr._infos.values() if i.slot == "run-pay-5-1" and i.conv_root != i.id]
+        turns[0].credits, turns[1].credits = 24.2, 6.8
+        root = mgr.by_slot("run-pay-5-1")
+        assert mgr.slot_stats("run-pay-5-1")["credits"] is None          # its whole transcript not read yet
+        assert mgr.slot_credits(root.slot) == 31.0 == mgr.credits_by_key()["RUN-PAY-5-1"]
+        assert [i.slot for i in mgr.roots(key="RUN-PAY-5-1")] == ["run-pay-5-1"]   # one row for the one session
+        assert mgr.slot_credits(None) is None and mgr.slot_credits("nobody") is None
+        # what the page gets (service._sessions_snapshot): the row's credits are the total's
+        snap = mod("service").Service._sessions_snapshot(SimpleNamespace(sessions=mgr))
+        assert [r["credits"] for r in snap["by"]["RUN-PAY-5-1"]] == [31.0] and snap["credits"]["RUN-PAY-5-1"] == 31.0
 
     asyncio.run(go())
