@@ -631,6 +631,8 @@ export interface Decision {
   cites: string[]
   vouchers: string[]
   src: string
+  /** the questions the AI asked straight in the session (Q1 …) whose answer this row records, from its text and why */
+  asked?: string[]
 }
 
 export interface QuestionOption { id: string; text: string }

@@ -13,6 +13,13 @@ from .deliveries import KIND_LABEL, park_waiting
 
 CITE_RE = re.compile(r"(?<![A-Za-z0-9-])([PTIJ]-[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,3})(?![0-9-])")
 VOUCHER_RE = re.compile(r"(?<![0-9A-Za-z])V-[0-9a-f]{10}(?![0-9a-f])")
+# a question the AI asked straight in the session, as decisions.md records its answer (「Q1 选 A」, 「Q2 答"按推荐"」)
+ASKED_RE = re.compile(r"(?<![A-Za-z0-9])Q([1-9][0-9]{0,2})(?![0-9A-Za-z])")
+
+
+def asked_in(*texts: Any) -> list[str]:
+    """The in-session questions (Q1 …) a decision row records the answer of, from its text and its why."""
+    return list(dict.fromkeys("Q" + n for t in texts if t for n in ASKED_RE.findall(str(t))))
 # decisions.md Who, in the runner's vocabulary (brainkit.trace.classify_who, brain-kit 9935b11), each optionally
 # followed by a note in brackets: agent | a kit bot user | brain <entry id>[, <id>] | check | <P-xxxx> <V-xxxxxxxxxx> |
 # owner. Anything else is "unclassified": not guessed, and not shown (it may be a real name).
@@ -79,7 +86,8 @@ def decisions(text: str | None, path: str, bot_users: list[str]) -> list[dict[st
                 rows.append({"id": str(d.get("id")), "date": d.get("at"), "stage": d.get("stage"),
                              "text": str(d.get("text") or "")[:1000], "why": (str(d["why"])[:500] if d.get("why") else None),
                              "who": d.get("who"), "by": d.get("by"), "cites": list(d.get("cites") or []),
-                             "vouchers": list((d.get("refs") or {}).get("vouchers") or []), "src": str(d.get("src") or path)})
+                             "vouchers": list((d.get("refs") or {}).get("vouchers") or []), "src": str(d.get("src") or path),
+                             "asked": asked_in(d.get("text"), d.get("why"))})
             return rows
         except Exception:  # noqa: BLE001 - fall back to the small reader
             rows = []
@@ -109,7 +117,7 @@ def decisions(text: str | None, path: str, bot_users: list[str]) -> list[dict[st
                      else None, "stage": row.get("stage") or None, "text": dec[:1000], "why": row.get("why") or None,
                      "who": who, "by": by,
                      "cites": sorted(set(CITE_RE.findall(whole))), "vouchers": sorted(set(VOUCHER_RE.findall(whole))),
-                     "src": "%s:%d" % (path, n)})
+                     "src": "%s:%d" % (path, n), "asked": asked_in(dec, row.get("why"))})
     return rows
 
 

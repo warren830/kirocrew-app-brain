@@ -491,3 +491,18 @@ def test_what_an_older_app_wrote_is_read_in_words(tmp_path):
     assert [(e["label"], e["detail"]) for e in st.events("r1-DEMO-1")] == [
         ("开了本机会话", "工具调用不用逐个批准"), ("回写 Brain：成功", "brain/DEMO-1-reflect-1"), ("回写 Brain 并推送：失败", None),
         ("开了审查会话", None)]
+
+
+@needs_brainkit
+def test_a_decision_says_which_question_asked_in_the_session_it_answers():
+    """DETAIL-16 (real DEMO-1, DEMO-3): the AI asked Q1…Q3 straight in the session; decisions.md records the answers,
+    in the decision (「（Q1 选 A）」) or in its why (「Q2 答"按推荐"」). Each row says which."""
+    if not bk.load(str(BRAINKIT))["ok"]:
+        pytest.skip("brain-kit checkout not found")
+    detail = mod("detail")
+    text = ("| ID | Date | Stage | Decision | Why | Who |\n|---|---|---|---|---|---|\n"
+            "| D-1 | 2026-11-09 | requirements | 用乘号（Q1 选 A） | 用户要的 | owner |\n"
+            "| D-2 | 2026-11-09 | requirements | 小数照常算 | Q2 答\"按推荐\" | owner |\n"
+            "| D-3 | 2026-11-09 | code-generation | 一行 return a * b | 跟 add 一样，不是 Q10x | agent |\n")
+    rows = detail.decisions(text, "decisions.md", [])
+    assert {d["id"]: d["asked"] for d in rows} == {"D-1": ["Q1"], "D-2": ["Q2"], "D-3": []}

@@ -599,7 +599,7 @@ def main() -> None:
         day = iso(r.start_at or T0)[:10]
         return [{"id": "D-%d" % i, "date": day, "stage": st, "text": text, "why": why, "who": who, "by": by,
                  "cites": list(cites), "vouchers": ["V-%s" % sha(r.key, i)[:10]] if by == "person" else [],
-                 "src": "aidlc-docs/%s/decisions.md#L%d" % (r.intent, 7 + i)}
+                 "src": "aidlc-docs/%s/decisions.md#L%d" % (r.intent, 7 + i), "asked": detail.asked_in(text, why)}
                 for i, (st, text, why, who, by, cites) in enumerate(rows, 1)]
 
     # ---------------------------------------------------------------- shop-pay
@@ -770,7 +770,7 @@ def main() -> None:
                mr={"iid": 52, "url": "%s/shop/shop-pay/-/merge_requests/52" % GL, "state": "opened"}, open_questions=[])
     extra_rows.append(classified(p10, row, mr={"state": "opened", "labels": [], "questions": []}, at_handover=True))
     board_later(p10, row, mr_desc=mrdesc(p10, row["summary"]), credits=12.6,
-                decisions=decisions(p10, [("requirements", "超过一万的退款要二次确认", "产品定的", "P-1A2B", "person", [])]))
+                decisions=decisions(p10, [("requirements", "超过一万的退款要二次确认", "Q1 答\"按推荐\"（产品定的）", "P-1A2B", "person", [])]))
 
     # PAY-1: on this machine, built and verified; its session is idle since; Lean's next is the release, after a
     # review in a new session (the one that wrote the code cannot review it)
