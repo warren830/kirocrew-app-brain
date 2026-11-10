@@ -231,8 +231,10 @@ def test_no_session_without_brain_dev_carrying_leans_hooks(tmp_path, home):
             await svc.stop()
 
     out = run(go())
-    assert out["ok"] and out["slot"] is None and "hook" in out["session_error"]
-    assert not gw.slot_rows
+    assert out["ok"] and out["slot"] is None and not gw.slot_rows
+    # the button 设置's KiroCrew row has for this state, by its name
+    assert out["session_error"].startswith("brain-dev 的设置缺 Lean 的拦截：") and \
+        "在「设置」的 KiroCrew 里点「补上 Lean 的拦截」" in out["session_error"], out["session_error"]
 
 
 def test_a_missing_brain_dev_template_fails_closed_instead_of_crews_default_agent(tmp_path, home):

@@ -243,6 +243,25 @@ def test_agent_ok_needs_the_checks_to_have_found_leans_hooks():
                         {"level": "FAIL", "text": "仓库 pay：.kiro/brain/lean-hook.py is not committed"}])
 
 
+def test_a_session_refused_names_the_button_settings_shows_for_brain_dev(tmp_path, home):
+    """NEW-4: why brain-dev cannot be opened is said by the row 设置's KiroCrew shows, so the button it names is the
+    one there: brain-dev.json missing → 装上 brain-dev; hooks missing → 补上 Lean 的拦截; the file unreadable or
+    brain-kit not loaded → what to do, no button."""
+    cc, P = mod("crewcheck"), mod("problems")
+    make_service(tmp_path, [make_project(tmp_path)]).reload_sync()  # brain-kit loaded, no background tasks
+    agent = home / ".kiro" / "agents" / "brain-dev.json"
+    said = cc.not_ready(cc.checks([])["rows"])
+    assert not agent.exists() and said == "KiroCrew 里还没有 brain-dev。在「设置」的 KiroCrew 里点「装上 brain-dev」：" \
+        "装上 brain-kit 带的那一份；没有它，Lean 的拦截在 KiroCrew 里不会跑", said
+    agent.parent.mkdir(parents=True, exist_ok=True)
+    agent.write_text(json.dumps({"name": "brain-dev", "hooks": {}}))
+    assert "在「设置」的 KiroCrew 里点「补上 Lean 的拦截」" in cc.not_ready(cc.checks([])["rows"])
+    agent.write_text("{ not json")
+    said = cc.not_ready(cc.checks([])["rows"])
+    assert said.startswith("brain-dev 的设置读不懂") and "点「" not in said and "自己修好它" in said, said
+    assert cc.not_ready([P.brainkit_missing()]) == "brain-kit 没装载。在「设置」里写对 brain-kit 的位置"
+
+
 def test_a_repo_whose_lean_counts_the_run_records_as_code_fails(tmp_path, home):
     """brain-kit 72b278e / 48b6b97: Lean must leave runs/** out of its code fingerprint (aidlc-docs/lean.json
     fingerprint_exclude), or a park.json or MR.md written after `lean release` voids the RELEASE approval; `brain

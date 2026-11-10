@@ -17358,6 +17358,7 @@
   "repo": null,
   "raw": "没有 ~/.kiro/agents/brain-dev.json"
  },
+ "crew_not_ready": "KiroCrew 里还没有 brain-dev。在「设置」的 KiroCrew 里点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的拦截在 KiroCrew 里不会跑",
  "boards": {
   "r1/PAY-2": {
    "at": 1794146400,

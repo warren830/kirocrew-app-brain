@@ -214,6 +214,17 @@ def agent_ok(rows: list[dict[str, Any]]) -> bool:
     return any(r.get("level") == "OK" and str(r.get("text", "")).startswith(AGENT_OK) for r in rows)
 
 
+def not_ready(rows: list[dict[str, Any]]) -> str:
+    """Why a brain-dev session cannot be opened (agent_ok says no), in the words of the row 设置's KiroCrew shows for
+    it: its text and its 做什么, whose 点「…」 is the button that row has there (装上 brain-dev when brain-dev.json is
+    not there, 补上 Lean 的拦截 when hooks are missing), else what to do (brain-kit not loaded, the file unreadable)."""
+    r = next((r for r in rows if r.get("level") == "FAIL" and not r.get("repo")), None)
+    if r is None:
+        return "brain-dev 还没准备好：到「设置」的 KiroCrew 里再检查一次"
+    todo = str(r.get("todo") or "")
+    return "%s。%s%s" % (r["text"], "在「设置」的 KiroCrew 里" if todo.startswith("点「") else "", todo)
+
+
 def fix_agent() -> str:
     cli = bk.m("cli")
     path = cli.crew_agent_path()

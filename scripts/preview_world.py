@@ -54,6 +54,7 @@ service = importlib.import_module("_brainapp_backend.core.service")
 bk = importlib.import_module("_brainapp_backend.core.bk")
 brainview = importlib.import_module("_brainapp_backend.core.brainview")
 intake = importlib.import_module("_brainapp_backend.core.intake")
+crewcheck = importlib.import_module("_brainapp_backend.core.crewcheck")
 repo_mod = importlib.import_module("_brainapp_backend.core.repo")
 store = importlib.import_module("_brainapp_backend.core.store")
 BRAINKIT = Path(os.environ.get("BRAIN_TEST_BRAINKIT") or Path.home() / "warren_ws" / "brain-kit")
@@ -1133,7 +1134,7 @@ def main() -> None:
         r_["remote"] = r_["id"] not in local and r_["id"] != "r2"
     world = {"note": "made by scripts/preview_world.py: do not edit by hand", "at": T0, "status": world_status, "overview": world_ov,
              "overviews": overviews, "overviews_team": overviews_team, "todo": world_todo, "reflects": reflects,
-             "crew_missing": crew_fail, "boards": boards, "details": details, "stages": STAGES,
+             "crew_missing": crew_fail, "crew_not_ready": crewcheck.not_ready([crew_fail]), "boards": boards, "details": details, "stages": STAGES,
              "brains": brains, "intake_gates": intake_gates()}
     (ROOT / "ui" / "preview" / "world.json").write_text(json.dumps(world, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     # the contract fixtures the UI tests read: the overview's numbers for its own rows, one live board and one merged

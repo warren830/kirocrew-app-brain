@@ -74,8 +74,10 @@ const W = world as unknown as {
   overviews: Record<'eval' | 'noeval', Record<string, Overview>>; todo: Record<'ok' | 'crewfail' | 'team', Todo>
   /** team mode's 交付总览 (the team runner's machine): each requirement once, a handed-over one as the runner's */
   overviews_team?: Record<'eval' | 'noeval', Record<string, Overview>>
-  /** KiroCrew's row when brain-dev.json is not there at all (problems.agent_missing) */
+  /** KiroCrew's row when brain-dev.json is not there at all (problems.agent_missing), and why a session is not opened
+   * then (crewcheck.not_ready: the button that row has) */
   crew_missing?: CheckRow
+  crew_not_ready?: string
   stages: Record<string, RequirementDetail['lean']['stages']>; brains: Record<string, BrainView>
   /** brainview.preview of a reflectable run, by repo/key, when the world recorded it */
   reflects?: Record<string, ReflectPreview>
@@ -319,6 +321,8 @@ setApiRoutes({
   [`POST ${API}/refresh`]: (body) => ({ ok: true, text: `预览：没有真的跑 git fetch（${(body as { repo: string }).repo}）` }),
   [`POST ${API}/requirements/*`]: (body, path) => {
     if (path.endsWith('/session')) {
+      // as service._open_local: no brain-dev session while KiroCrew's brain-dev row fails
+      if (flags.has('crewfail') && !crewFixed) throw new StubApiError(409, { error: W.crew_not_ready ?? '', code: 'agent_not_ready' })
       const { key } = reqOf(path.replace(/\/session$/, ''))
       const slot = (body as OpenSessionBody | undefined)?.review ? `brain-${key}-review-${Math.random().toString(16).slice(2, 6)}` : `brain-${key}-7f3a`
       return { ok: true, slot, url: `/chat?sid=${slot}` }
@@ -359,6 +363,7 @@ setApiRoutes({
     const b = body as StartBody
     const r = keyed(fx.start(), b)
     if (!b.open_session) return { ...r, slot: null, url: null }
+    if (flags.has('crewfail') && !crewFixed) return { ...r, slot: null, url: null, session_error: W.crew_not_ready ?? '' }
     return r
   },
   [`POST ${API}/crew/fix`]: (body) => {

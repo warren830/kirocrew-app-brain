@@ -883,7 +883,7 @@ class Service:
                           kickoff: bool, review: bool = False) -> dict[str, Any]:
         self.crew = await asyncio.to_thread(self.crew_sync)
         if not crewcheck.agent_ok(self.crew["rows"]):
-            raise AppError("brain-dev 还没带上 Lean 的拦截：先在设置的 KiroCrew 里点「补上 Lean 的拦截」", "agent_not_ready", 409)
+            raise AppError(crewcheck.not_ready(self.crew["rows"]), "agent_not_ready", 409)
         scope = scope_of(repo.id, key)
         if review:
             task = intake.review_task(key, branch, run.get("intent"))
