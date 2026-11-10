@@ -594,6 +594,10 @@ def main() -> None:
     for e in ov["errors"] + [r_ for r_ in status["repos"] if r_.get("error")]:
         if "还没装 brain-kit" in e["error"]:
             e["error"] = NO_KIT
+    for e in ov["errors"]:      # service._overview_sync: what the app said, and its path (or the exception) for 细节
+        e["raw"] = e.get("raw") or "/Users/alice/workplace/shop-web"
+    for d_ in det["decisions"]:     # detail.decisions: the in-session questions each records the answer of
+        d_["asked"] = detail.asked_in(d_["text"], d_["why"])
     # each row's 变更说明 first line (service._row: mrdesc_view.plain_line of it): the requirement's own
     first = {"PAY-2": "退款单号加上校验位，重复和非法单号在入口就拒掉。", "PAY-4": "对账单按商户拆成一户一份，大商户按小时切。",
              "PAY-5": "退款回调失败自动重试，第 6 次转人工处理。", "PAY-7": "退款时选原因，原因列表在后台维护。"}

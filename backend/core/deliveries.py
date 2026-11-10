@@ -390,6 +390,13 @@ def _pair(x: Any) -> list[int] | None:
 
 NO_EVALUATE = "这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit"
 REPEAT_RULE = "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
+# how brainkit.evaluate counts each number (its eval.md and its own rule texts), said in words
+METRIC_RULE = {
+    "autonomy": "交接以后没有人插手就合并的需求 ÷ 交接过、已经合并的需求（批准、验收这些必经的审批不算插手）",
+    "delivery": "一次通过验收、合并后 14 天里没有回滚也没有修补的需求 ÷ 合并满 14 天的需求",
+    "judgment": "人做的事里落在判断点的（批准、驳回、回答停下来问的问题）÷ 人做的全部",
+    "credits_per_success": "做完的需求花的 credits 合计 ÷ 正确交付的需求数（只用来看，不设上限）",
+}
 
 
 def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict[str, Any] | None,
@@ -412,10 +419,6 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
         view["error"], view["raw"] = "交付评估的结果读不懂：brain-kit 的原话在细节里", repr(data)[:2000]
         return view, None
 
-    def rule(k: str) -> str:
-        v = data.get(k)
-        return str(v.get("rule") or "")[:300] if isinstance(v, dict) else ""
-
     def val(k: str) -> Any:
         v = data.get(k)
         return _pair(v.get("value")) if isinstance(v, dict) else _pair(v)
@@ -423,9 +426,9 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
     cost = data.get("cost") if isinstance(data.get("cost"), dict) else {}
     stale = data.get("staleness") if isinstance(data.get("staleness"), dict) else {}
     view["metrics"] = [
-        {"id": "autonomy", "label": "自主度", "value": val("autonomy"), "rule": rule("autonomy")},
-        {"id": "delivery", "label": "交付正确率", "value": val("delivery"), "rule": rule("delivery")},
-        {"id": "judgment", "label": "介入落在判断点", "value": val("judgment"), "rule": rule("judgment")},
+        {"id": "autonomy", "label": "自主度", "value": val("autonomy"), "rule": METRIC_RULE["autonomy"]},
+        {"id": "delivery", "label": "交付正确率", "value": val("delivery"), "rule": METRIC_RULE["delivery"]},
+        {"id": "judgment", "label": "介入落在判断点", "value": val("judgment"), "rule": METRIC_RULE["judgment"]},
         {"id": "repeat_rate", "label": "重复纠正率", "value": _pair(data.get("repeat_rate")),
          "rule": REPEAT_RULE},
         {"id": "useful", "label": "知识有用率", "value": _pair(data.get("useful")),
@@ -434,7 +437,7 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
          else None, "rule": "过时引用 + 同名术语 + 本期覆盖或撤回"},
         {"id": "credits_per_success", "label": "每个正确交付的 credits",
          "value": cost.get("per_success") if isinstance(cost.get("per_success"), (int, float)) else None,
-         "rule": str(cost.get("rule") or "")[:300]},
+         "rule": METRIC_RULE["credits_per_success"]},
     ]
     queue = []
     for q in data.get("review_queue") or []:

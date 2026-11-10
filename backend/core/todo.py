@@ -37,7 +37,8 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
         w = row.get("waits") or {}
         base = {"repo": row["repo"], "key": row["key"], "title": row["title"], "line": None, "approval": None,
                 "mr_url": (row.get("mr") or {}).get("url"), "question": None, "session": e.get("session"),
-                "since": w.get("since") if w.get("since") is not None else row.get("updated_at")}
+                "since": w.get("since") if w.get("since") is not None else row.get("updated_at"),
+                "review": bool(w.get("review")), "path": None}
         if team:
             if row["state"] == "parked" and (row.get("waits") or {}).get("who") == "people" and \
                     not any(d.get("state") == "open" for d in e.get("decisions") or []):
@@ -95,5 +96,6 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
             items.append({"kind": "crew", "repo": "", "key": "",
                           "title": "KiroCrew 检查" + (" · %s" % os.path.basename(os.path.normpath(repo)) if repo else ""),
                           "text": "%s。%s" % (r["text"], todo) if todo else r["text"], "line": None,
-                          "approval": None, "mr_url": None, "question": None, "session": None, "since": None})
+                          "approval": None, "mr_url": None, "question": None, "session": None, "since": None,
+                          "review": False, "path": None})
     return {"items": items, "team": team}
