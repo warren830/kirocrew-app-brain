@@ -597,7 +597,7 @@ function StartOut({ r, path, onOpen, onBoard, onItem, onMe }: {
         <span className="nr-started-mark" aria-hidden="true">{r.ok ? '✓' : '✕'}</span>
         <div>
           <b role="status">{r.ok ? `开工了${r.key ? `：${r.key}` : ''}` : r.problem ? `没开成：${r.problem.text}` : '没开成'}</b>
-          <small>{r.ok ? (r.url ? STARTED_NEXT : '分支和工作目录都好了。要开会话时，在需求详情里点「打开会话」。')
+          <small>{r.ok ? (r.url ? STARTED_NEXT : `分支和工作目录都好了。要开会话时，在${ACT.openDetail}里点「${ACT.openSession}」。`)
             : r.problem?.todo || '原因在下面「细节」里（开工时 brain-kit 的原话）：照它改好，再点「开工」。'}</small>
         </div>
       </div>
