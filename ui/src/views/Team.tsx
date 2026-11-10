@@ -85,13 +85,14 @@ type LedgerKey = keyof TeamView['ledger']
 const ledgerMeta = (k: LedgerKey, state: string): { label: string; tone: Tone } =>
   k === 'runs' ? runStateMeta(state) : k === 'decisions' ? questionMeta(state) : HANDOFF_STATE[state] ?? { label: state, tone: 'idle' }
 
-/** How a team runner works, for a machine that is not one. */
+/** How a team runner works, for a machine that is not one. The words break only where a phrase ends (TM_CSS keeps the
+ * rest whole): after punctuation, at a zero-width space (\u200b), never at a no-break space (\u00a0). */
 const RUNNER_FLOW: FlowStep[] = [
   { icon: 'handover', title: '交接', text: 'MR 打上交接标签' },
   { icon: 'bridge', title: '桥', text: '每一轮看 MR，检查交接' },
-  { icon: 'signer', title: '签名', text: '单独的签名服务签合同' },
-  { icon: 'runner', title: '运行机会话', text: '运行机上的会话接着做' },
-  { icon: 'release', title: 'MR 上回答、验收', text: '以 GitLab 身份' },
+  { icon: 'signer', title: '签名', text: '单独的签名服务\u200b签合同' },
+  { icon: 'runner', title: '运行机会话', text: '运行机上的会话\u200b接着做' },
+  { icon: 'release', title: '回答、验收', text: '在 MR 上，以\u00a0GitLab\u00a0身份' },
 ]
 
 export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
@@ -399,6 +400,8 @@ function RunChip({ state }: { state: string }) {
 }
 
 const TM_CSS = `
+/* a step's words break only between phrases (回答、| 验收; 每一轮看 MR，| 检查交接), never inside a word */
+.tm-root .br-flow > li { word-break: keep-all; overflow-wrap: anywhere; }
 .tm-top { display: flex; align-items: center; gap: .6em 1em; flex-wrap: wrap; }
 .tm-top-icon { color: var(--accent); }
 .tm-same .kt-role-icon { color: var(--kt-warn); }

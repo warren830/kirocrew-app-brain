@@ -184,6 +184,12 @@ describe('运行机', () => {
     expect(within(hero).getByText(/这台机器没开团队模式/)).toBeInTheDocument()
     for (const word of ['bridge.json', 'runnerd', 'brain-run']) expect(hero).not.toHaveTextContent(word)
     expect(within(hero).getAllByRole('listitem')).toHaveLength(5)
+    // each step's words break only where a phrase ends (1050: 「MR 上回 / 答、验收」 broke inside a word): kept whole,
+    // the last step's title is the two things done there, where in its line
+    const last = within(hero).getAllByRole('listitem')[4]
+    expect(last.querySelector('b')).toHaveTextContent(/^5回答、验收$/)
+    expect(last.querySelector('small')?.textContent).toBe('在 MR 上，以\u00a0GitLab\u00a0身份')
+    expect(document.querySelector('style')?.textContent).toContain('.tm-root .br-flow > li { word-break: keep-all;')
     await userEvent.setup().click(within(hero).getByRole('button', { name: '去设置' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'settings' })
     expect(apiCalls.filter((c) => c.path === `${API}/team`)).toHaveLength(0)
