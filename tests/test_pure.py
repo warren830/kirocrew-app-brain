@@ -2,6 +2,7 @@
 mode), overlaps, the decision funnel's fallback."""
 
 import json
+import time
 
 import pytest
 
@@ -336,7 +337,16 @@ def test_evaluate_notes_say_which_runs_wait_for_their_merge():
         {"key": "PAY-3", "correct": "wrong_open", "status": "pending"},
         {"key": "PAY-4", "correct": "wrong_open", "status": "pending"},
         {"key": "PAY-5", "correct": "correct", "status": "counted"}]},
-        "delivery": {"value": [1, 1], "rule": "", "wrong_open": ["PAY-4"]}}
+        "delivery": {"value": [1, 1], "rule": "", "wrong_open": ["PAY-4"]},
+        "cost": {"note": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"},
+        "review_queue": [{"key": "PAY-9", "reasons": [
+            {"rule": "verify_fail_rounds", "text": "verify 失败 3 次（≥2）"},
+            {"rule": "state_unknown", "text": "桥不知道派单成没成（send_unknown）：去 KiroCrew 看 slot"},
+            {"rule": "stuck", "text": "30 小时没有进展（最后一次 2026-11-08T01:00:00Z，≥24 小时算停住）：run 没接着做（park.json "
+                                      "还在等：去 KiroCrew 看 slot）"},
+            {"rule": "question_problem", "text": "桥上的问题没走通：D-2 作废（void）"},
+            {"rule": "outside_judgment", "text": "判断点之外有人介入 2 次（push_after_handover）"}]}],
+        "skipped": [{"key": "PAY-1", "why": "runs/PAY-1/run.json is not valid JSON"}]}
     mods = bk._state["mods"]
     saved = mods.get("evaluate")
     mods["evaluate"] = type("FakeEvaluate", (), {"collect": staticmethod(lambda *a, **k: data)})
@@ -350,6 +360,17 @@ def test_evaluate_notes_say_which_runs_wait_for_their_merge():
     assert view["available"] is True
     assert "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-4" in view["notes"]
     assert "已知有问题、还没合并（验收被驳回过；合并满 14 天才算进自主度）：PAY-3" in view["notes"]
+    # OVERVIEW-20: every note says what to do, brain-kit's own words under 细节
+    assert view["notes"] == [x["text"] for x in view["note_rows"]] and all(x["todo"] for x in view["note_rows"])
+    assert view["note_rows"][0]["text"] == "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个"
+    assert view["note_rows"][0]["raw"].startswith("--credits 只有一条记录")
+    # REST-29: the review queue's reasons and the skipped run in words
+    assert view["queue"][0]["reasons"] == [
+        "自动检查没过 3 次（2 次就要人看一眼）", "不知道运行机收没收到这次派单：去 KiroCrew 看一下它的会话",
+        "30 小时没有进展（最后一次 %s，≥24 小时算停住）：运行机没接着做（它的问题还在等：去 KiroCrew 看一下它的会话）" % time.strftime(
+            "%m-%d %H:%M", time.localtime(1794099600)),
+        "桥上的问题没走通：D-2 作废", "判断点之外有人介入 2 次（交接后推代码）"]
+    assert view["skipped"] == [{"key": "PAY-1", "why": "它的开工记录读不了", "raw": "runs/PAY-1/run.json is not valid JSON"}]
 
 
 def test_review_findings_are_listed_per_file():

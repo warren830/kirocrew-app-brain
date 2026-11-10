@@ -540,10 +540,12 @@ class Service:
         if not bk.has("evaluate"):
             return deliveries.evaluate("", {}, None, None)
         views, funnels, stale, got_parts = [], [], [], []
+        computing = False    # a repo's numbers for its default branch as it is now are still being worked out
         for rid in ids:
             repo = self.repos[rid]
             sha = repo.git.out("rev-parse", "-q", "--verify", (repo.main_ref() or "HEAD") + "^{commit}")
             got = self._eval.get(rid)
+            computing = computing or not got or got[0] != sha
             if not got or got[0] != sha or time.monotonic() - got[1] > EVAL_TTL_S:
                 stale.append((rid, sha))
             if got:
@@ -565,15 +567,16 @@ class Service:
                 threading_start(self._eval_compute, rid, sha, credits)
         if not views:
             return {"available": False, "error": "正在算交付评估…" if ids else "没有仓库", "raw": "", "ref": None,
-                    "metrics": [], "queue": [], "skipped": [], "notes": []}, None
+                    "metrics": [], "queue": [], "skipped": [], "notes": [], "computing": bool(ids)}, None
         ref = deliveries.branch_words([(v.pop("_name"), v.get("ref")) for v in views])
         if len(views) == 1:
-            return dict(views[0], ref=ref), (dict(funnels[0]) if funnels else None)
-        merged = {"available": any(v["available"] for v in views),
+            return dict(views[0], ref=ref, computing=computing), (dict(funnels[0]) if funnels else None)
+        merged = {"available": any(v["available"] for v in views), "computing": computing,
                   "error": "；".join(dict.fromkeys(v["error"] for v in views if v["error"])),
                   "raw": "\n".join(v.get("raw") or "" for v in views if v.get("raw")), "ref": ref, "metrics": [], "queue": [q for v in views for q in v["queue"]],
                   "skipped": [x for v in views for x in v.get("skipped") or []],
-                  "notes": [x for v in views for x in v.get("notes") or []]}
+                  "notes": [x for v in views for x in v.get("notes") or []],
+                  "note_rows": [x for v in views for x in v.get("note_rows") or []]}
         for m in views[0]["metrics"]:
             vals = [next((x["value"] for x in v["metrics"] if x["id"] == m["id"]), None) for v in views]
             pairs = [x for x in vals if isinstance(x, list)]

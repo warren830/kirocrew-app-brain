@@ -548,11 +548,15 @@ export interface EvalView {
   metrics: EvalMetric[]
   /** 复看队列 (low-score queue): runs that need a human look */
   queue: { key: string; intent: string | null; reasons: string[] }[]
-  /** runs brain-kit could not read: listed with brain-kit's reason, not counted in any metric */
-  skipped: { key: string; why: string }[]
+  /** runs brain-kit could not read: listed with the reason in words (brain-kit's own in raw), not counted in any metric */
+  skipped: { key: string; why: string; raw?: string }[]
   /** brain-kit's notes on the numbers, verbatim (credits it could not attribute to a run, deliveries already known
    * wrong whose 14 days are not over …) */
   notes: string[]
+  /** the same notes, each in words with what to do (做什么) and brain-kit's own words for 细节 */
+  note_rows?: EvalNote[]
+  /** true while brainkit.evaluate is still computing a repo's numbers: say 正在算, not 还没有 */
+  computing?: boolean
   /** brain-kit's own words behind error (for 细节); '' when none. The backend always sends it */
   raw?: string
 }
@@ -1245,3 +1249,6 @@ export interface CtoNumbers {
   /** merged per week (Monday, YYYY-MM-DD), by how: the last 12 weeks */
   weekly: { week: string; unattended: number; people: number; local: number; pending: number }[]
 }
+
+/** One of brain-kit's notes on the 交付评估 numbers: what it says, what to do, its own words (细节). */
+export interface EvalNote { text: string; todo: string; raw: string }

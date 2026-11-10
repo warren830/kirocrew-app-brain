@@ -206,3 +206,27 @@ def test_team_mode_lists_each_requirement_once_the_runners_facts_winning(tmp_pat
     assert sum(every["counts"].values()) == len(every["rows"]) == len(r1["rows"]) + len(runner["rows"])
     assert next(r for r in every["rows"] if r["key"] == "PAY-1")["state"] == "parked"
     assert not any(i["key"] == "PAY-1" and i["repo"] == "r1" for i in todo["items"]), todo["items"]
+
+
+def test_the_numbers_say_they_are_being_worked_out_until_evaluate_is_done(tmp_path, home):
+    """Overview 待确认-2: while brainkit.evaluate computes a repo's numbers the page is told so (正在算), then not."""
+    import asyncio
+    repo = make_project(tmp_path)
+    svc = make_service(tmp_path, [repo])
+
+    async def go():
+        await svc.start()
+        try:
+            first = await svc.overview("r1")
+            for _ in range(300):
+                later = await svc.overview("r1")
+                if not later["eval"].get("computing"):
+                    return first, later
+                await asyncio.sleep(0.1)
+            return first, later
+        finally:
+            await svc.stop()
+
+    first, later = run(go())
+    assert first["eval"]["computing"] is True and first["eval"]["available"] is False
+    assert later["eval"]["computing"] is False
