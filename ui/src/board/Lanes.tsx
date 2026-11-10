@@ -142,7 +142,7 @@ function LanesAxis({ board, ax }: { board: ReqBoard; ax: Axis }) {
 }
 
 const MARK_TITLE: Record<string, string> = {
-  commit: '提交', approved: '批准', rejected: '退回', request: '请求批准', refused: '口令没被接受', blocked: 'Lean 拦下',
+  commit: '提交', approved: '批准', rejected: '退回', request: '请求批准', refused: '批准的那一行没被接受', blocked: 'Lean 拦下',
   handover: '交接', accepted: '桥接手', signed: '签名', question: '问人', answer: '回答', 'verify-ok': '自动检查通过',
   'verify-fail': '自动检查没过', reflect: '回写', session: '会话',
 }

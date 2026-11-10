@@ -172,7 +172,7 @@
       "repo": "",
       "key": "",
       "title": "KiroCrew 检查",
-      "text": "brain-dev 的设置缺 Lean 的拦截：调用工具前。点「补上 Lean 的 hook」：只补上缺的（调用工具前），别的都不动",
+      "text": "brain-dev 的设置缺 Lean 的拦截：调用工具前。点「补上 Lean 的拦截」：只补上缺的（调用工具前），别的都不动",
       "line": null,
       "approval": null,
       "mr_url": null,

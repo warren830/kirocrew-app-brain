@@ -10,7 +10,7 @@ import { API, installFixtureRoutes } from './test/routes'
 import { apiCalls, apiError, badges, navigations } from './test/stubs/app-sdk'
 
 const bar = () => within(screen.getByTestId('br-appbar'))
-const FIX = '补上 Lean 的 hook'
+const FIX = '补上 Lean 的拦截'
 /** the bar's 待办 tab: its count is the number of things on 待办 */
 const TODO_N = fx.todo().items.length
 const TODO_TAB = `待办 ${TODO_N}`

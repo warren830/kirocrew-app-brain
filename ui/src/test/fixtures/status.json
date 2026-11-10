@@ -62,7 +62,7 @@
       {
         "level": "FAIL",
         "text": "brain-dev 的设置缺 Lean 的拦截：调用工具前",
-        "todo": "点「补上 Lean 的 hook」：只补上缺的（调用工具前），别的都不动",
+        "todo": "点「补上 Lean 的拦截」：只补上缺的（调用工具前），别的都不动",
         "fix": "agent",
         "repo": null,
         "raw": "缺的 hook：preToolUse"

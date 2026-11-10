@@ -536,7 +536,7 @@ def mr_title(purpose: str = "install") -> str:
 
 
 FILE_GROUPS = (
-    (".kiro/aidlc-lean/", "AI-DLC Lean 本体"), (".kiro/hooks/", "Lean 的 hook"), (".kiro/brain/", "KiroCrew 的 Lean hook 适配"),
+    (".kiro/aidlc-lean/", "AI-DLC Lean 本体"), (".kiro/hooks/", "Lean 的拦截"), (".kiro/brain/", "KiroCrew 里接上 Lean 拦截的那一层"),
     (".kiro/agents/", "brain-dev agent"), (".kiro/skills/", "skills（Lean 的和 brain 的）"),
     (".kiro/steering/", "steering"), ("aidlc-docs/", "Lean 的配置和记录（lean.json 的 fingerprint_exclude 加了 runs/**）"),
     (".brain/", "brain-kit 的配置 kit.json"), ("brain/", "Brain：PRODUCT、TECH、IMPROVEMENT、PROJECT"),

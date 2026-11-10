@@ -493,7 +493,7 @@ def now() -> float:
 
 # ---------------------------------------------------------------- the 交付总览's three numbers (the CTO 视图's)
 
-ACT_LABEL = {"approval": "批准", "rejection": "退回", "answer": "回答问题", "approval_refused": "口令没被接受",
+ACT_LABEL = {"approval": "批准", "rejection": "退回", "answer": "回答问题", "approval_refused": "批准的那一行没被接受",
              "push_after_handover": "交接后推代码", "allow_test_change": "允许改验收测试"}
 
 

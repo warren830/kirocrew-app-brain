@@ -23,7 +23,7 @@ EXCLUDE_FIX = ("修法：`brain install <项目目录>` 会把 \"runs/**\" 加�
 
 
 # a file name, a path, a field, a command or a code word in what a person reads (REST-29); the Brain's own files and
-# AGENTS.md may be named, and a button by its name (「补上 Lean 的 hook」)
+# AGENTS.md may be named, and a button by its name (「补上 Lean 的拦截」)
 CODE_WORD = re.compile(r"`|~/|\.kiro|aidlc-docs|\bruns/|\.json\b|\.py\b|\.gitignore|\b[a-z]+(?:_[a-z]+)+\b|\b(?:hook|hooks|"
                        r"PATH|pins|lint|rel|src|side|repeats|replaces|prop|run|origin|model|tools|rebase|kirocrew)\b")
 BRAIN_MD = re.compile(r"^(?:[\w-]+/)*(?:PRODUCT|TECH|IMPROVEMENT|PROJECT|PURGED)(?:-archive)?\.md$|^AGENTS\.md$")
@@ -222,7 +222,7 @@ def test_the_apps_own_rows():
     assert unread["text"] == "brain-dev 的设置读不懂：拦截那一段的写法认不出" and unread["raw"] == "文件：~/.kiro/agents/brain-dev.json"
     lacks = ok_row(P.agent_lacks([("userPromptSubmit", "UserPromptSubmit"), ("preToolUse", "PreToolUse")]))
     assert lacks["text"] == "brain-dev 的设置缺 Lean 的拦截：发消息、调用工具前" and lacks["fix"] == "agent"
-    assert lacks["todo"] == "点「补上 Lean 的 hook」：只补上缺的（发消息、调用工具前），别的都不动"
+    assert lacks["todo"] == "点「补上 Lean 的拦截」：只补上缺的（发消息、调用工具前），别的都不动"
     assert lacks["raw"] == "缺的 hook：userPromptSubmit、preToolUse"          # the trigger names only under 细节
     assert ok_row(P.agent_ok(0))["text"] == P.AGENT_OK == "brain-dev 的设置里 Lean 的拦截都在"
     assert P.agent_ok(2)["text"] == P.AGENT_OK + "（另有 2 个别的工具加的拦截，留着不动）"

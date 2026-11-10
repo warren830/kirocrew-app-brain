@@ -52,7 +52,7 @@ VALUE_NAMES: dict[str, dict[str, str]] = {
 
 # the fix buttons' names (ui.tsx CheckRows shows the name a row's 做什么 gives in 点「…」, these): every text that
 # points at a button says its name
-FIX_BUTTON = {"agent": "补上 Lean 的 hook", "engine": "把引擎换成 kas", "kit": "重装 kit 文件"}
+FIX_BUTTON = {"agent": "补上 Lean 的拦截", "engine": "把引擎换成 kas", "kit": "重装 kit 文件"}
 AGENT_NEW = "装上 brain-dev"      # the agent fix when ~/.kiro/agents/brain-dev.json is not there at all
 REINSTALL = "点「%s」：重装 brain-kit 并提交（默认直接在当前分支上，团队仓库可以选新分支开 MR）" % FIX_BUTTON["kit"]
 AGENT_NEW_TODO = "点「%s」：装上 brain-kit 带的那一份；没有它，Lean 的拦截在 KiroCrew 里不会跑" % AGENT_NEW

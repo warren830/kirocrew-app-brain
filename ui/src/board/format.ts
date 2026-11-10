@@ -51,7 +51,7 @@ export const EVENT_META: Record<BoardEventKind, { icon: string; label: string; t
   request: { icon: '✋', label: '请求批准', tone: 'approve' },
   approve: { icon: '👍', label: '批准', tone: 'ok' },
   reject: { icon: '↩️', label: '退回', tone: 'bad' },
-  refused: { icon: '🚫', label: '口令没被接受', tone: 'warn' },
+  refused: { icon: '🚫', label: '批准的那一行没被接受', tone: 'warn' },
   blocked: { icon: '🛑', label: 'Lean 拦下', tone: 'warn' },
   commit: { icon: '📝', label: '提交', tone: 'info' },
   handover: { icon: '📨', label: '交接', tone: 'handoff' },

@@ -207,7 +207,7 @@ describe('设置', () => {
     expect(crew).toHaveTextContent('brain-dev 的设置缺 Lean 的拦截：调用工具前')
     expect(within(crew).getByRole('img', { name: '1 正常，1 注意，1 有问题' })).toBeInTheDocument()
     expect(crew).toHaveClass('is-bad')
-    await user.click(within(crew).getByRole('button', { name: '补上 Lean 的 hook' }))
+    await user.click(within(crew).getByRole('button', { name: '补上 Lean 的拦截' }))
     expect(await within(crew).findByText('给 brain-dev 的设置补上了 Lean 的拦截：调用工具前。别的都没动；改之前的那份留作备份：brain-dev.json.bak-20261110-091500。新开的会话才会用上。')).toBeInTheDocument()
     expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/crew/fix`, body: { what: 'agent' } })
     expect(p.reloadStatus).toHaveBeenCalled()

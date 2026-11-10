@@ -342,7 +342,7 @@ describe('开需求', () => {
     for (const r of fx.status().crew.rows.filter((x) => x.level !== 'OK')) expect(card).toHaveTextContent(r.text)
     answer()
     expect(card).not.toHaveTextContent('KiroCrew 引擎：kas') // OK rows are not listed here
-    await user.click(within(card).getByRole('button', { name: '补上 Lean 的 hook' }))
+    await user.click(within(card).getByRole('button', { name: '补上 Lean 的拦截' }))
     await waitFor(() => expect(apiCalls.find((c) => c.path === `${API}/crew/fix`)?.body).toEqual({ what: 'agent' }))
     expect(await screen.findByText(CREW_OK)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'KiroCrew 的检查' })).toBeNull()
@@ -420,7 +420,7 @@ describe('开需求', () => {
     status.crew = { ...status.crew, rows: [fail, other] }
     const { user } = setup({
       [`GET ${API}/crew`]: () => ({ ...fx.crew(), rows: [fail, other] }),
-      [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了：~/.kiro/agents/brain-dev.json', rows: [{ ...fail, level: 'OK', text: 'brain-dev.json 的 Lean hook 都在', todo: '', fix: null }, other] }),
+      [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了：~/.kiro/agents/brain-dev.json', rows: [{ ...fail, level: 'OK', text: 'brain-dev.json 的 Lean 的拦截都在', todo: '', fix: null }, other] }),
     }, status)
     const card = await screen.findByRole('region', { name: 'KiroCrew 的检查' })
     expect(card).not.toHaveTextContent('lean-hook.py')                                  // shop-tools' row: not this requirement's
