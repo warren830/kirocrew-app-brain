@@ -5,7 +5,7 @@ own identities and ledger) and the bridge.json the app hosts, with brain-kit's s
 GitLab's notes, labels and MR versions are in memory; commits come from the bare repo (id and parent_ids, as GitLab's
 commits API shows them); authors come from the token (the bridge's, the signer's, a person's). A note can be edited
 (GitLab keeps its id and moves updated_at) or deleted, as whoever holds the account's token can on GitLab. GitLab
-GraphQL answers brain-kit's note_edits query (72b278e) as measured on gitlab.aws.dev on 2026-11-09: lastEditedAt follows
+GraphQL answers brain-kit's note_edits query (72b278e) as measured on a self-managed GitLab on 2026-11-09: lastEditedAt follows
 updated_at (an untouched note: its creation time; an award emoji moves it too), lastEditedBy names the last editor of
 the text only (an award emoji leaves it empty).
 """
@@ -21,7 +21,7 @@ from urllib.parse import parse_qsl, unquote, urlsplit
 
 import pytest
 
-from appkit import BRAINKIT, ROOT, sh
+from appkit import ready_note, BRAINKIT, ROOT, sh
 from brainfix import brain, make_project, start_in_worktree
 
 P = "grp/repo"
@@ -209,9 +209,9 @@ def make_world(tmp_path, home, monkeypatch, *, bridge_user="brain-bridge", signe
     wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "repo" / "refund", "refund", "退款")
     intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
     st = wt / "aidlc-docs" / intent / "aidlc-state.md"
-    st.write_text(st.read_text().replace("Status: Inception: starting", "Status: Construction step 2 of 4"))
+    ready_note(st, "Status: Construction step 2 of 4")
     sh("git", "-C", wt, "commit", "-qam", "notes")
-    brain(wt, "handoff", "--no-label")
+    push_unlabelled(wt)
     bare = tmp_path / "repo-origin.git"
     gl = GitLab(bare)
     (tmp_path / "keys").mkdir()
@@ -279,7 +279,7 @@ def push_park(path, park=PARK):
 def hand_off(world):
     """alice runs `brain handoff --no-label` again in her worktree: a new hand-over commit (run.json and nothing else,
     on top of the branch), pushed. The label is hers to add (``world["gl"].label("alice")``)."""
-    brain(world["wt"], "handoff", "--no-label")
+    push_unlabelled(world["wt"])
     return sh("git", "-C", world["wt"], "rev-parse", "HEAD").stdout.strip()
 
 
@@ -321,3 +321,11 @@ def answer_voucher(sha, park_raw, did, choice, author, question_note, kind="clar
         v["question_note"] = question_note
     v.update(extra)
     return v
+
+
+def push_unlabelled(wt) -> None:
+    """`brain handoff --no-label`: pushed, not labelled (the test labels the MR itself). brain-kit 1238919 (R1-26) exits
+    1 for a hand-over pushed but not labelled, as its docs 4.3 say; older ones exit 0."""
+    p = brain(wt, "handoff", "--no-label", check=False)
+    out = p.stdout + p.stderr
+    assert p.returncode == 0 or (p.returncode == 1 and "NOT labelled" in out), out

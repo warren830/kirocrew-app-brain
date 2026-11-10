@@ -285,6 +285,7 @@ def test_eval_batch_states_and_families_reach_the_numbers():
     assert runs["PAY-3"]["how"] == "pending"      # being built on this machine, not merged: not judged, not 本机做完
     fam = deliveries.family_rows(data)
     assert fam == [{"key": "PAY-1", "repo": "", "children": ["PAY-2", "PAY-3"], "merged": 1, "total": 2,
+                    "not_started": [], "closed": [],
                     "state": "in_progress", "state_label": "小需求在做", "at_points": 2, "outside": 1, "questions": 0,
                     "credits": 4.5}]
     weekly = deliveries.cto_numbers([("r1", deliveries.cto_part(data))], [], available=True, now=1794146400)["weekly"]
@@ -306,3 +307,18 @@ def test_the_timeline_says_a_bridge_decisions_state_and_commit_and_the_runs_on_a
     assert items["D-3 a_new_state"]["detail"] is None             # a state brain-kit adds later: as it is
     assert detail.other_runs(t) == ["RUN-PAY-3-1（ai/alice/PAY-3-old，已关闭）", "RUN-PAY-3-2（分支认不出，桥上没有它的状态）"]
     assert detail.other_runs({}) == []
+
+
+def test_families_count_as_intent_list_does_and_a_claim_closed_small_one_says_so():
+    """brain-kit 1238919 (R1-89): a family's total is the small ones not closed (not started included), not_started and
+    closed name them; a small one whose claim was closed is state closed with closed_by "claim": 需求关了, not MR 关了."""
+    data = {"traces": [{"key": "PAY-4", "outcome": {"handed_over": {"value": False}, "merged_at": {"value": None}},
+                        "humans": [], "cost": {}, "family": {"role": "child", "parent": "PAY-1"}}],
+            "autonomy": {"runs": []},
+            "batch": [{"key": "PAY-4", "state": "closed", "closed_by": "claim", "parent": "PAY-1", "delivery": "closed"}],
+            "families": [{"key": "PAY-1", "children": ["PAY-2", "PAY-3", "PAY-4"], "merged": 1, "total": 2,
+                          "not_started": ["PAY-3"], "closed": ["PAY-4"], "state": "in_progress", "judgment": [0, 0]}]}
+    fam = deliveries.family_rows(data)[0]
+    assert (fam["merged"], fam["total"], fam["not_started"], fam["closed"]) == (1, 2, ["PAY-3"], ["PAY-4"])
+    run = {r["key"]: r for r in deliveries.cto_part(data)["runs"]}["PAY-4"]
+    assert run["state_label"] == "需求关了（没合并）"

@@ -462,6 +462,8 @@ function BatchRows({ ev, onKey, onFamily }: { ev: EvalView; onKey: (key: string)
             <span className="br-batch-chips">
               <span className={`br-chip tone-${FAMILY_TONE[f.state] ?? 'idle'}`}>{f.state_label || f.state}</span>
               <span className="br-batch-chip" data-n="merged" title={f.children.length ? `小需求：${f.children.join('、')}` : undefined}>已合并<b>{f.merged}/{f.total}</b></span>
+              {(f.not_started?.length ?? 0) > 0 && <span className="br-batch-chip" data-n="not_started" title={f.not_started!.join('、')}>没开工<b>{f.not_started!.length}</b></span>}
+              {(f.closed?.length ?? 0) > 0 && <span className="br-batch-chip" data-n="closed" title={`关了，不算在内：${f.closed!.join('、')}`}>关了<b>{f.closed!.length}</b></span>}
               <span className="br-batch-chip" data-n="at_points" title="大需求和它的小需求加起来">判断点上<b>{f.at_points}</b></span>
               <span className="br-batch-chip" data-n="outside" title="大需求和它的小需求加起来">判断点外<b>{f.outside}</b></span>
               <span className="br-batch-chip" data-n="questions">问题<b>{f.questions}</b></span>

@@ -729,7 +729,12 @@ export interface EvalFamily {
   repo: string
   children: string[]
   merged: number
+  /** the small ones not closed, those not started included (brain-kit 1238919, as `brain intent list` counts) */
   total: number
+  /** of them, those nobody started yet; [] before brain-kit 1238919 */
+  not_started?: string[]
+  /** the small ones whose claim was closed: not counted in total */
+  closed?: string[]
   /** brain-kit's: in_progress | ready_to_release, or the big requirement's own (merged, closed, failed …) */
   state: string
   state_label: string
@@ -1099,9 +1104,10 @@ export interface ReflectApplyResult {
 
 /** handoff_unlabelled: pushed, but its MR carries no hand-over label (nothing was handed over); child_start: a small
  * requirement you claimed whose dependencies have all merged (开工 now); parent_release: a big requirement whose small
- * ones have all merged (review and release it) */
+ * ones have all merged (review and release it); closed_leftover: your requirement closed with `brain intent close` whose
+ * run branch or MR is still there (delete it, close it) */
 export type TodoKind = 'lean_approval' | 'question' | 'clarify' | 'acceptance' | 'handoff_rejected' | 'handoff_unlabelled' | 'crew'
-  | 'child_start' | 'parent_release'
+  | 'child_start' | 'parent_release' | 'closed_leftover'
 export interface TodoItem {
   kind: TodoKind
   repo: string

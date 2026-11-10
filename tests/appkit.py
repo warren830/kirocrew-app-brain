@@ -6,6 +6,7 @@ import importlib
 import itertools
 import json
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -176,3 +177,11 @@ def commit_file(repo: Path, rel: str, text: str, msg: str = "c") -> str:
 def write_json(path: Path, obj: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def ready_note(state: Path, status: str) -> None:
+    """Fill a new intent's Session notes the way a session does before `brain handoff`: its Status, and a ### Next item
+    in place of Lean's template one (brain-kit 1238919, R1-28: a Next still Lean's template is a note not written)."""
+    t = state.read_text().replace("Status: Inception: starting", status)
+    t = re.sub(r"(?m)^(\s*(?:[-*]|\d+\.)\s*)Read the code the change touches\..*$", r"\1Continue the code plan with its next step.", t)
+    state.write_text(t)

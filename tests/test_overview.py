@@ -2,6 +2,7 @@
 merged; overlaps; the approval line is shown, never sent."""
 
 import json
+from appkit import ready_note
 
 from brainfix import (install_brain_dev, lean, make_project, make_service, needs_brainkit, request_requirements, run,
                       sh, start_in_worktree, brain)
@@ -56,7 +57,7 @@ def test_a_handed_over_run_and_a_merged_one(tmp_path, home):
     wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "refund", "refund", "退款")
     intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
     state = wt / "aidlc-docs" / intent / "aidlc-state.md"
-    state.write_text(state.read_text().replace("Status: Inception: starting", "Status: Construction step 2 of 4"))
+    ready_note(state, "Status: Construction step 2 of 4")
     sh("git", "-C", wt, "commit", "-qam", "notes")
     brain(wt, "handoff", "--no-push")
     wt2 = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "done", "done", "做完了")

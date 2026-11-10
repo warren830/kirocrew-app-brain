@@ -504,7 +504,9 @@ def delivery_label(delivery: Any) -> str:
 
 
 def family_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
-    """brain-kit's eval ``families`` (0d52e97): one row per big requirement split into small ones; [] without."""
+    """brain-kit's eval ``families`` (0d52e97): one row per big requirement split into small ones; [] without. Since
+    1238919 (R1-89) ``total`` counts the small ones not closed, those not started included, as `brain intent list`
+    does; ``not_started`` and ``closed`` name them (absent before)."""
     out = []
     for x in data.get("families") or []:
         if not isinstance(x, dict) or not x.get("key"):
@@ -513,6 +515,8 @@ def family_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
         c = x.get("credits")
         out.append({"key": str(x["key"]), "repo": "", "children": [str(k) for k in x.get("children") or []][:50],
                     "merged": int(x.get("merged") or 0), "total": int(x.get("total") or 0),
+                    "not_started": [str(k) for k in x.get("not_started") or [] if isinstance(k, str)][:50],
+                    "closed": [str(k) for k in x.get("closed") or [] if isinstance(k, str)][:50],
                     "state": str(x.get("state") or ""), "state_label": state_label(x.get("state")),
                     "at_points": j[0], "outside": j[1], "questions": int(x.get("questions") or 0),
                     "credits": round(float(c), 2) if isinstance(c, (int, float)) and not isinstance(c, bool) else None})
@@ -566,7 +570,9 @@ def cto_part(data: dict[str, Any]) -> dict[str, Any]:
                      "credits": round(float(c), 2) if isinstance(c, (int, float)) and not isinstance(c, bool) else None,
                      "merged_at": lean_view.epoch(((o.get("merged_at") or {}).get("value"))),
                      "state": str(b["state"]) if b.get("state") else None,
-                     "state_label": state_label(b.get("state")) if b.get("state") else "",
+                     # 1238919 (R1-89): a small one whose claim was closed is `closed` too, closed_by "claim"
+                     "state_label": ("需求关了（没合并）" if b.get("closed_by") == "claim" else state_label(b.get("state")))
+                     if b.get("state") else "",
                      "stuck": b["stuck"] if isinstance(b.get("stuck"), bool) else None,
                      "delivery": str(b["delivery"]) if b.get("delivery") else None,
                      "delivery_label": delivery_label(b.get("delivery")) if b.get("delivery") else "",

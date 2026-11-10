@@ -639,13 +639,16 @@ describe('交付总览: 大需求和小需求', () => {
         at_points: 3, outside: 1, questions: 2, credits: 40.2 },
       { key: 'PAY-40', repo: '', children: ['PAY-41'], merged: 1, total: 1, state: 'ready_to_release', state_label: '小需求都合进了，等发布',
         at_points: 1, outside: 0, questions: 0, credits: null },
+      // brain-kit 1238919: the small ones not started and the closed ones are named
+      { key: 'PAY-50', repo: '', children: ['PAY-51', 'PAY-52', 'PAY-53'], merged: 1, total: 2, not_started: ['PAY-52'], closed: ['PAY-53'],
+        state: 'in_progress', state_label: '小需求在做', at_points: 0, outside: 0, questions: 0, credits: null },
     ]
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
     const p = props()
     render(<OverviewView entry={{}} {...p} />)
     const table = await screen.findByTestId('req-table')
     const rows = screen.getAllByTestId('eval-family')
-    expect(rows.map((r) => r.getAttribute('data-family'))).toEqual(['PAY-20', 'PAY-40'])
+    expect(rows.map((r) => r.getAttribute('data-family'))).toEqual(['PAY-20', 'PAY-40', 'PAY-50'])
     const chips = (r: HTMLElement) => Array.from(r.querySelectorAll('.br-batch-chip')).map((c) => c.textContent)
     expect(rows[0]).toHaveTextContent('大需求 PAY-20')
     expect(within(rows[0]).getByText('小需求在做')).toHaveClass('br-chip', 'tone-info')
@@ -653,9 +656,11 @@ describe('交付总览: 大需求和小需求', () => {
     expect(rows[0].querySelector('[data-n="merged"]')).toHaveAttribute('title', '小需求：PAY-21、PAY-22、PAY-23、PAY-24')
     expect(within(rows[1]).getByText('小需求都合进了，等发布')).toHaveClass('tone-wait')
     expect(chips(rows[1])).toEqual(['已合并1/1', '判断点上1', '判断点外0', '问题0', 'credits—'])
+    expect(chips(rows[2])).toEqual(['已合并1/2', '没开工1', '关了1', '判断点上0', '判断点外0', '问题0', 'credits—'])
+    expect(rows[2].querySelector('[data-n="closed"]')).toHaveAttribute('title', '关了，不算在内：PAY-53')
     // next to the batch rows: after the metrics, before 要复看 and 跳过; not requirement rows
     const order = Array.from(table.querySelectorAll('tr.br-batch')).map((r) => r.getAttribute('data-testid'))
-    expect(order).toEqual(['eval-batch', 'eval-family', 'eval-family', 'eval-queue', 'eval-skipped'])
+    expect(order).toEqual(['eval-batch', 'eval-family', 'eval-family', 'eval-family', 'eval-queue', 'eval-skipped'])
     expect(keysOf(table)).toEqual(ALL_KEYS)
     await user.click(within(rows[0]).getByRole('button', { name: 'PAY-20' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-20', from: 'overview' })
