@@ -97,6 +97,23 @@ describe('交付总览', () => {
     expect(screen.getByRole('article', { name: '无人值守' })).not.toHaveTextContent('0/0')
   })
 
+  test('brain-kit’s notes and a skipped run in words with 做什么, its own words under 细节 (the backend’s note_rows, skipped raw)', async () => {
+    const ov = fx.overview()
+    const raw = '--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）'
+    ov.eval = { ...ov.eval, notes: ['花费只有一个总数'], skipped: [{ key: 'PAY-1', why: '它的开工记录读不了', ...{ raw: 'runs/PAY-1/run.json: Expecting value: line 3' } }],
+      ...{ note_rows: [{ text: '花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个', todo: '在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来', raw }] } }
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props()} />)
+    const note = await screen.findByTestId('eval-notes')
+    expect(note).toHaveTextContent('brain-kit 说：花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个')
+    expect(note).toHaveTextContent('做什么：在这个 app 里开会话做需求，花费就按需求分开记')
+    expect((within(note).getByText('细节').closest('details') as HTMLDetailsElement).open).toBe(false)
+    expect(within(note).getByText(raw)).toBeInTheDocument()
+    const skipped = screen.getByTestId('eval-skipped')
+    expect(skipped).toHaveTextContent('读不了，不算进数字：它的开工记录读不了')
+    expect(within(skipped).getByText('细节').closest('details')).toHaveTextContent('Expecting value')
+  })
+
   test('/status not read (the login expired): the top says how many requirements, not 「0 个仓库」', async () => {
     installFixtureRoutes()
     render(<OverviewView entry={{}} {...props({ status: null })} />)
@@ -107,7 +124,7 @@ describe('交付总览', () => {
   test('while brain-kit works the eval out (the backend’s computing flag), the page says 正在算, not 还没有', async () => {
     const ov = fx.overview()
     ov.cto = { ...ov.cto, available: false, unattended: null, stepped_in: null }
-    ov.eval = { ...ov.eval, available: false, error: '正在算交付评估…', raw: '', metrics: [], queue: [], skipped: [], notes: [], computing: true } as typeof ov.eval
+    ov.eval = { ...ov.eval, available: false, error: '正在算交付评估…', raw: '', metrics: [], queue: [], skipped: [], notes: [], ...{ computing: true } }
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
     render(<OverviewView entry={{}} {...props()} />)
     const hero = await screen.findByTestId('ov-hero')

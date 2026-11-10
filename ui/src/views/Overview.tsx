@@ -142,12 +142,12 @@ type RepoCount = { open: number; you: number }
 const isOpen = (r: Requirement) => r.state !== 'merged' && r.state !== 'closed'
 const idOf = (r: { repo: string; key: string }) => `${r.repo}/${r.key}`
 
-/** brain-kit's eval is being worked out in the background (the first look, a new commit on the default branch). The
- * backend's flag on EvalView; without it the old words stand. */
-const isComputing = (ev: EvalView): boolean => {
-  const x = ev as EvalView & { computing?: unknown; state?: unknown }
-  return x.computing === true || x.state === 'computing'
-}
+/** What the backend's EvalView carries beyond this branch's types.ts (the backend fixer's, optional): computing while
+ * brain-kit works the numbers out, each note with 做什么 and its own words, a skipped run's own words. Without them the
+ * old words stand. */
+type EvalMore = Omit<EvalView, 'skipped'> & { computing?: boolean; note_rows?: { text: string; todo: string; raw: string }[]; skipped: { key: string; why: string; raw?: string }[] }
+const more = (ev: EvalView): EvalMore => ev
+const isComputing = (ev: EvalView): boolean => more(ev).computing === true
 
 /** A repo pill's counts: its requirements in progress, and those that wait on you (a merge to write back into the
  * Brain too, as 轮到你 lists them); 'all' among *ids*: every row. */
@@ -773,6 +773,7 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
 }) {
   const computing = !ev.available && isComputing(ev)
   const missing = !computing && (noModule || !ev.error)
+  const notes = more(ev).note_rows
   // brain-kit's own words; a backend older than EvalView.raw put them in the error of a missing module
   const folded = ev.raw ?? (missing ? ev.error : '')
   return (
@@ -814,15 +815,22 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
                   <span>{q.reasons.join('；')}</span>
                 </li>
               ))}
-              {ev.skipped.map((x) => (
+              {more(ev).skipped.map((x) => (
                 <li key={`s-${x.key}`} data-testid="eval-skipped">
                   <span className="kt-pill tone-idle">跳过</span>
                   <button type="button" className="br-link br-key" onClick={() => onItem(x.key)}>{x.key} ↗</button>
                   <span><span className="br-warn-text">读不了，不算进数字：</span>{x.why}</span>
                   <span className="cto-was">做什么：在它的分支上把这个文件改对，下一次评估就会算进来</span>
+                  {x.raw && x.raw !== x.why && <details className="br-raw"><summary>细节</summary><pre>{x.raw}</pre></details>}
                 </li>
               ))}
-              {ev.notes.length > 0 && <li className="cto-was" data-testid="eval-notes">brain-kit 说：{ev.notes.join('；')}</li>}
+              {notes ? notes.map((n, i) => (
+                <li key={`n-${i}`} className="cto-was" data-testid="eval-notes">
+                  <span>brain-kit 说：{n.text}</span>
+                  {n.todo && <span>做什么：{n.todo}</span>}
+                  {n.raw && n.raw !== n.text && <details className="br-raw"><summary>细节</summary><pre>{n.raw}</pre></details>}
+                </li>
+              )) : ev.notes.length > 0 && <li className="cto-was" data-testid="eval-notes">brain-kit 说：{ev.notes.join('；')}</li>}
             </ul>
           )}
         </>

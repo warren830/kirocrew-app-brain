@@ -941,6 +941,9 @@ export interface TodoItem {
   title: string
   /** what to do, one sentence */
   text: string
+  /** reply: the row's waits.review, Lean's review in a NEW session (开审查会话), not a turn in this one. The backend
+   * always sends it */
+  review?: boolean
   /** lean_approval: the exact line the person types themselves in that session (the app never sends it) */
   line: string | null
   approval: string | null
@@ -950,9 +953,6 @@ export interface TodoItem {
   /** the brain-dev session to open, for lean_approval / clarify */
   session: { slot: string; title: string; url: string } | null
   since: number | null
-  /** reply: the row's waits.review, Lean's review in a NEW session (开审查会话), not a turn in this one. The backend
-   * always sends it */
-  review?: boolean
 }
 export interface Todo { items: TodoItem[]; team: boolean }
 
