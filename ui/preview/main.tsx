@@ -73,6 +73,8 @@ const W = world as unknown as {
   status: Status; overview: Overview; boards: Record<string, ReqBoard>; details: Record<string, RequirementDetail>
   overviews: Record<'eval' | 'noeval', Record<string, Overview>>; todo: Record<'ok' | 'crewfail' | 'team', Todo>
   stages: Record<string, RequirementDetail['lean']['stages']>; brains: Record<string, BrainView>
+  /** brainview.preview of a reflectable run, by repo/key, when the world recorded it */
+  reflects?: Record<string, ReflectPreview>
 }
 let repos: RepoInfo[] = flags.has('norepos') ? [] : clone(W.status.repos)
 
@@ -228,13 +230,16 @@ function brain(path: string): BrainView {
     usage: { useful: [0, 0], repeat_rate: [0, 0], archived: 0, purged: 0, runs: [], never_cited: [], repeats_any: [], unmerged: [] }, reflect: [] }
 }
 
-/** POST /brain/reflect/preview: the requirement's own run, planned against that repo's Brain in the world. PAY-5 has
- * new knowledge (the fixture, said as the backend says brain-kit's lines); a run whose entries are in the Brain already
- * (T-ORD-2-1 is ORD-2's) was written back, so brain-kit skips those proposals; any other has nothing to write back. A
- * merged run is read on main, one in its worktree there. */
+/** POST /brain/reflect/preview: the requirement's own run, planned against that repo's Brain in the world: the
+ * backend's own answer when the world recorded it; else PAY-5 has new knowledge (the fixture, said as the backend says
+ * brain-kit's lines), a run whose entries are in the Brain already (T-ORD-2-1 is ORD-2's) was written back, so
+ * brain-kit skips those proposals, and any other proposes nothing the world knows of. A merged run is read on main,
+ * one in its worktree there. */
 function reflectPreview(repo: string, key: string): ReflectPreview {
   const brain = W.brains[repo]
   if (!brain || !listedRepos().some((r) => r.id === repo && r.ok)) throw new StubApiError(404, { error: '没有这个仓库', code: 'no_repo' })
+  const recorded = W.reflects?.[`${repo}/${key}`]
+  if (recorded) return clone(recorded)
   const row = W.boards[`${repo}/${key}`]?.row
   const source = `${row?.state === 'merged' ? 'main:' : ''}aidlc-docs/${row?.intent ?? key.toLowerCase()}/decisions.md`
   const f = fx.reflect()
