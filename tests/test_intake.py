@@ -73,6 +73,59 @@ def test_a_file_not_taken_says_why_in_words_and_brain_kit_s_own_stay_in_the_find
     assert intake.refused_text("不收 .exe 格式：请另存为 docx / xlsx / pptx / pdf / md 再交").startswith("不收 .exe 格式")
 
 
+def test_every_stop_line_of_the_current_brain_kit_is_said_in_the_apps_words(tmp_path, home):
+    """SETUP-5 / SETUP-13 / NEW-1…3: brain-kit's own dry run for a set where no file can be taken, excludes that leave
+    nothing, 绝密 picked or marked, 不确定 refused: each stop line by file name, no document code, no CLI flag, no
+    brain-kit English; 「不收这些文件」 only where leaving a file out is the fix."""
+    repo = make_project(tmp_path)
+    svc = make_service(tmp_path, [repo])
+    pic, one = tmp_path / "图", tmp_path / "一份"
+    pic.mkdir(), one.mkdir()
+    (pic / "截图.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 32)
+    (one / "需求.md").write_text("# 需求\n\n退款按原路退回。\n", encoding="utf-8")
+    (one / "绝密说明.md").write_text("# 说明\n\n绝密\n\n退款按原路退回。\n", encoding="utf-8")
+    req, secret = str(one / "需求.md"), str(one / "绝密说明.md")
+    form = dict(body(tmp_path), business="keep")
+
+    async def go():
+        await svc.start()
+        try:
+            return [await svc.intake_check(dict(form, **kw)) for kw in (
+                {"docs": [str(pic)]}, {"docs": [req], "exclude": ["需求.md"]}, {"docs": [req], "classification": "secret"},
+                {"docs": [secret]}, {"docs": [req], "classification": "unsure"})]
+        finally:
+            await svc.stop()
+
+    (pic_set, emptied, secret_pick, secret_file, unsure) = run(go())
+    assert pic_set["blocking"] == ["没有一个文件收得进来，这次没有材料可交：图/截图.png（图片里的字读不出来：把图里的文字写进文档再交）。"
+                                   "按原因改好再交"], pic_set
+    assert emptied["error"] == "没有可收的文件：「不收这些文件」把给的文件都去掉了：少写几个，或者不交文档", emptied
+    assert secret_pick["blocking"] == ["第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要"], secret_pick
+    assert secret_file["blocking"] == ["第 2 关：绝密材料不收（绝密说明.md 标着绝密）：先请产品写一份脱敏摘要，交摘要；"
+                                       "不想交这份，就把它写进「不收这些文件」"], secret_file
+    assert unsure["blocking"] == ["第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要"], unsure
+    said = json.dumps([[c["blocking"], c["error"]] for c in (pic_set, emptied, secret_pick, secret_file, unsure)],
+                      ensure_ascii=False)
+    for word in ("D01", "--", "OCR", "secret", "unsure", "exclude", "门 "):
+        assert word not in said, word
+    assert all(c["blocking_raw"] for c in (pic_set, secret_pick, secret_file, unsure))   # brain-kit's words, for 细节
+
+
+def test_older_brain_kits_stop_lines_still_read_in_words():
+    """The installed app may carry a brain-kit from before dac1856 / 2340f88 / f3ca3ec: its lines still read."""
+    gate = mod("intake").gate_text
+    assert gate("门 2：材料是绝密（），不收，只留哈希", {"classification": "secret"}) == \
+        "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要"
+    assert gate("门 2：材料是绝密（a.pdf），不收，只留哈希", {"classification": "internal"}) == \
+        "第 2 关：绝密材料不收（a.pdf 标着绝密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」"
+    conf = "门 2：材料按机密处理（D03 合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。"
+    assert gate(conf, {"classification": "internal"}).startswith("第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）")
+    # the person's own refused pick: leaving the file out would not help
+    assert "不收这些文件" not in gate(conf, {"classification": "confidential"})
+    assert gate("没有可收的文件", {"exclude": ["*.png"]}) == "没有可收的文件：文档是空的，或者都被「不收这些文件」排除了"
+    assert gate("没有可收的文件", {"exclude": []}) == "没有可收的文件：给的文件夹里没有文件"
+
+
 def test_a_requirement_claimed_already_is_started_with_its_own_key(tmp_path, home):
     """需求看板 / 需求详情 send a claimed requirement to 开需求 with its key: `brain start --key` takes the person's own
     claim (no new key); someone else's says whose it is, in words."""
