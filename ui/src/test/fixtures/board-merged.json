@@ -821,9 +821,9 @@
       "title": "回写 Brain",
       "sub": "合并后写回新知识",
       "icon": "brain",
-      "status": "merged",
-      "doing": "回写分支 brain/PAY-2-reflect-1 已合并",
-      "since": 1793834340,
+      "status": "done",
+      "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
+      "since": 1793715540.0,
       "history": [
         {
           "at": 1793661540.0,
@@ -836,12 +836,6 @@
           "status": "done",
           "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
           "who": null
-        },
-        {
-          "at": 1793834340,
-          "status": "merged",
-          "doing": "回写分支 brain/PAY-2-reflect-1 已合并",
-          "who": null
         }
       ],
       "spans": [],
@@ -850,11 +844,6 @@
           "at": 1793715540.0,
           "kind": "reflect",
           "title": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）"
-        },
-        {
-          "at": 1793834340,
-          "kind": "reflect",
-          "title": "回写分支 brain/PAY-2-reflect-1 已合并"
         }
       ],
       "facts": [
@@ -1396,16 +1385,6 @@
       "from": "person",
       "to": "reflect",
       "text": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
-      "detail": false,
-      "src": null
-    },
-    {
-      "seq": 50,
-      "at": 1793834340,
-      "kind": "reflect",
-      "from": "person",
-      "to": "reflect",
-      "text": "回写分支 brain/PAY-2-reflect-1 已合并",
       "detail": false,
       "src": null
     }
