@@ -24,7 +24,7 @@ import re
 from .. import __version__
 from ..common import BrainError, canonical, iso, utcnow, write_json, load_json
 from . import checks
-from .convert import Refused, convert
+from .convert import Refused, convert, head_and_tail
 
 CLASSES = ("public", "internal", "confidential", "secret")
 CLASS_MARKERS = [
@@ -54,6 +54,13 @@ def sha256_file(path) -> str:
     return h.hexdigest()
 
 
+def _size(path) -> int:
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return 0
+
+
 def collect(paths) -> list:
     """[(abs_path, display_name)] for files and folders (folders recursively, sorted, junk skipped)."""
     out = []
@@ -75,10 +82,96 @@ def collect(paths) -> list:
     return out
 
 
+def excluded(path, name, pattern) -> bool:
+    """`--exclude PATTERN` leaves out this file (`path`, shown as `name`, e.g. 飞书导出/附件/x.md). The pattern is the
+    path of the file or of a folder above it (absolute, or from the current folder: what Tab completion gives), or it
+    matches - as a glob, or as it is (a name with [ ]) - the name or a run of its parts: a folder (附件, 飞书导出/附件,
+    附件/*) leaves out everything under it."""
+    if not pattern.strip():
+        return False
+    for q in {os.path.abspath(os.path.expanduser(pattern)), os.path.realpath(os.path.expanduser(pattern))}:
+        for full in {path, os.path.realpath(path)}:
+            if full == q or full.startswith(q.rstrip(os.sep) + os.sep):
+                return True
+    pat = pattern.replace(os.sep, "/").strip("/")
+    parts = name.replace(os.sep, "/").split("/")
+    return any(run == pat or fnmatch.fnmatch(run, pat)
+               for i in range(len(parts)) for run in ("/".join(parts[i:j]) for j in range(i + 1, len(parts) + 1)))
+
+
+# A classification mark is a label, not a word in a sentence (CLASS_MARKERS are the words). In the text it is
+#   - the word on a line, in a part of a line or in a table cell of its own, maybe with a qualifier (a company name),
+#     a suffix, a ★ term or a "do not distribute" (机密, **CONFIDENTIAL**, 機密文件, Acme Pay Confidential, 绝密★启用前,
+#     Proprietary & Confidential, 公司机密，未经许可不得转发, Partner API Guide | Confidential | Page 3)
+#   - the word in brackets at the start of a line, or at the end of a title (【机密】退款方案, # 退款方案（绝密）)
+#   - a title (a heading, the first line) that starts with the word and a colon (# CONFIDENTIAL: Refund Design)
+#   - the value of a classification field (密级：机密, | 密级 | 秘密 |, Classification: Confidential)
+#   - a sentence about the document itself (本文件为机密文件, 此文件含有机密信息, 以下内容为机密, This document is
+#     confidential)
+# The same words in a sentence about something else are content: 保证数据的机密性, 回答秘密问题, 机密字段（证件号）,
+# restricted to admins, a confidentiality agreement, a confidential client, 它是秘密, and in the text a level and what
+# it means (机密：泄露会造成严重损害). In a label (a header, a footer, a sensitivity label) the word counts wherever it
+# stands.
+_QUAL = (r"(?:(?:strictly|highly|company|business|(?:private|proprietary)[ \t]*(?:and|&))[ \t]+"
+         r"|商业|商業|公司|内部|內部|严格|嚴格|高度|内容|內容)")
+_ORG = r"(?!(?:not|non|no)[ \t])(?-i:(?:[A-Z][A-Za-z0-9&.'-]*[ \t]+){1,3})"
+_SUFFIX = (r"(?:文件|文档|文檔|资料|資料|材料|件|级|級|使用|(?:[ \t]+use)?[ \t]+only|[ \t]+documents?"
+           r"|[ \t]+materials?|[ \t]+(?:and|&)[ \t]+proprietary)?(?![A-Za-z0-9一-鿿])")
+_DISTRIB = (r"(?:未[经經](?:许可|許可|授权|授權|同意|批准)[，,]?)?(?:请勿|請勿|不得|严禁|嚴禁|禁止)(?:外[传傳泄洩]|[转轉][发發]|复制|複製)"
+            r"|(?:仅限|僅限|仅供|僅供)[^，,。;；!！?？\n]{1,16}|注意保密"
+            r"|do[ \t]+not[ \t]+(?:distribute|forward|copy|share)|not[ \t]+for[ \t]+distribution")
+_OPEN, _CLOSE = r"[【\[(（<《「『]", r"[】\])）>》」』]"
+_FIELD = (r"(?:文档|文檔|文件|资料|資料)?(?:密级|密級|保密级别|保密級別|保密等级|保密等級|安全级别|安全級別|敏感级别|敏感級別)"
+          r"|(?:(?:security|data|document|information)[ \t]+)?classification|sensitivity(?:[ \t]+label)?"
+          r"|(?:confidentiality|security)[ \t]+level")
+_DOC = (r"(?:(?:本|此|该|該|这份|這份)(?:文件|文档|文檔|资料|資料|材料|报告|報告|邮件|郵件|方案|需求|说明|說明|指南|手册|手冊"
+        r"|内容|內容)|(?:以下|下列)(?:内容|內容))[^。！？!?\n不非无無未]{0,8}?")
+_VERB = r"(?:为|為|是|属于|屬於|属|屬|系|列为|列為|涉及|含有|包含|定为|定為)"
+_DOC_EN = (r"\b(?:this|the)[ \t]+(?:document|file|material|materials|presentation|deck|report|e-?mail|spec|specification"
+           r"|guide)[ \t]+(?:is|are|contains|includes|(?:is[ \t]+)?(?:classified|marked)(?:[ \t]+as)?)[ \t]+")
+_DECOR = " \t*_~`\"'“”‘’【】[]()（）<>《》「」『』#>"
+_PARTS_RE = re.compile(r"[ \t]*(?:[|·•–—★☆]|[ \t]-[ \t]|\t|[ \t]{2,})[ \t]*")    # not / (a URL path)
+
+
+def _mark_rules(word):
+    w = r"(?:%s)?(?:%s)%s" % (_QUAL, word, _SUFFIX)
+    # 此文件含有机密信息 is a mark, 本需求涉及用户的机密信息 is not: the verb comes right before the word
+    info = r"%s[ \t]*(?:%s)?(?:%s)(?:信息|資訊|内容|內容)(?![A-Za-z0-9一-鿿])" % (_VERB, _QUAL, word)
+    bracketed = r"%s[ \t]*%s[ \t]*%s" % (_OPEN, w, _CLOSE)
+    return {"part": re.compile(r"(?i)^(?:%s)?%s(?:[ \t]+%s)*(?:[ \t]*[,，:：;；.。!！]?[ \t]*(?:%s))?[ \t.。!！]*$"
+                               % (_ORG, w, w, _DISTRIB)),     # the word in two languages is one mark: CONFIDENTIAL 机密
+            "lead": re.compile(r"(?i)^[ \t#>*_~]*%s" % bracketed),
+            "title": re.compile(r"(?i)^[ \t#>*_~]*%s[ \t*_]*[:：]|%s[ \t*_]*$" % (w, bracketed)),
+            "field": re.compile(r"(?i)(?:%s)[ \t]*(?:[:：=|]|为|為|是)?[ \t*_【\[(（「]*%s" % (_FIELD, w)),
+            "doc": re.compile(r"(?i)%s(?:%s?[ \t]*%s|%s)|%s%s(?![ \t]+(?:to|clients?)\b)"
+                              % (_DOC, _VERB, w, info, _DOC_EN, w)),
+            "label": re.compile(r"(?i)(?<![A-Za-z])(?:%s)(?![A-Za-z]|性)" % word)}
+
+
+CLASS_MARKS = [(name, _mark_rules(rx.pattern)) for name, rx in CLASS_MARKERS]
+
+
+def _marked(line, rules, title) -> bool:
+    if rules["field"].search(line) or rules["doc"].search(line) or rules["lead"].match(line):
+        return True
+    if (title or line.lstrip().startswith("#")) and rules["title"].search(line):
+        return True
+    s = line.strip()
+    if s.startswith("|"):                            # a table row: only a lone cell (fields are taken above)
+        cells = [c for c in (x.strip() for x in re.split(r"(?<!\\)\|", s.strip("|"))) if c]
+        parts = cells if len(cells) == 1 else []
+    else:
+        parts = _PARTS_RE.split(s)
+    return any(rules["part"].match(p.strip(_DECOR)) for p in parts)
+
+
 def detect_class(text, labels):
-    blob = "\n".join(labels) + "\n" + text[:4000] + "\n" + text[-2000:]
-    for name, rx in CLASS_MARKERS:
-        if rx.search(blob):
+    """The strongest classification mark (CLASS_MARKS) in the labels (properties, headers, footers) or near the start
+    or the end of the text, or None."""
+    lines = (text[:4000] + "\n" + text[-2000:]).split("\n")
+    first = next((x for x in lines if x.strip()), "")
+    for name, rules in CLASS_MARKS:
+        if any(rules["label"].search(x) for x in labels) or any(_marked(x, rules, x == first) for x in lines):
             return name
     return None
 
@@ -145,8 +238,9 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
           exclude=()) -> dict:
     """Run the gates and (unless dry_run) write the package. Returns a report dict.
 
-    In a dry run a failed gate (2, 3, 5) is listed under report["blocking"] instead of stopping, so the person
-    sees every finding at once. `exclude`: glob patterns on the file names to leave out (e.g. a partner guide)."""
+    In a dry run a failed gate (1, 2, 3, 5) is listed under report["blocking"] instead of stopping, so the person
+    sees every finding at once. `exclude`: files or folders to leave out (e.g. a partner guide): a path, a name or a
+    glob (see excluded()); a pattern that leaves out nothing is reported under report["warnings"]."""
     blocking = []
 
     def block(msg):
@@ -155,17 +249,23 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
         blocking.append(msg)
 
     if not consent:
-        raise BrainError("门 1：确认你是作者，或已取得作者同意（--consent）")
+        block("门 1：确认你是作者，或已取得作者同意（--consent）")
     if classification not in CLASSES + ("unsure",):
-        raise BrainError("门 2：--classification 必须是 public / internal / confidential / secret / unsure")
-    given = "confidential" if classification == "unsure" else classification
-    files = [(p, n) for p, n in collect(paths)
-             if not any(fnmatch.fnmatch(n, x) or fnmatch.fnmatch(os.path.basename(n), x) for x in exclude)]
+        block("门 2：--classification 必须是 public / internal / confidential / secret / unsure")
+    # (a dry run without a class goes on as public: the marks in the files still count)
+    given = "confidential" if classification == "unsure" else classification if classification in CLASSES else "public"
+    files, used = [], set()
+    for p, n in collect(paths):
+        hit = {x for x in exclude if excluded(p, n, x)}
+        used |= hit
+        if not hit:
+            files.append((p, n))
+    warnings = ["--exclude %s 没有匹配任何文件，什么都没去掉" % x for x in exclude if x not in used]
     if not files:
-        raise BrainError("没有可收的文件")
+        raise BrainError("没有可收的文件%s" % ("（--exclude 把文件都去掉了）" if used else ""))
     max_file = kit_intake.get("max_file_mb", 50) * 1024 * 1024
     max_total = kit_intake.get("max_total_mb", 200) * 1024 * 1024
-    total = sum(os.path.getsize(p) for p, _ in files)
+    total = sum(_size(p) for p, _ in files)
     if total > max_total:
         raise BrainError("总大小 %.1f MB 超过上限 %d MB" % (total / 1048576, kit_intake.get("max_total_mb", 200)))
     masker = checks.Masker()
@@ -173,7 +273,12 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
     converted = []
     for i, (path, name) in enumerate(files, 1):
         sid = "D%02d" % i
-        info = {"id": sid, "name": name, "sha256": sha256_file(path), "bytes": os.path.getsize(path)}
+        try:
+            info = {"id": sid, "name": name, "sha256": sha256_file(path), "bytes": os.path.getsize(path)}
+        except OSError as e:                         # no read permission, a broken link, gone meanwhile: that file
+            refused.append({"id": sid, "name": name, "sha256": None, "bytes": _size(path),
+                            "reason": "读不了这个文件（%s）" % (e.strerror or type(e).__name__)})
+            continue
         if info["bytes"] > max_file:
             refused.append(dict(info, reason="单个文件超过 %d MB" % kit_intake.get("max_file_mb", 50)))
             continue
@@ -182,12 +287,15 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
         except Refused as e:
             refused.append(dict(info, reason=str(e)))
             continue
-        hits = checks.scan(doc.text)
+        leaks = checks.gitleaks_hits(path)          # what gitleaks finds is masked and listed like the built-in finds
+        hits = checks.with_leaks(doc.text, checks.scan(doc.text), leaks)
         hidden_text = "\n".join(t for _, t in doc.hidden)
-        hidden_hits = checks.scan(hidden_text) if hidden_text else []
+        hidden_hits = checks.with_leaks(hidden_text, checks.scan(hidden_text), leaks) if hidden_text else []
         secret_kinds = {h.kind for h in hits + hidden_hits if h.cat == "secret"}
-        for rule, line in checks.gitleaks_hits(path):
-            secret_kinds.add("gitleaks:" + rule)
+        secret_kinds |= {"gitleaks:" + rule for rule, _, _ in leaks}
+        for rule, line, secret in leaks:
+            if not (secret and (secret in doc.text or secret in hidden_text)):
+                doc.notes.append("gitleaks 在原文件第 %s 行找到 %s，收进来的文字里没有它；请照样轮换" % (line, rule))
         if secret_kinds & {"private_key", "cloud_key"} or any("private-key" in k or k.startswith("gitleaks:aws")
                                                                for k in secret_kinds):
             block("门 5：%s 里有私钥或云访问密钥，整份不收。请先删掉并轮换这把密钥。" % name)
@@ -196,7 +304,8 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
             refused.append(dict(info, reason="个人信息 %d 处，超过上限 %d（成批的个人信息不收）"
                                 % (pii, kit_intake.get("bulk_pii_limit", 30))))
             continue
-        cls = detect_class(doc.text, doc.labels)
+        # the hidden area goes into the package too (extras/hidden.md): gate 2 reads it as well
+        cls = detect_class(doc.text, doc.labels + [head_and_tail(t) for _, t in doc.hidden])
         if cls:
             detected.append((name, cls))
         converted.append((sid, name, info, doc, hits, hidden_hits))
@@ -207,8 +316,9 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
         if CLASSES.index(cls) > CLASSES.index(effective):
             effective = cls
     if effective == "secret":
-        block("门 2：材料是绝密（%s），不收，只留哈希" % ", ".join(n for n, c in detected if c == "secret")
-                         or classification)
+        marked = ", ".join("%s=secret" % n for n, c in detected if c == "secret")
+        block("门 2：材料按绝密处理（%s）：绝密材料不收，不写材料包。%s"
+              % (marked or "你选的是 %s" % classification, "不想交这份，请用 --exclude 去掉。" if marked else ""))
     if effective == "confidential" and not kit_intake.get("allow_confidential"):
         block("门 2：材料按机密处理（%s），而 intake.allow_confidential 是 false（决策 02 未放行）。"
                          "请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。"
@@ -219,8 +329,8 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
         block("门 3：找到商业敏感内容 %s，请选 --business keep（原样）或 --business mask（换占位符）；"
                          "不想交的文件请从输入里去掉" % summary.get("business"))
     mask_business = business == "mask"
-    # a value found by its form (an ID, a phone, an email, a key ...) is masked everywhere (other files, other rows,
-    # the hidden area); a name or password found next to a label only where it was found (checks.propagate)
+    # a value judged sensitive once (an ID, a phone, an email, a key, a name or a password next to its label ...) is
+    # masked everywhere: other files, other rows, the hidden area, file names (checks.propagate)
     values = {}
     for hs in all_hits.values():
         for h in hs:
@@ -235,14 +345,19 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
 
     for r in refused:
         r["name"] = meta(r["name"])
+    if not converted:
+        block("没有一个文件收得进来，不写材料包：%s。请按原因改好再交。"
+              % "；".join("%s %s（%s）" % (r["id"], r["name"], r["reason"]) for r in refused))
     segs, toc, hidden_out, findings = [], [], [], []
     limit = int(kit_intake.get("segment_chars", 6000))
+    shown = {}                                       # sid -> the body's hits as masked (values from other files too)
     for sid, name, info, doc, hits, hidden_hits in converted:
-        text = checks.apply(doc.text, checks.propagate(doc.text, hits, values), mask_business, masker)
+        shown[sid] = checks.propagate(doc.text, hits, values)
+        text = checks.apply(doc.text, shown[sid], mask_business, masker)
         name = meta(name)
         doc.notes = [meta(n) for n in doc.notes]
         info.update(name=name, kind=doc.kind, images=doc.images, hidden=len(doc.hidden), notes=doc.notes,
-                    findings=checks.summarize(hits), segments=[])
+                    segments=[])
         domains = sorted({h.value for h in hits if h.cat == "link"})
         if domains:
             info["link_domains"] = domains
@@ -259,12 +374,16 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
                                                        len(body), h8, "有图（需要人确认）" if has_img else ""))
             if not dry_run:
                 _write(os.path.join(store, "packages", pkg, "segments", fname), content)
+        hidden_found = []
         for where, t in doc.hidden:
             th = checks.propagate(t, checks.scan(t), values)
+            hidden_found += [h for h in th if h.cat != "review"]       # what to check is quoted from the body
             hidden_out.append("## %s · %s\n\n%s\n" % (name, meta(where), checks.apply(t, th, mask_business, masker)))
+        # what was masked in this file: found here, found in another file, or in the hidden area
+        info["findings"] = checks.summarize(shown[sid] + hidden_found)
         sources.append(info)
     for sid, name, info, doc, hits, hidden_hits in converted:
-        f = checks.summarize(hits)
+        f = info["findings"]
         line = "- **%s %s**：" % (sid, info["name"])
         parts = []
         for cat, label in (("pii", "个人信息（已打码）"), ("secret", "密钥（已打码，请轮换）"),
@@ -273,7 +392,7 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
             if f.get(cat):
                 parts.append("%s %s" % (label, ", ".join("%s×%d" % kv for kv in sorted(f[cat].items()))))
         if f.get("review"):
-            notes = [meta(q) for q in checks.review_notes(doc.text, hits)]
+            notes = [meta(q) for q in checks.review_notes(doc.text, shown[sid])]
             parts.append("请你确认 %d 处（可能是人名或密码，也可能只是普通的词，没打码；是人名或密码就改原文再交）：%s"
                          % (sum(f["review"].values()), "、".join("「%s」" % q for q in notes)))
         if doc.hidden:
@@ -284,34 +403,38 @@ def build(paths, key, store, *, submitter, consent, classification, business, ki
         findings.append(line + ("；".join(parts) if parts else "无"))
     for r in refused:
         findings.append("- **%s %s**：没收——%s" % (r["id"], r["name"], r["reason"]))
+    texts = {   # every file of the package besides the segments and the manifest: their hashes go in the manifest
+        "README.md": README.format(pkg=pkg),
+        "toc.md": "# 目录 %s\n\n| 段 | 标题 | 来源 | 字数 | 哈希 | 备注 |\n|---|---|---|---|---|---|\n%s\n"
+                  % (pkg, "\n".join(toc)),
+        "findings.md": "# 检查结果 %s\n\n密级：%s（你选的是 %s）\n\n%s\n" % (pkg, effective, classification,
+                                                                  "\n".join(findings)),
+        "extras/hidden.md": "# 原文里看不见的内容（不能当需求引用）\n\n%s\n" % ("\n".join(hidden_out) or "（无）"),
+    }
     manifest = {
         "schema": 1, "package": pkg, "key": key, "created_at": iso(utcnow()), "submitter": submitter,
         "consent": True, "classification": {"given": classification, "effective": effective,
                                             "detected": [{"file": meta(n), "class": c} for n, c in detected]},
         "business": business if business_hits else "none-found", "sources": sources, "refused": refused,
         "segments": segs, "hidden_items": len(hidden_out), "tool": "brain-kit %s" % __version__,
+        "files": {rel: hashlib.sha256(t.encode("utf-8")).hexdigest() for rel, t in sorted(texts.items())},
     }
     manifest_sha = hashlib.sha256(canonical(manifest)).hexdigest()
     report = {"package": pkg, "manifest_sha256": manifest_sha, "segments": len(segs), "sources": len(sources),
               "refused": refused, "findings": findings, "classification": effective, "store": store,
-              "blocking": blocking, "excluded": list(exclude)}
+              "blocking": blocking, "excluded": list(exclude), "warnings": warnings}
     if dry_run:
         return report
     base = os.path.join(store, "packages", pkg)
-    _write(os.path.join(base, "README.md"), README.format(pkg=pkg))
-    _write(os.path.join(base, "toc.md"), "# 目录 %s\n\n| 段 | 标题 | 来源 | 字数 | 哈希 | 备注 |\n|---|---|---|---|---|---|\n%s\n"
-           % (pkg, "\n".join(toc)))
-    _write(os.path.join(base, "findings.md"), "# 检查结果 %s\n\n密级：%s（你选的是 %s）\n\n%s\n"
-           % (pkg, effective, classification, "\n".join(findings)))
-    _write(os.path.join(base, "extras", "hidden.md"), "# 原文里看不见的内容（不能当需求引用）\n\n%s\n"
-           % ("\n".join(hidden_out) or "（无）"))
+    for rel, text in texts.items():
+        _write(os.path.join(base, *rel.split("/")), text)
     write_json(os.path.join(base, "manifest.json"), manifest)
     return report
 
 
 def _write(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:     # the bytes the manifest's hash was taken of
         f.write(text)
 
 
@@ -319,22 +442,53 @@ def manifest_digest(pkg_dir) -> str:
     return hashlib.sha256(canonical(load_json(os.path.join(pkg_dir, "manifest.json")))).hexdigest()
 
 
+OLD_UNHASHED = ("README.md", "toc.md", "findings.md", "extras/hidden.md")
+OLD_PACKAGE = ("old-version package, checked less strictly than a new one (its manifest records no hashes for "
+               "README.md, toc.md, findings.md and extras/, so a change to them is not found)")
+
+
+def is_old_version(pkg_dir) -> bool:
+    """Built before brain-kit recorded the hashes of the OLD_UNHASHED files in the manifest ('files')."""
+    return not isinstance(load_json(os.path.join(pkg_dir, "manifest.json")).get("files"), dict)
+
+
 def verify_package(pkg_dir) -> list:
-    """Problems: every segment listed in the manifest exists with the recorded hash, nothing extra."""
+    """Problems with a package: every file in it is the manifest, a segment or a file the manifest lists, with the
+    hash recorded there; no file is missing, nothing is extra, and nothing is a symbolic link (a copy would take in
+    whatever it points to). What Finder or Explorer leaves in a folder (SKIP_NAMES) is no part of a package. An
+    old-version package (is_old_version) cannot vouch for its OLD_UNHASHED files: they are not checked."""
+    if os.path.islink(pkg_dir):
+        return ["the package folder is a symbolic link"]
     m = load_json(os.path.join(pkg_dir, "manifest.json"))
     probs = []
-    listed = set()
+    expected = {}                               # path relative to the package, '/'-separated -> sha256
     for s in m.get("segments", []):
-        p = os.path.join(pkg_dir, s["file"])
-        listed.add(os.path.normpath(s["file"]))
-        if not os.path.exists(p):
-            probs.append("missing %s" % s["file"])
+        expected[os.path.normpath(s["file"]).replace(os.sep, "/")] = s["sha256"]
+    unchecked = {"manifest.json"}
+    if is_old_version(pkg_dir):
+        unchecked.update(OLD_UNHASHED)
+    else:
+        for rel, sha in m["files"].items():
+            expected[os.path.normpath(rel).replace(os.sep, "/")] = sha
+    found = set()
+    for root, dirs, names in os.walk(pkg_dir):
+        for n in sorted(dirs + names):
+            p = os.path.join(root, n)
+            rel = os.path.relpath(p, pkg_dir).replace(os.sep, "/")
+            if os.path.islink(p):
+                probs.append("symbolic link %s" % rel)
+            elif n in names and not os.path.isfile(p):
+                probs.append("not a regular file: %s" % rel)
+            elif n in names and n not in SKIP_NAMES:
+                found.add(rel)
+        dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(root, d))]
+    for rel, sha in sorted(expected.items()):
+        if rel not in found:
+            probs.append("missing %s" % rel)
             continue
-        with open(p, "rb") as f:
-            if hashlib.sha256(f.read()).hexdigest() != s["sha256"]:
-                probs.append("changed %s" % s["file"])
-    seg_dir = os.path.join(pkg_dir, "segments")
-    for f in (os.listdir(seg_dir) if os.path.isdir(seg_dir) else []):
-        if os.path.normpath("segments/" + f) not in listed:
-            probs.append("extra %s" % f)
+        with open(os.path.join(pkg_dir, *rel.split("/")), "rb") as f:
+            if hashlib.sha256(f.read()).hexdigest() != sha:
+                probs.append("changed %s" % rel)
+    for rel in sorted(found - set(expected) - unchecked):
+        probs.append("extra %s" % rel)
     return probs

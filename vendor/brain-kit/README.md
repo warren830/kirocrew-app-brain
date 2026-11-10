@@ -37,6 +37,12 @@
    - 问题的第一行写着提交号和 park 指纹；回答只认：问题评论没被改过、问题是在那次推送之后贴的、一个 D-n 只对应一个问题。否则这个问题作废，重问。
 6. **验收**：运行机执行 `lean release` 和 `lean request RELEASE`，再以"验收"类问题停下；产品在 MR 上回 approve。合并仍然要过 GitLab 审批和 CI。
 
+**大需求拆成小需求，大家一起做**：大需求照常走 Lean 的 Inception，在 `unit-of-work.md` 里拆成几个单元，人批 DESIGN 就是批了拆法。
+- `brain split PAY-1` 把每个单元登记成一个待认领的小需求（带着单元的 Paths、依赖、契约、验收标准）。
+- 大家 `brain claim PAY-2` 认领，`brain start --key PAY-2` 开工：从大需求的分支开自己的分支，放在单独的 worktree 里（一个 Lean clone，Lean 团队就是单元）。依赖没合并前不让开工。
+- `brain sync` 把大需求的分支合进来，自动解决 Lean 进度页的冲突；`brain handoff` 把 MR 开到大需求的分支，由大需求的负责人审、合并（小需求不交给运行机）。
+- 小需求都合并了，大需求再评审、发布。`brain intent list` 看进度（已合并 n/m）。详见 [docs/安装和使用.md](docs/安装和使用.md) 4.7；Lean 缺的几样和怎么绕见 [docs/lean-requests.md](docs/lean-requests.md)。
+
 ## Brain：团队共用的知识
 
 Brain 是仓库里的 `brain/PRODUCT.md`、`TECH.md`、`IMPROVEMENT.md`、`PROJECT.md` 四个文件，加上仓库根目录的 `AGENTS.md`。本地 run 和运行机上的 run 开工前都先读它们。
@@ -96,12 +102,12 @@ Brain 是仓库里的 `brain/PRODUCT.md`、`TECH.md`、`IMPROVEMENT.md`、`PROJE
 
 | 命令 | 谁跑、在哪 | 做什么 |
 |---|---|---|
-| `brain` | 每个人的电脑 | `install`、`doctor`、`claim`、`intake`、`start`、`handoff`、`status`；Brain：`lint`、`entry`、`reflect`（含 `--draft`）、`usage`；入口：`intent add/list/show/close`（见 [docs/intents.md](docs/intents.md)）；评估：`trace`、`eval`、`eval gaps`、`golden`（见 [docs/eval.md](docs/eval.md)） |
+| `brain` | 每个人的电脑 | `install`、`doctor`、`claim`、`intake`、`start`、`handoff`、`status`；大需求拆成小需求：`split`、`claim KEY`（认领待认领的）、`sync`（见 [docs/安装和使用.md](docs/安装和使用.md) 4.7）；Brain：`lint`、`entry`、`reflect`（含 `--draft`）、`usage`；入口：`intent add/list/show/close`（见 [docs/intents.md](docs/intents.md)）；评估：`trace`、`eval`、`eval gaps`、`golden`（见 [docs/eval.md](docs/eval.md)） |
 | `brain-bridge` | 团队运行机，`brainbridge` 用户 | `poll`（接手核对）、`dispatch`（送进 KiroCrew）、`watch`（贴问题）、`collect`（收回答并送回）、`reconcile`（MR 合并后收尾）、`report`（统计）、`loop`（循环跑以上全部） |
 | `brain-runnerd` | 团队运行机，`brainbot` 用户 | 验合同签名，按合同里的 commit 建 worktree，拷材料包 |
 | `brain-ci check-run` | GitLab MR 流水线（只在 MR 流水线里跑） | 检查五件事：run.json 和分支一致；材料包没被提交进仓库；run 分支没改 `brain/` 和 `AGENTS.md`；改了 risk-paths 必须有桥签名的设计批准；机器人提交的 commit 要有接手凭证。kit 配置、risk-paths 和 diff 基线都从**目标分支**读，MR 分支上改了也不算数 |
 | `brain-ci brain-lint` | GitLab MR 流水线（每个 MR） | Brain 的关系规则，对照 MR 的 diff 基线；配置从目标分支读 |
-| `brain-pre-receive` | GitLab 服务器钩子 | 人只能推 `ai/<自己>/*`；`claim/<KEY>` 只有 claim.json 里写的那个人能建、能改、能删；机器人只能推 `ai/*`，不能删分支、不能强推、不能推 tag，也不能改 gates、CI、`.brain/` |
+| `brain-pre-receive` | GitLab 服务器钩子 | 人只能推 `ai/<自己>/*`；`claim/<KEY>` 只有 claim.json 里写的那个人能建、能改、能删（待认领的另有规则，见 [docs/intents.md](docs/intents.md) 2.2）；机器人只能推 `ai/*`，不能删分支、不能强推、不能推 tag，也不能改 gates、CI、`.brain/` |
 | `remote/agents/brain-run.json` + `remote/prompts/brain-run.md` | 团队运行机上的 KiroCrew | 接手模式的 agent |
 
 ## 文档的五道关（`brain intake` / `brain start --doc`）
@@ -110,8 +116,8 @@ Brain 是仓库里的 `brain/PRODUCT.md`、`TECH.md`、`IMPROVEMENT.md`、`PROJE
 |---|---|---|
 | 1 交件权 | 交件人必须加 `--consent`，表示自己是作者，或已取得作者同意 | 不收 |
 | 2 密级 | 用交件人选的 `--classification`，但文件里如果有更高的密级标记（机密、Confidential、MSIP 标签等），以文件为准。选"不确定"按机密处理 | 机密：`intake.allow_confidential`（决策 02）放行才收，否则写脱敏摘要，或用 `--exclude` 去掉这份。绝密：不收 |
-| 3 商业敏感 | 认三类：金额（必须带币种或"元 / 萬"等字样，3M、12M 这类期限不算）、公司名（按"有限公司、銀行"等后缀认）、合同号 | 列出来，交件人用 `--business keep` 原样保留，或 `--business mask` 换成占位符 |
-| 4 个人信息 | 香港和内地身份证（都核对校验位）、手机号、银行卡（Luhn 校验）、邮箱、@人名、"修訂人 / 負責人 / Author"这类列里的人名 | 一律换成占位符；同一个值在所有文件里都换掉。单个文件超过 30 处时，整份不收 |
+| 3 商业敏感 | 认三类：金额（必须带币种或"元"字，如"5 万元""人民币 300 万"；只写"10万""2亿"算计数，3M、12M 这类期限也不算）、公司名（按"有限公司、銀行"等后缀认）、合同号 | 列出来，交件人用 `--business keep` 原样保留，或 `--business mask` 换成占位符 |
+| 4 个人信息 | 香港和内地身份证（都核对校验位）、手机号、银行卡（Luhn 校验）、邮箱、@人名、"修訂人 / 負責人 / Author"这类列里的人名 | 一律换成占位符；同一个值在所有文件和文件名里按整词都换掉（标签认出的人名、密码也一样；名字列里没有姓氏的值如 风控、Billing 只列出来请你确认；admin、password 这类普通词的密码只换认出的那一处）。单个文件超过 30 处时，整份不收 |
 | 5 密钥 | 内置规则；装了 gitleaks 时一并用上 | 普通密钥打码；私钥和云访问密钥整份不收 |
 
 - **看不见的内容**移到 `extras/hidden.md`，不进正文：隐藏文字、白字和极小的字、批注、隐藏的工作表 / 行 / 列、`;;;` 格式隐藏的单元格、`display:none`、HTML 注释、隐藏的幻灯片。
@@ -159,13 +165,14 @@ brain-kit/bin/brain install <项目目录> --lean <AI-DLC Lean 的 checkout 目�
 
 ## 测过什么
 
-本机 152 个测试全部通过（`python3 -m unittest discover -s tests -t .`）。做过两轮独立的对抗评审：流程部分找出 15 个问题，Brain 部分（条目工具、lint、reflect、usage）又找出 15 个，都已修掉，每个问题都补了回归测试。
+本机 994 个测试，在 python3.9（pytest）和 python3.12（`python3.12 -W error -m unittest discover -s tests -t .`）上都加 `-W error` 跑：除了 2 个跳过的（真实需求文档的测试，要 `BRAIN_TEST_REAL_DOCS` 指向一个文件夹），都要通过。加了或删了测试，就改这个数（`tests/test_r1_k2_cli.py` 的 R1-34 核对它）。做过三轮独立的对抗评审：流程部分找出 15 个问题，Brain 部分（条目工具、lint、reflect、usage）又找出 15 个，大需求拆分找出 16 个，都已修掉，每个问题都补了回归测试。
 
 - **认领**：本地和远端都测了；两个 clone 抢同一个号，git 本身就会拒掉后到的那个；钩子按 claim.json 认人。
+- **大需求拆成小需求**（`tests/test_split.py`、`tests/test_split_trace.py`）：用真的 Lean、一个 bare origin 和两个 clone 端到端跑（两人只靠登录名区分，没有 GitLab）：拆、认领、被拒的认领、被拒的开工、合并后开工、`brain sync` 解决 Lean 进度页的冲突、进度 n/m、大需求发布和关闭、重拆、`--on`、多团队模式下两个小需求之间走 Lean 的 CR；服务器钩子的每条认领规则；两个人抢同一个待认领；trace、eval、usage 的汇总。
 - **文档接收**：
   - 自造的 docx 和 xlsx 里各种隐藏内容都识别出来了，HTML 的隐藏元素和脚本也去掉了；
   - 五道关和 dry-run 都测了；
-  - 材料包被改动能查出来；
+  - 材料包被改动能查出来（旧版 brain-kit 做的材料包没有记 README.md、toc.md、findings.md、extras/ 的哈希，这几个被改查不出来，会提醒核对得没有新版严）；
   - 用一份真实的需求文件夹跑过：打码过的值，在材料包的任何文件里都找不到原值（设 `BRAIN_TEST_REAL_DOCS` 可以重跑）。
 - **桥**：
   - 接手核对的每种拒绝情况：Jira 模式和不接 Jira 模式都有；

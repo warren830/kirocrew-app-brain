@@ -32,7 +32,9 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from .gateway import GatewayError
+from .constants import LOCAL_AGENT
+from .gateway import GatewayError, said
+from .problems import AGENT_NEW
 
 PREFIX = "s-"
 ROOT_FOLDER = "Brain 需求"  # the default root folder (constants.LOCAL_FOLDER)
@@ -111,7 +113,7 @@ def agent_fields(info: Any) -> dict[str, Any]:
     queued = bool(g("queued", False))
     return {
         "id": str(g("id", "") or ""), "done": bool(g("done", False)), "queued": queued,
-        "queued_reason": str(g("queued_reason", "") or "") or ("在排队，等 Kiro Crew 开始这个会话" if queued else "") or None,
+        "queued_reason": str(g("queued_reason", "") or "") or ("在排队，等 KiroCrew 开始这个会话" if queued else "") or None,
         "result": str(g("result", "") or ""), "text": str(g("streaming_text", "") or ""), "error": error or None,
         "outcome": "stopped" if stopped else ("failed" if error else "completed"),
         "turns": int(_num(g("turns"))), "tool_count": int(_num(g("tool_count"))), "last_tool": str(g("last_tool", "") or ""),
@@ -143,7 +145,7 @@ class SessionInfo:
         self.sent_at: float | None = None
         self.done = False
         self.queued = True
-        self.queued_reason: str | None = "正在开 Crew 会话"
+        self.queued_reason: str | None = "正在开 KiroCrew 会话"
         self.result = ""
         self.streaming_text = ""
         self.error: str | None = None
@@ -250,7 +252,7 @@ class SessionManager:
             if isinstance(d, dict) and str(d.get("id", "")).startswith(PREFIX):
                 info = SessionInfo.from_dict(d)
                 if not info.done and info.queued and not info.slot:  # it was being opened when the app stopped
-                    info.done, info.error = True, "app 重启时这个会话还没开好"
+                    info.done, info.error = True, "app 重启时这个会话还没开好：再点一次「打开会话」"
                 self._infos[info.id] = info
         self._folders = {k: v for k, v in (data.get("folders") or {}).items() if isinstance(v, dict)}
         self._stats = {k: v for k, v in (data.get("stats") or {}).items() if isinstance(v, dict)}
@@ -324,17 +326,18 @@ class SessionManager:
         self._infos[info.id] = info
         self._dirty = True
         if root is None or not root.slot:
-            info.done, info.error = True, "conversation_gone: 找不到这个会话"
+            info.done, info.error = True, "找不到这个会话了：先点「打开会话」，再试一次"
             return info
         busy = [i for i in self._infos.values() if i.slot == root.slot and not i.done and i is not info]
         if busy:
-            info.done, info.error = True, "conversation_busy: 这个会话还有一轮没结束"
+            info.done, info.error = True, "这个会话还在做上一轮：等它做完再试一次"
             return info
         self._inherit(info, root)
         try:
             await self._send(info)
         except Exception as exc:  # noqa: BLE001
-            info.done, info.error = True, f"发不出去：{exc}"[:300]
+            info.done, info.error = True, f"没送进会话：{said(exc)}"[:300]
+            self.log.warning(self.app + ": sending to session %s failed: %s", root.slot, exc)
             return info
         info.queued, info.queued_reason, info.started = False, None, self.now()
         return info
@@ -393,21 +396,30 @@ class SessionManager:
         """{credits, turns, busy, awaiting, last_activity, missing, error} of a slot this app opened (None: unknown)."""
         return dict(self._stats[slot]) if slot and slot in self._stats else None
 
+    def slot_credits(self, slot: str | None) -> float | None:
+        """The credits of one session (slot): its whole transcript's (slot_stats) once read, else the sum of the turns
+        this app sent to it (each its own info); None while none of them has reported any. The one number a session's
+        row shows and its requirement's total adds up."""
+        if not slot:
+            return None
+        c = (self._stats.get(slot) or {}).get("credits")
+        if c is not None:
+            return round(float(c), 3)
+        got = [float(x.credits) for x in self._infos.values() if x.slot == slot and x.credits is not None]
+        return round(sum(got), 3) if got else None
+
     def credits_by_key(self) -> dict[str, float]:
-        """Credits per requirement key / run id over every slot this app opened for it (each slot counted once)."""
+        """Credits per requirement key / run id over every slot this app opened for it (each slot counted once, as
+        slot_credits says it)."""
         out: dict[str, float] = {}
         seen: set[str] = set()
         for i in self._infos.values():
             if not i.key or not i.slot or i.slot in seen:
                 continue
             seen.add(i.slot)
-            st = self._stats.get(i.slot) or {}
-            c = st.get("credits")
-            if c is None:
-                c = sum(float(x.credits) for x in self._infos.values() if x.slot == i.slot and x.credits is not None) \
-                    if any(x.credits is not None for x in self._infos.values() if x.slot == i.slot) else None
+            c = self.slot_credits(i.slot)
             if c is not None:
-                out[i.key] = round(out.get(i.key, 0.0) + float(c), 3)
+                out[i.key] = round(out.get(i.key, 0.0) + c, 3)
         return out
 
     # ---- opening, sending, watching -------------------------------------------------------------------- #
@@ -453,7 +465,7 @@ class SessionManager:
             row = await self._create(info, name, folder_id)
             key = str(row.get("key") or row.get("name") or "")
             if not key:
-                raise GatewayError(0, "创建会话没有返回 key", "no_key")
+                raise GatewayError(0, "KiroCrew 开了会话，却没回它的名字：再试一次", "no_key")
             info.slot = key
             self._stats.setdefault(key, {"credits": None, "turns": 0, "busy": False, "awaiting": False,
                                          "last_activity": None, "missing": False, "error": None,
@@ -470,7 +482,7 @@ class SessionManager:
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
-            info.done, info.error = True, f"开 Crew 会话失败：{exc}"[:300]
+            info.done, info.error = True, f"开不了 KiroCrew 会话：{said(exc)}"[:300]
             self.log.warning(self.app + ": opening a session for %s failed: %s", info.title, exc)
         self._dirty = True
 
@@ -485,7 +497,8 @@ class SessionManager:
                                                 agent_kind="template")
             except GatewayError as exc:
                 if exc.status in (400, 404, 409):
-                    raise GatewayError(exc.status, f"Kiro Crew 里没有 agent {info.agent}（~/.kiro/agents/{info.agent}.json）",
+                    fix = "在设置里点「%s」" % AGENT_NEW if info.agent == LOCAL_AGENT else "先在这台机器上装上它"
+                    raise GatewayError(exc.status, f"KiroCrew 里没有 {info.agent}：{fix}，再试一次",
                                        exc.code or "agent_choice_unavailable", exc.path) from None
                 raise
             info.agent_kind = "template"
@@ -583,7 +596,7 @@ class SessionManager:
         if row is None:
             info.missing += 1
             if info.missing >= MISSING_POLLS:
-                info.done, info.error = True, "Crew 里找不到这个会话了（被关掉或删除了）"
+                info.done, info.error = True, "KiroCrew 里找不到这个会话了（被关掉或删掉了）：要接着做，点「此刻」里的「打开会话」开一个新的"
                 self._dirty = True
             return
         info.missing = 0
@@ -650,8 +663,10 @@ class SessionManager:
         if replies:
             info.result = str(replies[-1].get("content") or "")
             info.streaming_text = "\n\n".join(str(m.get("content") or "") for m in replies)[-20000:]
-        elif errors:
-            info.error = (str(errors[-1].get("content") or "") or "KiroCrew 报错")[:300]
+        elif errors:   # KiroCrew's own words stay in the session (and the log)
+            info.error = "这一轮 KiroCrew 报错了：打开会话看它的原话"
+            self.log.info(self.app + ": session %s ended its turn with an error: %s", info.slot,
+                          str(errors[-1].get("content") or "")[:300])
         else:
             info.error = "这一轮结束了，但没有回复"
         info.done = True

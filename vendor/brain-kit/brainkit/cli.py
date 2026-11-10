@@ -3,10 +3,17 @@
   brain install <repo> [--lean PATH] [--team NAME] [--prefix OMS]   copy the kit (and AI-DLC Lean) into a project
   brain doctor                                    check this machine and repo before work
   brain claim [--key KEY] --title T               claim a requirement key (tracker "none": next free <prefix>-<n>)
+  brain claim KEY [--release]                     take a requirement filed for others (待认领; first push wins),
+                                                  or give yours back
   brain intake PATH... --key KEY --classification C --consent [--business keep|mask] [--dry-run]
                                                   check and mask requirement documents into a material package
   brain start <slug> [--key KEY] [--title T] [--doc PATH ...] [--package PKG] [--paths a,b]
                                                   claim (or check the claim), branch, Lean intent, run.json
+  brain start [slug] --key CHILD [--on DEP] [--worktree PATH]
+                                                  a split child: its own branch from the parent's, in its own
+                                                  worktree, continuing the parent's Lean intent for its unit
+  brain split PARENT [--dry-run] / brain sync [--from REF]
+                                                  file the approved units as children (commands/split_cmd.py)
   brain handoff [--no-push] [--no-label]          publish materials, commit the hand-over (with runs/<KEY>/MR.md),
                                                   set the MR description, label the MR
                                                   (exit 1: pushed but NOT labelled, nothing handed over)
@@ -46,9 +53,13 @@ KIT_SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 TEMPLATES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates")
 CREW_AGENT_SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "crew", "brain-dev.json")
 CREW_HOOK = ".kiro/brain/lean-hook.py"
-# The adapter version the team runner needs: 2 lets the run write its own runs/<KEY>/park.json in every Lean approval
-# state (kit/.kiro/brain/lean-hook.py, ADAPTER_VERSION).
-CREW_HOOK_VERSION = 2
+# The adapter version brain-kit needs (kit/.kiro/brain/lean-hook.py, ADAPTER_VERSION): 2 lets a run write its own
+# runs/<KEY>/park.json in every Lean approval state; 3 refuses every tool call while the kit's own files differ from
+# the reference commit, has the runner mode (the team runner runs the installed kit's copy) and escapes Lean's host
+# marker in forwarded text.
+CREW_HOOK_VERSION = 3
+KIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RUNNER_HOOK = os.path.join("kit", ".kiro", "brain", "lean-hook.py")     # in an installed brain-kit (/opt/brain-kit)
 VENDORED_LEAN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "vendor", "aidlc-lean")
 
 
@@ -59,13 +70,75 @@ def crew_hook_version(text) -> int:
 
 
 def crew_hook_problem(text) -> str:
-    """Why this adapter source is too old for the team runner, or ''."""
+    """Why this adapter source is too old, or ''."""
     have = crew_hook_version(text)
     if have >= CREW_HOOK_VERSION:
         return ""
-    return ("%s is an older adapter (version %d, needs %d): the team runner could not write runs/<KEY>/park.json, its "
-            "only way to ask a person, before the Lean approvals; run `brain install` and commit it on main through an "
-            "MR" % (CREW_HOOK, have, CREW_HOOK_VERSION))
+    return ("%s is an older adapter (version %d, needs %d): it does not refuse tool calls after the kit's own files "
+            "(.kiro/, .brain/kit.json, gates/) were changed%s; run `brain install` and commit it on main through an MR"
+            % (CREW_HOOK, have, CREW_HOOK_VERSION, "" if have >= 2 else ", and the team runner could not write "
+               "runs/<KEY>/park.json, its only way to ask a person, before the Lean approvals"))
+
+
+def _runner_command_problem(command, ev, adapter) -> str:
+    """'' when `command` runs `adapter` in runner mode for event `ev`, else why not."""
+    import shlex
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return "cannot be read"
+    if not argv or not os.path.isabs(argv[0]):
+        return "does not name its Python by an absolute path"
+    i = 1
+    while i < len(argv) and argv[i].startswith("-"):
+        i += 1
+    flags, script, tail = argv[1:i], (argv[i] if i < len(argv) else ""), argv[i + 1:]
+    if "-I" not in flags:
+        return "does not run Python isolated (-I: no PYTHON* variables, no user site-packages)"
+    if not os.path.isabs(script) or os.path.realpath(script) != os.path.realpath(adapter):
+        return ("does not run the installed brain-kit's adapter %s (a workspace's copy is one the run can change)"
+                % adapter)
+    if len(tail) != 3 or tail[0] != "--runner" or not os.path.isabs(tail[1]) or tail[2] != ev:
+        return "is not `%s --runner <runnerd.json> %s`" % (adapter, ev)
+    return ""
+
+
+def runner_hook_problems(kit_dir=None, spec_path=None) -> list:
+    """What the team runner's sessions need from the installed brain-kit (`kit_dir`; default: the one this code is
+    part of): its hook adapter (kit/.kiro/brain/lean-hook.py) at version CREW_HOOK_VERSION or later; and, given the
+    user-level agent spec KiroCrew runs (brain-run.json), Lean's three hooks running that adapter in runner mode
+    (`<absolute python> -I <adapter> --runner <runnerd.json> <event>`, PreToolUse for every tool), never a
+    workspace's .kiro/brain/lean-hook.py, which the run could change. brain-runnerd checks it before each workspace."""
+    kit = os.path.realpath(os.path.expanduser(kit_dir or KIT_ROOT))
+    adapter = os.path.join(kit, RUNNER_HOOK)
+    try:
+        with open(adapter, encoding="utf-8", errors="replace") as f:
+            have = crew_hook_version(f.read())
+    except OSError:
+        return ["the installed brain-kit (%s) has no hook adapter %s: a runner session's hooks could not run Lean"
+                % (kit, adapter)]
+    probs = []
+    if have < CREW_HOOK_VERSION:
+        probs.append("the installed brain-kit's hook adapter %s is version %d, needs %d: update brain-kit on the runner"
+                     % (adapter, have, CREW_HOOK_VERSION))
+    if not spec_path:
+        return probs
+    spec_path = os.path.expanduser(spec_path)
+    try:
+        hooks = agent_hooks(load_json(spec_path))
+    except (OSError, ValueError) as e:
+        return probs + ["the runner's agent spec %s cannot be read: %s" % (spec_path, e)]
+    for trig, ev in CREW_EVENTS:
+        rows = [(c, m) for t, c, m in hooks if t == trig and _is_lean(ev, c)]
+        if not rows:
+            probs.append("%s has no %s hook running Lean's %s" % (spec_path, trig, ev))
+        for c, m in rows:
+            why = _runner_command_problem(c, ev, adapter)
+            if not why and trig == "preToolUse" and m not in (None, "", "*"):
+                why = "has matcher %r: tool calls it does not match pass Lean by" % m
+            if why:
+                probs.append("%s: the %s hook `%s` %s" % (spec_path, trig, c, why))
+    return probs
 
 
 def crew_agent_path():
@@ -81,7 +154,8 @@ def _has_origin(repo) -> bool:
 
 
 def _dirty(repo, ignore=()) -> list:
-    rows = git_out(repo, "status", "--porcelain", "--untracked-files=no").splitlines()
+    # not git_out: its strip() would eat the first row's leading status column (" M path")
+    rows = [r for r in git(repo, "status", "--porcelain", "--untracked-files=no").stdout.splitlines() if r.strip()]
     return [r for r in rows if r[3:].strip() not in ignore]
 
 
@@ -123,11 +197,13 @@ def _login_name() -> str:
     return name if USER_RE.match(name) else ""
 
 
-def _store(repo, override=None) -> str:
-    """Where material packages live on this machine (a clone of brain-intake when shared)."""
+def _store(repo, override=None, create=True) -> str:
+    """Where material packages live on this machine (a clone of brain-intake when shared). A dry run does not
+    create it (create=False)."""
     s = override or os.environ.get("BRAIN_INTAKE_DIR") or git(repo, "config", "brain.intake", check=False).stdout.strip()
     s = os.path.abspath(os.path.expanduser(s or "~/.brain/intake"))
-    os.makedirs(os.path.join(s, "packages"), exist_ok=True)
+    if create:
+        os.makedirs(os.path.join(s, "packages"), exist_ok=True)
     return s
 
 
@@ -165,10 +241,17 @@ def _brain_base(repo, cfg):
 
 
 def _readonly_copy(src, dst):
+    s, d = os.path.realpath(src), os.path.realpath(dst)
+    if s == d or d.startswith(s + os.sep) or s.startswith(d + os.sep):
+        raise BrainError("not copying %s onto itself (%s): nothing was deleted" % (src, dst))
+    for root, dirs, files in os.walk(src):      # verify_package refuses links too; a copy must never follow one
+        for n in dirs + files:
+            if os.path.islink(os.path.join(root, n)):
+                raise BrainError("%s holds a symbolic link (%s): not copied" % (src, os.path.join(root, n)))
     if os.path.exists(dst):
         _make_writable(dst)
         shutil.rmtree(dst)
-    shutil.copytree(src, dst)
+    shutil.copytree(src, dst, symlinks=True, ignore=shutil.ignore_patterns(*intake.SKIP_NAMES))
     for root, dirs, files in os.walk(dst):
         for f in files:
             os.chmod(os.path.join(root, f), stat.S_IRUSR | stat.S_IRGRP)
@@ -184,15 +267,38 @@ def _make_writable(path):
             os.chmod(os.path.join(root, f), stat.S_IRUSR | stat.S_IWUSR)
 
 
-def attach_package(repo, store, pkg) -> dict:
-    """Copy a checked package read-only into the run's workspace; return its run.json entry."""
+def package_id_problem(pkg) -> str:
+    """Why `pkg` is not a material package id PKG-<KEY>-<n> (what `brain intake` prints), or ''. A path to the
+    package (tab completion gives one) is refused too: joined onto the store and the workspace it names the store's
+    own copy, which the attach would delete before copying."""
+    if runrec.PKG_RE.match(str(pkg or "")):
+        return ""
+    base = os.path.basename(os.path.normpath(str(pkg or "")))
+    if base != pkg and runrec.PKG_RE.match(base):
+        return "--package takes the package id, not its path: --package %s" % base
+    return "--package %r is not a package id PKG-<KEY>-<n> (`brain intake` prints it)" % (pkg,)
+
+
+def _checked_package(store, pkg) -> str:
+    """The store's folder of package `pkg` once it is an id, is there and is intact (else BrainError)."""
+    why = package_id_problem(pkg)
+    if why:
+        raise BrainError(why)
     src = os.path.join(store, "packages", pkg)
     if not os.path.isdir(src):
         raise BrainError("package %s not found in %s" % (pkg, store))
     probs = intake.verify_package(src)
     if probs:
         raise BrainError("package %s is damaged: %s" % (pkg, "; ".join(probs)))
+    return src
+
+
+def attach_package(repo, store, pkg) -> dict:
+    """Copy a checked package read-only into the run's workspace; return its run.json entry."""
+    src = _checked_package(store, pkg)
     _readonly_copy(src, os.path.join(repo, MATERIALS_DIR, pkg))
+    if intake.is_old_version(src):
+        print("WARN: package %s: %s" % (pkg, intake.OLD_PACKAGE))
     return {"package": pkg, "manifest_sha256": intake.manifest_digest(src)}
 
 
@@ -201,6 +307,8 @@ def _print_report(rep):
                                                rep["classification"], "（预览，未写入）" if rep.get("dry") else ""))
     for line in rep["findings"]:
         print("  " + line)
+    for w in rep.get("warnings", []):
+        print("  注意：" + w)
     for b in rep.get("blocking", []):
         print("  不能提交：" + b)
 
@@ -211,6 +319,18 @@ def cmd_install(a):
     repo = os.path.abspath(a.repo)
     if not os.path.isdir(repo):
         raise BrainError("not a directory: %s" % repo)
+    kit_cfg = os.path.join(repo, config.KIT_CONFIG)
+    new_cfg = None
+    if not os.path.exists(kit_cfg):
+        # the kit.json this install writes, checked as every later command loads it, before anything is written
+        new_cfg = load_json(os.path.join(TEMPLATES, "kit.json"))
+        if a.team:
+            new_cfg["team"] = a.team
+        if a.prefix:
+            new_cfg["req_prefix"] = a.prefix.strip().upper()     # keys are PAY-1: `--prefix pay` means PAY
+        probs = config.validate(config.merged(config.DEFAULTS, new_cfg))
+        if probs:
+            raise BrainError("%s would not be valid (%s); nothing installed" % (config.KIT_CONFIG, "; ".join(probs)))
     lean_src = os.path.abspath(a.lean) if a.lean else (VENDORED_LEAN if os.path.exists(
         os.path.join(VENDORED_LEAN, "install.sh")) else None)
     if lean_src:
@@ -224,15 +344,10 @@ def cmd_install(a):
             dst = os.path.join(repo, os.path.relpath(src, KIT_SRC))
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copyfile(src, dst)
-    kit_cfg = os.path.join(repo, config.KIT_CONFIG)
-    if not os.path.exists(kit_cfg):
-        cfg = load_json(os.path.join(TEMPLATES, "kit.json"))
-        if a.team:
-            cfg["team"] = a.team
-        if a.prefix:
-            cfg["req_prefix"] = a.prefix
-        write_json(kit_cfg, cfg)
+    if new_cfg is not None:
+        write_json(kit_cfg, new_cfg)
         print("Wrote %s: check tracker/req_prefix, gitlab, bot_users and pins, then commit it." % config.KIT_CONFIG)
+    _agent_model_from_kit(repo, config.merged(config.DEFAULTS, load_json(kit_cfg)))
     _exclude_run_records(repo, config.merged(config.DEFAULTS, load_json(kit_cfg)))
     bd = os.path.join(repo, load_json(kit_cfg).get("brain_dir", "brain"))
     os.makedirs(bd, exist_ok=True)
@@ -243,16 +358,44 @@ def cmd_install(a):
     if not os.path.exists(os.path.join(repo, "AGENTS.md")):
         shutil.copyfile(os.path.join(TEMPLATES, "AGENTS.md"), os.path.join(repo, "AGENTS.md"))
     gi = os.path.join(repo, ".gitignore")
-    have = []
+    text = ""
     if os.path.exists(gi):
         with open(gi, encoding="utf-8") as f:
-            have = f.read().splitlines()
-    with open(gi, "a", encoding="utf-8") as f:
-        for line in GITIGNORE_LINES:
-            if line not in have:
-                f.write(line + "\n")
+            text = f.read()
+    missing = [line for line in GITIGNORE_LINES if line not in text.splitlines()]
+    if missing:
+        with open(gi, "a", encoding="utf-8") as f:
+            # a last line without its newline (many editors save it so) would run into ours: neither would work
+            f.write(("\n" if text and not text.endswith("\n") else "") + "".join(line + "\n" for line in missing))
     print("brain-kit %s installed in %s. Next: `brain doctor`." % (__version__, repo))
     return 0
+
+
+BRAIN_DEV_MD = os.path.join(".kiro", "agents", "brain-dev.md")
+
+
+def _agent_model_from_kit(repo, cfg):
+    """The brain-dev agent the kit just copied names brain-kit's default model; the team's choice is kit.json's
+    `model` (what `brain doctor` holds it to): write that one into its front matter."""
+    model = cfg.get("model")
+    if not isinstance(model, str) or model not in (cfg.get("allowed_models") or []):
+        return                      # kit.json is wrong: every command says so (config.load)
+    p = os.path.join(repo, BRAIN_DEV_MD)
+    if not os.path.isfile(p) or _frontmatter(p).get("model") == model:
+        return
+    with open(p, encoding="utf-8") as f:
+        lines = f.read().split("\n")
+    if lines[0].strip() != "---":
+        return
+    for i, line in enumerate(lines[1:], 1):
+        if line.strip() == "---":
+            break
+        if line.split(":", 1)[0].strip() == "model":
+            lines[i] = "model: %s" % model
+            with open(p, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
+            print("%s: model %s, as %s says." % (BRAIN_DEV_MD, model, config.KIT_CONFIG))
+            return
 
 
 def _exclude_run_records(repo, cfg):
@@ -300,6 +443,18 @@ def _version_of(cmd) -> str:
     return text.splitlines()[0] if p.returncode == 0 and text else ""
 
 
+def lean_approvers(repo) -> list:
+    """The approval kinds aidlc-docs/lean.json restricts with Lean's `approvers` (a non-empty list of emails), sorted.
+    Lean refuses an approval line whose session git email is not on the kind's list: on the team runner that is the
+    bot's, so the bridge's approvals would never be recorded."""
+    try:
+        with open(os.path.join(repo, lean.CONFIG), encoding="utf-8") as f:
+            approvers = json.load(f).get("approvers")
+    except (OSError, ValueError, AttributeError):
+        return []
+    return sorted(str(k) for k, v in approvers.items() if v) if isinstance(approvers, dict) else []
+
+
 def doctor_checks(repo, cfg, fetch=True) -> list:
     out = []
     add = out.append
@@ -310,15 +465,32 @@ def doctor_checks(repo, cfg, fetch=True) -> list:
         last = ((p.stdout + p.stderr).strip().splitlines() or ["(no output)"])[-1].strip(" -")
         # Lean is a guardrail, not the gate (CI and GitLab are): its findings warn, they do not block.
         add(("OK" if p.returncode == 0 else "WARN", "AI-DLC Lean doctor: %s" % ("ok" if p.returncode == 0 else last)))
+        want, have = str(cfg["pins"].get("lean") or ""), lean.version(repo)
+        if not want:
+            add(("OK", "AI-DLC Lean %s (not pinned)" % (have or "version unknown")))
+        elif lean.version_matches(have, want):
+            add(("OK", "AI-DLC Lean %s (pinned %s)" % (have, want)))
+        else:
+            add(("FAIL", "AI-DLC Lean %s installed, pinned %s (%s pins): install that one (`brain install --lean "
+                         "<AI-DLC Lean %s checkout>`) and commit it" % (have or "of unknown version", want,
+                                                                       config.KIT_CONFIG, want)))
         why = mrdesc.write_problem(repo, cfg)
         add(("FAIL", "%s fingerprint_exclude: %s。%s" % (lean.CONFIG, why, mrdesc.exclude_fix(cfg))) if why else
             ("OK", "Lean does not count %s/ as code (%s fingerprint_exclude)" % (cfg["runs_dir"], lean.CONFIG)))
+        kinds = lean_approvers(repo)
+        if kinds:
+            add(("WARN", "%s sets Lean's approvers (%s): with the team runner and the bridge, Lean checks an approval "
+                         "the bridge sends back against the runner session's git email (a bot_emails address), "
+                         "refuses it (not in approvers) and records nothing. A repo that uses the bridge must not set "
+                         "approvers: who may answer is the bridge's identities.json (roles)" % (lean.CONFIG,
+                                                                                               ", ".join(kinds))))
         hook = os.path.join(repo, CREW_HOOK)
         if os.path.isfile(hook):
             with open(hook, encoding="utf-8", errors="replace") as f:
                 why = crew_hook_problem(f.read())
             add(("FAIL", why) if why else
-                ("OK", "%s lets a run write its own %s/<KEY>/park.json whatever Lean's approvals (version %d)"
+                ("OK", "%s lets a run write its own %s/<KEY>/park.json whatever Lean's approvals, and refuses tool "
+                       "calls while the kit's own files differ from the commit (version %d)"
                  % (CREW_HOOK, cfg["runs_dir"], CREW_HOOK_VERSION)))
         else:
             add(("FAIL", "%s missing in this repo (run `brain install`): KiroCrew sessions, the team runner's too, run "
@@ -341,7 +513,11 @@ def doctor_checks(repo, cfg, fetch=True) -> list:
     add(("OK" if os.path.exists(os.path.join(repo, "AGENTS.md")) else "FAIL", "AGENTS.md at repo root"))
     ignored = git(repo, "check-ignore", "-q", MATERIALS_DIR + "/x", check=False).returncode == 0
     add(("OK" if ignored else "FAIL", "%s/ is git-ignored (materials never get committed)" % MATERIALS_DIR))
-    if _has_origin(repo) and fetch:
+    if not _has_origin(repo):
+        add(("WARN", "no origin remote: Brain freshness not checked"))
+    elif not fetch:
+        add(("WARN", "Brain vs origin/%s not checked (--offline: nothing fetched)" % cfg["default_branch"]))
+    else:
         p = git(repo, "fetch", "-q", "origin", cfg["default_branch"], check=False)
         if p.returncode != 0:
             add(("WARN", "cannot fetch origin/%s: Brain freshness unknown" % cfg["default_branch"]))
@@ -350,8 +526,6 @@ def doctor_checks(repo, cfg, fetch=True) -> list:
                         cfg["brain_dir"], "AGENTS.md", check=False).returncode != 0
             add(("WARN" if stale else "OK", "Brain vs origin/%s: %s" % (cfg["default_branch"],
                                                                          "differs, merge or rebase" if stale else "same")))
-    else:
-        add(("WARN", "no origin remote: Brain freshness not checked"))
     for tool, cmd in (("kiro-cli", ["kiro-cli", "--version"]), ("kirocrew", ["kirocrew", "--version"])):
         want = cfg["pins"].get(tool, "")
         have = _version_of(cmd)
@@ -565,16 +739,70 @@ def cmd_claim(a):
     me = _me(repo, cfg)
     if me in cfg["bot_users"]:
         raise BrainError("%s is a bot account" % me)
-    key = _claim(repo, cfg, me, a.key, a.title)
+    if a.target and a.key and a.target != a.key:
+        raise BrainError("name the key once: `brain claim %s` or `brain claim --key %s`" % (a.target, a.key))
+    key = a.target or a.key
+    if a.release:
+        if not key:
+            raise BrainError("--release needs the key: `brain claim --release KEY`")
+        return _release(repo, cfg, me, key)
+    if a.target:
+        from .intents import key_problem
+        key_problem(a.target, cfg["req_prefix"])
+        doc = claims.read(repo, a.target)
+        if doc is not None:
+            if claims.unowned(doc):
+                doc = claims.take(repo, a.target, me)
+                more = " (unit %s of %s; `brain start --key %s` starts it)" % (doc.get("unit"), doc.get("parent"),
+                                                                                a.target) if doc.get("parent") else ""
+                print("Claimed %s for %s%s." % (a.target, me, more))
+                return 0
+            if doc.get("closed"):
+                raise BrainError("%s is closed (%s)" % (a.target, (doc["closed"] or {}).get("reason", "")))
+            if doc.get("owner") != me:
+                raise BrainError("%s is claimed by %s" % (a.target, doc.get("owner") or "someone"))
+            print("%s is already yours." % a.target)
+            return 0
+        if not a.key:   # `brain claim KEY` takes a requirement someone filed; one nobody filed is most likely a typo
+            raise BrainError("%s is not filed: nobody registered it (`brain intent list` shows what is). To claim a "
+                             "new requirement under this very key: `brain claim --key %s --title <title>`"
+                             % (a.target, a.target))
+    key = _claim(repo, cfg, me, key, a.title)
     print("Claimed %s for %s." % (key, me))
     return 0
 
 
+def _release(repo, cfg, me, key):
+    """Give a claim back (owner -> none, 待认领 again). Refused while I have a run branch for it: the run is mine."""
+    from . import intents
+    branches = [n for n in intents.run_keys(repo, cfg)[0] if n == key]
+    if branches:
+        here = [l for l in git_out(repo, "for-each-ref", "--format=%(refname:short)",
+                                   "refs/heads/%s/%s/" % (cfg["branch_prefix"], me)).split() if
+                (parse_branch(l, cfg["branch_prefix"]) or {}).get("key") == key]
+        there = []
+        if git(repo, "remote", "get-url", "origin", check=False).returncode == 0:
+            p = git(repo, "ls-remote", "origin", "refs/heads/%s/%s/*" % (cfg["branch_prefix"], me), check=False)
+            there = [l.split("\t", 1)[1][len("refs/heads/"):] for l in p.stdout.splitlines() if "\t" in l and
+                     (parse_branch(l.split("\t", 1)[1][len("refs/heads/"):], cfg["branch_prefix"]) or {}).get("key")
+                     == key]
+        if here or there:
+            # a hand-over keeps the branch (the run goes on): only deleting it, here and on origin, lets the key go
+            raise BrainError("%s has your run branch %s: delete it first (%s), then release it. Handing the run over "
+                             "keeps the branch" % (key, ", ".join(sorted(set(here + there))), "; ".join(
+                                 ["git branch -D %s" % n for n in sorted(set(here))] +
+                                 ["git push origin --delete %s" % n for n in sorted(set(there))])))
+    claims.release(repo, key, me)
+    print("Released %s: it is 待认领 again (`brain claim %s` takes it)." % (key, key))
+    return 0
+
+
 def _intake(repo, cfg, a, key, me):
-    rep = intake.build(a.doc, key, _store(repo, a.store), submitter=me, consent=a.consent,
+    dry = getattr(a, "dry_run", False)
+    rep = intake.build(a.doc, key, _store(repo, a.store, create=not dry), submitter=me, consent=a.consent,
                        classification=a.classification, business=a.business, kit_intake=cfg["intake"],
-                       dry_run=getattr(a, "dry_run", False), exclude=a.exclude or ())
-    rep["dry"] = getattr(a, "dry_run", False)
+                       dry_run=dry, exclude=a.exclude or ())
+    rep["dry"] = dry
     _print_report(rep)
     return rep
 
@@ -590,21 +818,135 @@ def cmd_intake(a):
 
 # ---------- start ----------
 
+LEAN_ACTIVE = os.path.join(".aidlc-lean", "active.json")     # Lean's active intent on this clone (git-ignored)
+
+
+def _untracked(repo) -> set:
+    out = git(repo, "ls-files", "-z", "--others", "--exclude-standard", check=False).stdout
+    return {p for p in out.split("\0") if p}
+
+
+def _start_snapshot(repo, pkg) -> dict:
+    """What `brain start` needs to go back to where it began, taken right before it switches to the run branch."""
+    def read(rel):
+        try:
+            with open(os.path.join(repo, rel), "rb") as f:
+                return f.read()
+        except OSError:
+            return None
+    return {"head": git(repo, "symbolic-ref", "-q", "--short", "HEAD", check=False).stdout.strip(),
+            "sha": git_out(repo, "rev-parse", "HEAD"), "untracked": _untracked(repo), "active": read(LEAN_ACTIVE),
+            "materials": os.path.join(repo, MATERIALS_DIR, pkg) if pkg and not os.path.exists(
+                os.path.join(repo, MATERIALS_DIR, pkg)) else None}
+
+
+def _unclaim(repo, key, sha) -> bool:
+    """Delete claim/<KEY>, which this start made, while it is still commit `sha` (never one someone changed)."""
+    r = claims.ref(key)
+    if _has_origin(repo):
+        if git(repo, "push", "-q", "--force-with-lease=%s:%s" % (r, sha), "origin", ":" + r,
+               check=False).returncode != 0:
+            return False
+        git(repo, "update-ref", "-d", "refs/remotes/origin/claim/" + key, check=False)
+        git(repo, "update-ref", "-d", r, check=False)
+        return True
+    return git(repo, "update-ref", "-d", r, sha, check=False).returncode == 0
+
+
+def _undo_start(repo, cfg, key, me, br, switched, created, took):
+    """Put back what a `brain start` that did not get to its commit did, so that the next try begins where this one
+    did: the run branch it made, with the files it wrote there (the branch it began on is checked out again; the
+    tree was clean then, so every change to a tracked file is its own), Lean's active intent, and the claim it made
+    (deleted) or took (released). What cannot be put back is said, with the command that does it."""
+    if switched:
+        back = switched["head"] or switched["sha"]
+        try:
+            git(repo, "reset", "-q", "--hard")
+            mine = (lean.DOCS + "/", "%s/%s/" % (cfg["runs_dir"], key))
+            for rel in sorted(_untracked(repo) - switched["untracked"]):
+                if rel.startswith(mine):
+                    os.remove(os.path.join(repo, rel))
+                    d = os.path.dirname(os.path.join(repo, rel))
+                    while d != repo and os.path.isdir(d) and not os.listdir(d):
+                        os.rmdir(d)
+                        d = os.path.dirname(d)
+            active = os.path.join(repo, LEAN_ACTIVE)
+            if switched["active"] is not None:
+                with open(active, "wb") as f:
+                    f.write(switched["active"])
+            elif os.path.exists(active):
+                os.remove(active)
+            if switched["materials"] and os.path.isdir(switched["materials"]):
+                _make_writable(switched["materials"])
+                shutil.rmtree(switched["materials"])
+            git(repo, "switch", "-q", *([switched["head"]] if switched["head"] else ["--detach", switched["sha"]]))
+            git(repo, "branch", "-q", "-D", br)
+            print("Removed branch %s: the start did not finish (back on %s)." % (br, back))
+        except Exception as e:  # noqa: BLE001 - say what is left; the error that stopped the start is shown next
+            print("WARN: branch %s is still there (%s): `git switch %s` and `git branch -D %s` remove it."
+                  % (br, e, back, br))
+    keep = ("WARN: %s is still claimed by you (%%s): `brain start <slug> --key %s` uses it, `brain claim --release "
+            "%s` makes it 待认领 again." % (key, key, key))
+    if took:
+        try:
+            claims.release(repo, key, me)
+            print("Released %s again: the start did not finish." % key)
+        except Exception as e:  # noqa: BLE001
+            print(keep % e)
+    if created:
+        if _unclaim(repo, key, created):
+            print("Gave %s back (claim/%s deleted): the start did not finish." % (key, key))
+        else:
+            print(keep % ("claim/%s could not be deleted" % key))
+
+
 def cmd_start(a):
     repo = repo_root()
     cfg = config.load(repo)
-    slug = a.slug.lower()
-    if not SLUG_RE.match(slug):
-        raise BrainError("slug must be lowercase letters, digits and '-' (max 40)")
-    if _dirty(repo):
-        raise BrainError("working tree has uncommitted changes; commit or stash first")
     if not lean.installed(repo):
         raise BrainError("AI-DLC Lean is not installed; run `brain install --lean <path>`")
     me = _me(repo, cfg)
     if me in cfg["bot_users"]:
         raise BrainError("%s is a bot account; local runs belong to a person" % me)
+    if cfg["tracker"] == "none" and a.key:
+        from . import intents, split
+        intents.key_problem(a.key, cfg["req_prefix"])
+        child = claims.read(repo, a.key)
+        if isinstance(child, dict) and child.get("parent"):
+            bad = intents.doc_problems(child, content=False)
+            if bad:
+                raise BrainError("claim/%s: %s" % (a.key, "; ".join(bad)))
+            return split.start_child(repo, cfg, a, child, me, __version__)
+    if a.on or a.worktree:
+        raise BrainError("--on and --worktree are for a child of a split (`brain split`); %s is not one" % (a.key or
+                                                                                                         "this"))
+    if not a.slug:
+        raise BrainError("name the run: `brain start <slug> ...` (lowercase letters, digits and '-')")
+    slug = a.slug.lower()
+    if not SLUG_RE.match(slug):
+        raise BrainError("slug must be lowercase letters, digits and '-' (max 40)")
+    if _dirty(repo):
+        raise BrainError("working tree has uncommitted changes; commit or stash first")
     if a.doc and a.package:
         raise BrainError("use --doc (take documents in now) or --package (an existing package), not both")
+    if a.package and package_id_problem(a.package):
+        raise BrainError(package_id_problem(a.package))
+    # what run.json must hold is checked by runrec.validate's rules now, before anything is claimed or written:
+    # status, handoff and the bridge refuse a run.json that breaks them
+    if a.package and runrec.package_key(a.package) != a.key:
+        pk = runrec.package_key(a.package)
+        raise BrainError("--package %s is %s's material package%s: a run takes only its own requirement's packages "
+                         "(`brain start %s --key %s --package %s`)" % (
+                             a.package, pk, ", not %s's" % a.key if a.key else " and this start names no --key",
+                             a.slug or "<slug>", pk, a.package))
+    paths = [p.strip() for p in (a.paths or "").split(",") if p.strip()]
+    bad = [w for w in (runrec.path_problem(p) for p in paths) if w]
+    if len(paths) > runrec.MAX_PATHS:
+        bad.append("%d paths, at most %d" % (len(paths), runrec.MAX_PATHS))
+    if bad:
+        raise BrainError("--paths: %s" % "; ".join(bad))
+    if a.package:
+        _checked_package(_store(repo, a.store), a.package)     # not there or damaged: refused before the claim
     if a.doc and (not a.consent or not a.classification):
         raise BrainError("--doc needs --consent and --classification (see `brain intake --help`)")
     from . import intents
@@ -618,12 +960,14 @@ def cmd_start(a):
         checked = not a.no_jira
     else:
         key = a.key
+        take = False
         if key:
             doc = claims.read(repo, key)
-            if doc and doc.get("owner") != me:
-                raise BrainError("%s is claimed by %s" % (key, doc.get("owner")))
-            if doc and doc.get("closed"):
+            if doc and doc.get("closed"):                           # closed first, as `brain claim` says it
                 raise BrainError("%s is closed (%s)" % (key, (doc["closed"] or {}).get("reason", "")))
+            take = claims.unowned(doc)                              # filed for others: starting it claims it,
+            if doc and not take and doc.get("owner") != me:         # once every check below has passed
+                raise BrainError("%s is claimed by %s" % (key, doc.get("owner") or "someone"))
             # a malformed claim is refused; content today's rules flag in text accepted when it was filed (it is
             # on the claim branch already) is shown, not refused
             bad = intents.doc_problems(doc, content=False) if intents.is_intent(doc) else []
@@ -633,41 +977,58 @@ def cmd_start(a):
                 if w not in bad:
                     print("WARN: claim/%s: %s (filed before this rule; check runs/%s/%s before you hand over)"
                           % (key, w, key, intents.INTENT_MD))
-        key = _claim(repo, cfg, me, key, a.title or (doc or {}).get("title") or slug.replace("-", " "))
+    created = took = switched = None    # what a start that does not finish puts back (_undo_start)
+    if cfg["tracker"] == "none":
+        if not take:
+            key = _claim(repo, cfg, me, key, a.title or (doc or {}).get("title") or slug.replace("-", " "))
+            if doc is None:             # claimed just now (not one I had already)
+                created = git(repo, "rev-parse", "-q", "--verify", claims.ref(key), check=False).stdout.strip()
         checked = True
-    title = a.title or (doc or {}).get("title") or slug.replace("-", " ")
-    rec_path = runrec.path(cfg["runs_dir"], key)
-    base, brain_commit = _brain_base(repo, cfg)
-    if git(repo, "cat-file", "-e", "%s:%s" % (base, rec_path), check=False).returncode == 0:
-        raise BrainError("%s already exists on %s: this requirement already has a run" % (rec_path, base))
     br = branch_name(cfg["branch_prefix"], me, key, slug)
-    if git(repo, "rev-parse", "--verify", "-q", "refs/heads/" + br, check=False).returncode == 0:
-        raise BrainError("branch %s already exists" % br)
-    if _has_origin(repo) and git(repo, "ls-remote", "--exit-code", "--heads", "origin", br,
-                                 check=False).returncode == 0:
-        raise BrainError("branch %s already exists on origin" % br)
-    materials = []
-    store = _store(repo, a.store)
-    if a.doc:
-        rep = _intake(repo, cfg, a, key, me)
-        a.package = rep["package"]
-    git(repo, "switch", "-q", "-c", br, base)
-    if a.package:
-        materials.append(attach_package(repo, store, a.package))
-    intent = lean.new_intent(repo, "%s-%s" % (key.lower(), slug), "%s %s" % (key, title))
-    paths = [p.strip() for p in (a.paths or "").split(",") if p.strip()]
-    rec = runrec.new(key, me, br, intent, brain_commit, __version__, paths, iso(utcnow()), checked,
-                     tracker=cfg["tracker"], materials=materials)
-    write_json(os.path.join(repo, rec_path), rec)
-    intent_md = []    # the claim's text (an intent from debt, alert, schedule, eval or gap) for the run's agent
-    if intents.is_intent(doc):
-        intent_md.append(os.path.join(cfg["runs_dir"], key, intents.INTENT_MD))
-        with open(os.path.join(repo, intent_md[0]), "w", encoding="utf-8") as f:
-            f.write(intents.render_md(doc))
-    git(repo, "add", "--", rec_path, os.path.join(lean.DOCS, intent), *intent_md)
-    if os.path.isdir(os.path.join(repo, lean.DOCS, "audit")):
-        git(repo, "add", "--", os.path.join(lean.DOCS, "audit"))
-    git(repo, "commit", "-q", "-m", "%s: start run (brain %s)" % (key, brain_commit[:10]))
+    try:
+        title = a.title or (doc or {}).get("title") or slug.replace("-", " ")
+        rec_path = runrec.path(cfg["runs_dir"], key)
+        base, brain_commit = _brain_base(repo, cfg)
+        if git(repo, "cat-file", "-e", "%s:%s" % (base, rec_path), check=False).returncode == 0:
+            raise BrainError("%s already exists on %s: this requirement already has a run" % (rec_path, base))
+        if git(repo, "rev-parse", "--verify", "-q", "refs/heads/" + br, check=False).returncode == 0:
+            raise BrainError("branch %s already exists" % br)
+        if _has_origin(repo) and git(repo, "ls-remote", "--exit-code", "--heads", "origin", br,
+                                     check=False).returncode == 0:
+            raise BrainError("branch %s already exists on origin" % br)
+        if cfg["tracker"] == "none" and a.key and take:
+            doc = claims.take(repo, key, me)
+            took = True
+            print("Claimed %s for %s." % (key, me))
+        materials = []
+        store = _store(repo, a.store)
+        if a.doc:
+            rep = _intake(repo, cfg, a, key, me)
+            a.package = rep["package"]
+        before = _start_snapshot(repo, a.package)
+        git(repo, "switch", "-q", "-c", br, base)
+        switched = before
+        if a.package:
+            materials.append(attach_package(repo, store, a.package))
+        intent = lean.new_intent(repo, "%s-%s" % (key.lower(), slug), "%s %s" % (key, title))
+        rec = runrec.new(key, me, br, intent, brain_commit, __version__, paths, iso(utcnow()), checked,
+                         tracker=cfg["tracker"], materials=materials)
+        probs = runrec.validate(rec, branch=br, prefix=cfg["branch_prefix"])
+        if probs:                   # never write a run.json that status, handoff and the bridge refuse
+            raise BrainError("run.json would not be valid: %s" % "; ".join(probs))
+        write_json(os.path.join(repo, rec_path), rec)
+        intent_md = []    # the claim's text (an intent from debt, alert, schedule, eval or gap) for the run's agent
+        if intents.is_intent(doc):
+            intent_md.append(os.path.join(cfg["runs_dir"], key, intents.INTENT_MD))
+            with open(os.path.join(repo, intent_md[0]), "w", encoding="utf-8") as f:
+                f.write(intents.render_md(doc))
+        git(repo, "add", "--", rec_path, os.path.join(lean.DOCS, intent), *intent_md)
+        if os.path.isdir(os.path.join(repo, lean.DOCS, "audit")):
+            git(repo, "add", "--", os.path.join(lean.DOCS, "audit"))
+        git(repo, "commit", "-q", "-m", "%s: start run (brain %s)" % (key, brain_commit[:10]))
+    except BaseException:
+        _undo_start(repo, cfg, key, me, br, switched, created, took)    # the start did not get to its commit
+        raise
     pushed = False
     if _has_origin(repo) and not a.no_push:
         git(repo, "push", "-q", "-u", "origin", br)
@@ -700,19 +1061,36 @@ def _current(repo, cfg):
     return br, b, rp, rec
 
 
+def _is_clone_root(path) -> bool:
+    """True when `path` is the top of a git work tree (a clone, or a worktree of one), not a folder somewhere
+    inside another repository."""
+    p = git(path, "rev-parse", "--show-toplevel", check=False)
+    return p.returncode == 0 and os.path.realpath(p.stdout.strip()) == os.path.realpath(path)
+
+
 def publish_materials(store, rec) -> list:
-    """Make sure each package is in the shared intake repo. Returns warnings (empty when all published)."""
+    """Make sure each package is intact and in the shared intake repo. Returns warnings (empty when all published and
+    none is an old-version package)."""
     warn = []
     for m in rec.get("materials", []):
         pdir = os.path.join(store, "packages", m["package"])
         if not os.path.isdir(pdir) or intake.manifest_digest(pdir) != m["manifest_sha256"]:
             raise BrainError("package %s in %s does not match run.json" % (m["package"], store))
+        probs = intake.verify_package(pdir)
+        if probs:
+            raise BrainError("package %s in %s is damaged: %s" % (m["package"], store, "; ".join(probs)))
+        if intake.is_old_version(pdir):
+            warn.append("package %s: %s" % (m["package"], intake.OLD_PACKAGE))
     if not rec.get("materials"):
         return warn
-    if git(store, "rev-parse", "--is-inside-work-tree", check=False).returncode != 0:
-        return ["intake store %s is not a git clone of brain-intake: the team runner cannot get the materials" % store]
+    if not _is_clone_root(store):
+        # only the store's own clone: inside an enclosing repo (a dotfiles repo in $HOME holding ~/.brain/intake)
+        # a commit and push would publish the masked materials to that repo's remote
+        return warn + ["intake store %s is not a git clone of brain-intake: the team runner cannot get the materials"
+                       % store]
     for m in rec["materials"]:
-        git(store, "add", "--", os.path.join("packages", m["package"]))
+        pkg = "packages/" + m["package"]
+        git(store, "add", "--", pkg, *[":(exclude,glob)%s/**/%s" % (pkg, n) for n in sorted(intake.SKIP_NAMES)])
     if git(store, "diff", "--cached", "--quiet", check=False).returncode != 0:
         git(store, "commit", "-q", "-m", "materials for %s" % rec["key"])
     if git(store, "remote", "get-url", "origin", check=False).returncode == 0:
@@ -767,8 +1145,9 @@ def _label_names(mr) -> list:
 
 
 def runner_kit_problems(repo) -> list:
-    """What the team runner's session needs in git (not just on this disk): Lean, and the hook adapter that
-    carries Lean's hooks in KiroCrew. Without the adapter every tool call of the runner's session is blocked."""
+    """What a run needs in git (not just on this disk): Lean, and the hook adapter that carries Lean's hooks in
+    KiroCrew at the version brain-kit needs. Teammates' local sessions run the committed adapter; the team runner runs
+    the installed brain-kit's own (runner_hook_problems), and runnerd still wants the project to have one."""
     probs = []
     for path, why in ((".kiro/aidlc-lean/aidlc_lean.py", "AI-DLC Lean"),
                       (CREW_HOOK, "the KiroCrew hook adapter (brain install wrote it)")):
@@ -783,11 +1162,28 @@ def runner_kit_problems(repo) -> list:
 
 
 def _risk_matches(path, pats, prefix=False) -> bool:
-    """Does `path` fall under a risk-paths pattern? prefix=True: `path` is a folder or glob from run.json
-    expected_paths ("src/pay"), which names everything below it too."""
-    from . import ci
-    cands = [path] + ([path.rstrip("/") + "/"] if prefix else [])
-    return any(ci.glob_match(c, x) for c in cands for x in pats)
+    """Does `path` fall under a risk-paths pattern (riskpaths: the rules brain-ci check-run uses)? prefix=True:
+    `path` is a file, folder or glob from run.json expected_paths ("src", "src/**"), which names everything below it
+    too: could a file it names be under one (riskpaths.meets)?"""
+    from . import riskpaths
+    test = riskpaths.meets if prefix else riskpaths.matches
+    return any(test(path, x) for x in pats)
+
+
+def allowed_signers_file() -> str:
+    """The bridge's public key(s) for checking signed vouchers on this machine: $BRAIN_ALLOWED_SIGNERS, else the
+    kit's own deploy/allowed_signers (the file brain-ci pins) once it holds a key. '' when there is neither."""
+    env = os.environ.get("BRAIN_ALLOWED_SIGNERS") or ""
+    if env:
+        return env
+    p = os.path.join(KIT_ROOT, "deploy", "allowed_signers")
+    try:
+        with open(p, encoding="utf-8", errors="replace") as f:
+            if any(line.strip() and not line.lstrip().startswith("#") for line in f):
+                return p
+    except OSError:
+        pass
+    return ""
 
 
 def handoff_risk_warnings(repo, cfg, rec) -> list:
@@ -811,7 +1207,8 @@ def handoff_risk_warnings(repo, cfg, rec) -> list:
     planned = [p for p in rec.get("expected_paths") or [] if isinstance(p, str) and _risk_matches(p, pats, True)]
     if not changed and not planned:
         return []
-    vdir, signers = default_vouchers(repo), os.environ.get("BRAIN_ALLOWED_SIGNERS") or ""
+    vdir, signers = default_vouchers(repo), allowed_signers_file()
+    unchecked = ""          # why this machine could not tell whether a bridge-signed DESIGN approval covers them
     if changed and vdir and signers and os.path.isfile(signers):
         design = "%s/%s/inception/application-design/application-design.md" % (lean.DOCS, rec["intent"])
         try:
@@ -820,14 +1217,23 @@ def handoff_risk_warnings(repo, cfg, rec) -> list:
             if any(not ci.design_approval_covers(repo, v, design, changed) for v in approvals):
                 return []
         except (BrainError, OSError, ValueError) as e:
-            print("WARN: bridge-signed DESIGN approvals not checked here (%s)" % e)
+            unchecked = str(e)
+    elif changed and vdir:
+        unchecked = ("no bridge public key here: set BRAIN_ALLOWED_SIGNERS to the bridge's allowed_signers file, or "
+                     "put the key in the kit's deploy/allowed_signers" if not signers else
+                     "BRAIN_ALLOWED_SIGNERS=%s is not a file" % signers)
     shown = ", ".join((changed or planned)[:5])
-    out = ["this run %s risk paths (%s; %s) and no DESIGN approval signed by the bridge covers %s yet: brain-ci "
-           "check-run will fail the MR until one does. A DESIGN approved in your own Lean chat does not count. The "
-           "runner asks for it through the bridge (lean request DESIGN, then park.json with lean_request DESIGN) "
-           "before it writes more code." % ("changes" if changed else "plans to change (run.json expected_paths)",
-                                            shown, cfg["risk_paths_file"], "them" if len(changed or planned) > 1
-                                            else "it")]
+    it = "them" if len(changed or planned) > 1 else "it"
+    what = "changes" if changed else "plans to change (run.json expected_paths)"
+    if unchecked:
+        head = ("this run %s risk paths (%s; %s) and whether a DESIGN approval signed by the bridge covers %s was not "
+                "checked here (%s): brain-ci check-run fails the MR unless one does." % (
+                    what, shown, cfg["risk_paths_file"], it, unchecked))
+    else:
+        head = ("this run %s risk paths (%s; %s) and no DESIGN approval signed by the bridge covers %s yet: brain-ci "
+                "check-run will fail the MR until one does." % (what, shown, cfg["risk_paths_file"], it))
+    out = [head + " A DESIGN approved in your own Lean chat does not count. The runner asks for it through the bridge "
+           "(lean request DESIGN, then park.json with lean_request DESIGN) before it writes more code."]
     note = lean.state_path(repo, rec["intent"])
     steps = []
     if os.path.isfile(note):
@@ -840,16 +1246,18 @@ def handoff_risk_warnings(repo, cfg, rec) -> list:
     return out
 
 
-def handoff_description(repo, cfg, key):
+def handoff_description(repo, cfg, key, what="hand-over"):
     """Write runs/<KEY>/MR.md from the records (mrdesc.build / render) and, when it changed, amend it into the
     hand-over commit just made: the MR head stays the one hand-over commit the bridge takes (one parent, it changes
-    run.json). Returns the description, or None after a warning when it could not be written (the hand-over goes
-    on without it; the working tree is left clean)."""
+    run.json). Made after that commit, so the description is of what the MR holds (nothing left uncommitted).
+    Returns the description, or None after a warning when it could not be written (the hand-over goes on without
+    it; the working tree is left clean). `what`: the commit's name in the messages (a split child's is not a
+    hand-over)."""
     from .commands.trace_cmd import default_vouchers
     md = mrdesc.md_path(cfg, key)
     try:
         text = mrdesc.render(mrdesc.build(repo, cfg, key, vouchers_dir=default_vouchers(repo),
-                                          allowed_signers=os.environ.get("BRAIN_ALLOWED_SIGNERS") or None))
+                                          allowed_signers=allowed_signers_file() or None))
         mrdesc.write(repo, cfg, key, text)
         git(repo, "add", "--", md)
         if git(repo, "diff", "--cached", "--quiet", "--", md, check=False).returncode != 0:
@@ -860,10 +1268,10 @@ def handoff_description(repo, cfg, key):
             git(repo, "checkout", "-q", "HEAD", "--", md, check=False)
         elif os.path.lexists(os.path.join(repo, md)):
             os.remove(os.path.join(repo, md))
-        print("WARN: %s not written (%s): the hand-over goes on without the MR description."
-              % (md, str(e).replace(repo, ".")))
+        print("WARN: %s not written (%s): the %s goes on without the MR description."
+              % (md, str(e).replace(repo, "."), what))
         return None
-    print("Wrote %s from the records into the hand-over commit (`brain mr-desc` regenerates it)." % md)
+    print("Wrote %s from the records into the %s commit (`brain mr-desc` regenerates it)." % (md, what))
     return text
 
 
@@ -885,6 +1293,15 @@ def cmd_handoff(a):
     me = _me(repo, cfg)
     if me != rec["owner"]:
         raise BrainError("this run belongs to %s; only the owner hands it off" % rec["owner"])
+    target = cfg["default_branch"]
+    if cfg["tracker"] == "none":
+        from . import split
+        for w in split.handoff_problems(repo, cfg, rec):
+            raise BrainError(w)
+        for w in split.handoff_warnings(repo, cfg, rec):
+            print("WARN: " + w)
+    if rec.get("parent"):
+        return _child_mr(repo, cfg, a, br, b, rec, me)
     probs = lean.handover_problems(repo, rec["intent"])
     if probs:
         raise BrainError("hand-over note not ready (%s/%s/aidlc-state.md): %s"
@@ -915,23 +1332,38 @@ def cmd_handoff(a):
     git(repo, "add", "--", rel)
     git(repo, "commit", "-q", "-m", "%s: hand off to team runner" % rec["key"])
     desc = handoff_description(repo, cfg, rec["key"])
+    unpublished = [m["package"] for m in rec.get("materials") or []] if a.no_push else []
+    if unpublished:
+        # pushing and labelling by hand would hand over a run whose package the bridge cannot find in brain-intake
+        print("Committed the hand-over; not pushed, and material package %s not published to brain-intake either "
+              "(--no-push skips both; the bridge refuses a hand-over whose package is not there). When it is ready, "
+              "run `brain handoff` again without --no-push: it publishes the package, pushes %s and labels its MR%s."
+              % (", ".join(unpublished), br, " (its description is %s)" % md if desc is not None else ""))
+        return 0
     if a.no_push or not _has_origin(repo):
         print("Committed the hand-over; not pushed. Push %s and add label '%s' to its MR%s." % (
             br, cfg["handoff_label"], " (its description is %s)" % md if desc is not None else ""))
         return 0
     git(repo, "push", "-q", "-u", "origin", br)
+    # exit 1 from here on whenever the MR is not labelled: pushed, but nothing handed over (docs 4.3)
     if a.no_label:
-        print("Pushed %s. Add label '%s' to its MR when ready." % (br, cfg["handoff_label"]))
-        return 0
+        print("Pushed %s, but NOT labelled (--no-label): nothing was handed over yet. Add the label '%s' to its MR "
+              "when it is ready." % (br, cfg["handoff_label"]))
+        return 1
     gl = _gitlab(cfg)
     if not gl or not cfg["gitlab"]["project"]:
-        print("Pushed %s. GitLab not configured here: add label '%s' to its MR by hand." % (br, cfg["handoff_label"]))
-        return 0
+        missing = ["gitlab.%s in %s" % (k, config.KIT_CONFIG) for k in ("base", "project") if not cfg["gitlab"][k]]
+        if cfg["gitlab"]["base"] and not read_token():
+            missing.append("a GitLab token on this machine (GITLAB_TOKEN, or %s)" % os.environ.get(
+                "BRAIN_GITLAB_TOKEN_FILE", "~/.brain/gitlab-token"))
+        print("Pushed %s, but NOT labelled: missing %s. Nothing was handed over: add the label '%s' to its MR by "
+              "hand, or set that up and run `brain handoff` again." % (br, "; ".join(missing), cfg["handoff_label"]))
+        return 1
     proj = cfg["gitlab"]["project"]
     head = git_out(repo, "rev-parse", "HEAD")
     mr = gl.mr_for_branch(proj, br)
     if not mr:
-        mr = _create_mr(gl, proj, br, cfg["default_branch"], "%s %s" % (rec["key"], b["slug"].replace("-", " ")), desc)
+        mr = _create_mr(gl, proj, br, target, "%s %s" % (rec["key"], b["slug"].replace("-", " ")), desc)
     elif desc is not None:
         try:
             gl.edit_mr(proj, mr["iid"], description=desc)
@@ -955,6 +1387,76 @@ def cmd_handoff(a):
     gl.edit_labels(proj, mr["iid"], add=[label], remove=[cfg["rejected_label"]])
     print("Handed off: MR !%s labelled '%s' at %s. The bridge checks it and the team runner continues." %
           (mr["iid"], label, head[:12]))
+    return 0
+
+
+def _child_mr(repo, cfg, a, br, b, rec, me):
+    """`brain handoff` on a split child (phase 1): its work goes to the parent's owner, not to the team runner. The
+    note is checked (its own `### Next (team <unit>)`), run.json records the request to merge ("mr": the child
+    counts as merged once this commit is on the parent's branch) and is committed, MR.md is written from the records
+    and amended into that one commit (handoff_description, as for any run), the branch is pushed and the MR into the parent's run branch is opened or updated with that description. No hand-over record
+    and no label: the bridge takes hand-overs into the default branch only (handing children to the runner is
+    phase 2)."""
+    target = rec["target_branch"]
+    probs = lean.handover_problems(repo, rec["intent"], rec.get("lean_team"))
+    if probs:
+        raise BrainError("hand-over note not ready (%s/%s/aidlc-state.md): %s"
+                         % (lean.DOCS, rec["intent"], "; ".join(probs)))
+    md = mrdesc.md_path(cfg, rec["key"])
+    rp = os.path.join(repo, runrec.path(cfg["runs_dir"], rec["key"]))
+    rel = os.path.relpath(rp, repo)
+    dirty = _dirty(repo, ignore=(md, rel))
+    if dirty:
+        raise BrainError("commit your work first:\n  " + "\n  ".join(dirty))
+    gl = None if a.no_push or not _has_origin(repo) else _gitlab(cfg)
+    proj = cfg["gitlab"]["project"] if gl else ""
+    existing = None
+    if proj:
+        # an MR of this branch opened by hand (GitLab's "create merge request" link targets the default branch)
+        # goes elsewhere: merged, the child would land there, not in its parent's branch. Before anything is written.
+        mrs = gl.mrs_for_branch(proj, br)
+        wrong = [m for m in mrs if m.get("target_branch") != target]
+        if wrong:
+            raise BrainError("%s: a child of a split merges into its parent's branch %s only. Change the target branch "
+                             "of %s on GitLab to %s, or close it, then run `brain handoff` again (nothing was committed "
+                             "or pushed)" % (", ".join("MR !%s goes into %s" % (m.get("iid"), m.get("target_branch"))
+                                                       for m in wrong), target,
+                                             "it" if len(wrong) == 1 else "them", target))
+        existing = mrs[0] if mrs else None
+    rec["mr"] = {"requested_at": iso(utcnow()), "by": me, "local_head": git_out(repo, "rev-parse", "HEAD")}
+    write_json(rp, rec)
+    git(repo, "add", "--", rel)
+    try:
+        warnings = handoff_risk_warnings(repo, cfg, rec)
+    except (BrainError, OSError, ValueError) as e:
+        warnings = ["risk paths not checked (%s)" % e]
+    for w in warnings:
+        print("WARN: " + w)
+    git(repo, "commit", "-q", "-m", "%s: ready to merge into %s (unit %s of %s)" % (rec["key"], target,
+                                                                                   rec.get("unit"), rec["parent"]))
+    # after the commit, as for any run: a description made before it would count run.json as not committed
+    desc = handoff_description(repo, cfg, rec["key"], what="ready-to-merge")
+    who = "%s's owner" % rec["parent"]
+    if a.no_push or not _has_origin(repo):
+        print("Ready for %s: push %s and open its MR into %s (not pushed). A child is merged by its parent's owner; "
+              "handing it to the team runner comes with phase 2." % (who, br, target))
+        return 0
+    git(repo, "push", "-q", "-u", "origin", br)
+    if not proj:
+        print("Pushed %s. GitLab not configured here: open its MR into %s by hand, for %s to review and merge." % (
+            br, target, who))
+        return 0
+    mr = existing
+    if not mr:
+        mr = _create_mr(gl, proj, br, target, "%s %s (unit %s of %s)" % (rec["key"], b["slug"].replace("-", " "),
+                                                                        rec.get("unit"), rec["parent"]), desc)
+    elif desc is not None:
+        try:
+            gl.edit_mr(proj, mr["iid"], description=desc)
+        except BrainError as e:
+            print("WARN: the description of MR !%s was not set (%s); it is in %s on the branch." % (mr["iid"], e, md))
+    print("Pushed %s; MR !%s goes into %s for %s to review and merge (no runner hand-over for a child yet: phase 2)."
+          % (br, mr["iid"], target, who))
     return 0
 
 
@@ -1058,6 +1560,15 @@ def cmd_entry(a):
         print("%s\n%s" % (hit[1].header(), "\n".join(hit[1].body)))
         return 0
     before = entries.Brain.load(bd)
+    base_ref = _default_base(repo, cfg)       # what brain lint and CI compare with
+    base = entries.Brain.from_git(repo, base_ref, cfg["brain_dir"]) if base_ref else before
+    if a.op in ("replace", "withdraw", "purge") and (a.id in before.main() or a.id in before.archived()) \
+            and a.id not in base.used_ids():
+        raise BrainError("%s was added in this change and is not on %s yet: %s only applies to merged entries (the "
+                         "archive and PURGED.md keep those). Append to it with adds-to, or delete it from the file "
+                         "by hand and add it again (it was never merged, so lint does not count that as a deletion)%s"
+                         % (a.id, cfg["default_branch"], a.op, ". If you committed it, its text is in this branch's "
+                            "history: drop or rewrite those commits" if a.op == "purge" else ""))
     brain = entries.Brain.load(bd)
     used = reflect.used_on_branches(repo, cfg["brain_dir"]) if a.op in ("add", "replace") else set()
     if a.op == "add":
@@ -1076,7 +1587,7 @@ def cmd_entry(a):
         res = "%s（第 %d 次重复%s）" % (a.id, n, "：该改成 gate 了" if n >= 2 else "")
     else:
         res = brain.purge(a.id, a.reason, a.approved_by)
-    errors, warnings = brainlint.check(brain, base=before, purge_approvers=cfg.get("purge_approvers") or [])
+    errors, warnings = brainlint.check(brain, base=base, purge_approvers=cfg.get("purge_approvers") or [])
     _print_lint(errors, warnings)
     if errors:
         print("brain entry: 没有写入（上面的错误要先改）")
@@ -1133,8 +1644,8 @@ def cmd_reflect(a):
         print("%s 里没有 brain-proposal 块：这个 run 没有提出 Brain 条目。" % label)
         return 0
     brain = entries.Brain.from_git(repo, base, mcfg["brain_dir"])
-    used, pending = reflect.open_branches(repo, mcfg["brain_dir"])
-    ops, more, notes = reflect.plan(brain, proposals, key, pending=pending, used_extra=used)
+    used, pending, stuck = reflect.open_branches(repo, mcfg["brain_dir"], base)
+    ops, more, notes = reflect.plan(brain, proposals, key, pending=pending, used_extra=used, stuck=stuck)
     probs += more
     rows, more = reflect.plan_gaps(repo, cfg, gaps, key)
     probs += more
@@ -1172,8 +1683,6 @@ def cmd_reflect(a):
         print("这是预览。加 --apply 在 main 上开新分支写入（不动你当前的工作区）%s。"
               % ("，并登记 %d 个缺口" % len(fresh) if fresh else ""))
         return 0
-    if fresh:
-        file_gaps()
     br = reflect.branch_name(repo, key)
     wt = os.path.abspath(a.worktree) if a.worktree else os.path.join(reflect.worktree_root(repo),
                                                                      br.replace("/", "-"))
@@ -1181,6 +1690,7 @@ def cmd_reflect(a):
         raise BrainError("%s already exists" % wt)
     os.makedirs(os.path.dirname(wt), exist_ok=True)
     git(repo, "worktree", "add", "-q", "--no-track", "-b", br, wt, base)
+    title = "Brain: %s reflect（%d 条）" % (key, sum(1 for op in ops if op.kind != "same"))
     try:
         bd = os.path.join(wt, mcfg["brain_dir"])
         b2 = entries.Brain.load(bd)
@@ -1190,19 +1700,21 @@ def cmd_reflect(a):
                                            purge_approvers=mcfg.get("purge_approvers") or [])
         if errors:
             raise BrainError("brain lint refused the result:\n  " + "\n  ".join(errors))
-        desc = reflect.mr_description(key, ops, warnings + lost, label, gaps=rows)
-        title = "Brain: %s reflect（%d 条）" % (key, sum(1 for op in ops if op.kind != "same"))
-        with open(wt + ".mr.md", "w", encoding="utf-8") as f:
-            f.write("%s\n\n%s" % (title, desc))
         if not a.no_commit:
             git(wt, "add", "-A", "--", mcfg["brain_dir"])
-            git(wt, "commit", "-q", "-m", "%s\n\n%s" % (title, desc))
+            git(wt, "commit", "-q", "-m", "%s\n\n%s" % (title, reflect.mr_description(
+                key, ops, warnings + lost, label, gaps=None if fresh else rows)))
+        if fresh:            # their claims go to origin: only once every step that can fail here has passed
+            file_gaps()
     except BaseException:
         git(repo, "worktree", "remove", "--force", wt, check=False)
         git(repo, "branch", "-D", br, check=False)
-        if os.path.exists(wt + ".mr.md"):
-            os.remove(wt + ".mr.md")
         raise
+    desc = reflect.mr_description(key, ops, warnings + lost, label, gaps=rows)
+    with open(wt + ".mr.md", "w", encoding="utf-8") as f:
+        f.write("%s\n\n%s" % (title, desc))
+    if fresh and not a.no_commit:
+        git(wt, "commit", "-q", "--amend", "-m", "%s\n\n%s" % (title, desc))
     for op in ops:
         print("  %s %s%s" % (op.kind, op.result, "（%s）" % op.note if op.note else ""))
     if a.no_commit:
@@ -1239,7 +1751,8 @@ def _intake_args(s, required_key):
     s.add_argument("--consent", action="store_true", help="gate 1: I am the author or have the author's consent")
     s.add_argument("--business", choices=("keep", "mask"), help="gate 3: amounts/companies/contract numbers")
     s.add_argument("--store", help="intake store (default $BRAIN_INTAKE_DIR, git config brain.intake, ~/.brain/intake)")
-    s.add_argument("--exclude", action="append", help="leave out files matching this glob (repeatable)")
+    s.add_argument("--exclude", action="append", help="leave out a file or a folder: its path, its name or a glob "
+                                                     "(repeatable)")
 
 
 def main(argv=None):
@@ -1256,8 +1769,11 @@ def main(argv=None):
     s.add_argument("--offline", action="store_true", help="skip git fetch")
     s.set_defaults(fn=cmd_doctor)
     s = sub.add_parser("claim")
+    s.add_argument("target", nargs="?", metavar="KEY", help="take this requirement (filed for others) or check it is "
+                                                           "yours")
     s.add_argument("--key")
     s.add_argument("--title", default="")
+    s.add_argument("--release", action="store_true", help="give your claim back: it is 待认领 again")
     s.set_defaults(fn=cmd_claim)
     s = sub.add_parser("intake")
     s.add_argument("doc", nargs="+", help="files or folders (a Feishu/Lark export folder works)")
@@ -1266,8 +1782,11 @@ def main(argv=None):
     _intake_args(s, True)
     s.set_defaults(fn=cmd_intake)
     s = sub.add_parser("start")
-    s.add_argument("slug")
+    s.add_argument("slug", nargs="?", help="branch name part (a split child: default its unit)")
     s.add_argument("--key", help="requirement key (tracker none: omit to claim the next free one)")
+    s.add_argument("--on", metavar="DEP", help="a split child: start from the branch of this dependency, which has "
+                                               "not merged yet")
+    s.add_argument("--worktree", help="a split child: its worktree (default ~/.brain/worktrees/<repo>/<KEY>)")
     s.add_argument("--title")
     s.add_argument("--doc", nargs="+", help="take these documents in now (runs the five gates)")
     s.add_argument("--package", help="attach an existing material package PKG-<KEY>-<n>")

@@ -34,6 +34,7 @@ skipping gaps filed before (same title and text), and lists them in the Brain MR
 from __future__ import annotations
 
 import glob
+import hashlib
 import os
 import re
 
@@ -232,23 +233,35 @@ class Op:
         self.note = ""
 
 
-def plan(brain, proposals, key, pending=None, used_extra=()) -> tuple:
+def plan(brain, proposals, key, pending=None, used_extra=(), stuck=None) -> tuple:
     """(ops, problems, notes). Problems block the whole reflect; notes are shown.
-    `pending`: {proposal hash: branch} already written on open brain/* branches (MRs not merged yet)."""
+    `pending`: {proposal hash: branch} already written on open brain/* branches (MRs not merged yet).
+    `stuck`: {proposal hash: (branch, ids)} written on a branch that cannot merge (open_branches): written again."""
     ops, probs, notes = [], [], []
     props = brain.props()
     pending = pending or {}
+    stuck = stuck or {}
     main = brain.main()
     texts = {e.text(): eid for eid, (f, e) in main.items()}
+    seen = {}
+    fresh = {}       # (file, type, text) of a new entry this run writes: the same text from other sources joins it
     for p in proposals:
         where = p.label()
         f = p.fields
+        if p.hash in seen:
+            notes.append("%s: same proposal as %s, skipped" % (where, seen[p.hash].label()))
+            continue
+        seen[p.hash] = p
         if p.hash in props:
             notes.append("%s: already in the Brain as %s, skipped" % (where, props[p.hash]))
             continue
         if p.hash in pending:
             notes.append("%s: already on %s (MR not merged yet), skipped" % (where, pending[p.hash]))
             continue
+        if p.hash in stuck:
+            branch, taken = stuck[p.hash]
+            notes.append("%s: on %s, which cannot merge (%s taken on the target branch meanwhile): written again on "
+                         "a new branch; close that MR" % (where, branch, ", ".join(taken)))
         unknown = set(f) - {"file", "type", "rel", "section", "src"}
         if unknown:
             probs.append("%s: unknown fields %s" % (where, ", ".join(sorted(unknown))))
@@ -301,12 +314,18 @@ def plan(brain, proposals, key, pending=None, used_extra=()) -> tuple:
                 probs.append("%s: section: up to 40 characters, no #, <, >, `, [, ], |" % where)
             else:
                 probs += ["%s: section: %s" % (where, x) for x in brainlint.content_problems(sec)[0]]
+        if p.rel == "new" and (fk, etype, body) in fresh:
+            first = fresh[(fk, etype, body)]
+            first.kw["also"].append(p)
+            notes.append("%s: same text as %s: one entry with the sources of both" % (where, first.p.label()))
+            continue
         if p.rel == "new" and body in texts:
             notes.append("%s: same text as %s: recorded as same (sources added)" % (where, texts[body]))
             ops.append(Op("same", p, eid=texts[body], type=main[texts[body]][1].type))
             continue
         if p.rel == "new":
-            ops.append(Op("new", p, file=fk, type=etype, section=f.get("section") or None))
+            ops.append(Op("new", p, file=fk, type=etype, section=f.get("section") or None, also=[]))
+            fresh[(fk, etype, body)] = ops[-1]
         elif p.rel == "replaces":
             ops.append(Op("replaces", p, eid=p.target, type=etype))
         else:
@@ -339,6 +358,8 @@ def apply(brain, ops, key, used_extra=()):
         if op.kind == "new":
             op.result = brain.new(kw["file"], kw["type"], body, key, p.src, section=kw["section"], prop=p.hash,
                                   used_extra=used_extra)
+            for q in kw.get("also", ()):
+                brain.same(op.result, q.src, prop=q.hash)
         elif op.kind == "replaces":
             op.result = brain.replace(kw["eid"], body, key, p.src, etype=kw["type"], prop=p.hash,
                                       used_extra=used_extra)
@@ -395,18 +416,52 @@ def rejected_without_correction(vouchers_dir, key, proposals) -> list:
 
 # ---------- git side ----------
 
-def open_branches(repo, brain_dir) -> tuple:
-    """(ids, {proposal hash: branch}) on open Brain branches (local and origin): parallel reflects and
-    `brain entry` never pick an id that is already taken there, and a re-run never writes the same proposal twice."""
+def open_branches(repo, brain_dir, main_ref=None) -> tuple:
+    """(ids, {proposal hash: branch}, {proposal hash: (branch, ids)}) on open Brain branches (local and origin, and
+    what a worktree of one holds uncommitted, as `reflect --apply --no-commit` leaves it): parallel reflects and
+    `brain entry` never pick an id that is already taken there, and a re-run never writes the same proposal twice.
+    With `main_ref`: a branch with an id that main took after the branch left it (another MR merged first; CI's
+    brain-lint refuses its MR) holds nothing pending. Its proposals come in the third dict, to be written again."""
     refs = git_out(repo, "for-each-ref", "--format=%(refname)", "refs/heads/brain/", "refs/remotes/origin/brain/")
-    ids, props = set(), {}
-    for ref in refs.split():
-        b = E.Brain.from_git(repo, ref, brain_dir)
+    views = [(ref.replace("refs/heads/", "").replace("refs/remotes/", ""), ref, E.Brain.from_git(repo, ref, brain_dir))
+             for ref in refs.split()]
+    for path, branch in brain_worktrees(repo):
+        if os.path.isdir(os.path.join(path, brain_dir)):
+            views.append(("%s in %s, not committed" % (branch, path), "refs/heads/" + branch,
+                          E.Brain.load(os.path.join(path, brain_dir))))
+    main = E.Brain.from_git(repo, main_ref, brain_dir) if main_ref else None
+    ids, props, stuck = set(), {}, {}
+    for where, ref, b in views:
         ids |= b.used_ids()
-        short = ref.replace("refs/heads/", "").replace("refs/remotes/", "")
+        taken = taken_meanwhile(repo, brain_dir, ref, b, main_ref, main) if main else []
         for h in b.props():
-            props.setdefault(h, short)
-    return ids, props
+            if taken:
+                stuck.setdefault(h, (where, taken))
+            else:
+                props.setdefault(h, where)
+    return ids, props, {h: v for h, v in stuck.items() if h not in props}
+
+
+def taken_meanwhile(repo, brain_dir, ref, b, main_ref, main) -> list:
+    """Ids `b` (the Brain on branch `ref`) adds since it left `main_ref` that `main` (the Brain there now) has too:
+    the ids CI's brain-lint refuses as taken on the target branch meanwhile."""
+    p = git(repo, "merge-base", main_ref, ref, check=False)
+    if p.returncode != 0:
+        return []
+    mine = E.Brain.from_git(repo, p.stdout.strip(), brain_dir).used_ids()
+    taken = main.used_ids()
+    return sorted(eid for eid in list(b.main()) + list(b.archived()) if eid not in mine and eid in taken)
+
+
+def brain_worktrees(repo) -> list:
+    """[(path, branch)] of the worktrees that have a brain/* branch checked out."""
+    out, path = [], None
+    for line in git_out(repo, "worktree", "list", "--porcelain").split("\n"):
+        if line.startswith("worktree "):
+            path = line[len("worktree "):]
+        elif line.startswith("branch refs/heads/brain/") and path:
+            out.append((path, line[len("branch refs/heads/"):]))
+    return out
 
 
 def used_on_branches(repo, brain_dir) -> set:
@@ -427,8 +482,9 @@ def mr_description(key, ops, warnings, source, gaps=None) -> str:
     rows = []
     for op in ops:
         p = op.p
+        src = list(dict.fromkeys(p.src + [s for q in op.kw.get("also", ()) for s in q.src]))
         how = []
-        if any(brainlint.DOC_SRC_RE.match(s) for s in p.src):
+        if any(brainlint.DOC_SRC_RE.match(s) for s in src):
             how.append("来自文档：单条审")
         if brainlint.RELAX_RE.search(E.norm(p.body)):
             how.append("放宽类：Builder + 安全两人批")
@@ -439,7 +495,7 @@ def mr_description(key, ops, warnings, source, gaps=None) -> str:
         rows.append("| %s | %s | %s | %s | %s | %s |" % (
             op.result, fk, op.kw.get("type", ""), op.kind + (" " + op.kw["eid"] if op.kind != "new" and
                                                                 op.kw.get("eid") != op.result else ""),
-            ", ".join(p.src), "；".join(how) or "按文件负责人批"))
+            ", ".join(src), "；".join(how) or "按文件负责人批"))
     out = ["Brain 回写：%s（来源：%s）" % (key, source), "",
            "| 条目 | 文件 | 类型 | 关系 | 出处 | 怎么审 |", "|---|---|---|---|---|---|"] + rows
     out += ["", "- 谁批：PRODUCT 归产品；TECH、IMPROVEMENT 归 Builder；PROJECT 两边各一人（CODEOWNERS）。",
@@ -496,11 +552,14 @@ def _intent(raw, where) -> str:
 
 
 def worktree_root(repo) -> str:
-    """~/.brain/worktrees/<repo name>: the main repository's name, also when reflect runs inside a run's worktree
-    (a worktree's own folder is named after the requirement, not the repo)."""
+    """~/.brain/worktrees/<repo name>-<8 hex of its path>: one folder per main repository, also when reflect runs
+    inside a run's worktree (a worktree's own folder is named after the requirement, not the repo), and two projects
+    whose clones have the same folder name do not share one. Worktrees made under ~/.brain/worktrees/<repo name>
+    before stay there: git still lists them, and the kit finds worktrees by their branch, not by this path."""
     common = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir", check=False).stdout.strip()
-    main = os.path.dirname(common) if common.endswith(os.sep + ".git") else (common or repo)
-    return os.path.join(os.path.expanduser("~"), ".brain", "worktrees", os.path.basename(os.path.realpath(main)))
+    main = os.path.realpath(os.path.dirname(common) if common.endswith(os.sep + ".git") else (common or repo))
+    tag = hashlib.sha256(main.encode("utf-8")).hexdigest()[:8]
+    return os.path.join(os.path.expanduser("~"), ".brain", "worktrees", "%s-%s" % (os.path.basename(main), tag))
 
 
 def main_cfg(repo, base):

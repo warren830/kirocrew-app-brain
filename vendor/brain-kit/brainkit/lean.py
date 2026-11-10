@@ -18,12 +18,40 @@ SCRIPT = os.path.join(".kiro", "aidlc-lean", "aidlc_lean.py")
 DOCS = "aidlc-docs"
 CONFIG = DOCS + "/lean.json"
 TEMPLATE_STATUS = "Status: Inception: starting"
+# The '### Next' items a new intent's aidlc-state.md starts with: Lean's templates/aidlc-state.md (the same since
+# 0.2.0) and, for `lean new --ideation`, IDEATION_NEXT in aidlc_lean.py. A note whose Next items are all still
+# these has not been filled in.
+TEMPLATE_NEXT = (
+    "Read the code the change touches. Brownfield: `lean stage start reverse-engineering`; greenfield: "
+    "`lean stage skip reverse-engineering --reason \"greenfield\"`.",
+    "Ask the clarifying questions in one batch, then fill in inception/requirements/requirements.md "
+    "(skill aidlc-lean-inception).",
+    "Fill in ideation/intent-capture/intent-statement.md with the product owner (skill aidlc-lean-ideation), then "
+    "`lean stage done intent-capture --note ...`.",
+    "Scope Definition and Approval Handoff are required, the other Ideation stages optional; then `lean request "
+    "IDEATION` and wait for the approval before Inception.",
+)
 # Lean's DEFAULT_CONFIG fingerprint_exclude (aidlc_lean.py). A lean.json that sets the key replaces this list.
 DEFAULT_FINGERPRINT_EXCLUDE = (DOCS + "/**", ".kiro/**")
 
 
 def installed(repo) -> bool:
     return os.path.exists(os.path.join(repo, SCRIPT)) and os.path.exists(os.path.join(repo, DOCS, "lean.json"))
+
+
+def version(repo) -> str:
+    """VERSION of the AI-DLC Lean installed in `repo` ('' when there is none or it cannot be read)."""
+    try:
+        with open(os.path.join(repo, SCRIPT), encoding="utf-8", errors="replace") as f:
+            m = re.search(r'^VERSION = "([^"\n]+)"', f.read(), re.M)
+    except OSError:
+        return ""
+    return m.group(1) if m else ""
+
+
+def version_matches(have, pin) -> bool:
+    """A pin names a version or a release line: "0.3" takes 0.3, 0.3.0, 0.3.1, not 0.30 or 10.3."""
+    return have == pin or have.startswith(pin + ".")
 
 
 def call(repo, *args, check=True):
@@ -112,19 +140,58 @@ def next_steps(text: str) -> list:
     return items
 
 
-def handover_problems(repo, intent) -> list:
-    """Why aidlc-state.md is not yet a usable hand-over note."""
+def team_key(name) -> str:
+    """A team name as Lean compares it (aidlc_lean.py team_key): letters of any script, digits and _, the rest as _."""
+    return re.sub(r"[^\w]", "_", str(name or "").strip("`* \t"))
+
+
+def same_team(repo, a, b) -> bool:
+    """Would the Lean installed in `repo` read a and b as one team? 0.3.1 on compares team names through team_key
+    (`web-ui` is `web_ui`); 0.3.0 compared the Owner team cell as written."""
+    have = tuple(int(n) for n in re.findall(r"[0-9]+", version(repo))[:3])
+    return team_key(a) == team_key(b) if have >= (0, 3, 1) else a == b
+
+
+def team_next_steps(text: str, team: str) -> list:
+    """Items under '### Next (team <team>)' in the Session notes (Lean's per-team subsection; the team named the way
+    Lean compares team names, so `web-ui` and `web_ui` are one team)."""
+    for m in re.finditer(r"^#{2,4}[ \t]*Next[ \t]*\([ \t]*team[ \t:]+`?([A-Za-z0-9_.-]+)`?[ \t]*\)[ \t]*$"
+                         r"(.*?)(?=^#{1,6} |\Z)", text, re.M | re.S | re.I):
+        if team_key(m.group(1)) == team_key(team):
+            return [s for s in (re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", l).strip() for l in m.group(2).splitlines())
+                    if s]
+    return []
+
+
+def handover_problems(repo, intent, team=None) -> list:
+    """Why aidlc-state.md is not yet a usable hand-over note (team: a split child's, whose note is its own
+    '### Next (team <unit>)' subsection: the parent's Status and Next are shared by every child)."""
     p = state_path(repo, intent)
     if not os.path.exists(p):
         return ["%s is missing" % os.path.relpath(p, repo)]
     with open(p, encoding="utf-8") as f:
-        return handover_text_problems(f.read())
+        return handover_text_problems(f.read(), team)
 
 
-def handover_text_problems(text: str) -> list:
+def handover_text_problems(text: str, team=None) -> list:
+    if team:
+        if not team_next_steps(text, team):
+            return ["Session notes have no '### Next (team %s)' items: a child of a split keeps its own Status and "
+                    "Next there" % team]
+        return []
     probs = []
     if TEMPLATE_STATUS in text:
         probs.append("Session notes still say '%s': update Status" % TEMPLATE_STATUS)
-    if not next_steps(text):
+    steps = next_steps(text)
+    if not steps:
         probs.append("Session notes have no '### Next' items")
+    elif all(_same_text(s) in _TEMPLATE_NEXT for s in steps):
+        probs.append("Session notes' '### Next' is still Lean's template: write what the next session does")
     return probs
+
+
+def _same_text(s) -> str:
+    return " ".join(str(s).split())
+
+
+_TEMPLATE_NEXT = frozenset(_same_text(s) for s in TEMPLATE_NEXT)

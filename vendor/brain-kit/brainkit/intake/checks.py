@@ -24,15 +24,13 @@ PHONE_CN_RE = re.compile(r"(?<![0-9])(?:\+?86[-\s]?)?1[3-9][0-9]{9}(?![0-9])")
 # glued to a code (ORD-138-2026-0001 stays)
 PHONE_CN_GROUPED_RE = re.compile(r"(?<![A-Za-z0-9_-])(?:(?:\+|00)?86[ \u00a0-]?|\(\+?86\)[ \u00a0]?)?"
                                  r"1[3-9][0-9]([ \u00a0-])[0-9]{4}\1[0-9]{4}(?![0-9A-Za-z_-])")
-PHONE_HK_PREFIXED_RE = re.compile(r"(?<![0-9])\+?852[-\s]?[2-9][0-9]{3}[-\s]?[0-9]{4}(?![0-9])")
+# +852 9123 4567, 00852-9123-4567, and the usual HK way with the code in brackets: (852) 9123 4567, (+852) 2123 4567
+PHONE_HK_PREFIXED_RE = re.compile(r"(?:(?<![0-9])(?:\+|00)?852|\(\+?852\))[-\s]?[2-9][0-9]{3}[-\s]?[0-9]{4}(?![0-9])")
 PHONE_HK_CONTEXT_RE = re.compile(r"(?i)(電話|电话|手機|手机|聯絡|联系|tel|phone|mobile|whatsapp)[^0-9\n]{0,12}"
                                  r"((?<![0-9])[2-9][0-9]{3}[-\s]?[0-9]{4}(?![0-9]))")
 EMAIL_RE = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})+")
 CARD_RE = re.compile(r"(?<![0-9])(?:[0-9][ -]?){14,18}[0-9](?![0-9])")
 MENTION_RE = re.compile(r"@([A-Z][a-zA-Z]+(?:[  ]+[A-Z][A-Za-z]+){0,3}|[一-鿿]{2,4})")
-NAME_COL_RE = re.compile(r"修[訂订]人|負責人|负责人|聯絡人|联系人|聯繫人|姓名|客[戶户]名稱|客户名称|審批人|审批人|申請人|申请人"
-                         r"|^\s*(owner|contact|contact name|customer name|client name|approver|reviewer|author"
-                         r"|prepared by|approved by)\s*$", re.I)
 # a cell that looks like a person: 2-4 CJK chars, or 1-4 capitalised Latin words (optionally @-mentioned)
 NAME_VALUE_RE = re.compile(r"^@?(?:[一-鿿]{2,4}|[A-Z][a-z]+(?:[ .-]+[A-Z][A-Za-z]+){0,3}|[A-Z][a-z]+ [A-Z]{2,})$")
 
@@ -87,6 +85,11 @@ LATIN_FIELD_LABELS = (r"owner|assignee|reporter|on[- ]?call|contact(?:[ \t]+pers
 LATIN_BY_LABELS = (r"assigned[ \t]+to|reported[ \t]+by|approved[ \t]+by|reviewed[ \t]+by|prepared[ \t]+by"
                    r"|written[ \t]+by|raised[ \t]+by|requested[ \t]+by|filed[ \t]+by|opened[ \t]+by|escalated[ \t]+to"
                    r"|handled[ \t]+by|acknowledged[ \t]+by|resolved[ \t]+by|fixed[ \t]+by")
+# a table column of people: headed by one of the labels above (负责人, 处理人, 对接人, Assignee, Reporter, Reported by
+# ...) or by a name column (姓名, 客户名称, Customer name). One list for both: a word that names a person after a
+# label names the people in a column too.
+NAME_COL_RE = re.compile(r"%s|姓名|客[戶户]名稱|客户名称|^\s*(?:%s|%s|contact[ \t]+name|customer[ \t]+name"
+                         r"|client[ \t]+name)\s*$" % (CJK_LABELS, LATIN_FIELD_LABELS, LATIN_BY_LABELS), re.I)
 _LATIN_WORD = r"[A-Z][a-z]+(?:['’-][A-Za-z]+)?"
 LATIN_LABEL_NAME_RE = re.compile(
     r"(?i:\b(?:(?P<field>%s)\b[ \t]*[:：=]|(?P<by>%s)\b[ \t]*[:：=]?))[ \t]*@?"
@@ -121,7 +124,7 @@ LATIN_SURNAMES = set((
     "shao wan qian dai mo kong kang yi qiao lai wen chang pang lan ou mai guan cen gan geng ni nie zhan "
     "chan wong leung cheung lau lee ho ng lam tsang chow yip tam kwok lo mak choi fung tse yeung hui siu kwan law chu "
     "poon yuen au chung ip ko so lai tong tsui chiu shum sze mok hung chau chui kwong fong kam chiang tsoi yau lui "
-    "wai lok chik tsoi chui leong lim tan ong teo goh koh kho "
+    "wai lok chik tsoi chui leong lim tan ong teo goh koh kho to or an on "     # to / or / an / on: stop words but in a name cell
     "smith johnson williams brown jones garcia miller davis rodriguez martinez hernandez lopez gonzalez wilson "
     "anderson thomas taylor moore jackson martin perez thompson white harris sanchez clark ramirez lewis robinson "
     "walker young allen king wright scott torres nguyen hill flores green adams nelson baker hall rivera campbell "
@@ -183,20 +186,32 @@ def latin_person(v, cell=False) -> tuple:
 CELL_SPLIT_RE = re.compile(r"<br\s*/?>|[,，、/;；&()（）\[\]【】]|(?<=[一-鿿]{2})[和及与與](?=[一-鿿]{2})")
 
 
-def _cell_person(x) -> bool:
-    """One part of a name-column cell is a person (张伟, 王工程师, Alice Wang, Peter To), not a role or team."""
+def _cell_person(x):
+    """'name', 'maybe' or None for one part of a name-column cell. The column says a person may stand here, but only
+    what the name check is sure of is a name (张伟, 王工程师, Alice Wang, Peter To); a value without a surname (风控,
+    商家, Billing) is 'maybe', listed for the person to check."""
     if not NAME_VALUE_RE.match(x):
-        return False
+        return None
     core = x.lstrip("@")
     if re.match(r"^[一-鿿]+$", core):
-        return cjk_person(core, need_surname=False) is not None    # the column says it is a person
+        if cjk_person(core, need_surname=False) is None:
+            return None
+        return cjk_person(core) or "maybe"
     flat = re.sub(r"[.-]+", " ", core)
     verdict, n = latin_person(flat, cell=True)
-    return verdict is not None and n == len(flat.split())
+    return verdict if n == len(flat.split()) else None
+
+
+# Markdown emphasis on a label or a name (**负责人**：李娜, - **联系人：** 王芳, **Owner:** Alice Wang, Reported by **Bob
+# Chen**): the label rules read the text with the markers blanked out (same length, so the offsets hold); an
+# underscore inside a word (owner_id) stays
+EMPHASIS_RE = re.compile(r"\*+|(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])")
 
 
 def _labelled_names(text) -> list:
     hits = []
+    original = text
+    text = EMPHASIS_RE.sub(lambda m: " " * len(m.group(0)), text)
     for m in CJK_LABEL_NAME_RE.finditer(text):
         name, start = m.group(3), m.start(3)
         bare = m.group("duty") is None and not (m.group(1) or "").strip()
@@ -223,13 +238,15 @@ def _labelled_names(text) -> list:
             verdict = "name"                         # Owner: / On-call: / Assignee: a field that names a person
         spans = [w.span() for w in re.finditer(r"\S+", m.group("v"))]
         start, end = m.start("v"), m.start("v") + spans[n - 1][1]
-        hits.append(Hit("pii" if verdict == "name" else "review", "person", start, end, text[start:end]))
+        hits.append(Hit("pii" if verdict == "name" else "review", "person", start, end, original[start:end]))
     return hits
 
 
 # ---------- secrets ----------
 
-PRIVATE_KEY_RE = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
+# the armour line of a private key in any of its text forms: PEM (RSA, EC, PKCS#8, ENCRYPTED), OpenSSH, SSH2
+# and PGP (its armour line ends in "PRIVATE KEY BLOCK"); the same shape as gitleaks' private-key rule
+PRIVATE_KEY_RE = re.compile(r"(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----")
 CLOUD_KEY_RE = re.compile(r"(?<![A-Z0-9])(AKIA|ASIA)[0-9A-Z]{16}(?![A-Z0-9])")
 KV_SECRET_RE = re.compile(r"(?i)((?:passw(?:or)?d|pwd|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret"
                           r"|密碼|密码|口令)[\"']?\s*[=:：]\s*)([^\s\"'<>|,;]{4,})")
@@ -272,8 +289,9 @@ def _kv_secrets(text) -> list:
     for m in KV_SECRET_RE.finditer(text):
         cut = _NOT_ASCII_RE.search(m.group(2))
         v = m.group(2)[:cut.start()] if cut else m.group(2)          # 密码：abc123（测试环境）
-        if len(v) < 4 or _blanked(v) or v.startswith(("$", "%(", "{{")) or describes_a_secret(v):
-            continue
+        if len(v) < 4 or _blanked(v) or v.startswith(("$", "%(", "{{")) or describes_a_secret(v) or \
+                SAID_SECRET_UNIT_RE.match(text, m.start(2) + len(v)):
+            continue                                 # 密码：8-16位 is a rule
         hits.append(Hit("secret", "kv_secret", m.start(2), m.start(2) + len(v), v))
     for m in SAID_SECRET_RE.finditer(text):
         v = m.group(2).rstrip(".")
@@ -290,26 +308,46 @@ def _kv_secrets(text) -> list:
 
 # ---------- business-sensitive ----------
 
-CUR = r"(?:HKD|USD|CNY|RMB|HK\$|US\$|S\$|¥|￥|\$|€|£)"
-SCALE = r"(?:億|亿|萬|万|千|k|K|m|M|bn|million|billion)"          # only after a currency: 3M alone is a tenor
-MONEY_WORD = r"(?:元|港元|港幣|港币|美元|美金|人民幣|人民币|歐元|欧元|英鎊|英镑|日元)"
+# An amount carries a currency (a code, a sign or a name, before or after the number) or 元 (README, gate 3):
+# HKD 50,000, EUR 300, 300 EUR, €300, 港幣 50,000, 人民币 5,000, 人民币 300 万, 100萬港元, 5 万元, 3,000 元. A number
+# with 万 / 亿 alone is a count (峰值 QPS 10万, 日活 100万), the user's decision of 2026-11-10.
 CUR_CODE = r"(?:HKD|USD|CNY|RMB|CNH|EUR|GBP|SGD|JPY|AUD)"
-AMOUNT_RE = re.compile(r"(?<![A-Za-z0-9])(?:%s\s?[0-9][0-9,]*(?:\.[0-9]+)?(?:\s?%s)?(?:\s?%s)?"
-                       r"|[0-9][0-9,]*(?:\.[0-9]+)?\s?(?:億|亿|萬|万)?\s?%s"
-                       r"|[0-9][0-9,]*(?:\.[0-9]+)?\s?%s?\s?%s)(?![A-Za-z0-9])"
-                       % (CUR, SCALE, MONEY_WORD, MONEY_WORD, SCALE, CUR_CODE))
+CUR_NAME = r"(?:港元|港幣|港币|美元|美金|人民幣|人民币|歐元|欧元|英鎊|英镑|日元)"
+CUR = r"(?:%s|HK\$|US\$|S\$|¥|￥|\$|€|£|%s)" % (CUR_CODE, CUR_NAME)     # before the number (元 alone only after it)
+MONEY_WORD = r"(?:元|%s)" % CUR_NAME                                       # after the number
+CJK_SCALE = r"(?:[百千]?[億亿萬万]|[百千])"
+SCALE = r"(?:%s|k|K|m|M|bn|million|billion)" % CJK_SCALE                    # only after a currency: 3M alone is a tenor
+_NUM = r"[0-9][0-9,]*(?:\.[0-9]+)?"
+_SP = r"[ \t\u00a0]?"
+AMOUNT_RE = re.compile(r"(?<![A-Za-z0-9])(?:{cur}{sp}{num}(?:{sp}{scale})?(?:{sp}{word})?"
+                       r"|{num}{sp}(?:{cjk}{sp})?{word}"
+                       r"|{num}{sp}(?:{scale}{sp})?{code})(?![A-Za-z0-9])".format(
+                           cur=CUR, sp=_SP, num=_NUM, scale=SCALE, word=MONEY_WORD, cjk=CJK_SCALE, code=CUR_CODE))
+# A company name ends with its suffix. The suffixes are also the head of common words (银行卡, 银行账户, 证券账户, 证券代码,
+# 资产管理计划): followed by one of these characters it is such a word, not a name. A Latin name stays on one line
+# (a heading "Payment Methods" over "Bank cards ..." is no company).
+COMPANY_WORD_NEXT = "卡账帳户戶号號转轉流代码碼间間业業系端侧側网網柜櫃存利汇匯信名回渠接交市投类類级級费費产產品计計规規"
 COMPANY_RE = re.compile(r"[一-鿿A-Za-z0-9&·（）()]{2,30}?(?:股份有限公司|有限公司|有限責任公司|銀行|银行|集團|集团|證券|证券|"
-                        r"基金管理|資產管理|资产管理)"
-                        r"|\b[A-Z][A-Za-z0-9&.\-]*(?:\s+[A-Z][A-Za-z0-9&.\-]*){0,5}\s+(?:Limited|Ltd\.?|Bank|Securities|"
-                        r"Inc\.?|LLC|Corp\.?|Corporation|Holdings|Group)\b")
-CONTRACT_RE = re.compile(r"(?:合同|合約|合约|協議|协议|Contract)\s*(?:編號|编号|號|号|No\.?)\s*[:：#]?\s*([A-Za-z0-9-]{4,})", re.I)
+                        r"基金管理|資產管理|资产管理)(?![%s])"
+                        r"|\b[A-Z][A-Za-z0-9&.\-]*(?:[ \t]+[A-Z][A-Za-z0-9&.\-]*){0,5}[ \t]+(?:Limited|Ltd\.?|Bank|"
+                        r"Securities|Inc\.?|LLC|Corp\.?|Corporation|Holdings|Group)\b" % COMPANY_WORD_NEXT)
+# 合同编号：HT-2026-001, Contract No. C-12345: "No" is a word of its own and the number has a digit (a contract
+# notification, the contract no longer applies)
+CONTRACT_RE = re.compile(r"(?:合同|合約|合约|協議|协议|Contract)\s*(?:編號|编号|號|号|No(?![A-Za-z])\.?)\s*[:：#]?\s*"
+                         r"((?=[A-Za-z-]*[0-9])[A-Za-z0-9-]{4,})", re.I)
 
 # ---------- links and instructions ----------
 
 URL_RE = re.compile(r"https?://([A-Za-z0-9.-]+)(?::\d+)?[^\s)\]>\"']*")
+# A line that reads as an approval, a rejection or "allow test change": every form Lean takes as one (its APPROVE_RE,
+# REJECT_RE, ALLOW_PROTECTED_RE: 批准DESIGN, 驳回PLAN, approveDESIGN, 同意：PLAN), and more (approve all ..., 批准所有 ...).
+# A Chinese word needs no space after it, but must not run on into another one (拒绝服务, 批准人, 同意书 are words).
+APPROVAL_KIND = r"IDEATION|REQUIREMENTS|DESIGN|INCEPTION|PLAN|RELEASE|CR-[A-Za-z0-9_]+-[0-9]+"
 APPROVAL_LINE_RE = re.compile(r"(?im)^[ \t]*(?:[-*+][ \t]+|[0-9]{1,3}[.)、][ \t]*)?"
-                              r"(?:approve|approved|批准|同意|reject|驳回|拒绝|allow test change|允许改测试"
-                              r"|允许修改测试|允许修改验收测试)\b.*$")
+                              r"(?:(?:approve|approved|批准|同意|reject|驳回|拒绝)[ \t]*[:：]?[ \t]*(?:%s)"
+                              r"|(?:approve|approved|reject|allow test change)\b"
+                              r"|(?:批准|同意|驳回|拒绝|允许改测试|允许修改测试|允许修改验收测试)(?![一-鿿])"
+                              r"|(?:批准|同意)(?:所有|全部)).*$" % APPROVAL_KIND)
 INJECTION_RE = re.compile(r"(?i)(ignore|disregard|forget)\s+(all\s+|the\s+)?(previous|prior|above|earlier)\s+"
                           r"(instructions|rules|prompts?)|忽略(以上|之前|前面|上面)(的)?(所有)?(指令|指示|规则|規則|要求)"
                           r"|you are now\b|你现在是|你現在是|system prompt|系統提示|系统提示|developer mode")
@@ -378,14 +416,27 @@ def _table_name_cells(text):
                             cuts = [0] + [x for m in CELL_SPLIT_RE.finditer(cell) for x in m.span()] + [len(cell)]
                             for p0, p1 in zip(cuts[::2], cuts[1::2]):
                                 part = cell[p0:p1].strip().strip("*").strip()
-                                if part and _cell_person(part):
+                                verdict = _cell_person(part) if part else None
+                                if verdict:
                                     s = offsets[j] + a + cell.index(part, p0)
-                                    hits.append(Hit("pii", "person", s, s + len(part), part))
+                                    hits.append(Hit("pii" if verdict == "name" else "review", "person", s,
+                                                    s + len(part), part))
                 j += 1
             i = j
         else:
             i += 1
     return hits
+
+
+FENCE_RE = re.compile(r"(?m)^[ \t]*(?:`{3,}|~{3,})")
+INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
+
+
+def _code_spans(text) -> list:
+    """[(start, end)] of fenced code blocks and inline code."""
+    fences = [m.start() for m in FENCE_RE.finditer(text)] + [len(text)]
+    spans = list(zip(fences[0:-1:2], fences[1::2]))
+    return spans + [m.span() for m in INLINE_CODE_RE.finditer(text)]
 
 
 def scan(text) -> list:
@@ -417,8 +468,19 @@ def scan(text) -> list:
         digits = re.sub(r"[ -]", "", m.group(0))
         if 15 <= len(digits) <= 19 and luhn_ok(digits):
             add(Hit("pii", "card", m.start(), m.end(), m.group(0)))
+    code = _code_spans(text)
     for m in MENTION_RE.finditer(text):
-        add(Hit("pii", "person", m.start(), m.end(), m.group(0)))
+        v = m.group(1)
+        if re.match(r"[一-鿿]", v):
+            if cjk_person(v) is not None:            # not @所有人, @大家
+                add(Hit("pii", "person", m.start(), m.end(), m.group(0)))
+            continue
+        if any(a <= m.start() < b for a, b in code):
+            continue                                 # an annotation (@Service, @Autowired)
+        verdict, n = latin_person(v)
+        if verdict:                                  # not @Data, @Service
+            end = m.start(1) + [w.end() for w in re.finditer(r"\S+", v)][n - 1]
+            add(Hit("pii", "person", m.start(), end, text[m.start():end]))
     hits += _table_name_cells(text)
     hits += _labelled_names(text)
     for m in AMOUNT_RE.finditer(text):
@@ -438,46 +500,101 @@ def scan(text) -> list:
 
 
 def _dedupe(hits):
-    """Drop hits that overlap a stronger hit (secret > pii > business > review); links and instructions stay."""
+    """Drop hits that overlap a stronger hit (secret > pii > business > review); links and instructions stay.
+
+    One pass after the sort: the hits kept (but links and instructions) never overlap and come in order of start,
+    so only the last of them can overlap the next hit (a long CSV export has tens of thousands of hits)."""
     rank = {"secret": 0, "pii": 1, "business": 2, "review": 3, "link": 4, "instruction": 5}
     hits.sort(key=lambda h: (h.start, rank[h.cat], -(h.end - h.start)))
     kept = []
+    last = -1                                        # index in kept of the last hit that is no link or instruction
     for h in hits:
         if h.cat in ("link", "instruction"):
             kept.append(h)
             continue
-        clash = next((k for k in kept if k.cat not in ("link", "instruction") and h.start < k.end and k.start < h.end),
-                     None)
+        clash = kept[last] if last >= 0 and h.start < kept[last].end and kept[last].start < h.end else None
         if clash is None:
+            last = len(kept)
             kept.append(h)
-        elif rank[h.cat] < rank[clash.cat]:
-            kept.remove(clash)
+        elif _replaces(h, clash, rank):
+            kept[last] = None                        # dropped; h goes to the end, as before
+            last = len(kept)
             kept.append(h)
-    return sorted(kept, key=lambda h: h.start)
+    return sorted((k for k in kept if k is not None), key=lambda h: h.start)
 
 
-# Values a detector finds by their own form (check digits, phone, card and address formats, key formats, amounts,
-# company suffixes) are masked wherever they occur in the package. Names and passwords found next to a label are
-# masked only where they were found: a guess from the words around it must not spread (one 提出人：顾客 would turn
-# every 顾客 in the package into a placeholder).
+def _replaces(h, k, rank) -> bool:
+    """h takes the place of k, which it overlaps: the stronger hit wins, but personal data that holds a secret stays
+    whole (a phone 139 8888 1234 holding the PIN 8888), so no part of it shows around the secret's placeholder."""
+    if {h.cat, k.cat} == {"pii", "secret"}:
+        pii, secret = (h, k) if h.cat == "pii" else (k, h)
+        if pii.start <= secret.start and secret.end <= pii.end and pii.end - pii.start > secret.end - secret.start:
+            return h is pii
+    return rank[h.cat] < rank[k.cat]
+
+
+# A value judged sensitive once is masked wherever it occurs in the package as a whole word: other rows, other files,
+# the hidden area and file names. That holds for values found by their own form (check digits, phone, card and
+# address formats, key formats, amounts, company suffixes) and for names and passwords found next to a label (R1-48,
+# the user's decision of 2026-11-10). Only a sure find spreads: a name the name check is not sure of (提出人：顾客,
+# 负责人列的 风控) is never a value, and a name that is also a word (负责人：高峰, but 高峰期) is masked only where found. A password that is a common word of requirements (password: admin) or names its own
+# field (token=refresh_token, api_key: X-Api-Key) is masked where it was found but does not spread, so the word
+# elsewhere (a role, /api/admin, the refresh_token field) stays readable.
 PROPAGATE_KINDS = {"hkid", "cnid", "phone", "email", "card", "private_key", "cloud_key", "bearer", "token",
-                   "amount", "company", "contract"}
+                   "amount", "company", "contract", "person", "kv_secret"}
+WORD_PASSWORDS = set("admin administrator root test demo guest user default monkey".split())
+WORD_NAMES = set("高峰".split())         # a name that is also a word (高峰期): masked where found, not spread
+FIELD_WORDS = set("password passwd pwd secret token key api apikey access refresh client auth session id app bearer"
+                  .split())
+FIELD_NAME_RE = re.compile(r"[A-Za-z]+(?:[-_.][A-Za-z]+)*")
+_WORD_CHAR = re.compile(r"[A-Za-z0-9_]")
+
+
+def _spreads(kind, v) -> bool:
+    if len(v) < 2:
+        return False
+    if kind == "person":
+        return v not in WORD_NAMES
+    if kind == "kv_secret":
+        return v.lower() not in WORD_PASSWORDS and not _field_name(v)
+    return True
+
+
+def _field_name(v) -> bool:
+    """The value is itself a field name (refresh_token, X-Api-Key): letters only, each part a field word or a letter.
+    Prod_Secret_2026 or live-api-key-7f3k is a password that only holds such a word."""
+    return bool(FIELD_NAME_RE.fullmatch(v)) and all(len(w) == 1 or w.lower() in FIELD_WORDS
+                                                    for w in re.split(r"[-_.]", v))
+
+
+def _whole_word(text, start, end) -> bool:
+    """A Latin or digit edge of the value is no part of a longer word or number (Service in RefundService, 5万 in 15万,
+    8888 in 13988881234). Chinese has no spaces between words, so a Chinese edge always counts."""
+    def glued(a, b):
+        return 0 <= a and b < len(text) and _WORD_CHAR.match(text[a]) and _WORD_CHAR.match(text[b])
+    return not glued(start - 1, start) and not glued(end - 1, end)
 
 
 def propagate(text, hits, values) -> list:
-    """Add a hit for every occurrence of a value already judged sensitive anywhere in the submission (only the kinds
-    in PROPAGATE_KINDS)."""
+    """Add a hit for every occurrence of a value already judged sensitive anywhere in the submission (the kinds in
+    PROPAGATE_KINDS, see _spreads, and what gitleaks found: a key by its form)."""
     extra = []
     for (cat, kind), vals in values.items():
-        if kind not in PROPAGATE_KINDS:
+        if kind not in PROPAGATE_KINDS and not kind.startswith("gitleaks:"):
             continue
         for v in vals:
-            if len(v) < 2:
+            if kind == "person":
+                v = v.lstrip("@")                    # an @mention spreads as the name (@李娜 -> 李娜 elsewhere)
+            if not _spreads(kind, v):
                 continue
             start = text.find(v)
             while start >= 0:
-                extra.append(Hit(cat, kind, start, start + len(v), v))
-                start = text.find(v, start + len(v))
+                if _whole_word(text, start, start + len(v)):
+                    extra.append(Hit(cat, kind, start, start + len(v), v))
+                    start += len(v)
+                else:
+                    start += 1
+                start = text.find(v, start)
     return _dedupe(list(hits) + extra) if extra else hits
 
 
@@ -486,8 +603,8 @@ _GITLEAKS_SEEN_MAX = 512     # a long-running process, do not run gitleaks again
 
 
 def gitleaks_hits(path) -> list:
-    """Extra secret findings from gitleaks when it is installed: [(rule, line)]. Empty when not installed. The result
-    for the same file with the same content is reused (gitleaks takes about half a second per call)."""
+    """Extra secret findings from gitleaks when it is installed: [(rule, line, secret)]. Empty when not installed. The
+    result for the same file with the same content is reused (gitleaks takes about half a second per call)."""
     tool = shutil.which("gitleaks")
     if not tool:
         return []
@@ -512,14 +629,27 @@ def _run_gitleaks(tool, path) -> list:
             if p.returncode == 0 and os.path.exists(report):
                 try:
                     with open(report) as f:
-                        return [(x.get("RuleID", ""), x.get("StartLine", 0)) for x in json.load(f) or []]
+                        return [(x.get("RuleID", ""), x.get("StartLine", 0), x.get("Secret") or "")
+                                for x in json.load(f) or []]
                 except ValueError:
                     return []
     return []
 
 
+def with_leaks(text, hits, leaks) -> list:
+    """`hits` plus a secret hit (kind gitleaks:<rule>) for every place in `text` where a value gitleaks found
+    (gitleaks_hits) stands, so it is masked and listed like the built-in finds."""
+    extra = []
+    for rule, _, secret in leaks:
+        start = text.find(secret) if len(secret) >= 4 else -1
+        while start >= 0:
+            extra.append(Hit("secret", "gitleaks:" + rule, start, start + len(secret), secret))
+            start = text.find(secret, start + len(secret))
+    return _dedupe(list(hits) + extra) if extra else hits
+
+
 class Masker:
-    """Same value -> same placeholder within one package."""
+    """Same value -> same placeholder within one package; numbered per label (令牌 is a bearer or a token)."""
 
     LABEL = {"hkid": "身份證", "cnid": "身份证", "phone": "电话", "email": "邮箱", "card": "卡号", "person": "人名",
              "kv_secret": "密钥", "bearer": "令牌", "token": "令牌", "amount": "金额", "company": "公司",
@@ -530,10 +660,11 @@ class Masker:
         self.count = {}
 
     def placeholder(self, kind, value):
-        key = (kind, value)
+        key = (kind, value.lstrip("@") if kind == "person" else value)     # @李娜 and 李娜 are one person
         if key not in self.seen:
-            self.count[kind] = self.count.get(kind, 0) + 1
-            self.seen[key] = "[%s-%d]" % (self.LABEL.get(kind, kind), self.count[kind])
+            label = "密钥" if kind.startswith("gitleaks:") else self.LABEL.get(kind, kind)
+            self.count[label] = self.count.get(label, 0) + 1
+            self.seen[key] = "[%s-%d]" % (label, self.count[label])
         return self.seen[key]
 
 

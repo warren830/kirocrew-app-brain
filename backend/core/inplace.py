@@ -23,18 +23,18 @@ from typing import Any, Callable
 
 from . import bk
 from .constants import GIT_BIN
-from .importer import (GIT_TIMEOUT_S, KIT, ImportFail, Records, choices, default_branch, git_failure, last_lines,
-                       origin_of, quiet_env, run_quiet, status_map, symlinks_on_targets, tail, touches, write_targets)
-from .installer import (COMMIT_TIMEOUT_S, DOCTOR_TIMEOUT_S, INSTALL_TIMEOUT_S, LEAN_AUDIT, MAX_FILES, PUSH_TIMEOUT_S,
-                        UP_TO_DATE, _kit_of, brain_env, commit_failure, commit_message, doctor_rows, kit_data, kit_form,
-                        kit_line)
+from .importer import (GIT_TIMEOUT_S, KIT, LINKS_REFUSED, ImportFail, Records, choices, default_branch, git_failure,
+                       last_lines, origin_of, quiet_env, run_quiet, status_map, symlinks_on_targets, tail, touches,
+                       write_targets)
+from .installer import (COMMIT_TIMEOUT_S, DOCTOR_TIMEOUT_S, INSTALL_TIMEOUT_S, KIT_LINK, LEAN_AUDIT, MAX_FILES,
+                        PUSH_TIMEOUT_S, UP_TO_DATE, _kit_of, brain_env, commit_failure, commit_message, doctor_rows,
+                        install_branch_ok, kit_data, kit_form, kit_line, worktrees_of)
 from .intake import brain_cmd
 from .repo import Git
 
-INSTALL_STEPS = (("check", "看能不能直接装"), ("install", "跑 brain install"), ("kit", "写 kit.json"),
-                 ("doctor", "跑 brain doctor"), ("commit", "提交"))
-UPGRADE_STEPS = (("check", "看能不能直接装"), ("install", "跑 brain install（更新 kit 文件）"), ("doctor", "跑 brain doctor"),
-                 ("commit", "提交"))
+INSTALL_STEPS = (("check", "看能不能直接装"), ("install", "装 brain-kit 的文件"), ("kit", "写这个仓库的设置"),
+                 ("doctor", "自检"), ("commit", "提交"))
+UPGRADE_STEPS = (("check", "看能不能直接装"), ("install", "更新 kit 文件"), ("doctor", "自检"), ("commit", "提交"))
 MAX_WATCH = 2000      # the person's uncommitted files watched for a change during the install (size, mtime)
 
 
@@ -103,6 +103,8 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
     upgrade; the record lives only until the commit went through."""
     upgrade = purpose == "upgrade"
     g = Git(top)
+    stuck = records.get(top)       # an earlier install on a branch that could not go in: dropped after this commit
+    stuck = stuck if not upgrade and isinstance(stuck, dict) and stuck.get("mode") != "inplace" else None
     origin = origin_of(g)
     head = g.out("rev-parse", "-q", "--verify", "HEAD^{commit}") or None
     cur = g.out("symbolic-ref", "-q", "--short", "HEAD")
@@ -120,7 +122,8 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
     if upgrade:
         cfg = _kit_of(top)
         if cfg is None:
-            raise ImportFail("这个检出里没有能读的 .brain/kit.json：先装上 brain-kit", "not_installed", 409, res)
+            raise ImportFail("这个检出里没有能读的 brain-kit 设置：先在「导入仓库」里检查它，装上 brain-kit", "not_installed",
+                             409, res)
         kit = kit_form(cfg)
         kit["default_branch"] = kit["default_branch"] or (default_branch(g)[0] or "")
         res["kit"] = kit
@@ -137,12 +140,13 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
     targets = write_targets(cfg)
     links = sorted(set(_links_in_tree(top, targets) + symlinks_on_targets(g, head)))
     if links:
-        text = "仓库里 %s 是符号链接：brain install 会顺着它写到别处，这里不装。先把它换成普通的目录或文件" % "、".join(links)
+        text = LINKS_REFUSED % "、".join(links)
         step("check", "fail", text)
         raise ImportFail(text, "symlink", 409, res)
     before = status_map(g)
     if before is None:
-        raise ImportFail("看不出有没有没提交的改动（git status 没结束）：不直接装", "status_timeout", 409, res)
+        raise ImportFail("看不出有没有没提交的改动（git 没查完）：不直接装。过一会再试，或者装到新分支", "status_timeout", 409,
+                         res)
     mine = {p: _stat(top, p) for p in sorted(before)[:MAX_WATCH]}
     step("check", "ok", "在 %s 上%s" % (cur, "，检出是干净的" if not before else "；你没提交的 %d 个改动不碰" % len(before)))
 
@@ -153,8 +157,8 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
     res["output"] = tail(p)
     if p.returncode != 0 or not os.path.isfile(os.path.join(top, KIT)) or (upgrade and _kit_of(top) is None):
         undone = take_back(top, before, targets)
-        text = "brain install 没成功（退出码 %d）%s：\n%s" % (p.returncode, "，它写了一半的文件已经还原" if undone else "",
-                                                       last_lines(res["output"], 12))
+        text = "brain-kit 没装成（退出码 %d）%s。它说：\n%s" % (p.returncode, "，它写了一半的文件已经还原" if undone else "",
+                                                     last_lines(res["output"], 12))
         step("install", "fail", text)
         raise ImportFail(text, "install_failed", 500, res)
     step("install", "ok", "brain-kit %s" % (bk.info().get("version") or ""))
@@ -164,7 +168,7 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
         try:
             path = os.path.join(top, KIT)
             if os.path.islink(path) or os.path.islink(os.path.dirname(path)):
-                raise ImportFail("%s 是符号链接：不写" % KIT, "symlink")
+                raise ImportFail(KIT_LINK, "symlink")
             C = bk.m("common")
             data = kit_data(C.load_json(path), kit)
             cm = bk.m("config")
@@ -174,7 +178,7 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
             C.write_json(path, data)
         except (ImportFail, OSError, ValueError) as exc:
             take_back(top, before, targets)
-            text = str(exc) if isinstance(exc, ImportFail) else "写不了 kit.json：%s" % str(exc)[:200]
+            text = str(exc) if isinstance(exc, ImportFail) else "写不了 brain-kit 设置：%s" % str(exc)[:200]
             step("kit", "fail", text)
             raise ImportFail(text + "（装的文件已经还原）", getattr(exc, "code", "kit_failed"), 400, res)
         step("kit", "ok", kit_line(kit))
@@ -186,7 +190,7 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
     fails = sum(1 for r in rows if r["level"] == "FAIL")
     warns = sum(1 for r in rows if r["level"] == "WARN")
     if not rows:
-        step("doctor", "warn", "brain doctor 没给出结果（退出码 %d）" % p.returncode)
+        step("doctor", "warn", "自检没给出结果（退出码 %d）" % p.returncode)
     else:
         step("doctor", "warn" if fails else "ok", "%d 项通过，%d 项注意，%d 项没过" % (len(rows) - fails - warns, warns, fails))
 
@@ -209,11 +213,35 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
                                                                    "fail": fails},
                       "at": time.time(), "pushed": False, "commit": None, "brainkit": bk.info().get("version")})
     res["commit"] = commit(top, records, step, purpose=purpose)
+    if stuck and res["commit"]["ok"]:
+        gone = drop_branch_install(top, stuck, c["target"])
+        if gone:
+            res["commit"]["text"] += "\n另外删掉了没推送的那次安装：%s。" % "、".join(gone)
     if moved:
         res["commit"]["text"] += "\n另外：你没提交的 %s 在安装时变了，没提交它，看一下。" % "、".join(moved[:5])
     if upgrade:
         res["text"] = done_text(res)
     return res
+
+
+def drop_branch_install(top: str, rec: dict[str, Any], default: str) -> list[str]:
+    """The install branch (and its worktree) of an earlier install that could not be merged, once brain-kit is
+    committed in place: only the app's own branch, only when it was never pushed; its worktree only when clean (no
+    --force). What went, said in words."""
+    g = Git(top)
+    b, wt = str(rec.get("branch") or ""), rec.get("worktree")
+    if rec.get("pushed") or rec.get("mr_url") or not install_branch_ok(b, default):
+        return []
+    if g.ok("rev-parse", "-q", "--verify", "refs/remotes/origin/" + b):
+        return []
+    gone = []
+    if wt and os.path.isdir(wt) and os.path.realpath(wt) in worktrees_of(top):
+        if g.run("worktree", "remove", wt, timeout=60).returncode != 0:
+            return gone            # a change in it: the branch stays with it
+        gone.append("工作目录 %s" % wt)
+    if g.ok("rev-parse", "-q", "--verify", "refs/heads/" + b) and g.run("branch", "-D", b, timeout=30).returncode == 0:
+        gone.append("分支 %s" % b)
+    return gone
 
 
 def done_text(res: dict[str, Any]) -> str:
@@ -259,7 +287,7 @@ def commit(top: str, records: Records, step: Callable[..., None] | None = None, 
     paths = _present(g, top, paths)
     p = run_quiet([GIT_BIN, "-C", top, "add", "-A", "--", *paths], top, GIT_TIMEOUT_S * 2, brain_env())
     if p.returncode != 0:
-        out.update(text="git add 没成功：%s" % last_lines(tail(p)), output=tail(p))
+        out.update(text="改动没能加进提交，git 说：%s" % last_lines(tail(p)), output=tail(p))
         step("commit", "fail", out["text"])
         return out
     subject, body = commit_message(rec.get("kit") or {}, purpose, rec.get("brainkit"), inplace=True)
@@ -284,7 +312,7 @@ def push(top: str, confirm: dict[str, Any]) -> dict[str, Any]:
     g = Git(top)
     origin = origin_of(g)
     if origin is None:
-        raise ImportFail("这个仓库没有 origin：推不了", "no_origin", 409)
+        raise ImportFail("这个仓库没有远端：推不了", "no_origin", 409)
     cur = g.out("symbolic-ref", "-q", "--short", "HEAD")
     if not cur:
         raise ImportFail("检出不在任何分支上：推不了", "detached", 409)
@@ -300,5 +328,5 @@ def push(top: str, confirm: dict[str, Any]) -> dict[str, Any]:
             text += "\n%s 在远端多半受保护：改用「装到新分支，开 MR 给团队看」。" % cur
         out["text"] = text
         return out
-    out.update(ok=True, pushed=True, text="推上去了：%s → origin" % cur)
+    out.update(ok=True, pushed=True, text="推上去了：%s → 远端" % cur)
     return out

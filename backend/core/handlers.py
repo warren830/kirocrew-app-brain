@@ -10,6 +10,8 @@ from typing import Any
 from .constants import KEY_RE, REPO_ID_RE
 from .httpkit import AppError, Kit
 
+NO_REPO = "页面没说是哪个仓库：刷新页面再试"
+
 try:  # always there in the gateway; plain pytest passes a fake web module
     from aiohttp import web as _web
 except ImportError:  # pragma: no cover
@@ -52,7 +54,7 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
         body = await kit.body(request)
         rid = str(body.get("repo") or "")
         if not REPO_ID_RE.match(rid):
-            raise AppError("repo 要写仓库号（r1 …）", "invalid_repo")
+            raise AppError(NO_REPO, "invalid_repo")
         return kit.json(await svc.refresh(rid))
 
     async def overview(request: Any) -> Any:
@@ -67,22 +69,50 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
     async def open_session(request: Any) -> Any:
         body = await kit.body(request)
         return kit.json(await svc.open_session(_rid(request), _key(request), trust=body.get("trust", True) is not False,
-                                               kickoff=body.get("kickoff", True) is not False))
+                                               kickoff=body.get("kickoff", True) is not False,
+                                               review=body.get("review") is True))
 
     async def answer(request: Any) -> Any:
         body = await kit.body(request)
         did = body.get("id")
         if did is not None and (not isinstance(did, str) or not re.fullmatch(r"D-[1-9][0-9]{0,6}", did)):
-            raise AppError("id 是问题号 D-<n>", "invalid_id")
+            raise AppError("问题号不对（要像 D-3）：刷新页面再试", "invalid_id")
         note = body.get("note")
         if note is not None and not isinstance(note, str):
-            raise AppError("note 是一句话", "invalid_note")
+            raise AppError("「补一句」要是一段文字：刷新页面再试", "invalid_note")
         return kit.json(await svc.answer(_rid(request), _key(request), body.get("choice"), note, did))
+
+    # 大需求拆成小需求: brain split / claim / start --key / sync (each checked again by the service: whose it is, its family)
+    async def split(request: Any) -> Any:
+        body = await kit.body(request)
+        if not isinstance(body.get("apply", False), bool):
+            raise AppError("apply 是 true（拆）或 false（先看会拆成什么）", "invalid_body")
+        return kit.json(await svc.family_split(_rid(request), _key(request), body.get("apply") is True))
+
+    async def claim(request: Any) -> Any:
+        body = await kit.body(request)
+        if not isinstance(body.get("release", False), bool):
+            raise AppError("release 是 true（放弃认领）或 false", "invalid_body")
+        return kit.json(await svc.family_claim(_rid(request), _key(request), body.get("release") is True))
+
+    async def child_start(request: Any) -> Any:
+        body = await kit.body(request)
+        on = body.get("on")
+        if on is not None and (not isinstance(on, str) or not KEY_RE.match(on)):
+            raise AppError("on 要写它依赖的那个小需求的号", "invalid_on")
+        for k in ("open_session", "trust"):
+            if not isinstance(body.get(k, True), bool):
+                raise AppError("%s 是 true 或 false" % k, "invalid_body")
+        return kit.json(await svc.family_start(_rid(request), _key(request), on, body.get("open_session", True) is True,
+                                               body.get("trust", True) is True))
+
+    async def sync(request: Any) -> Any:
+        return kit.json(await svc.family_sync(_rid(request), _key(request)))
 
     async def intake_next(request: Any) -> Any:
         rid = str(request.query.get("repo") or "")
         if not REPO_ID_RE.match(rid):
-            raise AppError("repo 要写仓库号（r1 …）", "invalid_repo")
+            raise AppError(NO_REPO, "invalid_repo")
         return kit.json(await svc.intake_next(rid))
 
     async def intake_check(request: Any) -> Any:
@@ -100,13 +130,13 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
     async def brain(request: Any) -> Any:
         rid = str(request.query.get("repo") or "")
         if not REPO_ID_RE.match(rid):
-            raise AppError("repo 要写仓库号（r1 …）", "invalid_repo")
+            raise AppError(NO_REPO, "invalid_repo")
         return kit.json(await svc.brain(rid))
 
     def _rk(body: dict[str, Any]) -> tuple[str, str]:
         rid, key = str(body.get("repo") or ""), str(body.get("key") or "")
         if not REPO_ID_RE.match(rid) or not KEY_RE.match(key):
-            raise AppError("要写 repo（r1 …）和需求号 key", "invalid_body")
+            raise AppError("页面没说是哪个仓库、哪个需求：刷新页面再试", "invalid_body")
         return rid, key
 
     async def reflect_preview(request: Any) -> Any:
@@ -191,6 +221,10 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
         AppRoute("GET", "/board/{repo}/{key}", kit.guarded(board)),
         AppRoute("POST", "/requirements/{repo}/{key}/session", kit.guarded(open_session)),
         AppRoute("POST", "/requirements/{repo}/{key}/answer", kit.guarded(answer)),
+        AppRoute("POST", "/requirements/{repo}/{key}/split", kit.guarded(split)),
+        AppRoute("POST", "/requirements/{repo}/{key}/claim", kit.guarded(claim)),
+        AppRoute("POST", "/requirements/{repo}/{key}/start", kit.guarded(child_start)),
+        AppRoute("POST", "/requirements/{repo}/{key}/sync", kit.guarded(sync)),
         AppRoute("GET", "/intake/next", kit.guarded(intake_next)),
         AppRoute("POST", "/intake/check", kit.guarded(intake_check)),
         AppRoute("POST", "/intake/start", kit.guarded(intake_start)),
