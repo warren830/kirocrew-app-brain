@@ -588,8 +588,11 @@ def main() -> None:
     for r_ in ov["rows"] + [det["row"]]:
         r_.setdefault("home", None)                                     # deliveries.base_row: a runner row's only
     rows = {r["key"]: r for r in ov["rows"]}
-    for q in ov["eval"]["queue"]:
-        q["reasons"] = [deliveries.eval_reason(x) for x in q["reasons"]]
+    for q in ov["eval"]["queue"]:      # deliveries.evaluate: each reason in words, what to do by brain-kit's rule
+        rules = [next((r for t, r in (("验收被", "acceptance_rejected"), ("判断点之外", "outside_judgment"),
+                                       ("小时没有进展", "stuck")) if t in x), "") for x in q["reasons"]]
+        q["reasons"] = [deliveries.eval_reason({"rule": r, "text": x}) for r, x in zip(rules, q["reasons"])]
+        q["todo"] = "；".join(dict.fromkeys(deliveries.QUEUE_TODO.get(r, deliveries.QUEUE_TODO[""]) for r in rules))
     # brainkit.evaluate's notes and its skipped run, as deliveries.evaluate says them
     ov["eval"]["note_rows"] = deliveries.eval_notes(COST_NOTE, ["PAY-2"], [])
     ov["eval"]["notes"] = [x["text"] for x in ov["eval"]["note_rows"]]

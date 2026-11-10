@@ -558,7 +558,8 @@ export interface EvalView {
   ref: string | null
   metrics: EvalMetric[]
   /** 复看队列 (low-score queue): runs that need a human look */
-  queue: { key: string; intent: string | null; reasons: string[] }[]
+  /** todo: what to do about it, in words (deliveries.QUEUE_TODO by brain-kit's rule). The backend always sends it */
+  queue: { key: string; intent: string | null; reasons: string[]; todo?: string }[]
   /** runs brain-kit could not read: listed with the reason in words (brain-kit's own in raw), not counted in any metric */
   skipped: { key: string; why: string; raw?: string }[]
   /** brain-kit's notes on the numbers, verbatim (credits it could not attribute to a run, deliveries already known

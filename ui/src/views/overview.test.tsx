@@ -638,6 +638,7 @@ describe('交付总览', () => {
     const user = userEvent.setup()
     const ov = fx.overview()
     ov.eval.metrics = ov.eval.metrics.map((m) => (m.id === 'repeat_rate' ? { ...m, value: [0, 0] as [number, number] } : m))
+    ov.eval.queue = ov.eval.queue.map((q) => ({ ...q, todo: '打开需求看板看产品为什么退回；学到的在合并以后回写 Brain，下次就不会再犯' }))
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
     const p = props()
     render(<OverviewView entry={{}} {...p} />)
@@ -653,6 +654,8 @@ describe('交付总览', () => {
     expect(batch.querySelector('[data-metric="useful"]')).toHaveTextContent('只看默认分支')
     const queue = within(batch).getByTestId('eval-queue')
     expect(queue).toHaveTextContent('要复看PAY-4 ↗验收被退回 1 次')
+    // OVERVIEW-20: its own 做什么, in the one-line form of the other notes
+    expect(queue).toHaveTextContent('做什么：打开需求看板看产品为什么退回')
     await user.click(within(queue).getByRole('button', { name: 'PAY-4 ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-4', from: 'overview' })
     const skipped = within(batch).getByTestId('eval-skipped')

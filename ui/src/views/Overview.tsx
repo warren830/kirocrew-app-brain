@@ -849,6 +849,7 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
                   <span className="kt-pill tone-warn">要复看</span>
                   <button type="button" className="br-link br-key" onClick={() => onBoard(q.key)}>{q.key} ↗</button>
                   <span>{q.reasons.join('；')}</span>
+                  {q.todo && <span className="cto-was">做什么：{q.todo}</span>}
                 </li>
               ))}
               {ev.skipped.map((x) => (

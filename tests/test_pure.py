@@ -381,10 +381,19 @@ def test_evaluate_notes_say_which_runs_wait_for_their_merge():
     assert view["note_rows"][0]["raw"].startswith("--credits 只有一条记录")
     # REST-29: the review queue's reasons and the skipped run in words
     assert view["queue"][0]["reasons"] == [
-        "自动检查没过 3 次（2 次就要人看一眼）", "不知道运行机收没收到这次派单：去 KiroCrew 看一下它的会话",
+        "自动检查没过 3 次（2 次就要人看一眼）", "不知道运行机收没收到这次派单",
         "30 小时没有进展（最后一次 %s，≥24 小时算停住）：运行机没接着做（它的问题还在等：去 KiroCrew 看一下它的会话）" % time.strftime(
             "%m-%d %H:%M", time.localtime(1794099600)),
         "桥上的问题没走通：D-2 作废", "判断点之外有人介入 2 次（交接后推代码）", "验收被退回 1 次"]
+    # OVERVIEW-20: a run to look at again says what to do too, each rule's once (real DEMO-1/3: 29 小时没有进展)
+    todo = view["queue"][0]["todo"]
+    assert todo.startswith(deliveries.QUEUE_TODO["verify_fail_rounds"] + "；" + deliveries.QUEUE_TODO["state_unknown"])
+    assert deliveries.QUEUE_TODO["stuck"] in todo and todo.count(deliveries.QUEUE_TODO["stuck"]) == 1
+    assert not re.search(r"[A-Za-z_]{5,}", view["queue"][0]["todo"].replace("KiroCrew", "").replace("Brain", ""))
+    assert set(deliveries.QUEUE_TODO) >= {"stuck", "closed_unmerged", "runner_failed", "state_unknown", "merge_not_here",
+                                         "question_problem", "not_readable", "acceptance_rejected", "reverted_or_hotfixed",
+                                         "verify_fail_rounds", "repeat_corrections", "stale_citations",
+                                         "outside_judgment", "cost_outlier"}     # brain-kit evaluate.py's rules
     assert view["skipped"] == [{"key": "PAY-1", "why": "它的开工记录读不了", "raw": "runs/PAY-1/run.json is not valid JSON"}]
 
 
