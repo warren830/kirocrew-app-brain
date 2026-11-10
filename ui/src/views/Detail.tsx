@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, usePoll, useAction } from '../api'
-import { PERSON, todoLeft, whoWord } from '../board/format'
+import { PERSON, boardWho, todoLeft, whoThen, whoWord } from '../board/format'
 import { isReview, REVIEW_SENDS } from '../board/next'
 import { RoleIcon } from '../board/RoleIcon'
 import { Hit, Mini } from '../cto/charts'
@@ -26,7 +26,7 @@ import type {
 } from '../types'
 import { APPROVAL_META, Icon, LoadState, MrLink, STAGE_META, StateChip, TYPE_IT_YOURSELF, isOpenQuestion } from '../ui'
 import {
-  ACT, CHECK_GROUP_NAME, DECIDED_BY, DO_NAME, WHERE_NAME, approvalName, leanProgress, missingSourceName, sourceName, stageName, waitsOn,
+  ACT, CHECK_GROUP_NAME, DECIDED_BY, DO_NAME, WHERE_NAME, approvalName, leanProgress, missingSourceName, sourceName, stageName,
 } from '../vocab'
 import { Inline } from './Markdown'
 import type { ViewProps } from './props'
@@ -163,13 +163,15 @@ function handedOver(x: RequirementDetail): boolean {
   return !!x.run?.handoff || ['handed_over', 'running', 'parked', 'acceptance'].includes(x.row.state)
 }
 
-/** Lean's progress the one way (vocab.leanProgress): the backend's counts, else counted from the stages. */
-function leanOf(x: RequirementDetail): Required<Pick<LeanSummary, 'done_n' | 'skipped_n' | 'next'>> {
+/** Lean's progress the one way (vocab.leanProgress): the backend's counts, else counted from the stages; a next stage
+ * already started is 在做 (its stage_state), not 下一步. */
+function leanOf(x: RequirementDetail): Required<Pick<LeanSummary, 'done_n' | 'skipped_n' | 'next' | 'stage' | 'stage_state'>> {
   const l = x.row.lean
-  if (l.done_n !== undefined && l.skipped_n !== undefined && l.next !== undefined) return { done_n: l.done_n, skipped_n: l.skipped_n, next: l.next }
+  if (l.done_n !== undefined && l.skipped_n !== undefined && l.next !== undefined) return { done_n: l.done_n, skipped_n: l.skipped_n, next: l.next, stage: l.stage, stage_state: l.stage_state }
   const st = x.lean.stages
   const next = st.find((s) => s.state === 'started' || s.state === 'todo')
-  return { done_n: st.filter((s) => s.state === 'done').length, skipped_n: st.filter((s) => s.state === 'skipped').length, next: next ? { id: next.id, label: next.label, n: next.n } : null }
+  return { done_n: st.filter((s) => s.state === 'done').length, skipped_n: st.filter((s) => s.state === 'skipped').length, next: next ? { id: next.id, label: next.label, n: next.n } : null,
+    stage: next?.id ?? null, stage_state: next?.state === 'started' ? 'started' : null }
 }
 
 const isoSec = (iso: string | null | undefined) => (iso && Number.isFinite(Date.parse(iso)) ? Date.parse(iso) / 1000 : null)
@@ -197,6 +199,8 @@ function oldDo(x: RequirementDetail): WaitDo {
 
 interface Now {
   who: WaitWho
+  /** whom it waits on, in the one word every view says it (board/format.ts whoWord): 等你, 等产品, 等 carol */
+  whoSay: string
   do: WaitDo
   where: Waits['where']
   text: string
@@ -222,7 +226,7 @@ function nowOf(x: RequirementDetail, board: ReqBoard | null, live: SessionRow | 
     : step === 'start' || step === 'write_back' ? 'app' : step === 'none' || step === 'watch' ? null : onMr ? 'mr' : 'session'
   const open = x.questions.find((q) => isOpenQuestion(q) && q.source !== 'park')
   return {
-    who: w.who, do: step, where, text: w.text, line: w.line,
+    who: w.who, whoSay: whoWord(w.who, x.row.owner, board?.person.me ?? false), do: step, where, text: w.text, line: w.line,
     since: w.since ?? (step === 'start' ? isoSec(x.claim?.created_at) : step === 'reply' ? live?.last_activity ?? null : null),
     sessionUrl: live?.url ?? null,
     mrUrl: board?.accept.step.mr_url ?? open?.mr_url ?? x.row.mr?.url ?? null,
@@ -257,11 +261,13 @@ function reflectBranch(x: RequirementDetail, board: ReqBoard | null): string | n
 
 // ------------------------------------------------------------------ the page
 
-export function DetailView({ entry, onBack, onSwitch, ...props }: {
+export function DetailView({ entry, onBack, onSwitch, onMissing, ...props }: {
   entry: ItemEntry
   onBack?: () => void
   /** 切换需求: open another requirement here (default: a move to its 需求详情) */
   onSwitch?: (repo: string, key: string) => void
+  /** told whether the repo has this requirement (the app bar's other tab cannot open one it does not have) */
+  onMissing?: (missing: boolean) => void
 } & ViewProps) {
   const d = usePoll<RequirementDetail>(paths.requirement(entry.repo, entry.key), props.pollMs ?? POLL_MS)
   const b = usePoll<ReqBoard>(d.data ? paths.board(entry.repo, entry.key) : null, props.pollMs ?? POLL_MS)
@@ -274,6 +280,9 @@ export function DetailView({ entry, onBack, onSwitch, ...props }: {
   const x = d.data
   const board = b.data
   const missing = !x && d.status === 404
+  useEffect(() => {
+    if (missing || x) onMissing?.(missing)
+  }, [missing, !!x]) // eslint-disable-line react-hooks/exhaustive-deps
   const repoInfo = props.status?.repos.find((r) => r.id === entry.repo) ?? null
   const live = x ? x.sessions.find((s) => s.kind === 'local' && !s.error) ?? null : null
   const toBoard = (more: Partial<BoardEntry> = {}) => props.go({ kind: 'board', repo: entry.repo, key: entry.key, from: 'item', ...more })
@@ -333,7 +342,11 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
   }
   const canOpen = x.row.state === 'local' && !live
   const toAt = (t: number | null) => toBoard(t ? { at: Math.round(t) } : {})
-  const scrollTo = (label: string) => document.querySelector(`[data-testid="br-detail"] [aria-label="${label}"]`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  // whom the open questions and approvals wait on when it is not the person looking: the 此刻 judgment, said once
+  // (DETAIL-10); then the cards below only look (看 MR)
+  const waiter = now.who === 'you' ? null : PERSON.has(now.who) ? now.whoSay : '等人'
+  // to a card by its name (a section: the cost card's own row of session icons is not the 会话 card)
+  const scrollTo = (label: string) => document.querySelector(`[data-testid="br-detail"] section[aria-label="${label}"]`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   return (
     <>
       <section className="br-detail-head" aria-label="需求">
@@ -345,12 +358,12 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
       </section>
       <Cards x={x} board={board} at={at} localOnly={localOnly} replying={now.do === 'reply'} onBoard={toBoard} onSessions={() => scrollTo('会话')} />
       <StreamCard board={board} at={at} onAt={toAt} />
-      <LeanCard x={x} sessionUrl={now.sessionUrl} mrUrl={now.mrUrl} />
+      <LeanCard x={x} sessionUrl={now.sessionUrl} mrUrl={now.mrUrl} waiter={waiter} />
       <DecisionsCard decisions={x.decisions} stages={x.lean.stages} repo={entry.repo} owner={x.row.owner} me={board?.person.me ?? false} go={props.go} onAt={toAt}
         picked={entry.decision ?? null} />
       <div className="br-twocol">
         <div className="br-col">
-          <QuestionsCard x={x} repo={entry.repo} reqKey={entry.key} onAnswered={after} />
+          <QuestionsCard x={x} repo={entry.repo} reqKey={entry.key} onAnswered={after} waiter={waiter} />
           <MrDescCard m={x.mr_desc} />
         </div>
         <div className="br-col">
@@ -402,7 +415,7 @@ function Facts({ x, start, localOnly }: { x: RequirementDetail; start: number | 
   ] as [string, string | null | undefined][]).filter((kv): kv is [string, string] => !!kv[1])
   return (
     <dl className="br-detail-facts" aria-label="基本信息">
-      {r.branch && <div><dt>分支</dt><dd><code>{r.branch}</code></dd></div>}
+      {r.branch && <div><dt>分支</dt><dd><PathText path={r.branch} /></dd></div>}
       {r.worktree && <div><dt>工作目录</dt><dd><PathText path={r.worktree} /></dd></div>}
       {r.intent && <div><dt>Lean 记录</dt><dd><PathText path={`aidlc-docs/${r.intent}/`} /></dd></div>}
       {r.where !== 'claim' && (
@@ -500,13 +513,16 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
   const person = !['agent', 'runner', 'bridge', 'nobody'].includes(now.who)
   const waited = person && now.since ? fmtSpan(at - now.since) : null
   const onMr = now.where === 'mr'
-  const openSession = now.sessionUrl && !canOpen
-    ? <button type="button" className={`kt-btn${review || onMr ? '' : ' is-primary'}`} onClick={() => navigate(now.sessionUrl as string)}><Icon name="MessageSquare" size={13} />{ACT.openSession}</button>
-    : null
+  const verb = now.do === 'accept' ? '验收' : '回答'
+  // the session, by the step's one name (REST-18): 去回话 for an idle one, 打开会话 where a line is typed
+  const session = (label: string = ACT.openSession) => (now.sessionUrl && !canOpen
+    ? <button type="button" className={`kt-btn${onMr ? '' : ' is-primary'}`} onClick={() => navigate(now.sessionUrl as string)}><Icon name="MessageSquare" size={13} />{label}</button>
+    : null)
+  const openSession = session()
   const mrLink = now.mrUrl && /^https?:\/\//i.test(now.mrUrl)
     ? (
       <a className={`kt-btn${mine ? ' is-primary' : ''}`} href={now.mrUrl} target="_blank" rel="noopener noreferrer">
-        {mine ? ACT.answerOnMr : '在 MR 上看'}{now.question ? ` ${now.question}` : ''} <Icon name="ExternalLink" size={12} />
+        {mine ? `${now.do === 'accept' ? ACT.acceptOnMr : ACT.answerOnMr}${now.question ? ` ${now.question}` : ''}` : ACT.viewMr} <Icon name="ExternalLink" size={12} />
       </a>
     )
     : null
@@ -519,7 +535,7 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
       if (onMr) {
         body = mine
           ? <p>{now.do === 'answer' ? '问题已经发到 MR 上了' : '交接以后，批准在 MR 上回答'}{now.question ? `：回答 ${now.question}` : ''}（{now.choices}）。</p>
-          : <p>{waitsOn(now.who)}在 MR 上回答{now.question ? ` ${now.question}` : ''}，你不用做什么；回答以后运行机接着做。</p>
+          : <p>{whoThen(now.whoSay, `在 MR 上${verb}${now.question ? ` ${now.question}` : ''}`)}，你不用做什么；{verb}以后运行机接着做。</p>
         acts = mrLink
       } else if (now.line) {
         body = (
@@ -543,10 +559,11 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
             {review.say && <ReviewSay say={review.say} />}
           </>
         )
-        acts = <><ReviewButton repo={repo} reqKey={reqKey} liveSlot={live?.slot ?? null} worktree={x.row.worktree} />{openSession}</>
+        // never the session that wrote the code: the review is a new one
+        acts = <ReviewButton repo={repo} reqKey={reqKey} liveSlot={live?.slot ?? null} worktree={x.row.worktree} />
       } else {
         body = x.lean.next[0] ? <p>Lean 记下的下一步：<Inline text={x.lean.next[0]} /></p> : null
-        acts = openSession
+        acts = session(DO_NAME.reply)
       }
       break
     case 'tool':
@@ -557,11 +574,11 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
           {x.row.waits.raw && <details className="br-raw"><summary>细节</summary><pre>{x.row.waits.raw}</pre></details>}
         </div>
       )
-      acts = openSession
+      acts = session(now.do === 'tool' ? DO_NAME.tool : ACT.openSession)
       break
     case 'label_handoff':
       body = <p>做什么：{DO_NAME.label_handoff}（在 MR 上加交接标签）。</p>
-      acts = now.mrUrl ? <a className="kt-btn is-primary" href={now.mrUrl} target="_blank" rel="noopener noreferrer">去 MR 上看 <Icon name="ExternalLink" size={12} /></a> : null
+      acts = now.mrUrl ? <a className="kt-btn is-primary" href={now.mrUrl} target="_blank" rel="noopener noreferrer">{DO_NAME.label_handoff} <Icon name="ExternalLink" size={12} /></a> : null
       break
     case 'start':
       acts = mine ? <button type="button" className="kt-btn is-primary" onClick={onStart}>{ACT.start}</button> : null
@@ -575,7 +592,7 @@ function NowBar({ x, now, at, live, canOpen, repo, reqKey, onStart, onAnswer, on
     <section className={`br-now${mine ? ' is-you' : ''}`} aria-label="此刻" data-testid="detail-waits" data-do={now.do}>
       <div className="br-now-head">
         <span className="cto-eyebrow">此刻</span>
-        {person && <span className={`br-chip tone-${mine ? 'wait' : 'idle'}`}>{waitsOn(now.who)}</span>}
+        {person && <span className={`br-chip tone-${mine ? 'wait' : 'idle'}`}>{now.whoSay}</span>}
         <span className="br-now-text">{now.text || '—'}</span>
         {waited && <span className="br-dim">已等 {waited}</span>}
       </div>
@@ -705,10 +722,10 @@ function CostCard({ x, replying, onSessions }: { x: RequirementDetail; replying:
     <article className="cto-card" aria-label="成本">
       <div className="cto-eyebrow">成本</div>
       <div className="cto-value">{x.credits.total !== null ? <>{fmtCredits(x.credits.total)}<span className="cto-of">credits</span></> : <span className="cto-of" style={{ marginLeft: 0 }}>还没有</span>}</div>
-      <div className="cto-desc">{ss.length ? `${ss.length} 个会话` : '还没开过会话'}</div>
+      <div className="cto-desc">{ss.length ? `${ss.length} 个会话` : x.credits.total !== null ? SESSIONS_GONE : '还没开过会话'}</div>
       {ss.length > 0 && (
         <>
-          <div className="cto-chips" aria-label="会话">
+          <div className="cto-chips" aria-label="会话的用量">
             {ss.map((s) => {
               const st = sessionState(s, replying)
               return (
@@ -748,7 +765,7 @@ function ChecksCard({ board, localOnly, sent, blocked, onBoard }: {
   const ok = !!w && w.total > 0 && w.passed === w.total && !todo.length && !waiting.length
   const say = !w ? '看板的数据还没来'
     : w.total === 0 && !todo.length ? '还没有检查结果'
-      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed === 1 ? '1 项过了' : `${w.passed} 项都过`}`, waiting.length ? `${board && PERSON.has(board.row.waits.who) ? whoWord(board.row.waits.who, board.person.owner) : '等人'}：${waiting.join('、')}` : '',
+      : [failed.length ? `没过：${failed.join('、')}` : `目前 ${w.passed === 1 ? '1 项过了' : `${w.passed} 项都过`}`, waiting.length ? `${board && PERSON.has(board.row.waits.who) ? boardWho(board) : '等人'}：${waiting.join('、')}` : '',
         watching.length ? `观察中：${watching.join('、')}` : '', todo.length ? `还剩 ${todo.join('、')}` : '']
         .filter(Boolean).join(' · ')
   return (
@@ -796,7 +813,7 @@ function SplitBar({ split }: { split: { p: Part; s: number }[] }) {
 
 // ------------------------------------------------------------------ Lean
 
-function LeanCard({ x, sessionUrl, mrUrl }: { x: RequirementDetail; sessionUrl: string | null; mrUrl: string | null }) {
+function LeanCard({ x, sessionUrl, mrUrl, waiter }: { x: RequirementDetail; sessionUrl: string | null; mrUrl: string | null; waiter: string | null }) {
   const { stages, approvals } = x.lean
   const lean = leanOf(x)
   const onMr = handedOver(x)
@@ -818,6 +835,8 @@ function LeanCard({ x, sessionUrl, mrUrl }: { x: RequirementDetail; sessionUrl: 
             const q = x.questions.find((qq) => qq.lean_request?.startsWith(a.kind) && qq.source !== 'park')
             const url = q?.mr_url ?? mrUrl
             const unit = /\/([^/]+)-code-generation-plan\.md$/.exec(a.path ?? '')?.[1]
+            // the release is accepted on the MR (its question is the acceptance)
+            const accept = q?.kind === 'acceptance'
             return (
               <li key={`${a.kind}-${a.sha8 ?? i}`} className="br-approval" data-testid="approval" data-state={a.state}>
                 <div className="br-row">
@@ -833,8 +852,8 @@ function LeanCard({ x, sessionUrl, mrUrl }: { x: RequirementDetail; sessionUrl: 
                 {a.state === 'pending' && (onMr
                   ? (
                     <p className="br-note">
-                      在 MR 上回答{q?.id ? ` ${q.id}` : ''}（approve / reject），这里不能回答。
-                      {url && /^https?:\/\//i.test(url) && <> <a className="br-link" href={url} target="_blank" rel="noopener noreferrer">{ACT.answerOnMr} <Icon name="ExternalLink" size={12} /></a></>}
+                      {whoThen(waiter ?? '', `在 MR 上${accept ? '验收' : '回答'}${q?.id ? ` ${q.id}` : ''}`)}（approve / reject），{waiter ? '你不用做什么' : '这里不能回答'}。
+                      {url && /^https?:\/\//i.test(url) && <> <a className="br-link" href={url} target="_blank" rel="noopener noreferrer">{waiter ? ACT.viewMr : accept ? ACT.acceptOnMr : ACT.answerOnMr} <Icon name="ExternalLink" size={12} /></a></>}
                     </p>
                   )
                   : a.line && <ApprovalLine line={a.line} sessionUrl={sessionUrl} onOpen={(u) => navigate(u)} />)}
@@ -895,6 +914,30 @@ function decidedBy(d: Decision, owner: string | null, me: boolean): string {
   return d.who ?? '—'
 }
 
+/** Scrolls *ref* to the middle once *on*, and again while the page above it still settles (the value stream and the
+ * board's cards arrive after the detail and push it down), until the person scrolls themselves or 4 s are over. */
+function useKeepInView(ref: { current: HTMLElement | null }, on: boolean) {
+  useEffect(() => {
+    const el = ref.current
+    if (!on || !el) return
+    el.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+    const page = el.closest('[data-testid="br-detail"]')
+    if (!page || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => el.scrollIntoView?.({ block: 'center' }))
+    ro.observe(page)
+    const stop = () => {
+      ro.disconnect()
+      for (const k of ['wheel', 'touchstart', 'keydown'] as const) window.removeEventListener(k, stop)
+    }
+    for (const k of ['wheel', 'touchstart', 'keydown'] as const) window.addEventListener(k, stop, { passive: true })
+    const timer = setTimeout(stop, 4000)
+    return () => {
+      clearTimeout(timer)
+      stop()
+    }
+  }, [on]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt, picked }: {
   decisions: Decision[]
   stages: Stage[]
@@ -910,9 +953,7 @@ function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt, picked }:
   const atOf = (d: Decision) => stages.find((s) => s.id === d.stage)?.at ?? null
   const pickedRow = useRef<HTMLTableRowElement | null>(null)
   const found = !!picked && decisions.some((d) => d.id === picked)
-  useEffect(() => {
-    if (found) pickedRow.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
-  }, [found])
+  useKeepInView(pickedRow, found)
   return (
     <section className="cto-card" aria-label="决定">
       <div className="cto-chart-head">
@@ -953,7 +994,7 @@ function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt, picked }:
   )
 }
 
-function QuestionsCard({ x, repo, reqKey, onAnswered }: { x: RequirementDetail; repo: string; reqKey: string; onAnswered: () => void }) {
+function QuestionsCard({ x, repo, reqKey, onAnswered, waiter }: { x: RequirementDetail; repo: string; reqKey: string; onAnswered: () => void; waiter: string | null }) {
   // questions asked straight in the session (「Q1 选 A」 in decisions.md) are not park.json's or the MR's
   const asked = x.decisions.flatMap((d) => [...d.text.matchAll(/\bQ(\d+)\b/g)].map((m) => ({ q: `Q${m[1]}`, d: d.id })))
   const qs = [...new Set(asked.map((a) => a.q))]
@@ -969,7 +1010,7 @@ function QuestionsCard({ x, repo, reqKey, onAnswered }: { x: RequirementDetail; 
         </p>
       ) : (
         <div className="br-stack">
-          {x.questions.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={repo} reqKey={reqKey} onAnswered={onAnswered} />)}
+          {x.questions.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={repo} reqKey={reqKey} onAnswered={onAnswered} waiter={waiter} />)}
         </div>
       )}
     </section>
@@ -1008,12 +1049,18 @@ function sessionState(s: SessionRow, replying: boolean): { label: string; tone: 
   return { label: '空着', tone: 'idle' }
 }
 
+/** credits recorded, but no session is listed now (a closed one, or the runner's) */
+const SESSIONS_GONE = '现在没有开着的会话'
+
 function SessionsCard({ sessions, total, note, replying, at }: { sessions: SessionRow[]; total: number | null; note: string; replying: boolean; at: number }) {
   const navigate = useNavigate()
   return (
     <section className="cto-card" aria-label="会话">
-      <div className="cto-chart-head"><h3>会话</h3><span className="cto-dim" title={note || undefined}>这个 app 开的 · 合计 {fmtCredits(total)} credits</span></div>
-      {sessions.length === 0 ? <p className="br-empty">还没开过会话。</p> : (
+      <div className="cto-chart-head">
+        <h3>会话</h3>
+        <span className="cto-dim" title={note || undefined}>这个 app 开的{total !== null ? ` · 合计 ${fmtCredits(total)} credits` : sessions.length ? ' · 用量还没报' : ''}</span>
+      </div>
+      {sessions.length === 0 ? <p className="br-empty">{total !== null ? `${SESSIONS_GONE}；上面的合计是记下的用量。` : '还没开过会话。'}</p> : (
         <ul className="br-sessions">
           {sessions.map((s) => {
             const st = sessionState(s, replying)
@@ -1049,6 +1096,8 @@ function SessionsCard({ sessions, total, note, replying, at }: { sessions: Sessi
 function BrainUseCard({ x, board, repo, reqKey, go }: { x: RequirementDetail; board: ReqBoard | null; repo: string; reqKey: string; go: ViewProps['go'] }) {
   const b = x.brain
   const branch = b.proposals ? reflectBranch(x, board) : null
+  // the board's write-back step: merged once its branch is on the default branch, done while that branch waits
+  const reflect = board?.actors.find((a) => a.key === 'reflect')?.status ?? null
   const toReflect = () => go({ kind: 'brain', ...(repo !== 'runner' ? { repo } : {}), reflect: reqKey })
   return (
     <section className="cto-card" aria-label="用到的 Brain">
@@ -1060,7 +1109,8 @@ function BrainUseCard({ x, board, repo, reqKey, go }: { x: RequirementDetail; bo
       {b.proposals !== null && b.proposals > 0 && (
         <div className="br-row" data-testid="brain-proposals">
           <span>
-            提议 {b.proposals} 条新知识：{branch ? <>已写到回写分支 <code>{branch}</code>，等合并</> : '还没回写到 Brain'}
+            提议 {b.proposals} 条新知识：{reflect === 'merged' ? <>已合进 Brain{branch && <span className="br-dim">（回写分支 <code>{branch}</code>）</span>}</>
+              : branch || reflect === 'done' ? <>已写到回写分支{branch && <> <code>{branch}</code></>}，等合并</> : '还没回写到 Brain'}
           </span>
           <button type="button" className="cto-link" onClick={toReflect}>在 Brain 里看 ↗</button>
         </div>
@@ -1100,7 +1150,23 @@ function itemText(it: TimelineItem): { label: string; detail: string | null; tit
   if (it.kind === 'app' && it.label.startsWith('回写 Brain') && it.detail) return { label: it.label, detail: `分支 ${it.detail}`, title: null }
   if (it.kind === 'commit' && it.detail && /^[0-9a-f]{7,40}$/.test(it.detail)) return { label: it.label, detail: it.detail.slice(0, 8), title: it.detail }
   if (it.detail && /^claim\/\S+ 推到 origin$/.test(it.detail)) return { label: it.label, detail: '认领推到了远端', title: it.detail }
-  return { label: it.label, detail: it.detail ? it.detail.replace(/^工作区 /, '工作目录 ') : null, title: null }
+  const label = it.label.replace(/\s*[:：]\s*$/, '')
+  return { label, detail: it.detail ? it.detail.replace(/^工作区 /, '工作目录 ') : null, title: null }
+}
+
+/** The record brain-kit could not read: the backend says why in words (then that is the note, and what to do unless it
+ * says so itself); an older one sent brain-kit's own English, which is folded under 细节 to pass on. */
+function TraceError({ error }: { error: string }) {
+  const words = /[\u4e00-\u9fff]/.test(error) && !/[A-Za-z]{4,}/.test(error.replace(/brain-kit|Lean|KiroCrew|trace/g, ''))
+  return (
+    <div className="br-note" role="status" data-testid="timeline-error">
+      <p style={{ margin: 0 }}>{words ? error : '这个需求的记录有一部分读不出来，下面只列读到的。'}</p>
+      {!(words && /设置/.test(error)) && (
+        <p className="br-hint">做什么：等一会儿它会自己再读；一直这样的话，{words ? '到设置里看 brain-kit 能不能用' : '把细节里的原话发给维护 app 的人'}。</p>
+      )}
+      {!words && <details className="br-raw"><summary>细节</summary><pre>{error}</pre></details>}
+    </div>
+  )
 }
 
 function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: boolean }) {
@@ -1120,13 +1186,7 @@ function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: b
         <h3>时间线</h3>
         <span className="cto-dim">最新的在上面 · {t.source === 'trace' ? 'brain-kit 记下的' : 'app 从 Lean 记录和提交拼的'}</span>
       </div>
-      {t.error && (
-        <div className="br-note" role="status">
-          <p style={{ margin: 0 }}>这个需求的记录有一部分读不出来，下面只列读到的。</p>
-          <p className="br-hint">做什么：等一会儿它会自己再读；一直这样的话，把细节里的原话发给维护 app 的人。</p>
-          <details className="br-raw"><summary>细节</summary><pre>{t.error}</pre></details>
-        </div>
-      )}
+      {t.error && <TraceError error={t.error} />}
       <div className="br-tlbox">
         {items.length === 0 ? <p className="br-empty">还没有记录。</p> : [...days.entries()].map(([day, list]) => (
           <div key={day}>
@@ -1136,9 +1196,9 @@ function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: b
                 const k = KIND_META[it.kind] ?? { icon: 'commit', label: it.kind }
                 const s = itemText(it)
                 const long = !!s.detail && s.detail.length > 60
-                const who = it.who && !PSEUDONYM.test(it.who) ? it.who : null
+                const who = it.who ? (PSEUDONYM.test(it.who) ? '一位组员' : it.who) : null
                 return (
-                  <li key={i} data-testid="tl-item" data-kind={it.kind} title={[s.title, it.who && !who ? `化名 ${it.who}` : null].filter(Boolean).join(' · ') || undefined}>
+                  <li key={i} data-testid="tl-item" data-kind={it.kind} title={[s.title, it.who && PSEUDONYM.test(it.who) ? `化名 ${it.who}` : null].filter(Boolean).join(' · ') || undefined}>
                     <time>{clock(it.at)}</time>
                     <span title={k.label}><RoleIcon role={k.icon} size={16} /><span className="br-sr">{k.label}</span></span>
                     <span>

@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { paths, useAction } from '../api'
+import { whoThen } from '../board/format'
 import { fmtTime } from '../format'
 import { ENTRY_RE, fileOfEntry } from '../nav'
 import type { MrDesc, OpenSessionBody, OpenSessionResult, Question } from '../types'
@@ -51,6 +52,9 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered, waiter = null
   const asked = takeRefs(q.question)
   const raw = [...q.refs, ...asked.refs, ...(q.lean_request ? [q.lean_request] : []), ...(q.voucher_id ? [`凭证 ${q.voucher_id}`] : [])]
   const theirs = onMr && open && !!waiter
+  // an acceptance is 验收 on the MR, any other question an answer (REST-18)
+  const accept = q.kind === 'acceptance'
+  const verb = accept ? '验收' : '回答'
   return (
     <article className={`br-q${open ? ' is-open' : ''}`} aria-label={`问题 ${q.id ?? q.kind_label}`} data-testid="question">
       <div className="br-row">
@@ -76,7 +80,7 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered, waiter = null
       {q.lean_request && (
         <p className="br-note" data-testid="lean-request">
           {onMr
-            ? <>这是 Lean 的{what}：{theirs ? waiter : ''}在 MR 上回答{q.id ? ` ${q.id}` : ''}（approve / reject），桥会把回答带回运行机。</>
+            ? <>这是 Lean 的{what}：{whoThen(theirs ? waiter ?? '' : '', `在 MR 上${verb}${q.id ? ` ${q.id}` : ''}`)}（approve / reject），桥会把回答带回运行机。</>
             : <>这是 Lean 的{what}：在会话里自己打批准那一行，这里不能回答。</>}
         </p>
       )}
@@ -88,8 +92,8 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered, waiter = null
       )}
       {link && (
         <div className="br-row br-small">
-          {theirs && !q.lean_request && <span className="br-dim">{waiter}在 MR 上回答</span>}
-          <ExtLink href={link}>{open && !formHere && !theirs ? ACT.answerOnMr : ACT.viewMr}</ExtLink>
+          {theirs && !q.lean_request && <span className="br-dim">{whoThen(waiter ?? '', `在 MR 上${verb}`)}</span>}
+          <ExtLink href={link}>{open && !formHere && !theirs ? (accept ? ACT.acceptOnMr : ACT.answerOnMr) : ACT.viewMr}</ExtLink>
         </div>
       )}
       {raw.length > 0 && (

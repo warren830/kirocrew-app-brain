@@ -52,6 +52,12 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
   const [held, setHeld] = useState<Held>(() => heldOf(parseView(window.location.search), loadHeld()))
   const api = useAppApi()
   const [picking, setPicking] = useState(false)
+  // the requirement in hand that its repo does not have (需求详情 / 需求看板 got 404): its other tab cannot open it either
+  const [gone, setGone] = useState<string | null>(null)
+  const onMissing = useCallback((repo: string, key: string, missing: boolean) => {
+    const id = `${repo}/${key}`
+    setGone((g) => (missing ? id : g === id ? null : g))
+  }, [])
   const navigate = useNavigate()
   const badge = useNavBadge()
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -157,12 +163,14 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
     const fallback: View = entry.from === 'todo' ? { kind: 'todo' } : entry.from === 'brain' ? { kind: 'brain', repo: entry.repo }
       : entry.from === 'board' ? { kind: 'board', repo: entry.repo, key: entry.key } : entry.from === 'team' ? { kind: 'team' } : overviewFilters.current
     const { decision: _d, ...keep } = entry
-    body = <DetailView key={n} entry={entry} onBack={() => back(fallback)} onSwitch={(repo, key) => swap({ kind: 'item', ...keep, repo, key })} {...props} />
+    body = <DetailView key={n} entry={entry} onBack={() => back(fallback)} onSwitch={(repo, key) => swap({ kind: 'item', ...keep, repo, key })}
+      onMissing={(m) => onMissing(entry.repo, entry.key, m)} {...props} />
   } else if (v.kind === 'board') {
     const { kind: _k, ...entry } = v
     const fallback: View = entry.from === 'todo' ? { kind: 'todo' } : entry.from === 'item' ? { kind: 'item', repo: entry.repo, key: entry.key } : overviewFilters.current
     body = <BoardPage key={n} entry={entry} onBack={entry.from ? () => back(fallback) : undefined} {...props}
-      onSwitch={(repo, key) => swap({ kind: 'board', repo, key, ...(entry.from ? { from: entry.from } : {}) })} />
+      onSwitch={(repo, key) => swap({ kind: 'board', repo, key, ...(entry.from ? { from: entry.from } : {}) })}
+      onMissing={(m) => onMissing(entry.repo, entry.key, m)} />
   } else if (v.kind === 'new') {
     const { kind: _k, ...entry } = v
     body = <NewView key={n} entry={entry} {...props} />
@@ -194,7 +202,7 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
       <style>{APP_CSS}</style>
       <style>{KIT_CSS}</style>
       <style>{SHELL_CSS}</style>
-      <AppBar view={v.kind} onView={onTab} item={held?.key} picking={picking} todo={todoCount} team={!!s?.app.team} />
+      <AppBar view={v.kind} onView={onTab} item={held?.key} gone={!!held && gone === `${held.repo}/${held.key}`} picking={picking} todo={todoCount} team={!!s?.app.team} />
       <div className="br-banners" data-testid="br-banners">
         {off && (
           <Banner text={`${s ? '状态刷新没成：' : ''}${off.text}`} todo={off.todo} raw={status.raw} bad={!s} testid="br-status-error">

@@ -294,3 +294,6 @@ export function checksSay(w: CheckWall, b: Pick<ReqBoard, 'row' | 'person'>): Ch
   if (todo.length) return { text: `目前 ${all}${left}${watching}`, tone: 'info', green: false }
   return { text: `${w.passed === 1 ? '1 项过了' : `${w.passed} 项全过`}${watching}`, tone: 'ok', green: !watch }
 }
+
+/** 「等 carol 在 MR 上回答」, 「等产品在 MR 上回答」: a wait word and what follows, a space after a Latin name. */
+export const whoThen = (who: string, rest: string): string => `${who}${/[A-Za-z0-9]$/.test(who) && /^[^\s，。：；、）]/.test(rest) ? ' ' : ''}${rest}`

@@ -79,11 +79,13 @@ export function boardProblem(b: ReqBoard): { text: string; todo: string; raw: st
   return { text: '这个需求的运行记录没读全：图上只画了 Lean 的记录和仓库里看得到的', todo: '到需求详情看细节；一直这样的话，到设置里看 brain-kit 能不能用', raw: b.error }
 }
 
-export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs }: {
+export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, status, pollMs }: {
   entry: BoardEntry
   onBack?: () => void
   /** 切换需求: open another requirement's board here (default: a move to it) */
   onSwitch?: (repo: string, key: string) => void
+  /** told whether the repo has this requirement (the app bar's other tab cannot open one it does not have) */
+  onMissing?: (missing: boolean) => void
 } & ViewProps) {
   const api = useAppApi()
   const navigate = useNavigate()
@@ -100,6 +102,10 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
   }, [])
   const onDiff = useCallback((d: BoardDiff) => void (replaying.current || animate(d)), [animate])
   const live = useBoard(api, { repo: entry.repo, reqKey: entry.key, pollMs, onDiff })
+  const gone = live.missing && !live.board
+  useEffect(() => {
+    if (gone || live.board) onMissing?.(gone)
+  }, [gone, !!live.board]) // eslint-disable-line react-hooks/exhaustive-deps
   const rp = useReplay(live.board, animate)
   replaying.current = rp.on
   const board = rp.board ?? live.board
