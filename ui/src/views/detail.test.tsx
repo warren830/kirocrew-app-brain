@@ -296,6 +296,30 @@ describe('需求详情', () => {
     })
   })
 
+  test('team mode, a requirement handed to the runner opened at its repo: it says so and opens the runner’s 需求详情; never that it is not there', async () => {
+    const o = fx.overview()
+    o.rows = o.rows.map((r) => (r.key === 'PAY-4' ? { ...r, repo: 'runner', where: 'runner' } : r))
+    const s = fx.status()
+    s.app.team = true
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => o })
+    const { go } = renderDetail({ repo: 'r1', key: 'PAY-4', from: 'overview' }, { status: s })
+    const note = await screen.findByTestId('on-runner')
+    expect(note).toHaveTextContent('PAY-4 已交给运行机交付总览把它列在运行机下，以那边的为准。')
+    expect(document.body).not.toHaveTextContent(/shop-pay (仓库)?里没有/)
+    fireEvent.click(within(note).getByRole('button', { name: '打开运行机上的需求详情' }))
+    expect(go).toHaveBeenCalledWith({ kind: 'item', repo: 'runner', key: 'PAY-4' })
+    cleanup()
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => o, [`GET ${API}/requirements/*`]: () => { throw apiError(404, 'not_found', '没有这个需求') } })
+    renderDetail({ repo: 'r1', key: 'PAY-4', from: 'overview' }, { status: s })
+    expect(await screen.findByTestId('on-runner')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '没有这个需求' })).toBeNull()
+    cleanup()
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => o })
+    renderDetail({ repo: 'r1', key: 'PAY-4', from: 'overview' })   // not team mode: no runner, nothing to say
+    await screen.findByRole('region', { name: '此刻' })
+    expect(screen.queryByTestId('on-runner')).toBeNull()
+  })
+
   test('a requirement that is not there: which repo, what to do, back where it was opened from (as the crumb); no HTTP code, no 需求看板', async () => {
     installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => { throw apiError(404, 'not_found', '没有这个需求') } })
     const { go, onBack } = renderDetail({ repo: 'r1', key: 'PAY-99', from: 'todo' })

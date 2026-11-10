@@ -21,6 +21,32 @@ export function missingText(key: string, repoName: string): string {
   return `${key}（${repoName}${/[\x21-\x7e]$/.test(repoName) ? ' ' : ''}里没有）`
 }
 
+/** Team mode lists a handed-over requirement once, under 运行机 (its facts win): that row, when *repo*'s rows lack *key*. */
+export function runnerRow(rows: Requirement[], repo: string, key: string): Requirement | null {
+  if (repo === 'runner' || rows.some((r) => r.repo === repo && r.key === key)) return null
+  return rows.find((r) => r.repo === 'runner' && r.key === key) ?? null
+}
+
+/** 需求详情 / 需求看板 of a repo's requirement: the runner's row standing for it in team mode, from the list 切换需求 reads. */
+export function useOnRunner(repo: string, key: string, status: Status | null, pollMs?: number): Requirement | null {
+  const o = usePoll<Overview>(status?.app.team && repo !== 'runner' ? paths.overview('all') : null, Math.max(pollMs ?? 0, SWITCH_POLL_MS))
+  return o.data ? runnerRow(o.data.rows, repo, key) : null
+}
+
+/** Where a handed-over requirement is now, and the way to it. */
+export function OnRunner({ reqKey, what, onOpen }: { reqKey: string; what: '需求详情' | '需求看板'; onOpen: () => void }) {
+  return (
+    <div className="br-banner is-info" role="status" data-testid="on-runner">
+      <div className="br-row">
+        <b className="br-strong">{reqKey} 已交给运行机</b>
+        <span>交付总览把它列在运行机下，以那边的为准。</span>
+        <span className="cto-grow" />
+        <button type="button" className="kt-btn is-primary" onClick={onOpen}>打开运行机上的{what}</button>
+      </div>
+    </div>
+  )
+}
+
 export function ReqSwitch({ repo, reqKey, status, onPick, pollMs }: {
   repo: string
   reqKey: string
@@ -49,7 +75,7 @@ export function ReqSwitch({ repo, reqKey, status, onPick, pollMs }: {
           const [r, k] = e.target.value.split(SEP)
           if (r && k && (r !== repo || k !== reqKey)) onPick(r, k)
         }}>
-        {!here && <option value={idOf(repo, reqKey)}>{missingText(reqKey, nameOf(repo))}</option>}
+        {!here && <option value={idOf(repo, reqKey)}>{runnerRow(rows, repo, reqKey) ? `${reqKey}（已交给运行机）` : missingText(reqKey, nameOf(repo))}</option>}
         {groups.size > 1
           ? [...groups].map(([id, list]) => <optgroup key={id} label={nameOf(id)}>{options(list)}</optgroup>)
           : options([...groups.values()][0])}

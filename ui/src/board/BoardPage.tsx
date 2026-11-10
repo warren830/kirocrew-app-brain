@@ -19,7 +19,7 @@ import type { ReqBoard, WaitDo } from '../types'
 import { LoadState } from '../ui'
 import { QuestionCard } from '../views/Question'
 import type { ViewProps } from '../views/props'
-import { NotFound, ReqSwitch } from '../views/ReqSwitch'
+import { NotFound, OnRunner, ReqSwitch, useOnRunner } from '../views/ReqSwitch'
 import { Accept } from './Accept'
 import { ActorGraph, rosterRows, type FlashMap } from './ActorGraph'
 import { CheckWall } from './CheckWall'
@@ -103,6 +103,8 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
   const onDiff = useCallback((d: BoardDiff) => void (replaying.current || animate(d)), [animate])
   const live = useBoard(api, { repo: entry.repo, reqKey: entry.key, pollMs, onDiff })
   const gone = live.missing && !live.board
+  const onRunner = useOnRunner(entry.repo, entry.key, status, pollMs)
+  const pick = onSwitch ?? ((repo: string, key: string) => go({ kind: 'board', repo, key }))
   useEffect(() => {
     if (gone || live.board) onMissing?.(gone)
   }, [gone, !!live.board]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -211,12 +213,12 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
             <b>需求看板{focus && board ? ` · ${board.actors.find((a) => a.key === focus)?.title ?? ''}` : ''}{rp.on ? ' · 回放' : ''}</b>
           </nav>
           <span className="cto-grow" />
-          {!rp.on && <ReqSwitch repo={entry.repo} reqKey={entry.key} status={status} pollMs={pollMs}
-            onPick={onSwitch ?? ((repo, key) => go({ kind: 'board', repo, key }))} />}
+          {!rp.on && <ReqSwitch repo={entry.repo} reqKey={entry.key} status={status} pollMs={pollMs} onPick={pick} />}
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{fromName}</button>}
         </div>
+        {onRunner && !rp.on && <OnRunner reqKey={entry.key} what="需求看板" onOpen={() => pick('runner', entry.key)} />}
         {live.missing && !board
-          ? <NotFound repoName={status?.repos.find((r) => r.id === entry.repo)?.name ?? (entry.repo === 'runner' ? '运行机' : null)} reqKey={entry.key}
+          ? !onRunner && <NotFound repoName={status?.repos.find((r) => r.id === entry.repo)?.name ?? (entry.repo === 'runner' ? '运行机' : null)} reqKey={entry.key}
               backName={onBack ? fromName : VIEW_NAME.overview} onBack={onBack ?? (() => go({ kind: 'overview', ...(entry.repo !== 'runner' ? { repo: entry.repo } : {}) }))}
               testId="br-board-missing" />
           : <LoadState loading={live.loading} error={live.error} has={!!board} />}

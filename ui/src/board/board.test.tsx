@@ -459,6 +459,25 @@ describe('需求看板', () => {
     expect(back).toHaveBeenCalledTimes(1)
   })
 
+  test('team mode, a requirement handed to the runner opened at its repo: it says so and opens the runner’s 需求看板; never that it is not there', async () => {
+    const o = fx.overview()
+    o.rows = o.rows.map((r) => (r.key === 'PAY-4' ? { ...r, repo: 'runner', where: 'runner' } : r))
+    const s = fx.status()
+    s.app.team = true
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => o })
+    const p = renderBoard({ repo: 'r1', key: 'PAY-4' }, { status: s })
+    const note = await screen.findByTestId('on-runner')
+    expect(note).toHaveTextContent('PAY-4 已交给运行机')
+    fireEvent.click(within(note).getByRole('button', { name: '打开运行机上的需求看板' }))
+    expect(p.go).toHaveBeenCalledWith({ kind: 'board', repo: 'runner', key: 'PAY-4' })
+    cleanup()
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => o, ...boardRoute(() => { throw apiError(404, 'not_found', '这个仓库里没有 PAY-4') }) })
+    renderBoard({ repo: 'r1', key: 'PAY-4' }, { status: s })
+    expect(await screen.findByTestId('on-runner')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '没有这个需求' })).toBeNull()
+    expect(screen.getByTestId('br-board')).not.toHaveTextContent(/shop-pay (仓库)?里没有/)
+  })
+
   test('a backend without the /board route (a 404 without an error body) is the same missing state', async () => {
     const routes = fixtureRoutes()
     delete routes[`GET ${API}/board/*`]

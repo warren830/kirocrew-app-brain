@@ -32,7 +32,7 @@ import { Inline } from './Markdown'
 import type { ViewProps } from './props'
 import { EntryChip, MrDescCard, QuestionCard, ReviewButton, ReviewSay, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
-import { NotFound, ReqSwitch } from './ReqSwitch'
+import { NotFound, OnRunner, ReqSwitch, useOnRunner } from './ReqSwitch'
 
 export { EntryChip, MR_DESC_COPY_HINT, MrDescCard, QuestionCard, mrDescSource } from './Question'
 export { PART_LABEL, PART_VAR, valueStream, type Part, type StreamSeg } from './Stream'
@@ -280,6 +280,8 @@ export function DetailView({ entry, onBack, onSwitch, onMissing, ...props }: {
   const x = d.data
   const board = b.data
   const missing = !x && d.status === 404
+  const onRunner = useOnRunner(entry.repo, entry.key, props.status, props.pollMs)
+  const pick = onSwitch ?? ((repo: string, key: string) => props.go({ kind: 'item', repo, key }))
   useEffect(() => {
     if (missing || x) onMissing?.(missing)
   }, [missing, !!x]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -298,15 +300,15 @@ export function DetailView({ entry, onBack, onSwitch, onMissing, ...props }: {
           <b>{entry.key}</b>
         </nav>
         <span className="cto-grow" />
-        <ReqSwitch repo={entry.repo} reqKey={entry.key} status={props.status} pollMs={props.pollMs}
-          onPick={onSwitch ?? ((repo, key) => props.go({ kind: 'item', repo, key }))} />
+        <ReqSwitch repo={entry.repo} reqKey={entry.key} status={props.status} pollMs={props.pollMs} onPick={pick} />
         <div className="cto-item-act">
           {x && <button type="button" className="kt-btn is-primary" onClick={() => toBoard()}>需求看板 ↗</button>}
           {x && x.row.state === 'merged' && <button type="button" className="kt-btn" onClick={() => toBoard({ replay: true })}>▶ 回放 ↗</button>}
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{from}</button>}
         </div>
       </div>
-      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} backName={back.name} onBack={back.go} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
+      {onRunner && <OnRunner reqKey={entry.key} what="需求详情" onOpen={() => pick('runner', entry.key)} />}
+      {missing ? !onRunner && <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} backName={back.name} onBack={back.go} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
       {x && (
         <Page x={x} board={board} live={live} entry={entry} props={props} opened={opened} localOnly={x.row.local_only ?? repoInfo?.remote === false}
           onOpened={(r) => { setOpened(r); after() }} after={after} toBoard={toBoard} />
