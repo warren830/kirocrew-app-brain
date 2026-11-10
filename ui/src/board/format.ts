@@ -206,6 +206,10 @@ export function waitedOn(a: Pick<Actor, 'history'>, t: number): WaitWho | null {
 /** The ones a requirement may wait on that are people. */
 export const PERSON: ReadonlySet<WaitWho> = new Set<WaitWho>(['you', 'product', 'people', 'builder'])
 
+/** The board calls the requirement's owner 你 (the backend's person.you; an older backend: the owner looking, or no owner
+ * known). */
+export const ownerIsYou = (b: Pick<ReqBoard, 'person'>): boolean => b.person.you ?? (b.person.me || !b.person.owner)
+
 /** The board waits on the person looking at it. */
 export const waitsOnMe = (b: Pick<ReqBoard, 'row'>) => b.row.waits.who === 'you'
 
