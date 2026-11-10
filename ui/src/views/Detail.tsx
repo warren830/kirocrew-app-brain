@@ -772,7 +772,7 @@ function ChecksCard({ board, localOnly, sent, blocked, onBoard }: {
     <article className={`cto-card${w && w.total ? (w.failed ? ' is-bad' : ok ? ' is-ok' : '') : ''}`} aria-label="检查">
       <div className="cto-eyebrow">检查</div>
       <div className="cto-value">{w && w.total ? <>{w.passed}<span className="cto-of">/{w.total}</span></> : w ? <span className="cto-of" style={{ marginLeft: 0 }}>还没有</span> : '—'}</div>
-      <div className="cto-desc" data-testid="checks-say">{say}</div>
+      <div className="cto-desc" data-testid="checks-say"><Phrases text={say} /></div>
       {w && shown.length + ahead.length > 0 && (
         <button type="button" className="kt-segs cto-segs" aria-label="在需求看板的检查墙上看每一项" onClick={() => onBoard({ focus: 'checks' })}>
           {[...shown, ...ahead].map((c) => (
@@ -785,6 +785,11 @@ function ChecksCard({ board, localOnly, sent, blocked, onBoard }: {
       <div className="cto-legend"><span><RoleIcon role="bounce" size={14} />退回 {sent} 次 · Lean 拦下 {blocked} 次</span></div>
     </article>
   )
+}
+
+/** A sentence of names (「还剩 发布审批、签接手合同」) that wraps between its names, never inside one. */
+function Phrases({ text }: { text: string }) {
+  return <>{text.split(/(?<=[、 ])/).map((w, i) => <span key={i} className="br-nowrap">{w}</span>)}</>
 }
 
 function SplitBar({ split }: { split: { p: Part; s: number }[] }) {
