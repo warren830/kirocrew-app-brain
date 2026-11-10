@@ -259,7 +259,7 @@ describe('导入仓库', () => {
     expect(screen.getByLabelText('目录名（可不填）')).toHaveAttribute('placeholder', 'refund')
     await user.click(screen.getByRole('button', { name: '克隆' }))
     expect(apiCalls.find((c) => c.path === `${API}/import/clone`)?.body).toEqual({ url: 'git@gitlab.example.com:shop/refund.git', parent: '/Users/alice/workplace', name: '' })
-    expect(await screen.findByText(/刷新你的 SSH 登录凭证/, { selector: '[role="alert"]' })).toBeInTheDocument()
+    expect(await screen.findByText(/刷新你的 SSH 凭据/, { selector: '[role="alert"]' })).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: '克隆的进度' })).getByText('克隆没成')).toBeInTheDocument()
     expect(apiCalls.some((c) => c.path === `${API}/import/inspect`)).toBe(false)
     await user.click(screen.getByRole('button', { name: '克隆' }))

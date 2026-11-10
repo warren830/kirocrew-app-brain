@@ -224,7 +224,8 @@ def preview(repo: Repo, facts: dict[str, Any], vouchers_dir: str | None) -> dict
             gaps, more = R.parse_gaps(text)
             probs += more
         brain = E.Brain.from_git(repo.path, base, mcfg["brain_dir"])
-        used, pending = R.open_branches(repo.path, mcfg["brain_dir"])
+        # brain-kit 027c9c7 adds a third value (proposals stuck on a branch main overtook); older ones return two
+        used, pending = R.open_branches(repo.path, mcfg["brain_dir"])[:2]
         ops, more, notes = R.plan(brain, proposals, key, pending=pending, used_extra=used)
         probs += more
         rows = []
