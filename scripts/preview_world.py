@@ -380,8 +380,11 @@ def brain_views(reqs: dict[str, list[Req]], rows: list[dict], said: dict[str, li
                     x["id"], x["date"], x["stage"], x["text"], x["why"],
                     "brain %s" % ", ".join(x["cites"]) if x["by"] == "brain" and x["cites"] else
                     " ".join([x["who"] or x["by"]] + x["cites"])) for x in rows_)
+                # its proposals as the run writes them (brain reflect reads these): what it learned, from its first decision
+                props = "".join("```brain-proposal\nfile: TECH\ntype: guideline\nsrc: D-1\n---\n%s 学到的第 %d 条：%s\n```\n" % (
+                    r.key, n, r.title) for n in range(1, r.proposals + 1))
                 (d / "decisions.md").write_text("# Decisions\n\n| ID | Date | Stage | Decision | Why | Who |\n|---|---|---|---|---|---|\n"
-                                                + table + "```brain-proposal\n```\n" * r.proposals, encoding="utf-8")
+                                                + table + props, encoding="utf-8")
                 cited = {c for x in rows_ for c in x["cites"]}
                 (d / "inception" / "requirements" / "requirements.md").write_text(
                     "# %s\n\n" % r.title + "".join("- 照 Brain 的 %s\n" % c for c in CITES.get(r.key, []) if c not in cited),
