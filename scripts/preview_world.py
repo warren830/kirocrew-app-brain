@@ -53,6 +53,7 @@ identity = importlib.import_module("_brainapp_backend.core.identity")
 service = importlib.import_module("_brainapp_backend.core.service")
 bk = importlib.import_module("_brainapp_backend.core.bk")
 brainview = importlib.import_module("_brainapp_backend.core.brainview")
+intake = importlib.import_module("_brainapp_backend.core.intake")
 repo_mod = importlib.import_module("_brainapp_backend.core.repo")
 store = importlib.import_module("_brainapp_backend.core.store")
 BRAINKIT = Path(os.environ.get("BRAIN_TEST_BRAINKIT") or Path.home() / "warren_ws" / "brain-kit")
@@ -574,6 +575,37 @@ def snapshot(r: Req, row: dict, *, brain: dict, park: dict | None = None, sessio
                                    "error": "还没开工：开工以后才有变更说明"},
             "sessions": sessions, "credits": {"total": credits, "note": detail.NO_TOKENS},
             "source": "trace" if t else "app", "error": "", "missing": g["missing"]}
+
+
+# gate 3's line for the fixtures' documents (their amounts and company names, as intake-check.json counts them)
+BUSINESS_LINE = ("门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；"
+                 "不想交的文件请从输入里去掉")
+
+
+def intake_gates() -> dict:
+    """开需求's 先检查 in the preview: brain-kit's own gate 2 lines, from its dry run as the app runs it
+    (intake.package.build, a kit that does not take confidential material) for the picks 机密 / 不确定 / 绝密 and for the
+    fixtures' partner guide marked 机密; and what the page says for each line with each pick (intake.gate_text), so the
+    stub answers what the backend answers with the brain-kit this was made with. {} without brain-kit."""
+    if not (BRAINKIT / "brainkit" / "__init__.py").is_file():
+        return {}
+    bk.load(str(BRAINKIT))
+    pkg = bk.m("intake.package")
+    with tempfile.TemporaryDirectory() as d:
+        req, partner = Path(d, "需求.md"), Path(d, "合作方接口说明.md")
+        req.write_text("# 需求\n\n退款按原路退回。\n", encoding="utf-8")
+        partner.write_text("# 接口\n\n机密\n\n回调地址见附录。\n", encoding="utf-8")
+
+        def gate2(doc: Path, cls: str) -> str:
+            rep = pkg.build([str(doc)], "PAY-8", str(Path(d, "store")), submitter=ME, consent=True, classification=cls,
+                            business="keep", kit_intake={"allow_confidential": False}, dry_run=True)
+            return next(x for x in rep["blocking"] if x.startswith("门 2"))
+        raw = {c: gate2(req, c) for c in ("confidential", "unsure", "secret")}
+        raw["partner"] = gate2(partner, "internal").replace(partner.name, "合作方接口说明.pdf")
+    raw["business"] = BUSINESS_LINE
+    said = {"%s|%s" % (c, x): intake.gate_text(x, {"classification": c, "exclude": []})
+            for c in ("",) + intake.CLASSES for x in raw.values()}
+    return {"raw": raw, "said": said}
 
 
 def main() -> None:
@@ -1102,7 +1134,7 @@ def main() -> None:
     world = {"note": "made by scripts/preview_world.py: do not edit by hand", "at": T0, "status": world_status, "overview": world_ov,
              "overviews": overviews, "overviews_team": overviews_team, "todo": world_todo, "reflects": reflects,
              "crew_missing": crew_fail, "boards": boards, "details": details, "stages": STAGES,
-             "brains": brains}
+             "brains": brains, "intake_gates": intake_gates()}
     (ROOT / "ui" / "preview" / "world.json").write_text(json.dumps(world, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     # the contract fixtures the UI tests read: the overview's numbers for its own rows, one live board and one merged
     ov["cto"] = deliveries.cto_numbers([("r1", parts[0][1])], list(rows.values()), available=True, now=T0, names=names, repos=1)

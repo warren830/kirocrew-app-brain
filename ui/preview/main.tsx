@@ -79,6 +79,9 @@ const W = world as unknown as {
   stages: Record<string, RequirementDetail['lean']['stages']>; brains: Record<string, BrainView>
   /** brainview.preview of a reflectable run, by repo/key, when the world recorded it */
   reflects?: Record<string, ReflectPreview>
+  /** 先检查's stop lines: brain-kit's own (its dry run: the picks 机密 / 不确定 / 绝密, the partner guide marked 机密,
+   * gate 3) and the page's words for each, by "<pick>|<line>" (intake.gate_text) */
+  intake_gates?: { raw: Record<'confidential' | 'unsure' | 'secret' | 'partner' | 'business', string>; said: Record<string, string> }
 }
 let repos: RepoInfo[] = flags.has('norepos') ? [] : clone(W.status.repos)
 
@@ -336,20 +339,14 @@ setApiRoutes({
       c.files = (c.files ?? []).filter((f) => f.id !== 'D03')
       c.sources -= 1
     }
+    // brain-kit's lines as its dry run says them (gate 2 names a marked file, else the pick), each in the page's words
+    const gate = W.intake_gates!
     const raw: string[] = []
-    const plain: string[] = []
-    if (given === 'secret') {
-      raw.push('门 2：材料是绝密（你选的是 secret），不收，只留哈希')
-      plain.push('第 2 关：绝密材料不收（你选的是「绝密」）：只交脱敏摘要')
-    } else if (partner || given === 'confidential') {
-      const what = partner ? 'D03 合作方接口说明.pdf=confidential' : `你选的是 ${b.classification}`
-      raw.push(`门 2：材料按机密处理（${what}），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。`)
-      plain.push(`第 2 关：这个仓库不收机密材料（${partner ? 'D03 合作方接口说明.pdf 标着机密' : `你选的是「${b.classification === 'unsure' ? '不确定' : '机密'}」`}）。请产品写一份脱敏摘要再交，或者把这份写进「不收这些文件」`)
-    }
-    if (!b.business) {
-      raw.push("门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉")
-      plain.push('第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」')
-    }
+    if (given === 'secret') raw.push(gate.raw.secret)
+    else if (partner) raw.push(gate.raw.partner)
+    else if (b.classification === 'confidential' || b.classification === 'unsure') raw.push(gate.raw[b.classification])
+    if (!b.business) raw.push(gate.raw.business)
+    const plain = raw.map((l) => gate.said[`${b.classification}|${l}`] ?? l)
     if (b.business === 'mask') {
       // brain-kit masks them (its line: 商业敏感（已打码）), and backend/core/intake.py file_items says so
       c.findings = c.findings.map((l) => l.replace('商业敏感（原样保留）', '商业敏感（已打码）'))

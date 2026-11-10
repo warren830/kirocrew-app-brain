@@ -54748,5 +54748,46 @@
    "error": "",
    "raw": ""
   }
+ },
+ "intake_gates": {
+  "raw": {
+   "confidential": "门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。",
+   "unsure": "门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。",
+   "secret": "门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。",
+   "partner": "门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。",
+   "business": "门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉"
+  },
+  "said": {
+   "|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」",
+   "|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」",
+   "public|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "public|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "public|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "public|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」",
+   "public|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」",
+   "internal|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "internal|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "internal|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "internal|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」",
+   "internal|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」",
+   "confidential|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "confidential|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "confidential|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "confidential|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密、你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "confidential|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」",
+   "secret|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "secret|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "secret|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "secret|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」",
+   "secret|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」",
+   "unsure|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "unsure|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "unsure|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "unsure|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密、你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "unsure|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」"
+  }
  }
 }
