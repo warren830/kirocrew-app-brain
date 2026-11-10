@@ -295,6 +295,22 @@ describe('需求看板', () => {
     expect(name).not.toContain('等运行机')
   })
 
+  test('a run is said as the 运行机 page says it (第 1 次运行), its id only on hover: the feed and the runner’s lane', async () => {
+    const b = fx.boardMerged()
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard(PAY2)
+    await loaded()
+    const id = b.row.run_ids[0]
+    const feed = screen.getByTestId('kt-feed')
+    const signed = feed.querySelector('.kt-ev.is-signed') as HTMLElement
+    expect(signed).toHaveTextContent('签名服务签了接手合同（第 1 次运行）')
+    expect(signed).toHaveAttribute('title', `运行号 ${id}`)
+    expect(feed).not.toHaveTextContent(id)
+    const lane = region('各环节的泳道').querySelector('[data-role="runner"]') as HTMLElement
+    expect(within(lane).getByText('第 1 次运行')).toHaveAttribute('title', `运行号 ${id}`)
+    expect(lane).not.toHaveTextContent(id)
+  })
+
   test('the lanes’ time starts at 开工, the moment 需求详情 says it started; the claim before it is 认领, not 开工', async () => {
     installFixtureRoutes()
     renderBoard()

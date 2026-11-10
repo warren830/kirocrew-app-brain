@@ -289,7 +289,7 @@ function Work({ a, board }: { a: Actor; board: ReqBoard }) {
     <>
       {facts.length > 0 && (
         <ul className="kt-tools br-facts-chips" aria-label="事实">
-          {facts.map((f) => <li key={f}><span className="kt-mono br-fact">{f}</span></li>)}
+          {facts.map((f) => <li key={f}><span className="kt-mono br-fact" title={/次运行$/.test(f) && board.row.run_ids.length ? `运行号 ${board.row.run_ids.join('、')}` : undefined}>{f}</span></li>)}
         </ul>
       )}
       {commits.length > 0 && <Changes commits={commits} />}

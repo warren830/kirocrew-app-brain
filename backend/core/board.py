@@ -355,8 +355,9 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
             why = problems.reasons_text(str(h.get("reason") or "").split("; "), 90)[0]   # the bridge's English, said as the MR's is
             add(at, "rejected", "bridge", "handover", "桥拒绝接手%s" % ("：%s" % why if why else ""))
         elif kind == "voucher":
-            add(at, "signed", "bridge", "signer", "签名服务签了接手合同%s" % ("（%s）" % h["run_id"] if h.get("run_id") else ""),
-                run_id=h.get("run_id"))
+            rid = h.get("run_id")
+            add(at, "signed", "bridge", "signer", "签名服务签了接手合同%s" % ("（%s）" % run_words([rid]) if rid else ""),
+                src="运行号 %s" % rid if rid else None, run_id=rid)
     for q in ((t or {}).get("actions") or {}).get("questions") or []:
         at, st = _epoch(q.get("at")), q.get("status")
         s = side(at)
@@ -982,7 +983,7 @@ def _facts(fo: _Fold, f: dict[str, Any], evs: list[dict[str, Any]], row: dict[st
         "提交 %d 次" % n_commits["runner"] if n_commits["runner"] else "",
         "Lean 拦下 %d 次" % blocked["runner"] if blocked["runner"] else "",
         "停下问人 %d 次" % asked if asked else "",
-        ", ".join(row.get("run_ids") or [])) if x]
+        run_words(row.get("run_ids") or [])) if x]
     for g, lean_kinds in (("req", ("REQUIREMENTS", "INCEPTION")), ("design", ("DESIGN", "INCEPTION", "PLAN")), ("release", ("RELEASE",))):
         reqs = [e for e in evs if e["kind"] == "request" and e.get("lean") in lean_kinds]
         backs = [e for e in evs if e["kind"] == "reject" and e.get("lean") in lean_kinds]
@@ -1185,6 +1186,13 @@ def checks_line(checks: dict[str, Any]) -> str:
         return ("目前 %d 项都过" % checks["passed"] + later) if later else "全部 %d 项都过" % checks["passed"]
     return "检查 %d/%d 过%s%s%s" % (checks["passed"], checks["total"], " · 没过：%s" % "、".join(bad[:3]) if bad else "",
                                   " · 等人：%s" % "、".join(wait[:3]) if wait else "", later)
+
+
+def run_words(ids: list[Any]) -> str:
+    """brain-kit's run ids (RUN-<KEY>-<n>) as the 运行机 page says them: 「第 1 次运行」, 「第 1、2 次运行」 (the ids
+    themselves only on hover: the event's src, the lane's tooltip)."""
+    ns = [m.group(1) for m in (re.match(r"^RUN-.+-([0-9]+)$", str(i or "")) for i in ids) if m]
+    return "第 %s 次运行" % "、".join(ns) if ns else ("运行 %d 次" % len(ids) if ids else "")
 
 
 def runner_blind(f: dict[str, Any], row: dict[str, Any]) -> bool:

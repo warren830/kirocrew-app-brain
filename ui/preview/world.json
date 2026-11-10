@@ -17812,7 +17812,7 @@
       {
        "at": 1793639480.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-2-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1793650501.0,
@@ -18039,7 +18039,7 @@
      "facts": [
       "提交 6 次",
       "停下问人 4 次",
-      "RUN-PAY-2-1"
+      "第 1 次运行"
      ],
      "credits": 14.4,
      "session": {
@@ -18462,9 +18462,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-2-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-2-1"
     },
     {
      "seq": 23,
@@ -21097,7 +21097,7 @@
       {
        "at": 1794123380.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-4-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -21179,7 +21179,7 @@
      "facts": [
       "提交 1 次",
       "停下问人 2 次",
-      "RUN-PAY-4-1"
+      "第 1 次运行"
      ],
      "credits": 6.1,
      "session": {
@@ -21468,9 +21468,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-4-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-4-1"
     },
     {
      "seq": 20,
@@ -22249,7 +22249,7 @@
       {
        "at": 1793910680.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-5-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -22371,7 +22371,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-PAY-5-1"
+      "第 1 次运行"
      ],
      "credits": 24.2,
      "session": {
@@ -22717,9 +22717,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-5-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-5-1"
     },
     {
      "seq": 20,
@@ -25965,12 +25965,12 @@
      {
       "id": "bridge",
       "group": "handover",
-      "label": "桥",
-      "name": "桥核对交接",
+      "label": "标签",
+      "name": "补上交接标签",
       "status": "wait",
       "at": null,
-      "detail": "在核对",
-      "actor": "bridge"
+      "detail": "MR 上没有交接标签：桥不会接",
+      "actor": "handover"
      },
      {
       "id": "signer",
@@ -26015,7 +26015,7 @@
       "count": 1
      }
     ],
-    "checks": "检查 3/4 过 · 等人：桥核对交接 · 还剩 发布审批、签接手合同",
+    "checks": "检查 3/4 过 · 等人：补上交接标签 · 还剩 发布审批、签接手合同",
     "done": null
    },
    "brain": {
@@ -27390,7 +27390,7 @@
       {
        "at": 1788269780.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-1-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1788283921.0,
@@ -27549,7 +27549,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-ORD-1-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -27907,9 +27907,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-1-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-1-1"
     },
     {
      "seq": 20,
@@ -28887,7 +28887,7 @@
       {
        "at": 1788870980.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-2-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1788887041.0,
@@ -29051,7 +29051,7 @@
      "facts": [
       "提交 5 次",
       "停下问人 2 次",
-      "RUN-ORD-2-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -29446,9 +29446,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-2-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-2-1"
     },
     {
      "seq": 20,
@@ -30535,7 +30535,7 @@
       {
        "at": 1789647680.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-3-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1789662421.0,
@@ -30699,7 +30699,7 @@
      "facts": [
       "提交 5 次",
       "停下问人 2 次",
-      "RUN-ORD-3-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -31087,9 +31087,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-3-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-3-1"
     },
     {
      "seq": 23,
@@ -32126,7 +32126,7 @@
       {
        "at": 1790246180.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-4-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1790260321.0,
@@ -32285,7 +32285,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-ORD-4-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -32657,9 +32657,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-4-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-4-1"
     },
     {
      "seq": 20,
@@ -34692,7 +34692,7 @@
       {
        "at": 1791552080.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-6-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1791568141.0,
@@ -34856,7 +34856,7 @@
      "facts": [
       "提交 5 次",
       "停下问人 2 次",
-      "RUN-ORD-6-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -35275,9 +35275,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-6-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-6-1"
     },
     {
      "seq": 23,
@@ -36332,7 +36332,7 @@
       {
        "at": 1792236980.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-7-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1792251121.0,
@@ -36491,7 +36491,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-ORD-7-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -36849,9 +36849,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-7-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-7-1"
     },
     {
      "seq": 20,
@@ -37847,7 +37847,7 @@
       {
        "at": 1793097380.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-8-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1793108041.0,
@@ -38069,7 +38069,7 @@
      "facts": [
       "提交 5 次",
       "停下问人 4 次",
-      "RUN-ORD-8-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -38441,9 +38441,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-8-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-8-1"
     },
     {
      "seq": 20,
@@ -39577,7 +39577,7 @@
       {
        "at": 1793888480.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-9-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1793902621.0,
@@ -39736,7 +39736,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-ORD-9-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -40126,9 +40126,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-9-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-9-1"
     },
     {
      "seq": 23,
@@ -41123,7 +41123,7 @@
       {
        "at": 1794125720.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-10-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -41181,7 +41181,7 @@
      ],
      "facts": [
       "提交 3 次",
-      "RUN-ORD-10-1"
+      "第 1 次运行"
      ],
      "credits": 7.4,
      "session": {
@@ -41470,9 +41470,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-10-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-10-1"
     },
     {
      "seq": 20,
@@ -42525,8 +42525,8 @@
      "title": "本机会话",
      "sub": "brain-dev · AI-DLC Lean",
      "icon": "laptop",
-     "status": "waiting",
-     "doing": "等开工",
+     "status": "done",
+     "doing": "交接前的事：运行机还没建工作区，读不到它的记录",
      "since": null,
      "history": [],
      "spans": [],
@@ -42541,8 +42541,8 @@
      "title": "需求审批",
      "sub": "Lean 请人批需求",
      "icon": "req",
-     "status": "waiting",
-     "doing": "等 Lean 走到需求审批",
+     "status": "done",
+     "doing": "交接前的事：运行机还没建工作区，读不到它的记录",
      "since": null,
      "history": [],
      "spans": [],
@@ -42557,8 +42557,8 @@
      "title": "设计审批",
      "sub": "设计 · 代码生成计划",
      "icon": "design",
-     "status": "waiting",
-     "doing": "等需求批准以后的设计",
+     "status": "done",
+     "doing": "交接前的事：运行机还没建工作区，读不到它的记录",
      "since": null,
      "history": [],
      "spans": [],
@@ -42573,14 +42573,14 @@
      "title": "交接",
      "sub": "本机做完交给运行机",
      "icon": "handover",
-     "status": "queued",
-     "doing": "等桥核对交接",
-     "since": 1794146400.0,
+     "status": "merged",
+     "doing": "桥接手了",
+     "since": 1794146340.0,
      "history": [
       {
-       "at": 1794146400.0,
-       "status": "queued",
-       "doing": "等桥核对交接",
+       "at": 1794146340.0,
+       "status": "merged",
+       "doing": "桥接手了",
        "who": null
       }
      ],
@@ -42598,24 +42598,18 @@
      "title": "桥",
      "sub": "核对交接 · 转问题",
      "icon": "bridge",
-     "status": "running",
-     "doing": "签名服务在签接手合同",
-     "since": 1794146400.0,
+     "status": "done",
+     "doing": "核对过了：交给签名服务签合同",
+     "since": 1794146340.0,
      "history": [
       {
-       "at": 1794146400.0,
-       "status": "running",
-       "doing": "签名服务在签接手合同",
+       "at": 1794146340.0,
+       "status": "done",
+       "doing": "核对过了：交给签名服务签合同",
        "who": null
       }
      ],
-     "spans": [
-      {
-       "a": 1794146400.0,
-       "b": null,
-       "kind": "work"
-      }
-     ],
+     "spans": [],
      "marks": [],
      "facts": [],
      "credits": null,
@@ -42627,11 +42621,24 @@
      "title": "签名",
      "sub": "接手合同 · 回答凭证",
      "icon": "signer",
-     "status": "waiting",
-     "doing": "等桥核对完签接手合同",
-     "since": null,
-     "history": [],
-     "spans": [],
+     "status": "running",
+     "doing": "在签接手合同",
+     "since": 1794146340.0,
+     "history": [
+      {
+       "at": 1794146340.0,
+       "status": "running",
+       "doing": "在签接手合同",
+       "who": null
+      }
+     ],
+     "spans": [
+      {
+       "a": 1794146340.0,
+       "b": null,
+       "kind": "work"
+      }
+     ],
      "marks": [],
      "facts": [],
      "credits": null,
@@ -42650,7 +42657,7 @@
      "spans": [],
      "marks": [],
      "facts": [
-      "RUN-PAY-9-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -42753,16 +42760,6 @@
    "checks": {
     "cells": [
      {
-      "id": "gate-REQUIREMENTS",
-      "group": "gate",
-      "label": "需求",
-      "name": "需求审批",
-      "status": "skip",
-      "at": null,
-      "detail": "还没到这一步",
-      "actor": "req"
-     },
-     {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
@@ -42787,9 +42784,9 @@
       "group": "handover",
       "label": "桥",
       "name": "桥核对交接",
-      "status": "skip",
-      "at": null,
-      "detail": "还没交接",
+      "status": "pass",
+      "at": 1794146340.0,
+      "detail": "接手了",
       "actor": "bridge"
      },
      {
@@ -42799,19 +42796,19 @@
       "name": "签名服务签接手合同",
       "status": "skip",
       "at": null,
-      "detail": "还没签",
+      "detail": "在签",
       "actor": "signer"
      }
     ],
-    "passed": 0,
+    "passed": 1,
     "failed": 0,
-    "total": 0,
+    "total": 1,
     "todo": [
-     "需求审批",
      "发布审批",
-     "自动检查"
+     "自动检查",
+     "签接手合同"
     ],
-    "at": null,
+    "at": 1794146340.0,
     "history": []
    },
    "accept": {
@@ -42824,7 +42821,7 @@
      "session_url": null
     },
     "by": [],
-    "checks": "还没有检查结果 · 还剩 需求审批、发布审批、自动检查",
+    "checks": "目前 1 项都过 · 还剩 发布审批、自动检查、签接手合同",
     "done": null
    },
    "brain": {
@@ -42843,7 +42840,7 @@
     "source": null,
     "path": null,
     "ref": null,
-    "error": "还没开工：开工以后才有变更说明"
+    "error": "运行机还没开始做：它做完提交以后才有变更说明"
    },
    "sessions": [],
    "credits": {
@@ -43254,7 +43251,7 @@
       {
        "at": 1794123380.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-4-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -43336,7 +43333,7 @@
      "facts": [
       "提交 1 次",
       "停下问人 2 次",
-      "RUN-PAY-4-1"
+      "第 1 次运行"
      ],
      "credits": 6.1,
      "session": {
@@ -43625,9 +43622,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-4-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-4-1"
     },
     {
      "seq": 20,
@@ -44393,7 +44390,7 @@
       {
        "at": 1793910680.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-5-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -44515,7 +44512,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-PAY-5-1"
+      "第 1 次运行"
      ],
      "credits": 24.2,
      "session": {
@@ -44861,9 +44858,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-5-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-5-1"
     },
     {
      "seq": 20,
@@ -45912,7 +45909,7 @@
       {
        "at": 1793639480.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-2-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1793650501.0,
@@ -46139,7 +46136,7 @@
      "facts": [
       "提交 6 次",
       "停下问人 4 次",
-      "RUN-PAY-2-1"
+      "第 1 次运行"
      ],
      "credits": 14.4,
      "session": {
@@ -46562,9 +46559,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-2-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-2-1"
     },
     {
      "seq": 23,
@@ -47821,7 +47818,7 @@
       {
        "at": 1794125720.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-10-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -47902,7 +47899,7 @@
      "facts": [
       "提交 3 次",
       "停下问人 1 次",
-      "RUN-ORD-10-1"
+      "第 1 次运行"
      ],
      "credits": 7.4,
      "session": {
@@ -48191,9 +48188,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-10-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-10-1"
     },
     {
      "seq": 20,
@@ -49410,7 +49407,7 @@
     "source": null,
     "path": null,
     "ref": null,
-    "error": "还没开工：开工以后才有变更说明"
+    "error": "运行机还没开始做：它做完提交以后才有变更说明"
    }
   },
   "runner/PAY-4": {

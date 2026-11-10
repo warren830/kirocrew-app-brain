@@ -663,3 +663,20 @@ def test_the_runners_page_of_a_hand_over_it_cannot_read_yet_tells_one_story():
     b = snapshot(f, row, me="alice", local_only=False, now=T + M)
     assert actor(b, "signer")["status"] == "merged"
     assert (actor(b, "runner")["status"], actor(b, "runner")["doing"]) == ("queued", "运行机在准备工作区")
+
+
+def test_a_run_is_said_as_the_runner_page_says_it_the_id_only_on_hover():
+    """ovrest: the feed said 「签名服务签了接手合同（RUN-PAY-4-1）」 and the runner's lane had a 「RUN-PAY-4-1」 chip; the
+    运行机 page says 「第 1 次运行」."""
+    hand = T + 30 * M
+    f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "ychchen"})
+    t = {"actions": {"handovers": [{"kind": "bridge accepted", "at": iso(hand + M), "mr_iid": 41},
+                                   {"kind": "voucher", "at": iso(hand + 2 * M), "run_id": "RUN-DEMO-3-1"}]}}
+    row = dict(row_of("running", "runner", "运行机在跑"), run_ids=["RUN-DEMO-3-1"])
+    b = snapshot(f, row, t=t, local_only=False, now=hand + H)
+    signed = next(e for e in b["events"] if e["kind"] == "signed")
+    assert (signed["text"], signed["src"]) == ("签名服务签了接手合同（第 1 次运行）", "运行号 RUN-DEMO-3-1")
+    assert "第 1 次运行" in actor(b, "runner")["facts"]
+    shown = json.dumps([b["events"], [a["facts"] for a in b["actors"]], [a["marks"] for a in b["actors"]]], ensure_ascii=False)
+    assert "RUN-DEMO-3-1" not in shown.replace('"运行号 RUN-DEMO-3-1"', "")
+    assert board.run_words(["RUN-PAY-4-1", "RUN-PAY-4-2"]) == "第 1、2 次运行"
