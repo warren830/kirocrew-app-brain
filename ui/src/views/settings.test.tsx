@@ -253,8 +253,10 @@ describe('设置', () => {
     expect(runner.querySelector('details pre')).toHaveTextContent('poll: HTTPError 502 Bad Gateway')
     expect(runner.querySelector('details')).not.toHaveAttribute('open')
     const who = screen.getByRole('region', { name: '你是谁' })
-    expect(who).toHaveTextContent('导入仓库时会问你的名字')
-    expect(within(who).getByTestId('cmd-line')).toHaveTextContent('git config --global brain.user 你的用户名复制')
+    expect(who).toHaveTextContent('导入仓库时会问你的名字，在那里填上，点「保存」。')
+    const cmd = within(who).getByTestId('cmd-line')                                       // the command, folded under 细节
+    expect(cmd).toHaveTextContent('git config --global brain.user 你的用户名复制')
+    expect(cmd.closest('details')).not.toHaveAttribute('open')
   })
   test('你是谁 per repo: the login name without GitLab; 「你的 GitLab 用户名」 where brain-kit would not know, saved into that repo', async () => {
     const user = userEvent.setup()
@@ -307,6 +309,12 @@ describe('设置', () => {
     expect(waiting).toHaveTextContent('等 brain-kit')
     expect(waiting).toHaveTextContent('brain-kit 没装载：先在最上面写对 brain-kit 的位置，这个仓库就能读了')
     expect(within(waiting).queryByRole('button', { name: /去检查|去装/ })).toBeNull()
+    expect(within(waiting).getByTestId('repo-waits-kit').parentElement?.children).toHaveLength(1)   // one line, no gap before its colon
+    // nor can one without brain-kit be installed now: no 去装 to a page that cannot install it
+    const bare = screen.getByRole('region', { name: '仓库' }).querySelector<HTMLElement>('li[data-repo="r2"]') as HTMLElement
+    expect(bare).toHaveTextContent('还没装 brain-kit：先在最上面写对 brain-kit 的位置，才能装')
+    expect(bare).not.toHaveTextContent('在「导入仓库」里检查它')
+    expect(within(bare).queryByRole('button', { name: /去检查|去装/ })).toBeNull()
     unmount()
     const old = fx.status()
     old.brainkit = { ...old.brainkit, ok: false, error: 'brain-kit 太旧（没有 sign.SpoolSigner）：要 72b278e 或更新的版本' }
