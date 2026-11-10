@@ -486,9 +486,10 @@ class Service:
                 continue
             try:
                 facts = repo.scan()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001 - git's or brain-kit's own words go under 细节
                 if which in ("all", rid):
-                    errors.append({"repo": rid, "error": str(exc)[:300]})
+                    errors.append({"repo": rid, "error": "读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对",
+                                   "raw": str(exc)[:2000]})
                 continue
             mine += [(rid, f, self._row(repo, f, snap)) for f in facts]
         runner, taken = self._team_split(mine, snap) if team else ([], set())
@@ -506,8 +507,10 @@ class Service:
                 f.get("decisions_text"), "aidlc-docs/%s/decisions.md" % intent if intent else "decisions.md",
                 repo.cfg.get("bot_users") or [])]
         for rid, (path, err) in self.repo_errors.items():
-            if which in ("all", rid):
-                errors.append({"repo": rid, "error": "%s：%s" % (path, err)})
+            if which in ("all", rid):   # the app's own words say what to do; anything else is under 细节
+                said = re.search(r"[\u4e00-\u9fff]", err)
+                errors.append({"repo": rid, "error": err if said else "读不了这个仓库：在「导入仓库」里检查它，那里会说哪里不对",
+                               "raw": path if said else "%s：%s" % (path, err)})
         if which in ("all", "runner"):
             for row, f, decs in runner:
                 rows.append(row)

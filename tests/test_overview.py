@@ -230,3 +230,24 @@ def test_the_numbers_say_they_are_being_worked_out_until_evaluate_is_done(tmp_pa
     first, later = run(go())
     assert first["eval"]["computing"] is True and first["eval"]["available"] is False
     assert later["eval"]["computing"] is False
+
+
+def test_a_repo_that_cannot_be_read_is_said_in_words_with_the_original_under_details(tmp_path, home):
+    """Overview 待确认-1: an exception while reading a repo's requirements is not shown; the banner says what to do."""
+    repo = make_project(tmp_path)
+    svc = make_service(tmp_path, [repo])
+
+    async def go():
+        await svc.start()
+        try:
+            def broken(*a, **k):
+                raise OSError("[Errno 13] Permission denied: '.git/refs/heads/claim'")
+            svc.repos["r1"].scan = broken
+            return await svc.overview("all")
+        finally:
+            await svc.stop()
+
+    view = run(go())
+    (e,) = view["errors"]
+    assert e["error"] == "读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对"
+    assert e["raw"].startswith("[Errno 13] Permission denied")

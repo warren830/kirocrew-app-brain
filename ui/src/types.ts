@@ -588,7 +588,8 @@ export interface Overview {
   cto: CtoNumbers
   /** state → count */
   counts: Partial<Record<ReqState, number>>
-  errors: { repo: string; error: string }[]
+  /** a repo whose requirements could not be read: what happened and what to do, in words; raw: the original (细节) */
+  errors: { repo: string; error: string; raw?: string }[]
 }
 
 // ---------------------------------------------------------------- GET /requirements/{repo}/{key}
