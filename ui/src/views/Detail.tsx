@@ -26,7 +26,7 @@ import type {
 } from '../types'
 import { APPROVAL_META, Icon, LoadState, MrLink, STAGE_META, StateChip, TYPE_IT_YOURSELF, isOpenQuestion } from '../ui'
 import {
-  ACT, CHECK_GROUP_NAME, DECIDED_BY, DO_NAME, WHERE_NAME, approvalName, leanProgress, missingSourceName, sourceName, stageName,
+  ACT, CHECK_GROUP_NAME, DECIDED_BY, DO_NAME, WHERE_NAME, approvalName, leanProgress, missingSourceName, sourceName, stageName, waitsOn,
 } from '../vocab'
 import { Inline, Paths, pathPieces } from './Markdown'
 import type { ViewProps } from './props'
@@ -699,7 +699,7 @@ function Cards({ x, board, at, localOnly, replying, onBoard, onSessions }: {
           </div>
         )}
       </article>
-      <CostCard x={x} replying={replying} onSessions={onSessions} />
+      <CostCard x={x} replying={replying} me={board?.person.me ?? false} onSessions={onSessions} />
       <ChecksCard board={board} localOnly={localOnly} sent={sent} blocked={blocked} onBoard={onBoard} />
     </section>
   )
@@ -708,14 +708,24 @@ function Cards({ x, board, at, localOnly, replying, onBoard, onSessions }: {
 /** a session chip of the cost card by its state's tone: its look, its legend word and swatch */
 const CHIP: Record<string, { cls: string; label: string; sw: string }> = {
   bad: { cls: ' is-back', label: '出错', sw: 'var(--vs-rework)' },
-  wait: { cls: ' is-wait', label: '等人', sw: 'var(--vs-person)' },
+  wait: { cls: ' is-wait', label: '等人', sw: 'var(--vs-person)' },   // the legend says whom (sessionWaits)
   run: { cls: '', label: '在做', sw: 'var(--kt-ok-solid)' },
   idle: { cls: ' is-idle', label: '空着', sw: 'var(--border-strong)' },
 }
 
-function CostCard({ x, replying, onSessions }: { x: RequirementDetail; replying: boolean; onSessions: () => void }) {
+/** Whom a waiting session waits on, by waitsOn's rule: a session on this machine waits on the person at it (等你); the
+ * runner's on whom the requirement waits. */
+function sessionWaits(s: SessionRow, x: RequirementDetail, me: boolean): string {
+  return s.kind === 'local' ? waitsOn('you') : whoWord(x.row.waits.who, x.row.owner, me)
+}
+
+function CostCard({ x, replying, me, onSessions }: { x: RequirementDetail; replying: boolean; me: boolean; onSessions: () => void }) {
   const ss = x.sessions
-  const tones = [...new Set(ss.map((s) => sessionState(s, replying).tone))]
+  const legend = [...new Map(ss.map((s) => {
+    const { tone } = sessionState(s, replying)
+    const label = tone === 'wait' ? sessionWaits(s, x, me) : CHIP[tone].label
+    return [label, { label, sw: CHIP[tone].sw }] as const
+  })).values()]
   return (
     <article className="cto-card" aria-label="成本">
       <div className="cto-eyebrow">成本</div>
@@ -734,7 +744,7 @@ function CostCard({ x, replying, onSessions }: { x: RequirementDetail; replying:
             })}
           </div>
           <div className="cto-legend">
-            {tones.map((t) => <span key={t}><i className="cto-dot" style={{ background: CHIP[t].sw }} />{CHIP[t].label}</span>)}
+            {legend.map((l) => <span key={l.label}><i className="cto-dot" style={{ background: l.sw }} />{l.label}</span>)}
           </div>
           <div className="cto-foot"><button type="button" className="cto-link" onClick={onSessions}>看每个会话的用量 ↓</button></div>
         </>

@@ -902,7 +902,9 @@ describe('需求详情', () => {
     expect(card).not.toHaveTextContent('token')
     const chip = within(within(card).getByLabelText('会话的用量')).getByRole('button')
     expect(chip.title).toBe('PAY-3 退款单导出 CSV · 等批准 · 12.4 credits')
-    expect(card).toHaveTextContent('等人')
+    // the legend says whom it waits on, as waitsOn says it: this machine's session waits on you (BOARD-30)
+    expect(within(card).getByText('等你')).toBeInTheDocument()
+    expect(card).not.toHaveTextContent('等人')
   })
 
   test('看每个会话的用量 ↓ and the session icons scroll to the 会话 card, not to the icons themselves', async () => {
