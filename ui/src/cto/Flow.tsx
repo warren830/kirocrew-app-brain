@@ -60,6 +60,10 @@ export function colOf(r: Requirement): Col | null {
   return '构建'
 }
 
+/** The listed repo a row belongs to: its own, or for a row on the runner the repo of its GitLab project (Requirement.home;
+ * 'runner' when this machine does not list that project). */
+export const homeOf = (r: Requirement): string => r.home ?? r.repo
+
 /** Its lane: whose turn it is now (waits.who); nobody's turn goes where the work is. A small requirement nobody has is
  * 待认领, whoever could take it. */
 export function laneOf(r: Requirement): Lane {
@@ -255,7 +259,7 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, repos =
   }, {}))
   const longest = yours.map((r) => r.waits.since).filter((s): s is number => typeof s === 'number').sort((a, b) => a - b)[0]
   const split = hasSplit(rows)
-  const many = new Set(rows.map((r) => r.repo)).size > 1
+  const many = new Set(rows.map(homeOf)).size > 1
   const lanes = LANES.filter(([l]) => !(localOnly && l === 'runner') && (l !== 'unclaimed' || split))
   const cols = COLS.filter(([c]) => c !== '已合并')
   const template = `136px ${cols.map(([c]) => (localOnly && c === '交给运行机' ? '96px' : 'minmax(0, 1fr)')).join(' ')} minmax(0, 1fr)`
@@ -320,7 +324,7 @@ function LaneRow({ lane, name, icon, wait, first, span, cols, cell, at, hl, repo
             {list.length === 0 && lane === 'you' && <div className="cto-kempty">此刻没有</div>}
             {list.length === 0 && c === '交给运行机' && lane === 'agent' && <div className="cto-kempty">交给运行机以后就不在本机做了</div>}
             {list.length === 0 && c === '构建' && lane === 'unclaimed' && <div className="cto-kempty">小需求都有人认领了</div>}
-            {list.slice(0, PER_CELL).map((r) => <Card key={`${r.repo}/${r.key}`} r={r} at={at} hl={hl} repoName={repoName(r.repo)} h={h} />)}
+            {list.slice(0, PER_CELL).map((r) => <Card key={`${r.repo}/${r.key}`} r={r} at={at} hl={hl} repoName={repoName(homeOf(r))} h={h} />)}
             {list.length > PER_CELL && <button type="button" className="cto-kmore cto-link" onClick={() => h.onCell(c, lane)}>+{list.length - PER_CELL} 个（见下方交付清单）</button>}
           </div>
         )
@@ -330,7 +334,7 @@ function LaneRow({ lane, name, icon, wait, first, span, cols, cell, at, hl, repo
           {merged.length === 0 && <div className="cto-kempty">近 14 天还没有合并的</div>}
           {merged.slice(0, 5).map((r) => {
             const p = r.family?.role === 'parent' ? familyProgress(r.family) : null
-            return laneOf(r) === 'you' ? <Card key={`${r.repo}/${r.key}`} r={r} at={at} hl={hl} repoName={repoName(r.repo)} h={h} /> : (
+            return laneOf(r) === 'you' ? <Card key={`${r.repo}/${r.key}`} r={r} at={at} hl={hl} repoName={repoName(homeOf(r))} h={h} /> : (
               <button type="button" key={`${r.repo}/${r.key}`} data-key={r.key} className={`cto-kcard is-real${hl === r.key ? ' is-hl' : ''}`} title="打开它的需求看板（可以回放）" onClick={() => h.onOpen(r)}>
                 <span className="cto-ktop"><b className="kt-mono">{r.key}</b><span>{ago(r.updated_at, at)}</span></span>
                 <span className="cto-ktitle">{r.title}</span>

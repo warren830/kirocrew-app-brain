@@ -34,6 +34,8 @@ def test_saving_settings_reloads_repos_and_reports_bad_ones(tmp_path, home):
     assert view["errors"] and view["errors"][0]["repo"] == "r2"
     e = view["errors"][0]    # what happened and what to do in words; the path under 细节
     assert "还没装 brain-kit" in e["error"] and str(plain.resolve()) not in e["error"] and e["raw"] == str(plain.resolve())
+    # named and placed as /status says it, for the banner to use when /status cannot be read
+    assert (e["name"], e["path"]) == (st["repos"][1]["name"], st["repos"][1]["path"])
 
 
 def test_a_wrong_brainkit_path_turns_the_app_off_politely(tmp_path, home):

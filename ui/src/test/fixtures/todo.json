@@ -16,6 +16,8 @@
       "since": 1794146040.0,
       "review": false,
       "path": "aidlc-docs/261107-refund-export/construction/plans/refund-api-code-generation-plan.md",
+      "todo": "",
+      "raw": "",
       "kind": "lean_approval",
       "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行"
     },
@@ -64,6 +66,8 @@
       "since": 1794146040.0,
       "review": false,
       "path": null,
+      "todo": "",
+      "raw": "",
       "kind": "clarify",
       "text": "AI 停下问你：可以在这里回答"
     },
@@ -97,6 +101,8 @@
       "since": 1794135600.0,
       "review": false,
       "path": null,
+      "todo": "",
+      "raw": "",
       "kind": "question",
       "text": "等产品在 MR 上回答 D-2（设计）"
     },
@@ -130,6 +136,8 @@
       "since": 1794056400.0,
       "review": false,
       "path": null,
+      "todo": "",
+      "raw": "",
       "kind": "acceptance",
       "text": "等产品在 MR 上验收 D-3（approve / reject）"
     },
@@ -149,6 +157,8 @@
       "since": 1794129840.0,
       "review": false,
       "path": null,
+      "todo": "让 alice 自己交接（交接时会打标签）",
+      "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
       "kind": "handoff_rejected",
       "text": "接手被拒：标签是 bob 打的，不是负责人 alice"
     },
@@ -164,6 +174,8 @@
       "since": 1794118440.0,
       "review": false,
       "path": null,
+      "todo": "",
+      "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
       "kind": "handoff_unlabelled",
       "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次"
     },
@@ -180,7 +192,9 @@
       "session": null,
       "since": null,
       "review": false,
-      "path": null
+      "path": null,
+      "todo": "",
+      "raw": ""
     },
     {
       "repo": "r1",
@@ -194,6 +208,8 @@
       "since": 1794128400.0,
       "review": false,
       "path": null,
+      "todo": "",
+      "raw": "",
       "kind": "start",
       "text": "已认领，还没开工"
     },
@@ -213,6 +229,8 @@
       "since": 1794133620.0,
       "review": true,
       "path": null,
+      "todo": "",
+      "raw": "",
       "kind": "reply",
       "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）"
     }

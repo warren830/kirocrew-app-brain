@@ -100,6 +100,9 @@ export interface Waits {
   /** the reply is Lean's review in a NEW session (开审查会话: the session that wrote the code may not review it), not a
    * turn in the open one. The backend always sends it */
   review?: boolean
+  /** what to do, in words, when the step alone does not say it: a refused hand-over's reasons' own 做什么
+   * (backend/core/problems.py REASON_RULES); '' otherwise. The backend always sends it */
+  todo?: string
 }
 
 export interface LeanSummary {
@@ -129,6 +132,9 @@ export interface MrRef { iid: number; url: string | null; state: string | null }
 export interface Requirement {
   /** repo id from /status (r1, r2 …); team-mode rows use 'runner' */
   repo: string
+  /** a team-mode row on the runner: the listed repo (r1 …) of its GitLab project, whose view and pill hold it; null
+   * when this machine does not list that project, and for every other row. The backend always sends it */
+  home?: string | null
   key: string
   title: string
   owner: string | null
@@ -448,7 +454,12 @@ export interface Status {
 export interface TeamStatus {
   enabled: boolean
   ok: boolean
+  /** why the bridge did not start, in words ('' when it did) */
   error: string
+  /** what to do about it, in words (problems.team_start). The backend always sends it */
+  error_todo?: string
+  /** the error as it was (file names, keys), for 细节. The backend always sends it */
+  error_raw?: string
   last_loop_at: number | null
   loop_error: string
   /** the signer runs as this app's OS user (the local trial, or its signed/ and refused/ are writable here): it would
@@ -755,7 +766,8 @@ export interface EvalView {
   ref: string | null
   metrics: EvalMetric[]
   /** 复看队列 (low-score queue): runs that need a human look */
-  queue: { key: string; intent: string | null; reasons: string[] }[]
+  /** todo: what to do about it, in words (deliveries.QUEUE_TODO by brain-kit's rule). The backend always sends it */
+  queue: { key: string; intent: string | null; reasons: string[]; todo?: string }[]
   /** runs brain-kit could not read: listed with the reason in words (brain-kit's own in raw), not counted in any metric */
   skipped: { key: string; why: string; raw?: string }[]
   /** brain-kit's notes on the numbers, verbatim (credits it could not attribute to a run, deliveries already known
@@ -821,7 +833,9 @@ export interface Overview {
   /** state → count */
   counts: Partial<Record<ReqState, number>>
   /** a repo whose requirements could not be read: what happened and what to do, in words; raw: the original (细节) */
-  errors: { repo: string; error: string; raw?: string }[]
+  /** a repo that could not be read: its name and path as /status says them (the banner names it and opens 导入仓库 at
+   * that path even when /status cannot be read). The backend always sends name and path */
+  errors: { repo: string; name?: string; path?: string; error: string; raw?: string }[]
 }
 
 // ---------------------------------------------------------------- GET /requirements/{repo}/{key}
@@ -1208,6 +1222,11 @@ export interface TodoItem {
   since: number | null
   /** lean_approval: the document to read before approving (the approval's path), shown as 要读的 */
   path?: string | null
+  /** handoff_rejected: what to do, each reason's own 做什么 in words ('' otherwise). The backend always sends it */
+  todo?: string
+  /** handoff_rejected / handoff_unlabelled: the bridge's words as it wrote them, and how to do it by hand (做法), for
+   * 细节 ('' otherwise). The backend always sends it */
+  raw?: string
 }
 export interface Todo { items: TodoItem[]; team: boolean }
 

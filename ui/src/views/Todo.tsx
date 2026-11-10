@@ -241,9 +241,11 @@ function Item({ it, group, now, go, onAnswered, started, onStarted }: {
       {it.text && <p className="td-text">{it.text}</p>}
       {it.kind === 'lean_approval' && readOf(it) && <ToRead path={readOf(it)!} />}
       {group.key === 'stuck' && <p className="td-do"><b>做什么</b>找这个需求的负责人，在 MR 上决定重开还是关掉它。</p>}
+      {it.todo && <p className="td-do" data-testid="todo-do"><b>做什么</b>{it.todo}</p>}
       {/* a Lean approval's text is its waits.text, which says the person types the line (deliveries.lean_wait_text) */}
       {line && (it.kind === 'lean_approval' || it.kind === 'reply' || it.kind === 'handoff_rejected') && <TypeLine line={line} sessionUrl={session} said={it.kind === 'lean_approval'} />}
       {asked && <QuestionCard q={it.question!} repo={it.repo} reqKey={it.key} mrUrl={null} onAnswered={onAnswered} />}
+      {it.raw && <details className="br-raw"><summary>细节</summary><pre>{it.raw}</pre></details>}
       {it.kind === 'child_start' && started && <ChildStartOut r={started} onOpen={navigate} />}
       {start.error && <p className="br-error" role="alert">{start.error}</p>}
       <div className="td-acts">

@@ -261,9 +261,15 @@ def test_team_mode_never_holds_a_key(world, tmp_path):
                 await svc.stop()
 
         out[name] = run(go())["team"]
-    assert out["key and spool"]["ok"] is False and "不能写 signing_key" in out["key and spool"]["error"]
-    assert out["no signer"]["ok"] is False and "signing_key is required" in out["no signer"]["error"]  # brain-kit's
-    assert out["key signer"]["ok"] is False and "\"type\": \"spool\"" in out["key signer"]["error"]
+    # what is wrong and what to do in words; the file names and keys only as it was said (细节)
+    assert out["key and spool"]["ok"] is False and "不能写 signing_key" in out["key and spool"]["error_raw"]
+    assert out["key and spool"]["error"] == "桥的配置文件里写了私钥" and "删掉" in out["key and spool"]["error_todo"]
+    assert out["no signer"]["ok"] is False and "signing_key is required" in out["no signer"]["error_raw"]  # brain-kit's
+    assert out["no signer"]["error"] == "桥的配置文件里没写签名服务"
+    assert out["key signer"]["ok"] is False and "\"type\": \"spool\"" in out["key signer"]["error_raw"]
+    assert out["key signer"]["error"] == "桥的配置文件里没写签名服务"
+    for st in out.values():
+        assert not re.search(r"[A-Za-z_]{4,}|\.json", st["error"] + st["error_todo"]), st
     for d in (world["tmp"] / "spool", world["sspool"]):
         assert not (d / "requests").exists()  # nothing was checked or signed
 
@@ -281,7 +287,9 @@ def test_team_mode_refuses_a_signer_this_user_can_answer_for(world, tmp_path):
             await svc.stop()
 
     st = run(go())["team"]
-    assert st["ok"] is False and "signed/、refused/" in st["error"] and st["same_user"] is True
+    assert st["ok"] is False and "signed/、refused/" in st["error_raw"] and st["same_user"] is True
+    assert st["error"] == "签名服务的答复这个 app 也能写：签名服务就拦不住它了"
+    assert "「本机试用：签名器和 app 用同一个系统用户」" in st["error_todo"]
 
 
 def test_team_mode_refuses_config_the_agents_user_can_change(world, tmp_path):
@@ -295,8 +303,9 @@ def test_team_mode_refuses_config_the_agents_user_can_change(world, tmp_path):
             await svc.stop()
 
     st = run(go())
-    assert st["team"]["ok"] is False and "这个 app 的系统用户能改" in st["team"]["error"]
-    assert "bridge.json" in st["team"]["error"] and "allowed_signers" in st["team"]["error"]
+    assert st["team"]["ok"] is False and st["team"]["error"] == "运行机的配置文件这个 app 也能改"
+    assert "bridge.json" in st["team"]["error_raw"] and "allowed_signers" in st["team"]["error_raw"]
+    assert "brainbridge" not in st["team"]["error_todo"] and "只读" in st["team"]["error_todo"]
 
 
 def test_the_page_reads_the_ledger_while_a_round_runs(world, tmp_path):

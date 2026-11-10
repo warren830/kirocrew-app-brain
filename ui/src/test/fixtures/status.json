@@ -100,6 +100,8 @@
     "enabled": false,
     "ok": false,
     "error": "",
+    "error_todo": "",
+    "error_raw": "",
     "last_loop_at": null,
     "loop_error": "",
     "same_user": false,

@@ -642,7 +642,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     const intro = await screen.findByTestId('br-board-intro')
     expect(screen.queryByTestId('br-board-problem')).toBeNull()
     expect(screen.getByTestId('br-board')).not.toHaveTextContent('not found')
-    fireEvent.click(within(intro).getByRole('button', { name: '开工 PAY-3' }))
+    fireEvent.click(within(intro).getByRole('button', { name: '去开工 PAY-3' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'new', repo: 'r1', key: 'PAY-3', title: b.row.title })
   })
 
@@ -654,7 +654,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     renderBoard()
     const intro = await screen.findByTestId('br-board-intro')
     expect(within(intro).getByTestId('br-intro-start')).toHaveTextContent('carol 认领的，等 carol 开工')
-    expect(screen.queryByRole('button', { name: /^开工/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^去开工/ })).toBeNull()
     // the way's first step is carol's: 「0 认领 · carol · 认领、交文档、开工」, no 你 anywhere in it (BOARD-11)
     const claim = intro.querySelector('.kt-intro-phase') as HTMLElement
     expect(claim).toHaveTextContent('0 认领一个需求号，文档过五关carol认领、交文档、开工')
@@ -669,7 +669,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     renderBoard()
     let intro = await screen.findByTestId('br-board-intro')
     expect(intro.querySelector('.kt-intro-phase')).toHaveTextContent('0 认领一个需求号，文档过五关你认领、交文档、开工')
-    expect(within(intro).getByRole('button', { name: '开工 PAY-3' })).toBeInTheDocument()
+    expect(within(intro).getByRole('button', { name: '去开工 PAY-3' })).toBeInTheDocument()
     cleanup()
     // erin's claim in a repo where 你是谁 is not set yet: the backend named erin, so does the introduction
     Object.assign(b.row, { owner: 'erin' })
@@ -679,7 +679,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     status.repos = status.repos.map((r) => ({ ...r, me: r.me ? { ...r.me, name: null } : r.me }))
     renderBoard(PAY3, { status })
     intro = await screen.findByTestId('br-board-intro')
-    expect(screen.queryByRole('button', { name: /^开工/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^去开工/ })).toBeNull()
     expect(intro).toHaveTextContent('需求和设计由 erin 在会话里自己批准')
     expect(within(intro).getByTestId('br-intro-start')).toHaveTextContent('erin 认领的，等 erin 开工')
     expect(intro).not.toHaveTextContent('你')

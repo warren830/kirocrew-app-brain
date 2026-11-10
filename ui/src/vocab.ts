@@ -33,7 +33,9 @@ export const WHO_NAME: Record<WaitWho, string> = {
 }
 export const waitsOn = (who: WaitWho): string => (who === 'nobody' ? '' : `等${WHO_NAME[who]}`)
 
-/** the step a person takes (Waits.do) → the button / the verb, the same everywhere */
+/** the step a person takes (Waits.do) → the button / the verb, the same everywhere. `start` (去开工) is the jump to
+ * 开需求 with a claimed requirement's key and title, on every page that has it (交付总览, 待办, 需求详情, 需求看板);
+ * ACT.start (开工) is 开需求's own button only, the one that starts the run */
 export const DO_NAME: Record<WaitDo, string> = {
   approve: '去批准', reply: '去回话', tool: '去批准工具调用', start: '去开工', answer: '去回答', accept: '去验收',
   redo_handoff: '改好后重新交接', label_handoff: '补上交接标签', write_back: '回写 Brain', watch: '观察中', none: '',
@@ -43,6 +45,7 @@ export const DO_NAME: Record<WaitDo, string> = {
 export const ACT = {
   openSession: '打开会话',
   copyLine: '复制那一行',
+  /** 开需求's own button (POST /intake/start): never the jump to it, which is DO_NAME.start */
   start: '开工',
   answerOnMr: '去 MR 上回答',
   openBoard: '需求看板',

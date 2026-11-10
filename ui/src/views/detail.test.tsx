@@ -283,7 +283,7 @@ describe('需求详情', () => {
       const { go } = renderDetail()
       const bar = await screen.findByRole('region', { name: '此刻' })
       await waitFor(() => expect(bar).toHaveTextContent('认领了 12 小时，还没开工'))
-      fireEvent.click(within(bar).getByRole('button', { name: '开工' }))
+      fireEvent.click(within(bar).getByRole('button', { name: '去开工' }))
       expect(go).toHaveBeenLastCalledWith({ kind: 'new', repo: 'r1', key: 'PAY-3', title: '退款单导出 CSV' })
       for (const name of ['周期', '时间花在哪', '成本', '检查']) expect(screen.queryByRole('article', { name })).toBeNull()
       for (const name of ['价值流', 'Lean 进度', '时间线', '决定']) expect(screen.queryByRole('region', { name })).toBeNull()
@@ -300,7 +300,7 @@ describe('需求详情', () => {
       renderDetail()
       const bar = await screen.findByRole('region', { name: '此刻' })
       expect(bar).toHaveTextContent('等 alice 开工')
-      expect(within(bar).queryByRole('button', { name: '开工' })).toBeNull()
+      expect(within(bar).queryByRole('button', { name: '去开工' })).toBeNull()
     })
   })
 
@@ -363,7 +363,11 @@ describe('需求详情', () => {
     const card = await screen.findByRole('region', { name: '变更说明' })
     const m = fx.detail().mr_desc
     expect(within(card).getByTestId('mr-desc-first')).toHaveTextContent(m.first as string)
-    expect(card).toHaveTextContent('由记录生成 · 提交 7d2c9e4a1b30（分支上还没有 runs/PAY-3/MR.md）')
+    // where it comes from in words; the file and the commit only on hover
+    const from = within(card).getByTestId('mr-desc-from')
+    expect(from).toHaveTextContent(/^分支上还没写好，这份是从记录生成的$/)
+    expect(from.title).toBe('提交 7d2c9e4a1b30 · 分支上没有 runs/PAY-3/MR.md')
+    expect(card).not.toHaveTextContent('7d2c9e4a1b30')
     const text = within(card).getByTestId('mr-desc-text')
     expect(text.closest('details')).not.toBeNull()   // folded
     expect(within(text).getAllByRole('table')).toHaveLength(2)
@@ -381,7 +385,9 @@ describe('需求详情', () => {
     d.mr_desc = { ...d.mr_desc, source: 'file' }
     installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d })
     const { unmount } = render(<DetailView entry={{ repo: 'r1', key: 'PAY-3' }} status={fx.status()} go={vi.fn()} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} pollMs={60_000} />)
-    expect(await screen.findByRole('region', { name: '变更说明' })).toHaveTextContent('runs/PAY-3/MR.md · 提交 7d2c9e4a1b30')
+    const from = within(await screen.findByRole('region', { name: '变更说明' })).getByTestId('mr-desc-from')
+    expect(from).toHaveTextContent(/^分支上写好的变更说明$/)
+    expect(from.title).toBe('runs/PAY-3/MR.md · 提交 7d2c9e4a1b30')
     unmount()
     withDetail((x) => { x.mr_desc = { available: true, text: '', first: null, source: null, path: null, ref: null, error: '还没有 run（只有认领）：开工以后才有变更说明' } })
     renderDetail()
@@ -522,7 +528,9 @@ describe('需求详情', () => {
     })
     renderDetail()
     const card = await screen.findByRole('region', { name: '问题和回答' })
-    expect(card).toHaveTextContent('0 个')
+    // the count says the two asked in the session, never 「0 个」 above the sentence that they were asked (DETAIL-16)
+    expect(card).toHaveTextContent('问题和回答2 个 · 能在这里回答的才有回答框')
+    expect(card).not.toHaveTextContent('0 个')
     expect(card).toHaveTextContent('问题都是会话里直接问的（Q1、Q2），回答记在决定 D-1、D-2 里。')
     expect(card).not.toHaveTextContent('没有停下来问过人')
   })
@@ -532,6 +540,7 @@ describe('需求详情', () => {
     renderDetail()
     const card = await screen.findByRole('region', { name: '问题和回答' })
     expect(within(card).getAllByTestId('question')).toHaveLength(fx.detail().questions.length)
+    expect(card).toHaveTextContent(`问题和回答${fx.detail().questions.length + 1} 个`)
     expect(card).toHaveTextContent('另有会话里直接问的（Q1），回答记在决定 D-3 里。')
   })
 
@@ -856,6 +865,11 @@ describe('需求详情', () => {
     const card = await screen.findByRole('article', { name: '检查' })
     // it waits on the person looking: 等你, as everywhere
     await waitFor(() => expect(within(card).getByTestId('checks-say')).toHaveTextContent('没过：引用的 Brain 条目 · 等你：代码生成计划审批 · 还剩 发布审批、自动检查'))
+    // it wraps between its pieces only, each name whole in one piece (a piece wider than the card wraps inside itself:
+    // nothing runs past the card's edge)
+    const pieces = [...within(card).getByTestId('checks-say').querySelectorAll('.br-phrase')].map((x) => x.textContent)
+    expect(pieces).toEqual(['没过：', '引用的 Brain 条目 ·', '等你：', '代码生成计划审批 ·', '还剩 发布审批、', '自动检查'])
+    expect(within(card).getByTestId('checks-say').querySelector('.br-nowrap')).toBeNull()
     expect(card).toHaveTextContent('查的是：Lean 审批 · Brain')
     expect(card).toHaveClass('is-bad')
   })
@@ -902,7 +916,9 @@ describe('需求详情', () => {
     expect(card).not.toHaveTextContent('token')
     const chip = within(within(card).getByLabelText('会话的用量')).getByRole('button')
     expect(chip.title).toBe('PAY-3 退款单导出 CSV · 等批准 · 12.4 credits')
-    expect(card).toHaveTextContent('等人')
+    // the legend says whom it waits on, as waitsOn says it: this machine's session waits on you (BOARD-30)
+    expect(within(card).getByText('等你')).toBeInTheDocument()
+    expect(card).not.toHaveTextContent('等人')
   })
 
   test('看每个会话的用量 ↓ and the session icons scroll to the 会话 card, not to the icons themselves', async () => {
@@ -1032,6 +1048,43 @@ describe('需求详情', () => {
     const item = within(tl).getAllByTestId('tl-item').find((i) => i.title.includes('化名 P-7C1D'))!
     expect(item).toHaveTextContent(/^21:00人回答 · 一位组员$/)
     expect(tl).not.toHaveTextContent(/回答 ?：/)
+  })
+
+  test('时间线: the owner’s own acts are signed 你 to the owner and by name to anyone else, as 需求看板 says it (DETAIL-20)', async () => {
+    const own = { at: '2026-11-08T21:00:00+08:00', kind: 'human' as const, label: '批准需求', detail: null, who: 'owner', src: null }
+    withDetail((d) => { d.timeline.items.push(own) })
+    renderDetail()
+    const tl = await screen.findByRole('region', { name: '时间线' })
+    await waitFor(() => expect(within(tl).getAllByTestId('tl-item').find((i) => i.textContent?.includes('21:00'))).toHaveTextContent(/^21:00人批准需求 · 你$/))
+    expect(tl).not.toHaveTextContent('owner')
+    cleanup()
+    const b = fx.board()
+    b.person = { ...b.person, me: false }
+    withDetail((d) => { d.timeline.items.push(own) }, { [`GET ${API}/board/*`]: () => b })
+    renderDetail()
+    const tl2 = await screen.findByRole('region', { name: '时间线' })
+    await waitFor(() => expect(within(tl2).getAllByTestId('tl-item').find((i) => i.textContent?.includes('21:00'))).toHaveTextContent(/^21:00人批准需求 · alice$/))
+  })
+
+  test('the runner’s run and a hand-over’s commit are said in words, the id and the sha only on hover', async () => {
+    withDetail((d) => {
+      d.sessions = [{ ...d.sessions[0], slot: 'brain-run-RUN-PAY-3-1', title: 'RUN-PAY-3-1', kind: 'runner', agent: 'brain-run', awaiting: false }]
+      d.timeline.items.push(
+        { at: '2026-11-08T21:00:00+08:00', kind: 'handover', label: '桥接手了', detail: 'RUN-PAY-3-1', who: null, src: null },
+        { at: '2026-11-08T20:00:00+08:00', kind: 'handover', label: '交接', detail: 'd138dc559626', who: 'alice', src: null })
+    })
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '会话' })
+    const name = within(within(card).getByTestId('session')).getByText('第 1 次运行')
+    expect(name.title).toBe('RUN-PAY-3-1')
+    const tl = screen.getByRole('region', { name: '时间线' })
+    const items = within(tl).getAllByTestId('tl-item')
+    expect(items.find((i) => i.textContent?.startsWith('21:00'))).toHaveTextContent(/^21:00交接桥接手了 · 第 1 次运行$/)
+    const hand = items.find((i) => i.textContent?.startsWith('20:00'))!
+    expect(hand).toHaveTextContent(/^20:00交接交接 · 你$/) // alice is the owner reading her own page
+    expect(hand.title).toBe('提交 d138dc559626')
+    expect(card).not.toHaveTextContent('RUN-PAY-3-1')
+    expect(tl).not.toHaveTextContent(/RUN-PAY-3-1|d138dc559626/)
   })
 
   test('需求看板 ↗ and the time card’s parts go to this requirement’s board; no 回放 before it is merged', async () => {

@@ -233,8 +233,29 @@ DECISION_SAID = {"open": "%s 在 MR 上问人", "posting": "%s 等桥贴到 MR �
                  "closed": "%s 关了"}
 
 
+OWNER = "owner"   # an item's who when it was the requirement's owner (the page says 你 to the owner, else their name)
+
+
+def owner_marks(t: dict[str, Any]) -> set[str]:
+    """The pseudonyms the requirement's owner goes by in brainkit.trace's record, by the board's rule: what was done on
+    the owner's side before the hand-over is the owner's (an approval line typed in their own session: Lean's record,
+    channel local; the run branch's commits)."""
+    a = t.get("actions") or {}
+    mine = {h.get("who") for h in t.get("humans") or [] if isinstance(h, dict) and h.get("channel") in (None, "local")
+            and h.get("after_handover") is False and h.get("kind") != "push_after_handover"}
+    mine |= {c.get("who") for c in a.get("commits") or [] if isinstance(c, dict) and c.get("by") == "person"
+             and c.get("after_handover") is False}
+    return {str(w) for w in mine if w}
+
+
 def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
-    """Timeline items from brainkit.trace.build's record (who is a username, a pseudonym or a role, never an email)."""
+    """Timeline items from brainkit.trace.build's record (who is a username, a pseudonym or a role, never an email; the
+    owner's own acts are signed OWNER, so the page says 你 to them as 需求看板 does)."""
+    mine = owner_marks(t) | ({str(t["owner"])} if t.get("owner") else set())   # and the owner by their user name
+
+    def who(w: Any) -> Any:
+        return OWNER if w and str(w) in mine else w
+
     items = []
     for s in t.get("stages") or []:
         stage, _, unit = str(s.get("id", "")).partition("/")     # brainkit.trace: <stage>/<unit> for a unit's stage
@@ -247,7 +268,7 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
         detail = lean_view.refused_why(h.get("check")) if h.get("kind") == "approval_refused" else \
             "凭证 %s" % h["voucher_id"] if h.get("voucher_id") else None
         items.append({"at": h.get("at"), "kind": "human", "label": _human_label(h), "detail": detail,
-                      "who": h.get("who"), "src": ", ".join(h.get("src") or [])[:200] or None})
+                      "who": who(h.get("who")), "src": ", ".join(h.get("src") or [])[:200] or None})
     a = t.get("actions") or {}
     for c in a.get("commits") or []:
         # brain-kit 72b278e: "at" is the author date; committed_at the committer date (later: rebased or amended)
@@ -256,7 +277,7 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
             detail += " · 提交于 %s" % _iso_minute(c["committed_at"])
         items.append({"at": c.get("at"), "kind": "commit",
                       "label": ("运行机提交" if c.get("by") == "bot" else "提交") + ("（只改记录）" if c.get("records_only") else ""),
-                      "detail": detail, "who": c.get("who"), "src": c.get("src")})
+                      "detail": detail, "who": who(c.get("who")), "src": c.get("src")})
     for b in a.get("blocked") or []:
         items.append({"at": b.get("at"), "kind": "blocked", "label": "%s：%s" % (lean_view.BLOCKED, lean_view.block_rule(b.get("gate"))),
                       "detail": lean_view.block_what(b.get("path"), b.get("tool")), "who": None, "src": b.get("src")})
@@ -264,7 +285,7 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
         label = HANDOVER_LABEL.get(str(h.get("kind")), "桥记下了这次交接")
         why = problems.reasons_text(str(h.get("reason") or "").split("; "), 200)[0]   # the bridge's English, as the MR's
         items.append({"at": h.get("at"), "kind": "handover", "label": label,
-                      "detail": h.get("run_id") or why or str(h.get("commit") or "")[:12] or None, "who": h.get("by"),
+                      "detail": h.get("run_id") or why or str(h.get("commit") or "")[:12] or None, "who": who(h.get("by")),
                       "src": h.get("src")})
     for q in a.get("questions") or []:
         what = KIND_LABEL.get(str(q.get("kind")), "问题")

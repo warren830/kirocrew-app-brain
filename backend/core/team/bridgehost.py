@@ -372,8 +372,10 @@ class TeamRuntime:
 
     def status(self) -> dict[str, Any]:
         sig = self.signer_view()
+        why = problems.team_start(self.error)   # the start error in words; as it was (file names, keys) for 细节
         return {"enabled": bool(self.team.get("enabled")), "ok": self.host is not None and not self.error,
-                "error": self.error, "last_loop_at": self.last_loop_at, "loop_error": self.loop_error,
+                "error": why["text"], "error_todo": why["todo"], "error_raw": why["raw"],
+                "last_loop_at": self.last_loop_at, "loop_error": self.loop_error,
                 "same_user": self.same_user,
                 "signer": {"pending": len(sig["pending"]), "refused": len(sig["refused"])}}
 

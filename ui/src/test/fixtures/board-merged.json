@@ -22,19 +22,20 @@
       "skipped_n": 6,
       "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
       "who": "nobody",
       "text": "已合并，在观察合并后的 14 天（到 11-17）",
       "line": null,
       "raw": "",
       "do": "watch",
+      "todo": "",
       "since": 1793661540.0,
       "where": null,
       "review": false
     },
     "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
-    "credits": 22.7,
+    "credits": 8.3,
     "updated_at": 1793663640,
     "mr": {
       "iid": 37,
@@ -53,7 +54,8 @@
     ],
     "local_only": false,
     "session_url": "/chat?sid=brain-PAY-2-1c4e",
-    "family": null
+    "family": null,
+    "home": null
   },
   "branch": "ai/alice/PAY-2-refund-id",
   "base": "main",
@@ -695,12 +697,8 @@
         "停下问人 4 次",
         "第 1 次运行"
       ],
-      "credits": 14.4,
-      "session": {
-        "slot": "brain-run-RUN-PAY-2-1",
-        "url": "/chat?sid=brain-run-RUN-PAY-2-1",
-        "busy": false
-      },
+      "credits": null,
+      "session": null,
       "line": null
     },
     {
@@ -1923,25 +1921,10 @@
       "project": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
       "url": "/chat?sid=brain-PAY-2-1c4e",
       "error": null
-    },
-    {
-      "slot": "brain-run-RUN-PAY-2-1",
-      "title": "RUN-PAY-2-1",
-      "agent": "brain-run",
-      "kind": "runner",
-      "credits": 14.4,
-      "turns": 41,
-      "busy": false,
-      "awaiting": false,
-      "last_activity": 1793661540,
-      "opened_at": 1794038400,
-      "project": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
-      "url": "/chat?sid=brain-run-RUN-PAY-2-1",
-      "error": null
     }
   ],
   "credits": {
-    "total": 22.7,
+    "total": 8.3,
     "note": "KiroCrew 只报 credits，没有别的用量数"
   },
   "source": "trace",

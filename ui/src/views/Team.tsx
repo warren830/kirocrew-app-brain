@@ -122,13 +122,14 @@ const ledgerMeta = (k: LedgerKey, state: string): { label: string; tone: Tone } 
   k === 'runs' ? runStateMeta(state) : k === 'decisions' ? questionMeta(state) : k === 'outbox' ? outboxMeta(state)
     : HANDOFF_STATE[state] ?? { label: state, tone: 'idle' }
 
-/** How a team runner works, for a machine that is not one. */
+/** How a team runner works, for a machine that is not one. The words break only where a phrase ends (TM_CSS keeps the
+ * rest whole): after punctuation, at a zero-width space (\u200b), never at a no-break space (\u00a0). */
 const RUNNER_FLOW: FlowStep[] = [
   { icon: 'handover', title: '交接', text: 'MR 打上交接标签' },
   { icon: 'bridge', title: '桥', text: '每一轮看 MR，检查交接' },
-  { icon: 'signer', title: '签名', text: '单独的签名服务签合同' },
-  { icon: 'runner', title: '运行机会话', text: '运行机上的会话接着做' },
-  { icon: 'release', title: 'MR 上回答、验收', text: '以 GitLab 身份' },
+  { icon: 'signer', title: '签名', text: '单独的签名服务\u200b签合同' },
+  { icon: 'runner', title: '运行机会话', text: '运行机上的会话\u200b接着做' },
+  { icon: 'release', title: '回答、验收', text: '在 MR 上，以\u00a0GitLab\u00a0身份' },
 ]
 
 export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
@@ -201,13 +202,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
               <Icon name="Play" size={15} />{loop.busy ? '正在跑…' : '现在跑一轮'}
             </button>
           </div>
-          {st.error && (said(st.error) ? <p className="br-error br-pre">{st.error}</p> : (
-            <div className="tm-loop-error" data-testid="team-error">
-              <p className="br-bad-text"><b>桥没准备好</b></p>
-              <span className="tm-do"><b>做什么</b>看设置里团队模式填的配置文件（桥、运行机工作区）对不对，改好再跑一轮。</span>
-              <details className="br-raw"><summary>细节</summary><pre>{st.error}</pre></details>
-            </div>
-          ))}
+          {st.error && <StartError st={st} />}
           {st.loop_error && (
             <div className="tm-loop-error" data-testid="loop-error">
               <p className="br-bad-text"><b>上一轮有一步没成：</b>{failedSteps(st.loop_error).join('、')}</p>
@@ -288,6 +283,23 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
     </main>
   )
 }
+
+/** Why the bridge did not start: what is wrong and what to do in the backend's words (problems.team_start), the error
+ * as it was (file names, keys) under 细节. Without a 做什么 (a backend older than TeamStatus.error_todo) the error is
+ * the one as it was. */
+function StartError({ st }: { st: TeamStatus }) {
+  const worded = !!st.error_todo
+  const raw = worded ? st.error_raw ?? '' : st.error
+  const text = worded ? st.error : '桥没准备好'
+  return (
+    <div className="tm-loop-error" data-testid="team-error">
+      <p className="br-bad-text"><b>{text}</b></p>
+      <span className="tm-do"><b>做什么</b>{worded ? st.error_todo : START_TODO}</span>
+      {raw && raw !== text && <details className="br-raw"><summary>细节</summary><pre>{raw}</pre></details>}
+    </div>
+  )
+}
+const START_TODO = '看设置里团队模式填的两个配置文件（桥的、运行机的）对不对，改好再跑一轮'
 
 /** What one round did, step by step in words; anything else it reported and its error under 细节. */
 function LoopResult({ r }: { r: TeamLoopResult }) {
@@ -566,6 +578,8 @@ function Config({ rows }: { rows: TeamConfigRow[] }) {
 }
 
 const TM_CSS = `
+/* a step's words break only between phrases (回答、| 验收; 每一轮看 MR，| 检查交接), never inside a word */
+.tm-root .br-flow > li { word-break: keep-all; overflow-wrap: anywhere; }
 .tm-top { display: flex; align-items: center; gap: .6em 1em; flex-wrap: wrap; }
 .tm-top-icon { color: var(--accent); }
 .tm-same .kt-role-icon { color: var(--kt-warn); }

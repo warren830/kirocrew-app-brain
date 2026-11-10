@@ -692,8 +692,58 @@ def reason(raw: Any, *, repo: str | None = None) -> dict[str, Any]:
     return fallback("FAIL", s, repo=repo, todo="看下面的原话")
 
 
+def reasons_todo(raws: Iterable[Any], limit: int = 300) -> str:
+    """What to do about the reasons of one refused hand-over, each rule's own 做什么 once, joined by 「；」."""
+    rs = [reason(r) for r in raws if str(r or "").strip()]
+    return "；".join(dict.fromkeys(r["todo"] for r in rs if r["todo"]))[:limit]
+
+
 def reasons_text(raws: Iterable[Any], limit: int = 200) -> tuple[str, str]:
     """(the reasons in short Chinese joined by 「；」, the raw ones joined by 「; 」) for one text field."""
     rs = [reason(r) for r in raws if str(r or "").strip()]
     text = "；".join(dict.fromkeys(r["text"] for r in rs))
     return text[:limit], "; ".join(r["raw"] or r["text"] for r in rs)[:2000]
+
+
+# ---- why the team runner's bridge did not start (bridgehost.TeamRuntime.start) ------------------------------------- #
+
+SAME_USER_BOX = "本机试用：签名器和 app 用同一个系统用户"     # 设置's checkbox (ui/src/views/Settings.tsx)
+TEAM_START_TODO = "看设置里团队模式填的两个配置文件（桥的、运行机的）对不对，改好再跑一轮"
+# (the app's own start errors and brain-kit's load_bridge_config ones, what is wrong, what to do): the file names and
+# keys stay in raw (细节)
+TEAM_START_RULES: list[tuple[re.Pattern, str, str]] = [(re.compile(rx, re.S), t, d) for rx, t, d in (
+    (r"^bridge\.json 不能写 signing_key", "桥的配置文件里写了私钥",
+     "把私钥从桥的配置文件里删掉：私钥只给签名服务，桥只把要签的东西交给签名服务"),
+    (r"^bridge\.json 要有 \"signer\"|^bridge\.json 的 signer 不是签名服务|^bridge config: signing_key is required",
+     "桥的配置文件里没写签名服务", "在桥的配置文件里写上签名服务那一段（设置里「细节」有写法）：这个 app 只通过签名服务签名"),
+    (r"^bridge config: signer\.", "桥的配置文件里签名服务那一段没写对", "按设置里「细节」的写法改好签名服务那一段"),
+    (r"^找不到 bridge\.json signer\.allowed_signers", "找不到签名服务的公钥名单",
+     "看桥的配置文件里签名服务那一段写的公钥名单在不在那个位置"),
+    (r"^签名服务的 signed/、refused/ 这个 app 的系统用户能写", "签名服务的答复这个 app 也能写：签名服务就拦不住它了",
+     "让签名服务用它自己的系统用户跑；只在本机试用的话，在设置里勾上「%s」" % SAME_USER_BOX),
+    (r"^这些配置这个 app 的系统用户能改", "运行机的配置文件这个 app 也能改",
+     "把这些配置文件交给系统管理员或跑签名服务的那个系统用户，对这个 app 只读"),
+    (r"^runnerd\.json 的 spool_dir 和 bridge\.json 的不一样", "运行机的配置和桥的配置写的不是同一个排队目录",
+     "把两个配置文件里的排队目录改成同一个"),
+    (r"^bridge config: (?:identities|vouchers_dir|spool_dir|ledger) is required", "桥的配置文件少写了一项",
+     "按细节里的原话补上那一项"),
+    (r"^bridge config: projects is empty", "桥的配置文件里没写要看的项目", "在桥的配置文件里写上要看的 GitLab 项目"),
+    (r"^bridge\.json 的 gitlab\.base 没写，或者读不到 GitLab token", "桥连不上 GitLab：没写 GitLab 的地址，或者找不到桥的 GitLab 令牌",
+     "在桥的配置文件里写上 GitLab 的地址，再把桥的 GitLab 令牌放到配置里说的地方"),
+    (r"^\[Errno 2\]|^No such file", "找不到配置文件", "看设置里团队模式填的配置文件路径对不对"),
+    (r"^\[Errno 13\]|^Permission denied", "这个 app 读不了配置文件", "让这个 app 的系统用户能读那个文件（只读就够）"),
+    (r"^(?:Expecting|Extra data|Unterminated|Invalid control)", "配置文件不是合法的 JSON", "按细节里的原话改好那个文件"),
+    (r"^brain-kit 没装载", "brain-kit 没装载", "在设置里写对 brain-kit 的位置"),
+)]
+
+
+def team_start(raw: Any) -> dict[str, str]:
+    """Why the team runner's bridge did not start, as {text, todo, raw}: what is wrong and what to do in words, the
+    error as it was (file names, keys) for 细节; all '' when it started."""
+    s = " ".join(str(raw or "").split())
+    if not s:
+        return {"text": "", "todo": "", "raw": ""}
+    for rx, text, todo in TEAM_START_RULES:
+        if rx.search(s):
+            return {"text": text, "todo": todo, "raw": s}
+    return {"text": "桥没准备好", "todo": TEAM_START_TODO, "raw": s}

@@ -186,6 +186,19 @@ describe('待办', () => {
     expect(within(g).getByRole('link', { name: '看 MR' })).toBeInTheDocument()
   })
 
+  test('REST-12: a refused hand-over says its reason’s own 做什么; the bridge’s words and 做法 are under 细节 right on the card', async () => {
+    const raw = "label 'ai-handoff' was added by bob, not by the branch owner alice; brain_commit 0123456789ab does not exist\n做法：git rebase <默认分支>"
+    const rejected: TodoItem = { ...fx.todo().items[4], text: '接手被拒：标签是 bob 打的，不是负责人 alice', todo: '让 alice 自己交接（交接时会打标签）', raw }
+    installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items: [rejected] }) })
+    renderTodo()
+    const g = await screen.findByRole('region', { name: '接手被拒' })
+    expect(within(g).getByTestId('todo-do')).toHaveTextContent('做什么让 alice 自己交接（交接时会打标签）')
+    const fold = within(g).getByText('细节').closest('details') as HTMLDetailsElement
+    expect(fold.open).toBe(false)
+    expect(fold).toHaveTextContent('做法：git rebase <默认分支>')
+    expect(fold).toHaveTextContent("label 'ai-handoff' was added by bob")
+  })
+
   test('a question on the runner links to its MR and has no answer form', async () => {
     renderTodo()
     await screen.findByRole('region', { name: '运行机上的问题' })

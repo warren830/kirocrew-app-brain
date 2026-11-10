@@ -220,7 +220,7 @@ function overview(path: string): Overview {
     o.overlaps = o.overlaps.filter((x) => o.rows.some((r) => r.key === x.keys[0]))
   }
   const raw = (id: string) => o.errors.find((e) => e.repo === id)?.raw ?? ''
-  o.errors = listedRepos().filter((r) => !r.ok && !r.pending && (repo === 'all' || r.id === repo)).map((r) => ({ repo: r.id, error: r.error, raw: raw(r.id) }))
+  o.errors = listedRepos().filter((r) => !r.ok && !r.pending && (repo === 'all' || r.id === repo)).map((r) => ({ repo: r.id, name: r.name, path: r.path, error: r.error, raw: raw(r.id) }))
   if (flags.has('noeval') && !own) {
     o.eval = { available: false, error: '这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit', ref: null, metrics: [], queue: [], skipped: [], notes: [], families: [] }
     o.cto = { ...o.cto, available: false, unattended: null, stepped_in: null, runs: [], sentence: o.cto.credits.per_req !== null ? `每个需求平均 ${o.cto.credits.per_req} credits。` : o.cto.sentence }

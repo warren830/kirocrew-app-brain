@@ -72,7 +72,7 @@ def test_the_rows_of_a_family_say_who_it_waits_on():
     r = row_of("PAY-3")
     family.classify(r, dict(child, state="claimed", owner="bob"), {}, "alice")
     assert r["waits"] == {"who": "people", "do": "start", "text": "等 bob 开工", "line": None, "raw": "", "since": None,
-                          "where": "app", "review": False}
+                          "where": "app", "review": False, "todo": ""}
     r = row_of("PAY-3")
     family.classify(r, dict(child, state="claimed", owner="alice", blocked_by=[]), {}, "alice")
     assert (r["waits"]["who"], r["waits"]["do"], r["waits"]["text"]) == ("you", "start", "认领了，依赖都合进来了：可以开工")
