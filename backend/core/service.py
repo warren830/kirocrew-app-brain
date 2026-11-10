@@ -490,7 +490,8 @@ class Service:
                 facts = repo.scan()
             except Exception as exc:  # noqa: BLE001 - git's or brain-kit's own words go under 细节
                 if which in ("all", rid):
-                    errors.append({"repo": rid, "error": "读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对",
+                    errors.append({"repo": rid, "name": repo.name, "path": repo.path,
+                                   "error": "读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对",
                                    "raw": str(exc)[:2000]})
                 continue
             mine += [(rid, f, self._row(repo, f, snap)) for f in facts]
@@ -511,7 +512,8 @@ class Service:
         for rid, (path, err) in self.repo_errors.items():
             if which in ("all", rid):   # the app's own words say what to do; anything else is under 细节
                 said = re.search(r"[\u4e00-\u9fff]", err)
-                errors.append({"repo": rid, "error": err if said else "读不了这个仓库：在「导入仓库」里检查它，那里会说哪里不对",
+                errors.append({"repo": rid, "name": os.path.basename(path), "path": path,   # /status's name for it
+                               "error": err if said else "读不了这个仓库：在「导入仓库」里检查它，那里会说哪里不对",
                                "raw": path if said else "%s：%s" % (path, err)})
         for row, f, decs in runner:   # a repo's view has what the runner does for it, as 全部 and the runner's do
             if which in ("all", "runner", row["home"]):

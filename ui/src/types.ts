@@ -597,7 +597,9 @@ export interface Overview {
   /** state → count */
   counts: Partial<Record<ReqState, number>>
   /** a repo whose requirements could not be read: what happened and what to do, in words; raw: the original (细节) */
-  errors: { repo: string; error: string; raw?: string }[]
+  /** a repo that could not be read: its name and path as /status says them (the banner names it and opens 导入仓库 at
+   * that path even when /status cannot be read). The backend always sends name and path */
+  errors: { repo: string; name?: string; path?: string; error: string; raw?: string }[]
 }
 
 // ---------------------------------------------------------------- GET /requirements/{repo}/{key}

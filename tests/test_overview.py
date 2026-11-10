@@ -258,3 +258,4 @@ def test_a_repo_that_cannot_be_read_is_said_in_words_with_the_original_under_det
     (e,) = view["errors"]
     assert e["error"] == "读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对"
     assert e["raw"].startswith("[Errno 13] Permission denied")
+    assert (e["name"], e["path"]) == (repo.name, str(repo.resolve()))

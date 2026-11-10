@@ -601,8 +601,9 @@ def main() -> None:
     for e in ov["errors"] + [r_ for r_ in status["repos"] if r_.get("error")]:
         if "还没装 brain-kit" in e["error"]:
             e["error"] = NO_KIT
-    for e in ov["errors"]:      # service._overview_sync: what the app said, and its path (or the exception) for 细节
+    for e in ov["errors"]:      # service._overview_sync: what the app said, its name and path, the path for 细节
         e["raw"] = e.get("raw") or "/Users/alice/workplace/shop-web"
+        e.update(path=e["raw"], name=os.path.basename(e["raw"]))
     for d_ in det["decisions"]:     # detail.decisions: the in-session questions each records the answer of
         d_["asked"] = detail.asked_in(d_["text"], d_["why"])
     # each row's 变更说明 first line (service._row: mrdesc_view.plain_line of it): the requirement's own

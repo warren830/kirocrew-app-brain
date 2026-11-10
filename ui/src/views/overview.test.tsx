@@ -132,6 +132,20 @@ describe('交付总览', () => {
     expect(document.querySelector('.cto-org')).toHaveTextContent(/^6 个需求$/)
   })
 
+  test('/status not read, /overview read: the repo banner names the repo by its name and has 去导入仓库 for its path', async () => {
+    const user = userEvent.setup()
+    const ov = fx.overview()
+    ov.errors = [{ repo: 'r2', name: 'shop-web', path: '/Users/alice/workplace/shop-web', error: '还没装 brain-kit：在「导入仓库」里检查它，装上就能用', raw: '/Users/alice/workplace/shop-web' }]
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    const p = props({ status: null })
+    render(<OverviewView entry={{}} {...p} />)
+    const banner = await screen.findByTestId('repo-error')
+    expect(banner).toHaveTextContent(/^shop-web：还没装 brain-kit/)
+    expect(banner).not.toHaveTextContent('r2')
+    await user.click(within(banner).getByRole('button', { name: '去导入仓库' }))
+    expect(p.go).toHaveBeenCalledWith({ kind: 'import', path: '/Users/alice/workplace/shop-web' })
+  })
+
   test('while brain-kit works the eval out (the backend’s computing flag), the page says 正在算, not 还没有', async () => {
     const ov = fx.overview()
     ov.cto = { ...ov.cto, available: false, unattended: null, stepped_in: null }
