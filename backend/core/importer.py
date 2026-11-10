@@ -1025,6 +1025,7 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
 # what `brain install` writes (brain-kit's kit/, Lean's install.sh, the kit config, the Brain, AGENTS.md, .gitignore):
 # a symlink committed at one of these would make it write somewhere else
 INSTALL_TARGETS = (".kiro", ".brain", "aidlc-docs", "brain", "AGENTS.md", ".gitignore")
+LINKS_REFUSED = "仓库里 %s 是符号链接：安装会顺着它写到别处，这里不装。先把它换成普通的目录或文件"
 
 
 def symlinks_on_targets(g: Git, sha: str) -> list[str]:

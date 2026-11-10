@@ -227,7 +227,7 @@ def test_a_team_repo_installed_in_place_pushes_only_when_asked(tmp_path, home):
     assert r["mode"] == "inplace" and r["commit"]["ok"] and r["remote_url"] == str(bare.resolve())
     assert before_push == head(repo, "HEAD~1")                       # the install did not push by itself
     assert (unconfirmed.status, unconfirmed.body["code"]) == (400, "not_confirmed") and stale.code == "stale_confirm"
-    assert pushed["ok"] and pushed["pushed"] and pushed["text"] == "推上去了：main → origin"
+    assert pushed["ok"] and pushed["pushed"] and pushed["text"] == "推上去了：main → 远端"
     assert head(bare, "main") == head(repo)
 
 
@@ -430,7 +430,7 @@ def test_pull_after_the_mr_was_merged_and_the_install_branch_goes(tmp_path, home
     assert dirty["state"] == "merged" and dirty["pull"]["ok"] is False and "没提交的改动" in dirty["pull"]["why"]
     assert refused.code == "cannot_pull"
     assert ready["pull"] == {"ok": True, "why": ""} and ready["word"] == "要拉取" and "「拉取」" in ready["next"]
-    assert pulled["ok"] and pulled["text"] == "拉取了 origin/main：brain-kit 到了，这个仓库现在就能用"
+    assert pulled["ok"] and pulled["text"] == "拉取了远端的 main：brain-kit 到了，这个仓库现在就能用"
     assert (repo / ".brain" / "kit.json").is_file() and head(repo) == head(bare, "main")
     assert pulled["removed"] == ["工作目录 %s" % done["result"]["worktree"], "分支 brain/install"]
     assert after["repos"][0]["ok"] is True and svc.imports.get(str(repo.resolve())) is None
@@ -482,7 +482,7 @@ def test_the_new_routes_refuse_bad_bodies(tmp_path, home):
     assert {k: (v.status, v.body["code"]) for k, v in got.items()} == {
         "choices": (400, "invalid_path"), "purpose": (400, "invalid_purpose"), "mode": (400, "invalid_mode"),
         "merge": (409, "no_install"), "pull": (409, "cannot_pull")}
-    assert "没有 origin" in got["pull"].body["error"]
+    assert "没有远端" in got["pull"].body["error"]
 
 
 def test_a_branch_kit_update_merges_locally_too(tmp_path, home):

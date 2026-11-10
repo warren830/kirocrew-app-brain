@@ -8,7 +8,7 @@
       "id": "branch",
       "label": "建分支和工作目录",
       "state": "ok",
-      "detail": "brain/upgrade-kit，从 origin/main（a8b44abc）建的，在 /Users/alice/workplace/brain-app/shop-pay/_brain-upgrade-kit"
+      "detail": "brain/upgrade-kit，从远端的 main（a8b44abc）建的，在 /Users/alice/workplace/brain-app/shop-pay/_brain-upgrade-kit"
     },
     {
       "id": "install",

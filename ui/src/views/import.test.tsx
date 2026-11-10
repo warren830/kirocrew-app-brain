@@ -186,7 +186,7 @@ describe('导入仓库', () => {
   test('when the app cannot open the MR: the link and the exact commands, with 复制', async () => {
     const p = fx.importPublish()
     p.mr = null
-    p.text = '推上去了。这台机器上没有 GitLab token（$GITLAB_TOKEN 或 ~/.brain/gitlab-token），MR 要你自己开：用下面的命令或链接。'
+    p.text = '推上去了。这台机器上没有 GitLab 令牌（放在 ~/.brain/gitlab-token 或环境变量 GITLAB_TOKEN 里，app 就能自己开 MR），MR 这次要你自己开：用下面的命令或链接。'
     const pend = fx.importInspectPending()
     pend.pending!.can_open_mr = false
     const { user } = setup({ [`POST ${API}/import/inspect`]: () => pend, [`POST ${API}/import/publish`]: () => p })
@@ -207,7 +207,7 @@ describe('导入仓库', () => {
 
   test('a hook that says no: what it said, then 再提交一次', async () => {
     const blocked = fx.importJob()
-    blocked.result!.commit = { ok: false, sha: null, blocked: true, output: '扫描到可疑的 token', text: '提交被拦下了（多半是 git hook），它说：\n扫描到可疑的 token\n\n改动还在 /Users/alice/workplace/brain-app/refund/_brain-install 里：处理好以后点「再提交一次」。' }
+    blocked.result!.commit = { ok: false, sha: null, blocked: true, output: '扫描到可疑的 token', text: '提交被拦下了（多半是提交时跑的 git 检查），它说：\n扫描到可疑的 token\n\n改动还在 /Users/alice/workplace/brain-app/refund/_brain-install 里：处理好以后点「再提交一次」。' }
     blocked.steps[4] = { ...blocked.steps[4], state: 'fail', detail: blocked.result!.commit.text }
     let inspected = 0
     const { user } = setup({
@@ -392,7 +392,7 @@ describe('导入仓库', () => {
     expect(within(box).getByTestId('push-team')).toHaveTextContent('这会直接改团队的 main，没有 MR 评审；main 受保护时推不上去，就改用「装到新分支，开 MR 给团队看」')
     expect(apiCalls.some((c) => c.path === `${API}/import/push`)).toBe(false)
     await user.click(within(box).getByRole('button', { name: '确定推送' }))
-    expect(await within(box).findByText('推上去了：main → origin')).toBeInTheDocument()
+    expect(await within(box).findByText('推上去了：main → 远端')).toBeInTheDocument()
     expect(apiCalls.find((c) => c.path === `${API}/import/push`)?.body).toEqual({
       path: REPO, branch: 'main', remote_url: 'git@gitlab.example.com:shop/refund.git', confirm: true,
     })

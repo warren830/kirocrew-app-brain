@@ -225,7 +225,7 @@ def test_upgrade_refuses_what_it_should_and_leaves_nothing_behind(tmp_path, home
         return out
 
     got = started(svc, go)
-    assert got["plain"]["state"] == "failed" and "还没有 .brain/kit.json" in got["plain"]["error"]
+    assert got["plain"]["state"] == "failed" and "上还没有 brain-kit：先在「导入仓库」里装上它" in got["plain"]["error"]
     assert got["branch"].code == "invalid_branch" and got["purpose"].code == "invalid_purpose"
     assert (got["rel"].status, got["rel"].body["code"]) == (400, "invalid_path")
     assert got["owner"].status in (401, 403)

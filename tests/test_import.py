@@ -507,7 +507,7 @@ def test_publish_pushes_the_branch_and_opens_the_mr_with_the_persons_token(tmp_p
 
     p, stale, no_token, first, again, status = started(svc, go)
     assert p["can_open_mr"] is False and stale.code == "stale_confirm"
-    assert no_token["ok"] and no_token["pushed"] and no_token["mr"] is None and "没有 GitLab token" in no_token["text"]
+    assert no_token["ok"] and no_token["pushed"] and no_token["mr"] is None and "没有 GitLab 令牌" in no_token["text"]
     assert no_token["commands"][0] == "git -C %s push origin brain/install" % repo.resolve()
     assert no_token["commands"][1].startswith("glab mr create -R https://gitlab.example.com/grp/pay --source-branch "
                                               "brain/install --target-branch main")

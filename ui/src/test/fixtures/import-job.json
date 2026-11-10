@@ -8,7 +8,7 @@
       "id": "branch",
       "label": "建分支和工作目录",
       "state": "ok",
-      "detail": "brain/install，从 origin/main（a8b44abc）建的，在 /Users/alice/workplace/brain-app/refund/_brain-install"
+      "detail": "brain/install，从远端的 main（a8b44abc）建的，在 /Users/alice/workplace/brain-app/refund/_brain-install"
     },
     {
       "id": "install",
