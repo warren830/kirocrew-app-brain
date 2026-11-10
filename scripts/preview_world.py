@@ -65,6 +65,13 @@ ME = "alice"
 NO_KIT = "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"     # service.reload_sync's words for a repo without it
 CFG = {"default_branch": "main", "handoff_label": "ai-handoff", "running_label": "ai-running",
        "rejected_label": "ai-handoff-rejected"}
+# brain-kit's own words: an old committed hook adapter (cli.crew_hook_problem), the credits note and a run it could not
+# read (evaluate)
+ADAPTER_OLD = (".kiro/brain/lean-hook.py is an older adapter (version 0, needs 2): the team runner could not write "
+               "runs/<KEY>/park.json, its only way to ask a person, before the Lean approvals; run `brain install` and "
+               "commit it on main through an MR")
+COST_NOTE = "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+SKIPPED_RAW = "runs/PAY-1/run.json is not valid JSON: line 3"
 # what brainkit.trace says it could not read on a person's machine (its own words)
 TRACE_MISSING = ["bridge ledger (--ledger not given)", "vouchers (--vouchers not given and no intake store)",
                  "pushes (git keeps no push log; person commits after hand-over stand in for them)",
@@ -313,23 +320,25 @@ def no_trace_brain(r: Req) -> dict:
     return detail.brain_block(None, None, r.facts()["decisions_text"] if r.start_at is not None else None)
 
 
-def brain_views(reqs: dict[str, list[Req]], rows: list[dict], said: dict[str, list[dict]]) -> tuple[dict[str, dict], dict[str, dict]]:
+def brain_views(reqs: dict[str, list[Req]], rows: list[dict], said: dict[str, list[dict]]) -> tuple[dict[str, dict], dict[str, dict], dict[str, dict]]:
     """Each repo's Brain page (GET /brain) as brainview.view makes it with brain-kit, on a scratch git repo that holds
     what the world says: the Brain on main, each merged run (its run.json at the Brain it loaded, its decisions.md
     citing what it used) and the write-back that followed it, each run not merged yet on its branch (a local one in
     its worktree). Its decisions.md holds the decisions 需求详情 shows for it (*said*, by "<repo>/<key>"), so its 决定
     and its 用到的 Brain cite the same entries. And each run's Brain block, by "<repo>/<key>", as 需求详情 and 需求看板 get it: detail.brain_block of
     brainkit.trace's, the usage row of the run read where the service reads its trace (its worktree, else its ref), the
-    very read and row the Brain page's numbers come from. ({}, {}) without brain-kit (BRAIN_TEST_BRAINKIT)."""
+    very read and row the Brain page's numbers come from. And each run's 回写 Brain preview (POST /brain/reflect/preview)
+    by "<repo>/<key>", for the runs the Brain page offers to write back. ({}, {}, {}) without brain-kit
+    (BRAIN_TEST_BRAINKIT)."""
     if not (BRAINKIT / "brainkit" / "__init__.py").is_file():
         print("no brain-kit at %s: the Brain pages are left out" % BRAINKIT)
-        return {}, {}
+        return {}, {}, {}
     bk.load(str(BRAINKIT))
     E = bk.m("entries")
     paths = {"r1": "/Users/alice/workplace/shop-pay", "r3": "/Users/alice/workplace/shop-order",
              "r4": "/Users/alice/workplace/shop-tools"}
     prefix = {"r1": "PAY", "r3": "ORD", "r4": "TOOL"}
-    out, uses = {}, {}
+    out, uses, reflects = {}, {}, {}
     with tempfile.TemporaryDirectory() as tmp:
         for rid, path in paths.items():
             top = Path(tmp) / rid
@@ -410,12 +419,15 @@ def brain_views(reqs: dict[str, list[Req]], rows: list[dict], said: dict[str, li
                 r = by_key.get(f["key"])
                 if r is None or not f.get("run"):
                     continue
+                if any(x["key"] == r.key for x in reflect):     # brainview.preview, as the reflect route answers
+                    reflects["%s/%s" % (rid, r.key)] = json.loads(json.dumps(brainview.preview(repo, f, None),
+                                                                             ensure_ascii=False).replace(repo.path, path))
                 src, ref = (f["worktree"], None) if f.get("worktree") else (repo.path, f.get("ref"))   # service._timeline
                 got = trace_row(bk.m("usage").collect(src, repo.cfg, ref=ref), r.intent, r.key) or {}
                 uses["%s/%s" % (rid, r.key)] = detail.brain_block(
                     {"loaded": got.get("loaded"), "cited": got.get("cited"), "stale": got.get("stale"),
                      "unknown": got.get("unknown"), "proposals": {"total": r.proposals}}, None, None)
-    return out, uses
+    return out, uses, reflects
 
 
 def standard(r: Req, t: float, *, design_back: bool = False, units: tuple[str, ...] = ()) -> float:
@@ -559,9 +571,23 @@ def main() -> None:
         r_["label"] = deliveries.CAT_LABEL.get(r_["id"], r_["label"])
     det = json.loads((FIX / "detail.json").read_text(encoding="utf-8"))
     status = json.loads((FIX / "status.json").read_text(encoding="utf-8"))
+    # KiroCrew's checks as crewcheck makes them (problems.py's words): brain-dev.json lacks Lean's hook before a tool
+    # call; shop-pay's committed hook adapter is the old one (a reminder there: it is not handed to the runner); kas
+    status["crew"]["rows"] = [problems.agent_lacks([("preToolUse", "PreToolUse")]),
+                              problems.row("FAIL", ADAPTER_OLD, repo="/Users/alice/workplace/shop-pay", team=False),
+                              problems.engine("kas")]
+    status["crew"]["fix"] = {"agent": True, "engine": False}
     rows = {r["key"]: r for r in ov["rows"]}
     for q in ov["eval"]["queue"]:
-        q["reasons"] = [deliveries.acts_in_words(x) for x in q["reasons"]]
+        q["reasons"] = [deliveries.eval_reason(x) for x in q["reasons"]]
+    # brainkit.evaluate's notes and its skipped run, as deliveries.evaluate says them
+    ov["eval"]["note_rows"] = deliveries.eval_notes(COST_NOTE, ["PAY-2"], [])
+    ov["eval"]["notes"] = [x["text"] for x in ov["eval"]["note_rows"]]
+    ov["eval"]["skipped"] = [{"key": "PAY-1", "why": deliveries.skip_why({"why": SKIPPED_RAW}), "raw": SKIPPED_RAW}]
+    ov["eval"]["computing"] = False
+    for m in ov["eval"]["metrics"]:
+        if m["id"] == "repeat_rate":     # the app's own rule (the others are brainkit.evaluate's)
+            m["rule"] = deliveries.REPEAT_RULE
     for e in ov["errors"] + [r_ for r_ in status["repos"] if r_.get("error")]:
         if "还没装 brain-kit" in e["error"]:
             e["error"] = NO_KIT
@@ -683,8 +709,13 @@ def main() -> None:
     reqs["r1"].append(p4)
     row = classified(p4, rows["PAY-4"], park=p4_park, mr={"state": "opened", "labels": ["ai-running"], "questions": [
         {"id": "D-2", "kind": "design", "state": "open", "lean_request": None, "at": iso(T0 - 3 * H)}]})
-    board_later(p4, row, park=p4_park, decisions=decisions(p4, [
-                                      ("application-design", "按商户拆成一户一份", "财务按商户对账", None, "agent", ["T-12"])]),
+    # its decisions.md: D-1 the agent's; D-2 is the question still open on the MR; D-3 a Who outside the runner's
+    # vocabulary, the one brainkit.evaluate's funnel lists as 没归类 (交付总览 links to it)
+    p4_dec = decisions(p4, [("application-design", "按商户拆成一户一份", "财务按商户对账", None, "agent", ["T-12"]),
+                            ("functional-design", "拆分任务按商户号排好再按日期写", "对账脚本按这个顺序读", "split-job 规划", "unclassified", [])])
+    p4_dec[1].update(id="D-3", src=p4_dec[1]["src"].replace("#L9", "#L10"))
+    ov["funnel"]["unclassified"] = [{"key": "PAY-4", "id": "D-3", "src": p4_dec[1]["src"]}]
+    board_later(p4, row, park=p4_park, decisions=p4_dec,
                                   questions=[{"source": "mr", "id": "D-2", "kind": "design", "kind_label": "设计", "question": "按商户拆分时，一个商户一天超过 10 万行要不要再按小时切？",
                                               "options": [{"id": "A", "text": "按小时切成多份"}, {"id": "B", "text": "一份，压缩成 zip"}], "recommend": "A",
                                               "lean_request": None, "refs": ["D01#S002"], "state": "open", "answer": None, "answerer": None, "voucher_id": None,
@@ -951,7 +982,7 @@ def main() -> None:
                for r_ in all_rows if r_["state"] != "closed" and (r_["state"] != "merged" or r_["waits"]["who"] == "you")]
     crew_fail = problems.agent_missing()
     world_todo = {"ok": todo.build(entries, team=False, crew_rows=[]), "crewfail": todo.build(entries, team=False, crew_rows=[crew_fail])}
-    brains, uses = brain_views(reqs, all_rows, {bid: kw.get("decisions") or [] for bid, (_, _, kw) in LATER.items()})
+    brains, uses, reflects = brain_views(reqs, all_rows, {bid: kw.get("decisions") or [] for bid, (_, _, kw) in LATER.items()})
     for bid, (r_, row_, kw) in LATER.items():
         boards[bid] = snapshot(r_, row_, brain=uses.get(bid) or no_trace_brain(r_), **kw)
     det["brain"] = boards["r1/PAY-3"]["brain"]
@@ -1048,13 +1079,15 @@ def main() -> None:
          "me": {"name": "alice", "source": "login", "gitlab": "", "text": "alice（这台机器的登录名：这个仓库不用 GitLab）",
                 "ask": False, "label": "", "why": "", "suggest": "", "error": ""}}]
     # KiroCrew is fine in the world (the 「KiroCrew 有 FAIL」 switch shows a failing row); shop-tools keeps its ! reminder
-    ok_hook = {"level": "OK", "text": "brain-dev.json 的 Lean hook 都在", "todo": "", "fix": None, "repo": None, "raw": ""}
-    world_status["crew"]["rows"] = [ok_hook if r_["level"] == "FAIL" else r_ for r_ in status["crew"]["rows"] if r_.get("fix") != "kit"] + tool_kit
+    world_status["crew"]["rows"] = [problems.agent_ok(0) if r_["level"] == "FAIL" else r_ for r_ in status["crew"]["rows"]
+                                    if r_.get("fix") != "kit"] + tool_kit
+    world_status["crew"]["fix"] = {"agent": any(r_.get("fix") == "agent" for r_ in world_status["crew"]["rows"]),
+                                   "engine": any(r_.get("fix") == "engine" for r_ in world_status["crew"]["rows"])}
     world_status["counts"]["todo"] = len(world_todo["ok"]["items"])
     for r_ in world_status["repos"]:
         r_["remote"] = r_["id"] not in local and r_["id"] != "r2"
     world = {"note": "made by scripts/preview_world.py: do not edit by hand", "at": T0, "status": world_status, "overview": world_ov,
-             "overviews": overviews, "overviews_team": overviews_team, "todo": world_todo, "boards": boards, "details": details, "stages": STAGES,
+             "overviews": overviews, "overviews_team": overviews_team, "todo": world_todo, "reflects": reflects, "boards": boards, "details": details, "stages": STAGES,
              "brains": brains}
     (ROOT / "ui" / "preview" / "world.json").write_text(json.dumps(world, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     # the contract fixtures the UI tests read: the overview's numbers for its own rows, one live board and one merged

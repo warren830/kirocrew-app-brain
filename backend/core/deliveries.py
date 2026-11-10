@@ -389,6 +389,7 @@ def _pair(x: Any) -> list[int] | None:
 
 
 NO_EVALUATE = "这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit"
+REPEAT_RULE = "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
 
 
 def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict[str, Any] | None,
@@ -426,7 +427,7 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
         {"id": "delivery", "label": "交付正确率", "value": val("delivery"), "rule": rule("delivery")},
         {"id": "judgment", "label": "介入落在判断点", "value": val("judgment"), "rule": rule("judgment")},
         {"id": "repeat_rate", "label": "重复纠正率", "value": _pair(data.get("repeat_rate")),
-         "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"},
+         "rule": REPEAT_RULE},
         {"id": "useful", "label": "知识有用率", "value": _pair(data.get("useful")),
          "rule": "已经合并进默认分支的需求引用过的条目 ÷ Brain 里现有的条目（还在分支上、没合并的需求引用的不算）"},
         {"id": "staleness", "label": "过时与冲突", "value": stale.get("total") if isinstance(stale.get("total"), int)

@@ -103,7 +103,7 @@ def expected_paths(v: Any) -> list[str]:
     elif isinstance(v, list) and all(isinstance(x, str) for x in v):
         items = v
     else:
-        raise IntakeError("paths 要是路径的列表，或一串用逗号、空格分开的路径")
+        raise IntakeError("预计改动的路径要写成一串，用逗号或空格分开")
     out = []
     for p in (x.strip() for x in items):
         if p and p not in out:

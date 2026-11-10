@@ -210,7 +210,7 @@ def test_expected_paths_as_a_list_or_one_string(tmp_path, home):
     assert intake.expected_paths(["src/my module", "tests"]) == ["src/my module", "tests"]   # a list item is one path
     assert intake.expected_paths(None) == [] and intake.expected_paths("") == [] and intake.expected_paths([]) == []
     for bad in ({"a": 1}, ["a", 2], 7):
-        with pytest.raises(intake.IntakeError, match="paths"):
+        with pytest.raises(intake.IntakeError, match="预计改动的路径"):
             intake.expected_paths(bad)
     repo = make_project(tmp_path)
     svc = make_service(tmp_path, [repo])

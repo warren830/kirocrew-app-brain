@@ -883,12 +883,12 @@ class Service:
                           kickoff: bool, review: bool = False) -> dict[str, Any]:
         self.crew = await asyncio.to_thread(self.crew_sync)
         if not crewcheck.agent_ok(self.crew["rows"]):
-            raise AppError("brain-dev 还没带上 Lean 的 hook：先在设置里修好（KiroCrew 检查）", "agent_not_ready", 409)
+            raise AppError("brain-dev 还没带上 Lean 的 hook：先在设置的 KiroCrew 里点「补上 Lean 的 hook」", "agent_not_ready", 409)
         scope = scope_of(repo.id, key)
         if review:
             task = intake.review_task(key, branch, run.get("intent"))
             if not task:
-                raise AppError("这个需求的记录里没有 Lean 的 intent：开不了审查会话", "no_intent", 409)
+                raise AppError("这个需求的记录里找不到它在 Lean 里的名字：开不了审查会话", "no_intent", 409)
             title, said = "%s · 审查" % key, "开了审查会话"
         else:
             live = [i for i in self.sessions.roots(key=scope, kind="local") if i.slot and not
@@ -1433,7 +1433,7 @@ class Service:
                 try:
                     bk.m("config").load(top)
                 except Exception as exc:  # noqa: BLE001
-                    return False, None, "kit.json 有问题：%s。改好再加" % str(exc).split("\n", 1)[0][:200]
+                    return False, None, "这个仓库的 brain-kit 设置读不懂：在「导入仓库」里检查它，那里会说哪里不对"
                 return True, None, ""
             pend = importer.pending_state(top, self.imports.get(top), token=token)
             return (True, pend, "") if pend else (False, None, "这个仓库还没装 brain-kit：先检查它，装上再加入")
