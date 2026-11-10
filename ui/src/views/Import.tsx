@@ -557,7 +557,7 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted, added, ad
             </div>}
             <aside className="imp-preview" aria-label="会写进这个仓库的 brain-kit 设置">
               <span className="imp-preview-head">
-                <b>会写进这个仓库的 brain-kit 设置 <small className="br-mono">.brain/kit.json</small></b>
+                <b title="写在这个仓库的 .brain/kit.json">会写进这个仓库的 brain-kit 设置</b>
                 {!editing && (
                   <>
                     <button type="button" className="br-btn is-small" onClick={() => setEditing(true)}><Icon name="Pencil" size={13} />改设置</button>
@@ -1018,7 +1018,6 @@ const IMP_CSS = `
   background: color-mix(in srgb, var(--kt-info) 5%, var(--card)); }
 .imp-preview-head { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; }
 .imp-preview-head > b { color: var(--text-strong); font-weight: 750; }
-.imp-preview-head > b small { color: var(--muted); font-weight: 500; font-size: .8em; margin-left: 6px; }
 .imp-preview-head > .br-hint { margin: 0; }
 .imp-kv { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .imp-kv li { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border-radius: 10px;
