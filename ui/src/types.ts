@@ -913,7 +913,9 @@ export interface ReflectPreview {
   gaps: { title: string; kind: string; what: string }[]
   notes: string[]
   warnings: string[]
-  problems: string[]
+  /** what blocks --apply, each a FAIL row in the app's words (a brain lint line as the Brain 检查 card says it, with
+   * its 做什么); brain-kit's lines are in raw */
+  problems: CheckRow[]
   /** at least one op that is more than sources added: --apply would open a branch */
   substantive: boolean
   error: string

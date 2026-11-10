@@ -689,7 +689,7 @@ function ReflectCard({ repo, branch, items, pick, onPick, onItem, onApplied, pos
           {p.source && <SourceNote source={p.source} />}
           {p.error && <p className="br-error br-pre" role="alert">{p.error}</p>}
           {p.problems.length > 0 && (
-            <div data-testid="reflect-problems"><CheckRows rows={p.problems.map((x) => ({ level: 'FAIL', text: x }))} /></div>
+            <div data-testid="reflect-problems"><CheckRows rows={p.problems} /></div>
           )}
           {says.what === 'write' && (
             <div className="br-scroll">

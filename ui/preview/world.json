@@ -17173,7 +17173,14 @@
    "notes": [],
    "warnings": [],
    "problems": [
-    "TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
+    {
+     "level": "FAIL",
+     "text": "brain/TECH.md 第 20 行：来源「见群聊」不是引用",
+     "todo": "来源写成查得到的引用：需求文档的段落、材料、决定号、凭证号、运行号或条目号",
+     "fix": null,
+     "repo": null,
+     "raw": ""
+    }
    ],
    "substantive": true,
    "error": "",
@@ -17202,7 +17209,14 @@
    "notes": [],
    "warnings": [],
    "problems": [
-    "TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
+    {
+     "level": "FAIL",
+     "text": "brain/TECH.md 第 20 行：来源「见群聊」不是引用",
+     "todo": "来源写成查得到的引用：需求文档的段落、材料、决定号、凭证号、运行号或条目号",
+     "fix": null,
+     "repo": null,
+     "raw": ""
+    }
    ],
    "substantive": true,
    "error": "",

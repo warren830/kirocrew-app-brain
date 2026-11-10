@@ -496,7 +496,7 @@ def where_text(where: str, brain_dir: str = "brain") -> str:
     return where
 
 
-def _lint_parts(raw: Any) -> tuple[str, str, str]:
+def lint_parts(raw: Any) -> tuple[str, str, str]:
     """(the line on one line, its <where>, its <message>)."""
     s = " ".join(str(raw or "").split())
     m = LINT_WHERE.match(s)
@@ -515,22 +515,31 @@ def legacy_ids(ids: list[str], raws: list[str], *, prefix: str = "", repo: str |
               repo=repo, raw="\n".join(raws))
 
 
+def lint_says(msg: str, prefix: str = "") -> tuple[str, str] | None:
+    """One brain lint message (its <where> cut off) in the app's words: (what is wrong, 做什么); None when no rule
+    knows it. The Brain 检查 card and 回写's preview (its dry run lints the Brain with the proposals written) both say
+    brain lint through this."""
+    for rx, text, todo in LINT_RULES:
+        hit = rx.match(msg)
+        if hit:
+            g = _groups(hit)
+            return text.format(**g), todo.format(example=id_example(prefix), **g)
+    return None
+
+
 def lint(level: Any, raw: Any, *, brain_dir: str = "brain", repo: str | None = None, prefix: str = "") -> dict[str, Any]:
     """One of brain lint's errors (FAIL) or warnings (WARN), "<where>: <message>", as a CheckRow: 「brain/TECH.md 第
     12 行：条目号 T-1 重复了」. One nobody mapped: 「…：格式不对」 (an error) / 「…：要看一眼」 (a warning). A legacy id
     is the quiet note legacy_ids makes. *prefix*: the repo's requirement prefix, for the id example."""
     lv = norm_level(level)
-    s, where, msg = _lint_parts(raw)
+    s, where, msg = lint_parts(raw)
     old = LEGACY_ID.match(msg)
     if old:
         return legacy_ids([old.group("id")], [s], prefix=prefix, repo=repo)
-    for rx, text, todo in LINT_RULES:
-        hit = rx.match(msg)
-        if hit:
-            g = _groups(hit)
-            t = text.format(**g)
-            return mk(lv, "%s：%s" % (where_text(where, brain_dir), t) if where else t,
-                      todo.format(example=id_example(prefix), **g), None, repo, s)
+    said_ = lint_says(msg, prefix)
+    if said_:
+        t, todo = said_
+        return mk(lv, "%s：%s" % (where_text(where, brain_dir), t) if where else t, todo, None, repo, s)
     t = "格式不对" if lv == "FAIL" else "要看一眼"
     return mk(lv, "%s：%s" % (where_text(where, brain_dir), t) if where else GENERIC_TEXT[lv],
               "看下面 brain-kit 的原话" if lv != "OK" else "", None, repo, s)
@@ -543,7 +552,7 @@ def lint_rows(errors: Iterable[Any], warnings: Iterable[Any], *, brain_dir: str 
     nothing to do about any)."""
     warns, ids, raws = [], [], []
     for w in warnings:
-        s, _, msg = _lint_parts(w)
+        s, _, msg = lint_parts(w)
         old = LEGACY_ID.match(msg)
         if old:
             ids.append(old.group("id"))
