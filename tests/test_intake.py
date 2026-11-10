@@ -68,7 +68,7 @@ def test_a_file_not_taken_says_why_in_words_and_brain_kit_s_own_stay_in_the_find
     intake = mod("intake")
     line = "- **D04 截图.png**：没收——图片不单独收（没有 OCR）：请把图里的文字写进文档"
     (f,) = intake.file_items([line], "keep")
-    assert f["refused"] == "图片里的字读不出来，这份不收：把图里的文字写进文档再交"
+    assert f["refused"] == "图片里的字读不出来：把图里的文字写进文档再交"
     assert intake.refused_text("PDF 几乎没有文字（可能是扫描件），需要 OCR，请交文字版").startswith("这份 PDF 几乎没有文字")
     assert intake.refused_text("不收 .exe 格式：请另存为 docx / xlsx / pptx / pdf / md 再交").startswith("不收 .exe 格式")
 
