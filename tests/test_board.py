@@ -584,11 +584,10 @@ def test_the_board_says_the_bridges_refusal_the_repos_kit_and_what_it_could_not_
     t = {"actions": {"handovers": [{"at": iso(hand + 2 * M), "kind": "bridge rejected", "reason": "MR comes from a fork"}]},
          "missing": ["Lean audit (no aidlc-docs/audit/*.jsonl in worktree)", "aidlc-docs/261109-x/decisions.md (not in worktree)",
                      "runs/DEMO-3/run.json: intent is not a string (ignored)"]}
-    rows = [{"level": "FAIL", "text": ".kiro/brain/lean-hook.py 是旧版（第 1 版，要第 2 版）", "todo": "点「重装 kit 文件」",
-             "repo": "/r", "raw": ".kiro/brain/lean-hook.py is an older adapter (version 1, needs 2)"},
-            {"level": "FAIL", "text": "Lean 把 runs/ 下的记录算成代码", "todo": "点「重装 kit 文件」", "repo": "/r", "raw": ""},
-            {"level": "FAIL", "text": "仓库根目录没有 AGENTS.md", "todo": "点「重装 kit 文件」", "repo": "/r",
-             "raw": "AGENTS.md at repo root"}]
+    said = mod("problems").row   # the KiroCrew rows as 设置 says them, brain-kit's own line kept in raw
+    rows = [said("FAIL", line, repo="/r", team=True) for line in (
+        ".kiro/brain/lean-hook.py is an older adapter (version 1, needs 2)",
+        "runs/ 下的文件（MR.md、park.json）算在 Lean 的代码指纹里", "AGENTS.md at repo root")]
     f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "ychchen"})
     b = board.build(f, row_of("rejected", "you", "接手被拒：MR 是从复制出去的仓库开的", do="redo_handoff"), t, mr=None,
                     sessions=[], app_events=[], team_decisions=[], subjects={}, reflect_refs=[], default_branch="main",

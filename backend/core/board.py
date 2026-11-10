@@ -1203,7 +1203,7 @@ def kit_cells(rows: list[dict[str, Any]], repo_path: str) -> list[dict[str, Any]
         txt, raw = str(r.get("text") or ""), str(r.get("raw") or "")
         # its short name on the wall: brain-kit's own line (raw) says which file it is about
         label = "适配" if ("适配" in txt or "adapter" in txt + raw) else "Lean" if "Lean" in txt and "提交" in txt else \
-            "记录" if "runs/" in txt else KIT_LABEL
+            "记录" if "runs/" in txt + raw else KIT_LABEL
         out.append({"level": r.get("level"), "label": label, "text": txt, "todo": r.get("todo") or ""})
     return out
 
