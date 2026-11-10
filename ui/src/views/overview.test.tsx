@@ -97,6 +97,21 @@ describe('交付总览', () => {
     expect(screen.getByRole('article', { name: '无人值守' })).not.toHaveTextContent('0/0')
   })
 
+  test('while brain-kit works the eval out (the backend’s computing flag), the page says 正在算, not 还没有', async () => {
+    const ov = fx.overview()
+    ov.cto = { ...ov.cto, available: false, unattended: null, stepped_in: null }
+    ov.eval = { ...ov.eval, available: false, error: '正在算交付评估…', raw: '', metrics: [], queue: [], skipped: [], notes: [], computing: true } as typeof ov.eval
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props()} />)
+    const hero = await screen.findByTestId('ov-hero')
+    expect(hero).toHaveTextContent('brain-kit 正在算评估的数字，算好就出来：下面先看 credits 和合并')
+    expect(screen.getByTestId('ov-unattended')).toHaveTextContent(/^正在算$/)
+    expect(screen.getByTestId('ov-people')).toHaveTextContent(/^正在算$/)
+    expect(screen.getByRole('article', { name: '人介入' })).toHaveTextContent('brain-kit 正在算评估，算好就出来')
+    expect(screen.getByTestId('eval-computing')).toHaveTextContent('正在算')
+    expect(screen.getByTestId('eval-batch')).not.toHaveTextContent('还没有评估模块')
+  })
+
   test('a repo with no remote: said once at the top, 无人值守 and the runner fold to 这次不需要, no 从远端取最新', async () => {
     const { ov, status } = localWorld()
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })

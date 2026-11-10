@@ -141,6 +141,13 @@ type RepoCount = { open: number; you: number }
 const isOpen = (r: Requirement) => r.state !== 'merged' && r.state !== 'closed'
 const idOf = (r: { repo: string; key: string }) => `${r.repo}/${r.key}`
 
+/** brain-kit's eval is being worked out in the background (the first look, a new commit on the default branch). The
+ * backend's flag on EvalView; without it the old words stand. */
+const isComputing = (ev: EvalView): boolean => {
+  const x = ev as EvalView & { computing?: unknown; state?: unknown }
+  return x.computing === true || x.state === 'computing'
+}
+
 /** A repo pill's counts: its requirements in progress, and those that wait on you (a merge to write back into the
  * Brain too, as 轮到你 lists them); 'all' among *ids*: every row. */
 function repoCounts(rows: Requirement[], ids: string[]): Record<string, RepoCount> {
@@ -234,6 +241,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
     )
   }
   const c = data?.cto
+  const computing = !!data && !data.cto.available && isComputing(data.eval)
   const empty = !!data && data.rows.length === 0
   const credits = (data?.rows ?? []).filter((r) => r.credits !== null && r.credits > 0).map((r) => ({ key: r.key, credits: r.credits as number }))
   const yours = (data?.rows ?? []).filter((r) => r.waits.who === 'you' && r.state !== 'closed')
@@ -271,7 +279,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
           <p>
             {c.available
               ? `数字来自 brain-kit 的评估（读的是${c.ref || '默认分支'}）和这个 app 开的会话`
-              : 'brain-kit 的评估还没给出数字：下面先看 credits 和合并'}
+              : computing ? 'brain-kit 正在算评估的数字，算好就出来：下面先看 credits 和合并' : 'brain-kit 的评估还没给出数字：下面先看 credits 和合并'}
             {' · '}口径见末尾
             {!c.available && status?.brainkit.modules.evaluate === false && (
               <>。做什么：换一个带评估模块的 brain-kit<button type="button" className="br-link" onClick={() => go({ kind: 'settings' })}>去设置 ↗</button></>
@@ -317,8 +325,8 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
             onAll={() => filterTo(cellPick(undefined, 'you'))} />}
 
           <section className="cto-cards" data-testid="ov-cards">
-            <UnattendedCard c={c} localOnly={localOnly} pick={pick} onPick={filterTo} />
-            <PeopleCard c={c} onPick={filterTo} />
+            <UnattendedCard c={c} localOnly={localOnly} computing={computing} pick={pick} onPick={filterTo} />
+            <PeopleCard c={c} computing={computing} onPick={filterTo} />
             <article className="cto-card" aria-label="每个需求的 credits" data-anchor="credits">
               <div className="cto-eyebrow">每个需求的 credits</div>
               {c.credits.per_req !== null ? (
@@ -482,17 +490,17 @@ function LineCopy({ line, sessionUrl }: { line: string; sessionUrl?: string | nu
   )
 }
 
-/** A big number that is not there yet: 「还没有」, and when it will be. */
-function NotYet({ testid, why }: { testid: string; why: string }) {
+/** A big number that is not there yet: 「还没有」, and when it will be; 「正在算」 while brain-kit works it out. */
+function NotYet({ testid, why, computing = false }: { testid: string; why: string; computing?: boolean }) {
   return (
     <>
-      <div className="cto-value is-word" data-testid={testid}>还没有</div>
-      <div className="cto-desc">{why}</div>
+      <div className="cto-value is-word" data-testid={testid}>{computing ? '正在算' : '还没有'}</div>
+      <div className="cto-desc">{computing ? 'brain-kit 正在算评估，算好就出来' : why}</div>
     </>
   )
 }
 
-function UnattendedCard({ c, localOnly, pick, onPick }: { c: CtoNumbers; localOnly: boolean; pick: LedgerPick | null; onPick: (p: LedgerPick) => void }) {
+function UnattendedCard({ c, localOnly, computing, pick, onPick }: { c: CtoNumbers; localOnly: boolean; computing: boolean; pick: LedgerPick | null; onPick: (p: LedgerPick) => void }) {
   const u = c.unattended
   const count = (h: CtoRun['how']) => c.runs.filter((r) => r.how === h).length
   const howPick = (hs: CtoRun['how'][], label: string): LedgerPick => ({ id: `how:${hs.join(',')}`, label, keep: (_r, run) => !!run && hs.includes(run.how) })
@@ -506,7 +514,7 @@ function UnattendedCard({ c, localOnly, pick, onPick }: { c: CtoNumbers; localOn
           <div className="cto-desc">只在本机做的仓库不交给运行机；交给运行机、合并满 14 天的需求才算无人值守</div>
         </>
       ) : !u ? (
-        <NotYet testid="ov-unattended" why={c.available ? '交给运行机的需求合并满 14 天以后才评' : 'brain-kit 的评估给出数字以后才有'} />
+        <NotYet testid="ov-unattended" computing={computing} why={c.available ? '交给运行机的需求合并满 14 天以后才评' : 'brain-kit 的评估给出数字以后才有'} />
       ) : u[1] === 0 ? (
         <NotYet testid="ov-unattended" why="还没有评完的交接：交给运行机、合并满 14 天的需求才评" />
       ) : (
@@ -530,14 +538,14 @@ function UnattendedCard({ c, localOnly, pick, onPick }: { c: CtoNumbers; localOn
   )
 }
 
-function PeopleCard({ c, onPick }: { c: CtoNumbers; onPick: (p: LedgerPick) => void }) {
+function PeopleCard({ c, computing, onPick }: { c: CtoNumbers; computing: boolean; onPick: (p: LedgerPick) => void }) {
   const s = c.stepped_in
   const n = s ? s.at_points + s.outside : 0
   return (
     <article className={`cto-card${s && s.outside ? ' is-warn' : ''}`} aria-label="人介入" data-anchor="people">
       <div className="cto-eyebrow">人介入</div>
       {!s ? (
-        <NotYet testid="ov-people" why="brain-kit 的评估给出数字以后才有" />
+        <NotYet testid="ov-people" computing={computing} why="brain-kit 的评估给出数字以后才有" />
       ) : n === 0 ? (
         <NotYet testid="ov-people" why="人在判断点上批准、驳回、回答以后才有" />
       ) : (
@@ -751,7 +759,8 @@ function metricValue(v: EvalMetric['value']): string | null {
 function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
   ev: EvalView; noModule: boolean; onBoard: (k: string) => void; onItem: (k: string) => void; onSettings: () => void
 }) {
-  const missing = noModule || !ev.error
+  const computing = !ev.available && isComputing(ev)
+  const missing = !computing && (noModule || !ev.error)
   // brain-kit's own words; a backend older than EvalView.raw put them in the error of a missing module
   const folded = ev.raw ?? (missing ? ev.error : '')
   return (
@@ -762,7 +771,7 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
       </div>
       {!ev.available ? (
         <div className="br-note" style={{ marginTop: 6 }}>
-          {missing ? (
+          {computing ? <span data-testid="eval-computing">正在算：brain-kit 在后台评估默认分支上的记录，算好这里和上面的数字就出来，不用刷新。</span> : missing ? (
             <>
               brain-kit 还没有评估模块。做什么：换一个新一点的 brain-kit，评估的数字就会出来。
               <button type="button" className="br-link" style={{ marginLeft: 6 }} onClick={onSettings}>去设置 ↗</button>
