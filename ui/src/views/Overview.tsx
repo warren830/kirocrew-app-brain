@@ -107,6 +107,7 @@ export const OV_CSS = `
 .br-ov .br-funnel-rows { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 13px; }
 .br-ov .br-funnel-rows span { display: inline-flex; align-items: center; gap: 6px; }
 .br-ov .br-funnel-rows b { color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.br-ov .br-funnel-vs { margin-top: 8px; font-size: 12.5px; line-height: 1.5; }
 .br-ov .cto-notes li { line-height: 1.6; }
 .br-ov .cto-notes code { font-size: .92em; padding: 0 4px; border-radius: 4px; background: var(--kt-glass); }
 .br-ov .cto-table tr.cto-row-pick.is-merged td { color: var(--text); }
@@ -334,7 +335,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
                 </>
               )}
             </article>
-            <FunnelCard f={data.funnel} team={team} onDecision={openDecision} />
+            <FunnelCard f={data.funnel} team={team} steppedIn={c.stepped_in ? c.stepped_in.at_points + c.stepped_in.outside : null} onDecision={openDecision} />
           </section>
 
           <WeeklyChart weeks={c.weekly} onWeek={(w) => filterTo({ id: `week:${w}`, label: `${slash(w)} 起的一周合并的`, keep: (r, run) => weekOf(r, run) === w })} />
@@ -554,7 +555,8 @@ function PeopleCard({ c, onPick }: { c: CtoNumbers; onPick: (p: LedgerPick) => v
   )
 }
 
-function FunnelCard({ f, team, onDecision }: { f: Funnel; team: boolean; onDecision: (key: string, id: string) => void }) {
+/** *steppedIn*: 人介入's count, beside which 人定了 N 个 counts something else (said when the two differ). */
+function FunnelCard({ f, team, steppedIn, onDecision }: { f: Funnel; team: boolean; steppedIn: number | null; onDecision: (key: string, id: string) => void }) {
   const people = f.rows.find((r) => r.id === 'person')?.count ?? 0
   // the app's words for who decided (需求详情's decisions say the same), not brain-kit's labels with agent / Who in them
   const rows = f.rows.map((r) => ({ ...r, label: DECIDED_BY[r.id] ?? r.label }))
@@ -571,6 +573,9 @@ function FunnelCard({ f, team, onDecision }: { f: Funnel; team: boolean; onDecis
           <div className="br-funnel-rows">
             {rows.filter((r) => r.count > 0).map((r) => <span key={r.id} data-row={r.id}><i className="cto-sw" style={{ background: WHO_VAR[r.id] ?? 'var(--ov-ink-3)' }} />{r.label}<b>{r.count}</b></span>)}
           </div>
+          {steppedIn !== null && steppedIn > 0 && steppedIn !== people && (
+            <div className="cto-was br-funnel-vs" data-testid="funnel-vs-people">人定的 {people} 个是决定表里的条数；「人介入 {steppedIn} 次」数的是人做的动作（批准、驳回、回答），所以两个数不一样</div>
+          )}
         </>
       )}
       {f.unclassified.length > 0 && (

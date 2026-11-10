@@ -550,6 +550,8 @@ describe('交付总览', () => {
     const card = await screen.findByTestId('funnel-card')
     expect(card).toHaveTextContent('15个决定')
     expect(card).toHaveTextContent('人定了 4 个 · 数字来自 brain-kit 的评估 · 没合并的需求也算')
+    // beside 人介入 5 次, 人定了 4 个 says it counts something else
+    expect(within(card).getByTestId('funnel-vs-people')).toHaveTextContent('人定的 4 个是决定表里的条数；「人介入 5 次」数的是人做的动作（批准、驳回、回答），所以两个数不一样')
     expect(Array.from(card.querySelectorAll('[data-row]')).map((r) => r.getAttribute('data-row'))).toEqual(['person', 'check', 'brain', 'unclassified', 'unknown'])
     expect(card.querySelector('[data-row="person"]')).toHaveTextContent(/^人4$/)
     expect(within(card).getByRole('img', { name: /^决定：人 4，检查定的 5，照 Brain 3，AI 自己定的 0，/ })).toBeInTheDocument()
