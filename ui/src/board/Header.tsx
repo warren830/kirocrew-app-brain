@@ -8,7 +8,7 @@
 import type { ReqBoard } from '../types'
 import { StateChip } from '../ui'
 import { ACT, leanProgress } from '../vocab'
-import { WORKING, actorLabel, actorMeta, boardWho, checksSay, fmtCredits, fmtWhen, leanOf, localOnly, waitsOnMe } from './format'
+import { WORKING, actorLabel, actorMeta, boardWho, checksSay, fmtCredits, fmtWhen, leanOf, localOnly, runnerBlind, titleOf, waitsOnMe } from './format'
 import { useChangeCount, useTween } from './hooks'
 import { waitCount } from './next'
 import { RoleIcon } from './RoleIcon'
@@ -31,7 +31,7 @@ export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail,
   return (
     <header className="kt-top">
       <div className="kt-title">
-        {onDetail ? (
+        {!titleOf(r) ? null : onDetail ? (
           <button type="button" className="kt-run-title kt-run-link" onClick={onDetail} title="需求详情：周期、时间花在哪、成本、检查、决定和问题">{r.title}</button>
         ) : (
           <span className="kt-run-title">{r.title}</span>
@@ -43,7 +43,7 @@ export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail,
           <span className="kt-pill tone-idle" data-testid="br-local-only" title="这个仓库没有远端：不交给运行机，没有 MR，在本机做完、在本机合并">这个仓库只在本机做</span>
         )}
         <span className="kt-run-meta kt-mono" title={r.worktree ?? undefined}>
-          {board.branch ? `${board.branch} ← ${board.base}` : `还没有运行分支（${board.base}）`}{r.owner ? ` · ${r.owner}` : ''}
+          {board.branch ? `${board.branch} ← ${board.base}` : runnerBlind(board) ? '运行分支还读不到：运行机还没建工作区' : `还没有运行分支（${board.base}）`}{r.owner ? ` · ${r.owner}` : ''}
         </span>
       </div>
       <div className="kt-actions">
@@ -111,7 +111,7 @@ function LeanKpi({ board }: { board: ReqBoard }) {
   const blocked = board.events.filter((e) => e.kind === 'blocked').length
   const seg = (i: number) => (i < ln.done_n ? 'is-pass' : i < through ? 'is-skip' : ln.next && i === ln.next.n - 1 ? (ln.started ? 'is-run' : 'is-next') : '')
   return (
-    <div className="kt-kpi kt-kpi-gates br-kpi-lean" aria-label={`AI-DLC Lean：${leanProgress(ln)}`}>
+    <div className="kt-kpi kt-kpi-gates br-kpi-lean" aria-label={`AI-DLC Lean：${runnerBlind(board) ? '运行机还读不到 Lean 的记录' : leanProgress(ln)}`}>
       <div className="kt-kpi-label">AI-DLC Lean</div>
       <div className="kt-kpi-value" data-testid="br-lean-counter">
         <span className="kt-kpi-big">{ln.done_n}</span>
@@ -120,7 +120,7 @@ function LeanKpi({ board }: { board: ReqBoard }) {
       <div className="kt-segs" aria-hidden="true">
         {Array.from({ length: ln.total }, (_, i) => <i key={i} className={seg(i)} />)}
       </div>
-      <div className="kt-kpi-note br-lean-next">{ln.next ? <>{ln.started ? '在做' : '下一步'}：<b>{ln.next.label}</b></> : through ? '全部做完' : '还没开始'}</div>
+      <div className="kt-kpi-note br-lean-next">{runnerBlind(board) ? '运行机还读不到 Lean 的记录' : ln.next ? <>{ln.started ? '在做' : '下一步'}：<b>{ln.next.label}</b></> : through ? '全部做完' : '还没开始'}</div>
       <div className="kt-gates-rows">
         <span>批准 <b>{approved}</b></span>
         <span className={back ? 'is-hit' : ''}>退回 <b>{back}</b></span>
@@ -205,7 +205,7 @@ function CreditsKpi({ board, reducedMotion, replaying }: { board: ReqBoard; redu
     <div className="kt-kpi kt-kpi-credits">
       <div className="kt-kpi-label">credits</div>
       <div className="kt-kpi-value"><span className="kt-kpi-big">{c === null ? '—' : fmtCredits(shown)}</span></div>
-      <div className="kt-kpi-note">{replaying ? '回放时不算' : c === null ? '这个 app 开的会话还没报' : n ? `${n} 个会话合计` : '运行记录里的合计'}</div>
+      <div className="kt-kpi-note">{replaying ? '回放时不算' : c === null ? (n ? '这个 app 开的会话还没报' : '还没开过会话') : n ? `${n} 个会话合计` : '运行记录里的合计'}</div>
     </div>
   )
 }

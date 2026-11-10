@@ -217,6 +217,14 @@ export function localOnly(b: Pick<ReqBoard, 'row' | 'actors' | 'direct'>): boole
 }
 export const RUNNER_PART: ReadonlySet<string> = new Set(['handover', 'bridge', 'signer', 'runner'])
 
+/** The team runner's page of a requirement it has no working directory for yet (the bridge took it; the signer signs, or
+ * the runner prepares): nothing of its records is readable here, nor its branch (backend board.runner_blind). */
+export const runnerBlind = (b: Pick<ReqBoard, 'row'>): boolean =>
+  b.row.where === 'runner' && !b.row.worktree && !['claimed', 'merged', 'closed'].includes(b.row.state)
+
+/** The requirement's title when it has one of its own (one whose claim is not read yet is called by its key only). */
+export const titleOf = (r: Pick<ReqBoard['row'], 'key' | 'title'>): string => (r.title && r.title !== r.key ? r.title : '')
+
 /** *started*: the next stage is the one being worked on (「在做」), not one still to do; *stage_state* says the same in
  * LeanSummary's word, for vocab.leanProgress */
 export type LeanNow = { done_n: number; skipped_n: number; next: { id: string; label: string; n: number } | null; total: number; started: boolean; stage_state: 'started' | null }

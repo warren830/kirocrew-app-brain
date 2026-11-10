@@ -8,7 +8,7 @@ import type { ReactNode } from 'react'
 import type { ReqBoard } from '../types'
 import { Icon } from '../ui'
 import { useCopy } from '../views/Question'
-import { checksSay, fmtCredits, fmtWhen } from './format'
+import { checksSay, fmtCredits, fmtWhen, titleOf } from './format'
 import { RoleIcon } from './RoleIcon'
 
 const STATE: Record<ReqBoard['accept']['state'], { label: string; tone: string }> = {
@@ -65,7 +65,7 @@ export function Accept({ board, onDetail, quiet = false }: { board: ReqBoard; on
       <dl className="kt-sign-grid">
         <div>
           <dt>需求</dt>
-          <dd><b className="br-strong">{board.row.key}</b> {board.row.title}</dd>
+          <dd><b className="br-strong">{board.row.key}</b> {titleOf(board.row)}</dd>
         </div>
         <div className="br-accept-desc">
           <dt>变更说明 {m.text && <button type="button" className="br-link br-small br-copy" onClick={() => void copy()}><Icon name="Copy" size={12} />复制</button>}

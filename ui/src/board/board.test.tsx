@@ -609,7 +609,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
   test('someone else’s claim: it says whose it is and waits for them; no 开工', async () => {
     const b = fx.board()
     Object.assign(b.row, { state: 'claimed', state_label: '已认领', owner: 'carol' })
-    b.person = { ...b.person, owner: 'carol', me: false }
+    b.person = { ...b.person, owner: 'carol', me: false, you: false }
     installFixtureRoutes(boardRoute(() => structuredClone(b)))
     renderBoard()
     const intro = await screen.findByTestId('br-board-intro')
@@ -1229,6 +1229,29 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     const belt = screen.getByTestId('kt-conveyor')
     expect(belt).toHaveTextContent('运行机还没开始做，还没有它的提交：签名服务在签接手合同')
     expect(belt).not.toHaveTextContent('不在这台机器上')
+  })
+
+  test('the runner’s page of a hand-over it cannot read yet tells one story: no title twice, no 还没开工, no session to report', async () => {
+    const b = fx.board()
+    Object.assign(b, { source: 'app', belt: [], branch: null, events: [], sessions: [], credits: { ...b.credits, total: null } })
+    Object.assign(b.row, { where: 'runner', worktree: null, title: b.row.key, state: 'handed_over', state_label: '已交接',
+      waits: { ...b.row.waits, who: 'bridge', do: 'none', line: null, text: '签名服务在签接手合同' } })
+    b.mr_desc = { ...b.mr_desc, text: '', first: null, error: '运行机还没开始做：它做完提交以后才有变更说明' }
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    const graph = await loaded()
+    const top = document.querySelector('.kt-top') as HTMLElement
+    expect(top.querySelector('.kt-run-title')).toBeNull()
+    expect(top).toHaveTextContent('运行分支还读不到：运行机还没建工作区')
+    expect(top).not.toHaveTextContent('还没有运行分支')
+    expect(graph.querySelector('.kt-rail-label')).toHaveTextContent('运行分支 （运行机还读不到）')
+    const kpis = within(screen.getByRole('group', { name: '指标' }))
+    expect(kpis.getByText('credits').parentElement).toHaveTextContent('还没开过会话')
+    expect(kpis.getByText('AI-DLC Lean').parentElement).toHaveTextContent('运行机还读不到 Lean 的记录')
+    const accept = screen.getByTestId('br-accept')
+    expect(accept).toHaveTextContent(new RegExp(`需求${b.row.key}\\s*变更说明`))
+    expect(accept).toHaveTextContent('运行机还没开始做')
+    expect(screen.getByTestId('br-board')).not.toHaveTextContent('还没开工')
   })
 
   test('a repo done only here: the graph numbers and names its phases as its introduction does (2 检查 · 发布, 3 回写), no 验收', async () => {

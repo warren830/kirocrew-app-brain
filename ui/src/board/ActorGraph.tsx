@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, 
 import type { Actor, ReqBoard, WaitDo } from '../types'
 import { ACT, DO_NAME } from '../vocab'
 import { Engine, type Item } from './engine'
-import { LIVE, WORKING, actorLabel, actorMeta, boardWho, clip, fmtCredits, fmtWhen, isFinal, localOnly, waitsOnMe } from './format'
+import { LIVE, WORKING, actorLabel, actorMeta, boardWho, clip, fmtCredits, fmtWhen, isFinal, localOnly, runnerBlind, waitsOnMe } from './format'
 import { useLatest } from './hooks'
 import { NODE_H, NODE_W, ORCH_BOX, ROSTER, anchorBox, commandPath, headX, particlePath, pathD, SCALE, type GraphLayout, type NodeBox } from './layout'
 import { Overlay } from './overlay'
@@ -406,7 +406,7 @@ function Rail({ board, lay, head, focus, flash }: { board: ReqBoard; lay: GraphL
       <line className="kt-rail-base" x1={x1} y1={y} x2={x2} y2={y} />
       {any && <line className="kt-rail-fill" x1={x1} y1={y} x2={merged ? x2 : head} y2={y} />}
       <text className="kt-rail-label" x={x1} y={y - 18}>
-        运行分支 <tspan className="kt-mono">{board.branch ?? '（还没开工）'}</tspan>
+        运行分支 <tspan className="kt-mono">{board.branch ?? (board.row.state === 'claimed' ? '（还没开工）' : runnerBlind(board) ? '（运行机还读不到）' : '（还不知道）')}</tspan>
       </text>
       <text className="kt-rail-sub" x={x1} y={y + 24}>
         从 <tspan className="kt-mono">{board.base}</tspan> 出发{merged ? <>，已合并回 <tspan className="kt-mono">{board.base}</tspan></> : ''}

@@ -636,3 +636,30 @@ def test_a_write_back_branch_says_when_it_was_merged_into_the_default_branch(tmp
     assert got["brain/DEMO-3-reflect-1"][1] == got["brain/DEMO-3-reflect-1"][0]
     assert got["brain/DEMO-3-reflect-2"][1] == 1893456000.0
     assert got["brain/DEMO-3-reflect-3"][1] is None
+
+
+def test_the_runners_page_of_a_hand_over_it_cannot_read_yet_tells_one_story():
+    """runner/PAY-9: the team runner has it in its ledger, so the bridge took it; the signer signs its contract and the
+    runner has no working directory for it yet. The hand-over is behind it on every part of the board: no 等开工, no
+    桥 at work while 签名 waits for the bridge, no approvals 还剩 that were the person's before the hand-over."""
+    f = dict(facts([], run=False), claim=None, owner=None)
+    row = dict(row_of("handed_over", "bridge", "签名服务在签接手合同", do="none"), where="runner", repo="runner",
+               updated_at=T, mr={"iid": 53, "url": "https://gitlab.example.com/p/-/merge_requests/53", "state": None},
+               run_ids=["RUN-DEMO-3-1"])
+    b = snapshot(f, row, me="alice", local_only=False, now=T + M)
+    assert (actor(b, "handover")["status"], actor(b, "bridge")["status"]) == ("merged", "done")
+    assert (actor(b, "signer")["status"], actor(b, "signer")["doing"]) == ("running", "在签接手合同")
+    assert actor(b, "runner")["status"] == "waiting"
+    for k in ("local", "req", "design"):
+        assert (actor(b, k)["status"], actor(b, k)["doing"]) == ("done", board.RUNNER_BLIND), k
+    text = json.dumps(b["actors"], ensure_ascii=False)
+    assert "等开工" not in text and "等桥核对" not in text
+    cells = {c["id"]: c for c in b["checks"]["cells"]}
+    assert cells["bridge"]["status"] == "pass" and cells["signer"]["detail"] == "在签"
+    assert "gate-REQUIREMENTS" not in cells and "需求审批" not in b["checks"]["todo"]
+    assert "签接手合同" in b["checks"]["todo"] and "发布审批" in b["checks"]["todo"]
+    # signed: the runner prepares its working directory
+    row = dict(row, waits=dict(row["waits"], who="runner", text="运行机在准备工作区"))
+    b = snapshot(f, row, me="alice", local_only=False, now=T + M)
+    assert actor(b, "signer")["status"] == "merged"
+    assert (actor(b, "runner")["status"], actor(b, "runner")["doing"]) == ("queued", "运行机在准备工作区")

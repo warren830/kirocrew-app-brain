@@ -1049,7 +1049,7 @@ def main() -> None:
         brain_t = boards[bid]["brain"] if path and bid in boards else no_trace_brain(Req("r1", key, "", "", "", ""))
         b = snapshot(q, row_t, brain=brain_t, park=park, facts=f, team_decisions=decs, sessions=sess, me=ME,
                      decisions=kw.get("decisions") or [], reflect=kw.get("reflect") or [],
-                     mr_desc=kw.get("mr_desc") if path else mrdesc_view.empty("还没开工：开工以后才有变更说明"),
+                     mr_desc=kw.get("mr_desc") if path else mrdesc_view.empty(board.RUNNER_NO_DESC),
                      questions=detail.ledger_questions(decs, url), credits=row_t["credits"], bid="runner/%s" % key)
         boards["runner/%s" % key] = b
         run = f.get("run") or {}

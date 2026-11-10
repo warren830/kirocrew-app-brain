@@ -43,6 +43,10 @@ WAIT_TEXT = {
     "bridge": "等交接以后核对", "signer": "等桥核对完签接手合同", "runner": "等签好合同以后接手", "ci": "等提交以后跑自动检查",
     "release": "等 Lean 走到发布审批", "reflect": "等合并以后写回 Brain",
 }
+# the team runner's page of a requirement it has no working directory for yet (the bridge took it, the signer signs or
+# the runner prepares): nothing of what was done before the hand-over is readable there
+RUNNER_BLIND = "交接前的事：运行机还没建工作区，读不到它的记录"
+RUNNER_NO_DESC = "运行机还没开始做：它做完提交以后才有变更说明"
 # Lean's approval kinds -> the gate actors they ask
 GATES_OF = {"REQUIREMENTS": ("req",), "INCEPTION": ("req", "design"), "DESIGN": ("design",), "PLAN": ("design",),
             "RELEASE": ("release",)}
@@ -609,6 +613,11 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
     if merged_at is not None:   # what the clocks put a moment after the merge (Lean's ms, git's seconds) ends there too
         _merged(fo, merged_at, hand_at, proposals, again=True, you=you)
     _live_overlay(fo, f, row, sessions, now, hand_at, merged_at, evs, last_local[0], you)
+    blind = runner_blind(f, row)
+    if blind:   # it was handed over, so this machine's part is behind it; the runner just cannot read it yet
+        for k in ("local", "req", "design"):
+            if A[k]["status"] == "waiting":
+                fo.put(k, "done", RUNNER_BLIND, None)
     newest = max(reflect_refs, key=lambda x: x[1], default=None)
     if newest and newest[2] is not None and A["reflect"]["status"] == "done":   # the write-back is in the Brain now
         fo.put("reflect", "merged", "回写分支 %s 已合并" % newest[0], newest[2])
@@ -625,7 +634,7 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
         x["spans"] = [s for s in x["spans"] if s["b"] is None or s["b"] > s["a"]]
     wait_who = str((row.get("waits") or {}).get("who"))
     asked = you if wait_who == "you" else ASK_NAME.get(wait_who, "人")
-    checks = _checks(f, evs, A, kit_rows, t, local_only, hand_at, merged_at, you, asked)
+    checks = _checks(f, evs, A, kit_rows, t, local_only, hand_at, merged_at, you, asked, handed=hand_at is not None or blind)
     actors = [A[k] for k, *_ in ACTORS]
     _facts(fo, f, evs, row, sessions, proposals)
     person = _person(row, me, f, you)
@@ -764,6 +773,24 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
             # nothing was handed over: the bridge never had it, the hand-over waits on the person to label it
             A["bridge"]["spans"] = [x for x in A["bridge"]["spans"] if x["b"] is not None]
             fo.open("handover", "wait", at)
+        elif row.get("where") == "runner":
+            # the team runner has it in its ledger, so the bridge took it: the signer signs its contract (waits on the
+            # bridge's side), or it is signed and the runner prepares the working directory (brain-kit's signing /
+            # spooled, ready: deliveries.team_classify)
+            at = _first(since, hand_at, row.get("updated_at"), now)
+            for k, st, doing in (("handover", "merged", "桥接手了"), ("bridge", "done", "核对过了：交给签名服务签合同")):
+                if A[k]["status"] not in FINAL + ("done",):
+                    fo.put(k, st, doing, at)
+                    fo.close(k, at)
+            if waits.get("who") == "runner":
+                if A["signer"]["status"] not in FINAL:
+                    fo.put("signer", "merged", "签了接手合同", at)
+                    fo.close("signer", at)
+                if A["runner"]["status"] not in ("queued", "running"):
+                    fo.put("runner", "queued", waits.get("text") or "运行机在准备工作区", at)
+            elif A["signer"]["status"] not in ("running",):
+                fo.put("signer", "running", "在签接手合同", at)
+                fo.open("signer", "work", at)
         else:
             if A["handover"]["status"] not in ("queued",):
                 fo.put("handover", "queued", "等桥核对交接", _first(since, hand_at, now))
@@ -823,10 +850,13 @@ def _belt(evs: list[dict[str, Any]], changes: dict[str, list[dict[str, Any]]]) -
 
 def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str, Any]], kit_rows: list[dict[str, Any]],
             t: dict[str, Any] | None, local_only: bool, hand_at: float | None, merged_at: float | None,
-            you: str, asked: str = "人") -> dict[str, Any]:
+            you: str, asked: str = "人", handed: bool | None = None) -> dict[str, Any]:
     """The check wall. It counts what has happened (pass, fail, and wait: asked of a person); what is still to come on
     this requirement's way is `todo`, by name; what is not on its way (a design Lean skipped, the runner of a repo done
-    only here) is not_needed or left out; the 14 days after the merge are watched, nobody's turn."""
+    only here) is not_needed or left out; the 14 days after the merge are watched, nobody's turn. *handed*: it was handed
+    over (default: its hand-over is recorded; the team runner's page of one it cannot read yet knows it was)."""
+    handed = hand_at is not None if handed is None else handed
+    blind = handed and hand_at is None   # the runner's page, nothing before the hand-over readable: not said
     cells: list[dict[str, Any]] = []
     todo: list[str] = []
     ahead = merged_at is None and A["release"]["status"] not in FINAL
@@ -852,6 +882,8 @@ def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str,
                  "等%s在会话里打这一行批准：%s" % (you, pend[lean].get("line")) if hand_at is None and pend[lean].get("line")
                  else "等%s在 MR 上回答（approve 通过 / reject 退回）" % asked, actor)
         elif not e:
+            if blind and lean != "RELEASE":
+                continue
             if lean == "DESIGN" and A["design"]["status"] == "skipped" and A["design"]["doing"].startswith(NOT_NEEDED) \
                     and "PLAN" not in last:
                 cell("gate-DESIGN", "gate", label, "设计和代码计划审批", "not_needed", None, A["design"]["doing"], actor)
@@ -883,22 +915,22 @@ def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str,
     else:
         cell("verify", "verify", "自动检查", "自动检查", "skip", None, "还没跑过自动检查（构建和测试阶段跑）", "ci", later="自动检查")
     # the hand-over: the bridge and the signer (not on the way of a repo done only here, or of one done here and merged)
-    if not local_only and not (hand_at is None and merged_at is not None):
+    if not local_only and not (not handed and merged_at is not None):
         if A["handover"]["status"] == "stalled":
             # pushed without the hand-over label: nothing reached the bridge and nothing is checked; the person labels it
             cell("bridge", "handover", "标签", "补上交接标签", "wait", None,
                  A["bridge"]["doing"] or "MR 上没有交接标签：桥不会接", "handover")
         else:
             cell("bridge", "handover", "桥", "桥核对交接", "pass" if A["handover"]["status"] == "merged" else
-                 "fail" if A["handover"]["status"] == "failed" else "wait" if hand_at else "skip",
+                 "fail" if A["handover"]["status"] == "failed" else "wait" if handed else "skip",
                  A["handover"]["since"] if A["handover"]["status"] in ("merged", "failed") else None,
                  {"merged": "接手了", "failed": A["bridge"]["doing"]}.get(A["handover"]["status"],
-                                                                         "还没交接" if not hand_at else "在核对"),
+                                                                         "还没交接" if not handed else "在核对"),
                  "bridge")
         cell("signer", "handover", "签名", "签名服务签接手合同", "pass" if A["signer"]["status"] == "merged" else
              "fail" if A["signer"]["status"] == "failed" else "skip", A["signer"]["since"] if A["signer"]["status"] == "merged" else None,
-             "签了" if A["signer"]["status"] == "merged" else "还没签", "signer",
-             later="签接手合同" if hand_at and A["handover"]["status"] != "failed" else None)
+             "签了" if A["signer"]["status"] == "merged" else "在签" if A["signer"]["status"] == "running" else "还没签", "signer",
+             later="签接手合同" if handed and A["handover"]["status"] != "failed" else None)
     # the repo's kit (what the team runner needs committed): a ! reminder matters once a requirement is handed over, so
     # for a repo done only on this machine it is not on the way
     for i, k in enumerate(kit_rows):
@@ -1153,6 +1185,12 @@ def checks_line(checks: dict[str, Any]) -> str:
         return ("目前 %d 项都过" % checks["passed"] + later) if later else "全部 %d 项都过" % checks["passed"]
     return "检查 %d/%d 过%s%s%s" % (checks["passed"], checks["total"], " · 没过：%s" % "、".join(bad[:3]) if bad else "",
                                   " · 等人：%s" % "、".join(wait[:3]) if wait else "", later)
+
+
+def runner_blind(f: dict[str, Any], row: dict[str, Any]) -> bool:
+    """The team runner's page of a requirement it has no working directory for yet: handed over (the bridge took it),
+    nothing of its records readable there."""
+    return row.get("where") == "runner" and not f.get("run") and row.get("state") not in ("claimed", "merged", "closed")
 
 
 def run_of(f: dict[str, Any]) -> dict[str, Any]:
