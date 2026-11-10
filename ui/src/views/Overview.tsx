@@ -126,6 +126,7 @@ export const OV_CSS = `
   .br-ov .cto-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .br-ov .br-ledger { font-size: 13px; }
   .br-ov .br-ledger th, .br-ov .br-ledger td { padding: 8px 6px; }
+  .br-ov .br-ledger .br-acts { flex-direction: column; align-items: stretch; }
 }
 @container brov (max-width: 900px) {
   .br-ov .br-kanban { grid-template-columns: minmax(0, 1fr) !important; }
@@ -140,9 +141,9 @@ type LedgerPick = { id: string; label: string; keep: (r: Requirement, run: CtoRu
 type RepoCount = { open: number; you: number }
 
 const isOpen = (r: Requirement) => r.state !== 'merged' && r.state !== 'closed'
-const idOf = (r: { repo: string; key: string }) => `${r.repo}/${r.key}`
 /** the runner's rows of projects this machine does not list: no repo pill holds them, so one more pill does */
 const ELSEWHERE: LedgerPick = { id: 'elsewhere', label: '没导入的项目', keep: (r) => homeOf(r) === 'runner' }
+const idOf = (r: { repo: string; key: string }) => `${r.repo}/${r.key}`
 
 /** A repo pill's counts: its requirements in progress, and those that wait on you (a merge to write back into the
  * Brain too, as 轮到你 lists them), a row on the runner under its repo (homeOf; 'runner': a project not listed here);
@@ -223,8 +224,8 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
     if (r) go({ kind: 'item', repo: r, key, from: 'overview', decision: id })
   }
   const repoName = (id: string) => repos.find((x) => x.id === id)?.name
-  const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
   const elsewhere = pillCounts.runner
+  const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
   // nothing here can be handed over: no origin to push to, or no GitLab for the bridge (the backend's local_only rule)
   const localOnly = scope.length > 0 && scope.every((r) => r.remote === false || !(r.kit?.gitlab_base && r.kit?.gitlab_project))
   const manyRepos = repo === 'all' && repos.length > 1
@@ -304,7 +305,6 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
               </button>
             )
           })}
-        </nav>
           {elsewhere && elsewhere.open + elsewhere.you > 0 && (
             <button type="button" aria-pressed={pick?.id === ELSEWHERE.id} data-testid="pill-elsewhere" title="运行机在做的、这台机器没导入的项目：点一下在全部的交付清单里看它们"
               onClick={() => { if (repo !== 'all') pickRepo('all'); filterTo(ELSEWHERE) }}>
@@ -312,6 +312,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
               <span>进行中 {elsewhere.open}{elsewhere.you > 0 && <span className="is-you"> · 轮到你 {elsewhere.you}</span>}</span>
             </button>
           )}
+        </nav>
       )}
 
       {empty && noKit && (

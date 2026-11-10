@@ -8,7 +8,7 @@ import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
 import { apiCalls, apiError, navigations } from '../test/stubs/app-sdk'
 import type { Overview, Requirement, Status } from '../types'
-import { OverviewView, plainSummary } from './Overview'
+import { OV_CSS, OverviewView, plainSummary } from './Overview'
 import type { ViewProps } from './props'
 
 function props(over: Partial<ViewProps> = {}): ViewProps {
@@ -458,6 +458,11 @@ describe('交付总览', () => {
     expect(overlaps).toHaveTextContent('PAY-3alice和PAY-4carol都要改src/refund/先商量好谁先合，免得冲突')
     await user.click(within(overlaps).getByRole('button', { name: 'PAY-3' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-3', from: 'overview' })
+  })
+
+  test('a narrow ledger (1050) stacks a row’s 需求详情 and ▶ 回放, so the table fits its card without a sideways scroll', () => {
+    const narrow = OV_CSS.slice(OV_CSS.indexOf('@container brov (max-width: 1180px)'))
+    expect(narrow.slice(0, narrow.indexOf('\n}'))).toMatch(/\.br-ledger \.br-acts \{ flex-direction: column;/)
   })
 
   test('▶ 回放 is on a merged row only, and opens its 需求看板 replaying (replay=1)', async () => {
