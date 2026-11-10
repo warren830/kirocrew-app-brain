@@ -50,6 +50,8 @@ ${toneVars}
 .br-tabs button:hover:not(:disabled) { color: var(--text-strong); }
 .br-tabs button:disabled { color: var(--muted); cursor: default; opacity: .7; }
 .br-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--text-strong); }
+/* a tab that cannot open (the requirement in hand is not there): looks and feels off in both modes, no hand cursor */
+.br-tabs button[aria-disabled="true"], .br-tabs button[aria-disabled="true"]:hover { color: var(--muted); opacity: .45; cursor: not-allowed; }
 .br-count { display: inline-flex; align-items: center; justify-content: center; min-width: 1.6em; padding: 0 6px; border-radius: 999px; font-size: .78em; font-weight: 800;
   background: var(--kt-approve); color: var(--kt-on); }
 .br-bar .br-btn { margin: 4px 0 6px; }

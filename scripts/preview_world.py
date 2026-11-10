@@ -112,6 +112,7 @@ class Req:
         self.after14: dict | None = None
         self.app: list[dict] = []
         self.proposals = 0
+        self.worktree: str | None = None    # its checkout on this machine, if it has one
 
     # Lean's ledger
     def _lean(self, at: float, event: str, **data) -> None:
@@ -141,13 +142,25 @@ class Req:
         self._lean(at, "APPROVAL_REQUESTED", kind=kind, sha256=h, **self._doc(kind, unit))
         return h
 
-    def approve(self, at: float, kind: str, h: str, who: str = "P-1A2B", unit: str | None = None) -> None:
+    @property
+    def me(self) -> str:
+        """The owner's pseudonym in brain-kit's record (trace.pseudonym of their git email)."""
+        return "G-" + sha("git", self.owner)[:6].upper()
+
+    def _human(self, at: float, kind: str, what: str, who: str | None) -> None:
+        """brainkit.trace's human act: one typed in the owner's own session is the Lean record's identity (channel
+        local, before any hand-over); one *who* answered on the MR came through the bridge."""
+        self.humans.append({"at": iso(at), "kind": kind, "what": what, "who": who or self.me, "judgment_point": True,
+                            "channel": "bridge" if who else "local",
+                            "after_handover": self.hand_at is not None and at > self.hand_at})
+
+    def approve(self, at: float, kind: str, h: str, who: str | None = None, unit: str | None = None) -> None:
         self._lean(at, "APPROVED", kind=kind, sha256=h, **self._doc(kind, unit))
-        self.humans.append({"at": iso(at), "kind": "approval", "what": kind, "who": who, "judgment_point": True})
+        self._human(at, "approval", kind, who)
 
     def reject(self, at: float, kind: str, h: str) -> None:
         self._lean(at, "REJECTED", kind=kind, sha256=h, **self._doc(kind, None))
-        self.humans.append({"at": iso(at), "kind": "rejection", "what": kind, "who": "P-1A2B", "judgment_point": True})
+        self._human(at, "rejection", kind, None)
 
     def turn(self, at: float, session: str = "s-1") -> None:
         """The person typed in the session (Lean's UserPromptSubmit hook): the session's first prompt is its task."""
@@ -163,7 +176,7 @@ class Req:
     # git and the hand-over
     def commit(self, at: float, by: str, subject: str, files: int = 3, after: bool | None = None, records: bool = False) -> str:
         s = sha(self.key, "commit", at, subject)
-        self.commits.append({"sha": s, "at": iso(at), "committed_at": iso(at), "by": by, "who": None if by == "bot" else "G-3F2A1C",
+        self.commits.append({"sha": s, "at": iso(at), "committed_at": iso(at), "by": by, "who": None if by == "bot" else self.me,
                              "files": files, "records_only": records, "merge": False,
                              "after_handover": (self.hand_at is not None and at > self.hand_at) if after is None else after,
                              "subject": subject})
@@ -190,8 +203,7 @@ class Req:
         self.decs.append({"id": did, "source": "bridge", "kind": kind, "asked_at": iso(asked), "at": iso(answered) if answered else None,
                           "choice": choice, "state": state, "who": who if choice else None, "voucher_id": None})
         if choice:
-            self.humans.append({"at": iso(answered), "kind": "approval" if kind == "acceptance" else "answer",
-                                "what": "acceptance" if kind == "acceptance" else kind, "who": who, "judgment_point": True})
+            self._human(answered, "approval" if kind == "acceptance" else "answer", "acceptance" if kind == "acceptance" else kind, who)
 
     def merge(self, at: float, how: str = "merge commit") -> None:
         self.merged_at, self.merge_how = at, how
@@ -220,8 +232,10 @@ class Req:
                 run["handoff"] = {"requested_at": iso(self.hand_at), "by": self.owner, "local_head": sha(self.key, "lh")}
         return {"key": self.key, "claim": {"owner": self.owner, "title": self.title, "created_at": iso(self.claim_at or self.start_at or T0),
                                            "source": "product"},
-                "where": "main" if self.merged_at else "worktree" if self.hand_at is None else "branch", "branch": self.branch if run else None,
-                "owner": self.owner, "worktree": None, "run": run, "park": park, "merged": bool(self.merged_at),
+                # repo._key_facts: merged, else read in its checkout here when this machine has one, else on its branch
+                "where": "main" if self.merged_at else "worktree" if self.worktree or self.hand_at is None else "branch",
+                "branch": self.branch if run else None,
+                "owner": self.owner, "worktree": None if self.merged_at else self.worktree, "run": run, "park": park, "merged": bool(self.merged_at),
                 "merged_at": self.merged_at, "tip_at": self.merged_at or (_epoch(self.commits[-1]["at"]) if self.commits else None),
                 "park_at": _epoch(self.park[-1]["at"]) if self.park else None, "review": None,
                 "decisions_text": "```brain-proposal\n```\n" * self.proposals, "events": self.events, "approvals": approvals,
@@ -238,7 +252,7 @@ class Req:
                 row.update(state=lean_view.STAGE_STATE[e["event"]], at=e["ts"], note=d.get("note") or d.get("reason"), src="aidlc-docs/audit/L-3F2A1C.jsonl")
         stages = sorted(seen.values(), key=lambda r: r["first_at"])
         verify = [{"at": e["ts"], "ok": e["data"]["ok"], "src": "aidlc-docs/audit/L-3F2A1C.jsonl"} for e in self.events if e["event"] == "VERIFY"]
-        return {"stages": stages, "humans": self.humans, "brain": brain, "missing": TRACE_MISSING,
+        return {"owner": self.owner, "stages": stages, "humans": self.humans, "brain": brain, "missing": TRACE_MISSING,
                 "actions": {"commits": self.commits, "handovers": self.hands, "questions": self.park, "blocked": [
                     {"at": e["ts"], "gate": e["data"]["gate"], "path": e["data"]["path"], "tool": "fs_write", "src": "aidlc-docs/audit/L-3F2A1C.jsonl"}
                     for e in self.events if e["event"] == "BLOCKED"]},
@@ -533,10 +547,13 @@ def classified(r: Req, row: dict, *, park: dict | None = None, mr: dict | None =
                local_only: bool = False, reflected: bool = False, at_handover: bool = False) -> dict:
     """*row* with what the backend works out of *r*'s records (service._row: deliveries.base_row and classify): its
     state, Lean progress and what it waits on. The rest of *row* (title, summary, credits, the MR link) stays."""
+    r.worktree = row.get("worktree")     # the row's checkout on this machine is the requirement's
     f = r.facts(park)
     got = deliveries.base_row(r.repo, f, local_only=local_only)
     deliveries.classify(got, f, mr=mr, slot=slot, cfg=CFG, me=ME, reflected=reflected, now=T0, at_handover=at_handover)
-    row.update({k: got[k] for k in ("state", "state_label", "lean", "stage", "waits", "local_only")})
+    row.update({k: got[k] for k in ("state", "state_label", "lean", "stage", "waits", "local_only", "where", "worktree")})
+    # the head says where it is, the facts list its checkout: never 「这台机器没检出」 above a 工作目录 on this machine
+    assert not (row["where"] == "branch" and row["worktree"]), r.key
     row["session_url"] = slot["url"] if slot else None
     row["summary"] = mrdesc_view.plain_line(row.get("summary"))     # what service._row shows of the 变更说明
     return row
@@ -546,7 +563,13 @@ LATER: dict[str, tuple] = {}   # each board's makings by "<repo>/<key>", made on
 
 
 def board_later(r: Req, row: dict, **kw) -> None:
-    """*r*'s board (snapshot), made at the end: its Brain block comes from brain_views, which needs every record."""
+    """*r*'s board (snapshot), made at the end: its Brain block comes from brain_views, which needs every record.
+    *sessions*: the ones this machine opened for it (service._sessions_snapshot: the repo's scope), whose credits are its
+    total; *runner_sessions*: the team runner's for it (keyed by the run id), listed on the runner's page only."""
+    sess = kw.get("sessions") or []
+    assert all(x.get("kind") != "runner" for x in sess), "a runner's session on a repo's page: %s" % r.key
+    if sess:   # the total is the sessions' own credits added up (sessions.credits_by_key)
+        assert kw.get("credits") == (round(sum(x["credits"] for x in sess if x.get("credits") is not None), 3) or None), r.key
     LATER["%s/%s" % (r.repo, r.key)] = (r, row, kw)
 
 
@@ -607,6 +630,34 @@ def intake_gates() -> dict:
     said = {"%s|%s" % (c, x): intake.gate_text(x, {"classification": c, "exclude": []})
             for c in ("",) + intake.CLASSES for x in raw.values()}
     return {"raw": raw, "said": said}
+
+
+def detail_of(r: Req, row: dict, kw: dict, b: dict) -> dict:
+    """需求详情 (GET /requirements/<repo>/<key>) as service._detail_sync makes it from the same records as the board *b*:
+    its facts, the Lean card, brainkit.trace's timeline with the app's own events, the sessions of its scope and their
+    credits. Lean's Session notes stand in as its progress and what it waits on (the world writes no aidlc-state.md)."""
+    f = r.facts(kw.get("park"))
+    run = f.get("run") or {}
+    t = r.trace(b["brain"]) if run else None
+    handed = r.hand_at is not None
+    sess = kw.get("sessions") or []
+    return {
+        "row": row, "where_label": service.Service._where_label(f),
+        "run": {"owner": run.get("owner"), "branch": run.get("branch"), "intent": run.get("intent"),
+                "brain_commit": run.get("brain_commit"), "origin": run.get("origin"), "created_at": run.get("created_at"),
+                "materials": [str(m.get("package")) for m in run.get("materials") or []],
+                "handoff": {"requested_at": run["handoff"].get("requested_at"), "by": run["handoff"].get("by")}
+                if isinstance(run.get("handoff"), dict) else None} if run else None,
+        "claim": service.Service._claim_view(f.get("claim")),
+        "lean": {"stages": f["stages"], "approvals": [{k: a[k] for k in ("kind", "state", "sha8", "at", "line", "path")} for a in f["approvals"]],
+                 **lean_view.notes("Status: %s · %s" % (row["stage"], row["waits"]["text"]) if row.get("stage") else None)},
+        "decisions": kw.get("decisions") or [], "questions": kw.get("questions") or [],
+        "timeline": {"source": "trace" if t else "app",
+                     "items": sorted((detail.trace_timeline(t) if t else []) + r.app, key=lambda x: (x["at"] or "", x["kind"])),
+                     "error": "", "missing": board.missing_sources(TRACE_MISSING if t else [], local_only=bool(kw.get("local_only")), handed=handed)},
+        "sessions": [{k: x.get(k) for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
+                                             "last_activity", "opened_at", "project", "url", "error")} for x in sess],
+        "credits": {"total": kw.get("credits"), "note": detail.NO_TOKENS}, "brain": b["brain"], "mr_desc": b["mr_desc"]}
 
 
 def main() -> None:
@@ -686,17 +737,17 @@ def main() -> None:
     p2_sess = dict(det["sessions"][0], slot="brain-PAY-2-1c4e", url="/chat?sid=brain-PAY-2-1c4e", title="PAY-2 退款单号校验",
                    credits=8.3, turns=19, busy=False, awaiting=False, last_activity=p2.hand_at)
     row = classified(p2, rows["PAY-2"], reflected=True, slot=p2_sess)
-    row.update(updated_at=p2.merged_at + 35 * M, credits=22.7)
+    row.update(updated_at=p2.merged_at + 35 * M, credits=8.3)
     p2_decisions = decisions(p2, [("requirements", "退款单号按 RF + 9 位校验，旧的 7 位也认", "回答了澄清问题 D-1", "P-1A2B", "person", []),
                                   ("application-design", "重复和非法单号在入口直接拒", "下游对账按单号去重", None, "agent", ["T-12"]),
                                   ("code-generation", "校验写成纯函数，接口和批量导入共用", "照 Brain 的约定", "P-7", "brain", ["P-7"])])
     board_later(p2, row, decisions=p2_decisions,
                                   reflect=[("brain/PAY-2-reflect-1", p2.merged_at + 15 * H, None)],
-                                  sessions=[p2_sess,
-                                            dict(det["sessions"][0], slot="brain-run-RUN-PAY-2-1", url="/chat?sid=brain-run-RUN-PAY-2-1", title="RUN-PAY-2-1",
-                                                 agent="brain-run", kind="runner", credits=14.4, turns=41, busy=False, awaiting=False, last_activity=p2.merged_at)],
-                                  mr_desc=mrdesc(p2, first["PAY-2"]), credits=22.7)
-    runs.append({"key": "PAY-2", "repo": "r1", "how": "people", "beyond": ["回答问题"], "at_points": 5, "outside": 0, "credits": 22.7, "merged_at": p2.merged_at})
+                                  sessions=[p2_sess],
+                                  runner_sessions=[dict(det["sessions"][0], slot="brain-run-RUN-PAY-2-1", url="/chat?sid=brain-run-RUN-PAY-2-1", title="RUN-PAY-2-1",
+                                                        agent="brain-run", kind="runner", credits=14.4, turns=41, busy=False, awaiting=False, last_activity=p2.merged_at)],
+                                  mr_desc=mrdesc(p2, first["PAY-2"]), credits=8.3)
+    runs.append({"key": "PAY-2", "repo": "r1", "how": "people", "beyond": ["回答问题"], "at_points": 5, "outside": 0, "credits": 8.3, "merged_at": p2.merged_at})
 
     # PAY-3: on this machine, two units: refund-export's code written yesterday; the session sat quiet overnight until
     # alice spoke to it this morning; refund-api's code-generation plan (PLAN) waits for her approval, a clarify
@@ -765,8 +816,8 @@ def main() -> None:
                                               "options": [{"id": "A", "text": "按小时切成多份"}, {"id": "B", "text": "一份，压缩成 zip"}], "recommend": "A",
                                               "lean_request": None, "refs": ["D01#S002"], "state": "open", "answer": None, "answerer": None, "voucher_id": None,
                                               "mr_url": "%s/shop/shop-pay/-/merge_requests/41" % GL, "at": T0 - 3 * H, "answerable_here": False, "answer_via": None}],
-                                  sessions=[dict(det["sessions"][0], slot="brain-run-RUN-PAY-4-1", url="/chat?sid=brain-run-RUN-PAY-4-1", title="RUN-PAY-4-1", agent="brain-run",
-                                                 kind="runner", credits=6.1, turns=17, busy=False, awaiting=False, last_activity=T0 - 3 * H)],
+                                  runner_sessions=[dict(det["sessions"][0], slot="brain-run-RUN-PAY-4-1", url="/chat?sid=brain-run-RUN-PAY-4-1", title="RUN-PAY-4-1",
+                                                        agent="brain-run", kind="runner", credits=6.1, turns=17, busy=False, awaiting=False, last_activity=T0 - 3 * H)],
                                   mr_desc=mrdesc(p4, first["PAY-4"]), credits=None)
     runs.append({"key": "PAY-4", "repo": "r1", "how": "pending", "beyond": [], "at_points": 2, "outside": 0, "credits": None, "merged_at": None})
 
@@ -787,10 +838,13 @@ def main() -> None:
                                               "voucher_id": None, "mr_url": "%s/shop/shop-pay/-/merge_requests/44" % GL, "at": T0 - 1 * D - 1 * H, "answerable_here": False, "answer_via": None}],
                                   decisions=decisions(p5, [("requirements", "失败后最多重试 5 次，间隔翻倍", "回调方限流", "P-1A2B", "person", []),
                                                           ("code-generation", "第 6 次失败转人工队列", "照 TECH 的约定", "T-PAY-2-1", "brain", ["T-PAY-2-1"])]),
-                                  mr_desc=mrdesc(p5, first["PAY-5"]), credits=31.0,
-                                  sessions=[dict(det["sessions"][0], slot="brain-run-RUN-PAY-5-1", url="/chat?sid=brain-run-RUN-PAY-5-1", title="RUN-PAY-5-1", agent="brain-run",
-                                                 kind="runner", credits=24.2, turns=52, busy=False, awaiting=False, last_activity=T0 - 1 * D - 1 * H)])
-    runs.append({"key": "PAY-5", "repo": "r1", "how": "pending", "beyond": [], "at_points": 2, "outside": 0, "credits": 31.0, "merged_at": None})
+                                  mr_desc=mrdesc(p5, first["PAY-5"]), credits=6.8,
+                                  sessions=[dict(det["sessions"][0], slot="brain-PAY-5-8a1d", url="/chat?sid=brain-PAY-5-8a1d", title="PAY-5 退款回调失败重试",
+                                                 credits=6.8, turns=12, busy=False, awaiting=False, last_activity=p5.hand_at, opened_at=p5.start_at)],
+                                  runner_sessions=[dict(det["sessions"][0], slot="brain-run-RUN-PAY-5-1", url="/chat?sid=brain-run-RUN-PAY-5-1", title="RUN-PAY-5-1",
+                                                        agent="brain-run", kind="runner", credits=24.2, turns=52, busy=False, awaiting=False, last_activity=T0 - 1 * D - 1 * H)])
+    rows["PAY-5"]["credits"] = 6.8
+    runs.append({"key": "PAY-5", "repo": "r1", "how": "pending", "beyond": [], "at_points": 2, "outside": 0, "credits": 6.8, "merged_at": None})
 
     # PAY-7: the hand-over was refused (bob added the label, not the owner alice)
     p7 = Req("r1", "PAY-7", "退款原因下拉框", "alice", "refund-reason", "261108-refund-reason", project="shop/shop-pay")
@@ -926,15 +980,15 @@ def main() -> None:
     reqs["r3"].append(r)
     row = copy.deepcopy(tmpl)
     row.update(repo="r3", key="ORD-10", title="订单状态推送到企业微信", owner="erin", branch=r.branch, intent=r.intent, state="running", state_label="运行机在跑",
-               credits=7.4, updated_at=T0 - 4 * M, summary=None, waits={"who": "runner", "text": "运行机在跑", "line": None, "raw": ""},
+               credits=None, sessions=0, updated_at=T0 - 4 * M, summary=None, waits={"who": "runner", "text": "运行机在跑", "line": None, "raw": ""},
                mr={"iid": 19, "url": "%s/shop/shop-order/-/merge_requests/19" % GL, "state": "opened"}, run_ids=["RUN-ORD-10-1"], where="branch",
                open_questions=[], overlap=[], expected_paths=[], worktree=None)
     order_rows.append(classified(r, row, mr={"state": "opened", "labels": ["ai-running"], "questions": []}))
-    board_later(r, row, credits=7.4, sessions=[dict(det["sessions"][0], slot="brain-run-RUN-ORD-10-1", url="/chat?sid=brain-run-RUN-ORD-10-1",
-                                                                       title="RUN-ORD-10-1", agent="brain-run", kind="runner", credits=7.4, turns=21, busy=True,
-                                                                       awaiting=False, last_activity=T0 - 1 * M)],
+    board_later(r, row, runner_sessions=[dict(det["sessions"][0], slot="brain-run-RUN-ORD-10-1", url="/chat?sid=brain-run-RUN-ORD-10-1",
+                                              title="RUN-ORD-10-1", agent="brain-run", kind="runner", credits=7.4, turns=21, busy=True,
+                                              awaiting=False, last_activity=T0 - 1 * M)],
                                    mr_desc=mrdesc(r, "订单状态变化时推送到企业微信，失败自动重试"))
-    runs.append({"key": "ORD-10", "repo": "r3", "how": "pending", "beyond": [], "at_points": 2, "outside": 0, "credits": 7.4, "merged_at": None})
+    runs.append({"key": "ORD-10", "repo": "r3", "how": "pending", "beyond": [], "at_points": 2, "outside": 0, "credits": None, "merged_at": None})
 
     # ---------------------------------------------------------------- shop-tools: local only, the AI at work now
     r = Req("r4", "TOOL-1", "价格表批量导入", "alice", "price-import", "261108-price-import")
@@ -1030,7 +1084,10 @@ def main() -> None:
     world_todo = {"ok": todo.build(entries, team=False, crew_rows=[]), "crewfail": todo.build(entries, team=False, crew_rows=[crew_fail])}
     brains, uses, reflects = brain_views(reqs, all_rows, {bid: kw.get("decisions") or [] for bid, (_, _, kw) in LATER.items()})
     for bid, (r_, row_, kw) in LATER.items():
-        boards[bid] = snapshot(r_, row_, brain=uses.get(bid) or no_trace_brain(r_), **kw)
+        boards[bid] = snapshot(r_, row_, brain=uses.get(bid) or no_trace_brain(r_), **{k: v for k, v in kw.items() if k != "runner_sessions"})
+    for bid, (r_, row_, kw) in LATER.items():
+        if bid not in details:
+            details[bid] = detail_of(r_, row_, kw, boards[bid])
     det["brain"] = boards["r1/PAY-3"]["brain"]
     # 需求详情's timeline as service._timeline makes it: brainkit.trace's record (detail.trace_timeline) and the app's own
     det["timeline"]["items"] = sorted(detail.trace_timeline(p3.trace(det["brain"])) + p3.app,
@@ -1066,7 +1123,7 @@ def main() -> None:
         deliveries.team_classify(row_t, rr, decs, f.get("park"))
         bid = "%s/%s" % (q.repo, key)
         kw = LATER[bid][2] if bid in LATER else {}
-        sess = [x for x in kw.get("sessions") or [] if x.get("kind") == "runner"]
+        sess = kw.get("runner_sessions") or []
         url = rr["mr_url"]
         row_t.update(run_ids=[run_id], credits=round(sum(x.get("credits") or 0 for x in sess), 3) or None, sessions=len(sess),
                      mr={"iid": int(rr["iid"]), "url": url, "state": None}, updated_at=lean_view.epoch(rr.get("updated")),

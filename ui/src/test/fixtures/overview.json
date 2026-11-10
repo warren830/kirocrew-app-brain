@@ -27,7 +27,7 @@
           "n": 9
         }
       },
-      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "stage": "做完 4 · 跳过 4 · 在做：代码生成",
       "waits": {
         "who": "you",
         "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -82,7 +82,7 @@
           "n": 6
         }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
         "who": "product",
         "text": "等产品在 MR 上回答 D-2（设计）",
@@ -127,7 +127,7 @@
       "source": "alert",
       "state": "acceptance",
       "state_label": "等验收",
-      "where": "branch",
+      "where": "worktree",
       "branch": "ai/alice/PAY-5-callback-retry",
       "intent": "261103-callback-retry",
       "lean": {
@@ -145,7 +145,7 @@
           "n": 11
         }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
         "who": "product",
         "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -157,7 +157,7 @@
         "review": false
       },
       "summary": "退款回调失败自动重试，第 6 次转人工处理。",
-      "credits": 31.0,
+      "credits": 6.8,
       "updated_at": 1794052800,
       "mr": {
         "iid": 44,
@@ -187,7 +187,7 @@
       "source": "product",
       "state": "rejected",
       "state_label": "接手被拒",
-      "where": "branch",
+      "where": "worktree",
       "branch": "ai/alice/PAY-7-refund-reason",
       "intent": "261106-refund-reason",
       "lean": {
@@ -243,7 +243,7 @@
       "source": "product",
       "state": "claimed",
       "state_label": "已认领",
-      "where": "claim",
+      "where": "worktree",
       "branch": null,
       "intent": null,
       "lean": {
@@ -307,7 +307,7 @@
         "skipped_n": 6,
         "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
         "who": "nobody",
         "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -319,7 +319,7 @@
         "review": false
       },
       "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
-      "credits": 22.7,
+      "credits": 8.3,
       "updated_at": 1793663640,
       "mr": {
         "iid": 37,
@@ -518,7 +518,7 @@
   ],
   "cto": {
     "available": true,
-    "sentence": "交给运行机的 1 个需求里，0 个交接以后没人插手就做完了。人介入了 5 次（本机做的也算），5 次落在判断点上。有 credits 的 4 个需求，平均每个 21.1 credits。",
+    "sentence": "交给运行机的 1 个需求里，0 个交接以后没人插手就做完了。人介入了 5 次（本机做的也算），5 次落在判断点上。有 credits 的 4 个需求，平均每个 11.4 credits。",
     "ref": "远端的 main 分支",
     "unattended": [
       0,
@@ -541,8 +541,8 @@
       ]
     },
     "credits": {
-      "per_req": 21.1,
-      "total": 84.3,
+      "per_req": 11.4,
+      "total": 45.7,
       "reqs": 4
     },
     "runs": [
@@ -555,7 +555,7 @@
         ],
         "at_points": 5,
         "outside": 0,
-        "credits": 22.7,
+        "credits": 8.3,
         "merged_at": 1793661540
       },
       {
@@ -575,7 +575,7 @@
         "beyond": [],
         "at_points": 2,
         "outside": 0,
-        "credits": 31.0,
+        "credits": 6.8,
         "merged_at": null
       }
     ],

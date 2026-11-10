@@ -37,7 +37,8 @@ STAGE_STATE = {"STAGE_STARTED": "started", "STAGE_COMPLETED": "done", "STAGE_SKI
 # the notes Lean writes itself (aidlc_lean.py: verify's build-and-test completion, the RELEASE approval's, `lean new`'s
 # Ideation skip), said in words; a note the agent wrote is its own and stays as written
 LEAN_NOTES = (
-    (re.compile(r"^verify PASS: (\d+) checks? on code fingerprint [0-9a-f]*$"), lambda m: "%s 项自动检查都过了" % m.group(1)),
+    # as 需求看板 says a verify round (board.py: 「自动检查通过（1 项）」), never 「1 项…都过了」 (BOARD-29)
+    (re.compile(r"^verify PASS: (\d+) checks? on code fingerprint [0-9a-f]*$"), lambda m: "自动检查通过（%s 项）" % m.group(1)),
     (re.compile(r"^RELEASE approved \(sha [0-9a-f]*\)$"), lambda m: "发布审批通过了"),
     (re.compile(r"^not requested \(lean new without --ideation\)$"), lambda m: "这次没要构思这一段"),
 )
@@ -188,11 +189,16 @@ def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def stage_text(lean: dict[str, Any]) -> str | None:
-    """「做完 4 · 跳过 6 · 下一步：发布」, as ui/src/vocab.ts leanProgress says it; None before Lean recorded a stage."""
+    """「做完 4 · 跳过 6 · 下一步：发布」, said exactly as ui/src/vocab.ts leanProgress says it: a next stage already
+    started is 「在做：发布」, the end 「全部做完（跳过 6）」; None before Lean recorded a stage."""
     if not lean.get("stage_n"):
         return None
+    nxt = lean.get("next")
+    if not nxt:
+        return "全部做完（跳过 %d）" % lean["skipped_n"] if lean.get("skipped_n") else "全部做完"
     parts = ["做完 %d" % lean["done_n"]] + (["跳过 %d" % lean["skipped_n"]] if lean.get("skipped_n") else [])
-    parts.append("下一步：%s" % lean["next"]["label"] if lean.get("next") else "全部做完")
+    started = lean.get("stage_state") == "started" and lean.get("stage") in (None, nxt["id"])
+    parts.append("%s：%s" % ("在做" if started else "下一步", nxt["label"]))
     return " · ".join(parts)
 
 

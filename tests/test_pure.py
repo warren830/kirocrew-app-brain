@@ -175,15 +175,16 @@ def test_the_lean_stage_of_a_row():
     assert at([]) == (None, None, 0, 0, "reverse-engineering", None)
     # a stage Lean went past without a word (here a greenfield intent's reverse engineering) is skipped, said once
     assert at([ev("STAGE_STARTED", "requirements")]) == ("requirements", "started", 0, 1, "requirements",
-                                                         "做完 0 · 跳过 1 · 下一步：需求分析")
+                                                         "做完 0 · 跳过 1 · 在做：需求分析")
     done = [ev("STAGE_COMPLETED", s) for s in ("reverse-engineering", "requirements")] + \
         [ev("STAGE_SKIPPED", s) for s in ("user-stories", "application-design", "units")] + \
         [ev("STAGE_SKIPPED", s, "app") for s in ("functional-design", "nfr-design", "infrastructure-design")] + \
         [ev("STAGE_COMPLETED", "code-generation", "app"), ev("STAGE_COMPLETED", "build-and-test")]
     assert at(done) == ("release", "todo", 4, 6, "release", "做完 4 · 跳过 6 · 下一步：发布")
+    # a stage already started is 在做, never 下一步 (the 会话记录 said 「下一步：发布」 next to 「在做：发布」)
     assert at(done + [ev("STAGE_STARTED", "release")]) == ("release", "started", 4, 6, "release",
-                                                           "做完 4 · 跳过 6 · 下一步：发布")
-    assert at(done + [ev("STAGE_COMPLETED", "release")]) == ("release", "done", 5, 6, None, "做完 5 · 跳过 6 · 全部做完")
+                                                           "做完 4 · 跳过 6 · 在做：发布")
+    assert at(done + [ev("STAGE_COMPLETED", "release")]) == ("release", "done", 5, 6, None, "全部做完（跳过 6）")
     # a merged run that never recorded its unit's design stages: the cells and the count say the same (skipped)
     unsaid = [e for e in done if e["data"]["stage"] not in ("functional-design", "nfr-design", "infrastructure-design")]
     rows = lv.stages(unsaid + [ev("STAGE_COMPLETED", "release")])
@@ -320,6 +321,32 @@ def test_commit_dates_and_how_a_run_was_merged_in_the_timeline():
     assert items["3" * 12]["detail"] == "%s （压缩成一个提交合并（分支还在））" % ("3" * 12)
     t["outcome"]["merged_at"]["how"] = "a new way"
     assert any(i["detail"] == "%s （a new way）" % ("3" * 12) for i in detail.trace_timeline(t))
+
+
+def test_the_timeline_signs_the_owners_own_acts_as_the_owner():
+    """DETAIL-20: what was done on the owner's side before the hand-over (an approval line typed in their own session,
+    the run branch's commits) is the owner's, as 需求看板 says 「你批准了需求」: signed owner (the page says 你 to them),
+    and so is any later act of the same pseudonym; someone answering on the MR, or a push after the hand-over by another
+    pseudonym, stays as brain-kit names them."""
+    detail = mod("detail")
+    me, other = "G-A29056", "G-77B0C1"
+    t = {"owner": "alice",
+         "humans": [{"at": "2026-11-09T01:00:00Z", "kind": "approval", "what": "REQUIREMENTS", "who": me,
+                     "channel": "local", "after_handover": False},
+                    {"at": "2026-11-09T03:00:00Z", "kind": "answer", "what": "clarify", "who": "P-7C1D", "channel": "bridge",
+                     "after_handover": True},
+                    {"at": "2026-11-09T03:10:00Z", "kind": "push_after_handover", "what": "code", "who": other,
+                     "channel": "git", "after_handover": True},
+                    {"at": "2026-11-09T03:20:00Z", "kind": "push_after_handover", "what": "records", "who": me,
+                     "channel": "git", "after_handover": True}],
+         "actions": {"commits": [{"sha": "1" * 40, "at": "2026-11-09T02:00:00Z", "by": "person", "who": me, "after_handover": False},
+                                 {"sha": "2" * 40, "at": "2026-11-09T02:30:00Z", "by": "bot", "who": None, "after_handover": True}],
+                     "handovers": [{"at": "2026-11-09T02:10:00Z", "kind": "requested", "by": "alice", "commit": "1" * 40}]}}
+    who = [(i["label"], i["who"]) for i in detail.trace_timeline(t)]
+    assert who == [("批准需求", detail.OWNER), ("提交", detail.OWNER), ("交接", detail.OWNER), ("运行机提交", None),
+                   ("回答了澄清问题", "P-7C1D"), ("交接后有人推了代码", other), ("交接后有人改了记录", detail.OWNER)]
+    # an older brain-kit without the hand-over facts names nobody the owner
+    assert all(i["who"] != detail.OWNER for i in detail.trace_timeline({"humans": [{"kind": "approval", "who": me}]}))
 
 
 def test_the_timeline_says_what_happened_in_words_never_the_record_codes():
@@ -553,9 +580,9 @@ def test_lean_s_own_stage_lines_are_said_in_words_and_the_agent_s_stay():
                                   {"stage": "build-and-test", "note": "verify PASS: 1 check on code fingerprint 66bad1cf"},
                                   {"stage": "release", "note": "RELEASE approved (sha 0c9a7e21)"}], 1)]
     notes = {s["id"]: s["note"] for s in lean_view.stages(evs) if s["state"] == "done"}
-    assert notes == {"reverse-engineering": agent, "build-and-test": "1 项自动检查都过了", "release": "发布审批通过了"}
-    assert [i["detail"] for i in lean_view.stage_events(evs)] == [agent, "1 项自动检查都过了", "发布审批通过了"]
-    assert lean_view.say_note("verify PASS: 3 checks on code fingerprint 0123abcd") == "3 项自动检查都过了"
+    assert notes == {"reverse-engineering": agent, "build-and-test": "自动检查通过（1 项）", "release": "发布审批通过了"}
+    assert [i["detail"] for i in lean_view.stage_events(evs)] == [agent, "自动检查通过（1 项）", "发布审批通过了"]
+    assert lean_view.say_note("verify PASS: 3 checks on code fingerprint 0123abcd") == "自动检查通过（3 项）"
 
 
 def test_the_timeline_says_who_did_what_and_why_without_record_codes(tmp_path):

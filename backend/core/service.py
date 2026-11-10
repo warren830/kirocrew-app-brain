@@ -321,7 +321,7 @@ class Service:
             st = self.sessions.slot_stats(info.slot) or {}
             by.setdefault(info.key, []).append({
                 "slot": info.slot, "title": info.title, "agent": info.agent, "kind": info.kind or "local",
-                "credits": st.get("credits") if st.get("credits") is not None else info.credits,
+                "credits": self.sessions.slot_credits(info.slot),   # the very number credits_by_key adds up
                 "turns": int(st.get("turns") or info.turns or 0), "busy": bool(st.get("busy")),
                 "awaiting": bool(st.get("awaiting")), "last_activity": st.get("last_activity") or info.last_activity,
                 "opened_at": st.get("opened_at") or info.started, "project": info.cwd or None,
