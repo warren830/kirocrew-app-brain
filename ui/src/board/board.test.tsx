@@ -8,6 +8,7 @@ import type { BoardEntry } from '../nav'
 import type { ReqBoard } from '../types'
 import { TYPE_IT_YOURSELF } from '../ui'
 import type { ViewProps } from '../views/props'
+import { optionText } from '../views/ReqSwitch'
 import { BoardPage } from './BoardPage'
 import { tickLabel } from './Lanes'
 import { GW, NODE_H, NODE_W, SCALE, SLOTS, edgesOf, graphShape, graphWidth, layoutGraph } from './layout'
@@ -1316,6 +1317,9 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     expect(accept).toHaveTextContent(new RegExp(`需求${b.row.key}\\s*变更说明`))
     expect(accept).toHaveTextContent('运行机还没开始做')
     expect(screen.getByTestId('br-board')).not.toHaveTextContent('还没开工')
+    expect(kpis.getByText('AI-DLC Lean').parentElement!.querySelector('.kt-segs .is-next, .kt-segs .is-run')).toBeNull()
+    // 切换需求 names it once too
+    expect(optionText({ ...fx.overview().rows[0], key: 'PAY-9', title: 'PAY-9', state_label: '已交接', waits: { ...b.row.waits } })).toBe('PAY-9 · 已交接')
   })
 
   test('a repo done only here: the graph numbers and names its phases as its introduction does (2 检查 · 发布, 3 回写), no 验收', async () => {

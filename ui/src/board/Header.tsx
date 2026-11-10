@@ -109,9 +109,10 @@ function LeanKpi({ board }: { board: ReqBoard }) {
   const approved = board.events.filter((e) => e.kind === 'approve').length
   const back = board.events.filter((e) => e.kind === 'reject').length
   const blocked = board.events.filter((e) => e.kind === 'blocked').length
-  const seg = (i: number) => (i < ln.done_n ? 'is-pass' : i < through ? 'is-skip' : ln.next && i === ln.next.n - 1 ? (ln.started ? 'is-run' : 'is-next') : '')
+  const blind = runnerBlind(board)
+  const seg = (i: number) => (i < ln.done_n ? 'is-pass' : i < through ? 'is-skip' : !blind && ln.next && i === ln.next.n - 1 ? (ln.started ? 'is-run' : 'is-next') : '')
   return (
-    <div className="kt-kpi kt-kpi-gates br-kpi-lean" aria-label={`AI-DLC Lean：${runnerBlind(board) ? '运行机还读不到 Lean 的记录' : leanProgress(ln)}`}>
+    <div className="kt-kpi kt-kpi-gates br-kpi-lean" aria-label={`AI-DLC Lean：${blind ? '运行机还读不到 Lean 的记录' : leanProgress(ln)}`}>
       <div className="kt-kpi-label">AI-DLC Lean</div>
       <div className="kt-kpi-value" data-testid="br-lean-counter">
         <span className="kt-kpi-big">{ln.done_n}</span>
@@ -120,7 +121,7 @@ function LeanKpi({ board }: { board: ReqBoard }) {
       <div className="kt-segs" aria-hidden="true">
         {Array.from({ length: ln.total }, (_, i) => <i key={i} className={seg(i)} />)}
       </div>
-      <div className="kt-kpi-note br-lean-next">{runnerBlind(board) ? '运行机还读不到 Lean 的记录' : ln.next ? <>{ln.started ? '在做' : '下一步'}：<b>{ln.next.label}</b></> : through ? '全部做完' : '还没开始'}</div>
+      <div className="kt-kpi-note br-lean-next">{blind ? '运行机还读不到 Lean 的记录' : ln.next ? <>{ln.started ? '在做' : '下一步'}：<b>{ln.next.label}</b></> : through ? '全部做完' : '还没开始'}</div>
       <div className="kt-gates-rows">
         <span>批准 <b>{approved}</b></span>
         <span className={back ? 'is-hit' : ''}>退回 <b>{back}</b></span>
