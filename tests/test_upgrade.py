@@ -110,13 +110,13 @@ def test_the_kit_fix_reinstalls_on_a_new_branch_and_never_touches_the_checkout(t
 
     got = started(svc, go)
     rows = repo_rows(got["crew"], repo)
-    fp = [r for r in rows if r["text"] == "Lean 把 runs/ 下的记录算成代码"]
+    fp = [r for r in rows if r["text"] == "Lean 把变更说明和 AI 停下来写的问题也算成代码"]
     assert len(fp) == 1 and fp[0]["level"] == "WARN" and fp[0]["fix"] == "kit", rows    # a local-only repo: a reminder
     assert fp[0]["todo"].startswith("只有把需求交给运行机时才要紧") and "指纹" in fp[0]["raw"]
     if HAS_VERSION_CHECK:
         old = [r for r in rows if "是旧版" in r["text"]]
         assert len(old) == 1 and old[0]["level"] == "WARN" and old[0]["fix"] == "kit"
-        assert old[0]["text"] == ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 %s 版）" % NEED
+        assert old[0]["text"] == "Lean 的适配文件是旧版（第 0 版，要第 %s 版）" % NEED
         assert "is an older adapter (version 0, needs %s)" % NEED in old[0]["raw"]
     assert not [i for i in got["todo"]["items"] if i["kind"] == "crew"]                 # a WARN is no 待办 item
 
@@ -272,13 +272,13 @@ def test_runs_in_the_fingerprint_is_a_reminder_locally_and_fail_for_a_team_repo(
         return await svc.crew_checks(), await svc.todo(), await svc.import_inspect({"path": str(repo)})
 
     crew, todo, inspected = started(svc, go)
-    fp = [r for r in repo_rows(crew, repo) if r["text"] == "Lean 把 runs/ 下的记录算成代码"]
+    fp = [r for r in repo_rows(crew, repo) if r["text"] == "Lean 把变更说明和 AI 停下来写的问题也算成代码"]
     assert len(fp) == 1 and fp[0]["level"] == ("FAIL" if team else "WARN") and fp[0]["fix"] == "kit"
     assert fp[0]["todo"].startswith("交接会被拒") if team else fp[0]["todo"].startswith("只有把需求交给运行机时才要紧")
     items = [i for i in todo["items"] if i["kind"] == "crew" and i["title"] != "KiroCrew 检查"]   # the repo's, not brain-dev's
     assert len(items) == (1 if team else 0), todo["items"]
     if team:
-        assert items[0]["title"] == "KiroCrew 检查 · pay" and items[0]["text"].startswith("Lean 把 runs/ 下的记录算成代码。交接会被拒")
+        assert items[0]["title"] == "KiroCrew 检查 · pay" and items[0]["text"].startswith("Lean 把变更说明和 AI 停下来写的问题也算成代码。交接会被拒")
     assert [r["level"] for r in repo_rows(inspected["crew"], repo)] == [fp[0]["level"]]   # 检查 says the same
 
 
@@ -295,7 +295,7 @@ def test_an_older_adapter_is_a_reminder_locally_and_fail_for_a_team_repo(tmp_pat
     rows = repo_rows(crew, repo)
     assert len(rows) == 1, rows
     r = rows[0]
-    assert (r["level"], r["text"], r["fix"]) == ("FAIL" if team else "WARN", ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 %s 版）" % NEED,
+    assert (r["level"], r["text"], r["fix"]) == ("FAIL" if team else "WARN", "Lean 的适配文件是旧版（第 0 版，要第 %s 版）" % NEED,
                                                  "kit")
     assert r["raw"] == probs[0]      # brain-kit's own words
 
@@ -317,8 +317,8 @@ def test_the_mapping_knows_what_this_brain_kit_says(tmp_path, home):
     why = M.write_problem(str(repo), cfg)
     assert why, "this brain-kit does not say that Lean counts runs/ as code"
     for raw in (why, "%s。%s" % (why.rstrip("。"), M.exclude_fix(cfg))):
-        assert P.row("FAIL", raw, repo="/r", team=True)["text"] == "Lean 把 runs/ 下的记录算成代码"
+        assert P.row("FAIL", raw, repo="/r", team=True)["text"] == "Lean 把变更说明和 AI 停下来写的问题也算成代码"
     if hasattr(cli, "crew_hook_problem"):
         raw = cli.crew_hook_problem("")
-        assert P.row("FAIL", raw, repo="/r", team=True)["text"] == ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 %d 版）" % \
+        assert P.row("FAIL", raw, repo="/r", team=True)["text"] == "Lean 的适配文件是旧版（第 0 版，要第 %d 版）" % \
             cli.CREW_HOOK_VERSION
