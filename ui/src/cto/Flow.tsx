@@ -128,7 +128,7 @@ function Card({ r, at, hl, repoName, h }: { r: Requirement; at: number; hl: stri
 
 const PER_CELL = 3
 
-export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }: {
+export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, repos = 1, ...h }: {
   rows: Requirement[]
   at: number
   hl: string | null
@@ -136,6 +136,8 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
   repoName: (id: string) => string | undefined
   /** every repo here is done only on this machine: the runner's column and lane are 「这次不需要」 */
   localOnly?: boolean
+  /** how many repos the board shows (the band says 这个仓库 or 这 N 个仓库) */
+  repos?: number
 } & Handlers) {
   const live = rows.filter((r) => colOf(r) && colOf(r) !== '已合并')
   // a merge that still waits on you (回写 Brain) stays on the board however old it is
@@ -188,7 +190,7 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
         {localOnly && (
           <div className="br-kband" data-testid="flow-runner-off">
             <span className="br-lane-name"><RoleIcon role="runner" size={15} />运行机在跑</span>
-            <span>这次不需要：这个仓库只在本机做，不交给运行机</span>
+            <span>这次不需要：{repos > 1 ? `这 ${repos} 个仓库都只在本机做` : '这个仓库只在本机做'}，不交给运行机</span>
           </div>
         )}
       </div>

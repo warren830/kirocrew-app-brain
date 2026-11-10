@@ -351,7 +351,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
 
           {data.overlaps.length > 0 && <Overlaps data={data} onKey={(k) => openKey(k)} />}
 
-          <Flow rows={data.rows} at={data.at} hl={null} localOnly={localOnly} onOpen={(r) => toBoard(r)} onGo={go} onNew={newReq} repoName={repoName}
+          <Flow rows={data.rows} at={data.at} hl={null} localOnly={localOnly} repos={scope.length} onOpen={(r) => toBoard(r)} onGo={go} onNew={newReq} repoName={repoName}
             onCell={(col, lane) => filterTo(cellPick(col, lane))} />
 
           <section className="cto-card" aria-label="交付清单" data-anchor="ledger" data-testid="ledger" ref={ledgerRef}>
@@ -526,7 +526,7 @@ function UnattendedCard({ c, localOnly, computing, pick, onPick }: { c: CtoNumbe
           <MiniUnattended c={c} />
         </>
       )}
-      {c.runs.length > 0 && (
+      {c.runs.length > 0 && !localOnly && (
         <div className="cto-legend">
           {HOW.filter((h) => count(h) > 0).map((h) => (
             <button type="button" key={h} aria-pressed={pick?.id === `how:${h}`} title={`在交付清单里看「${HOW_LABEL[h]}」的需求`} onClick={() => onPick(howPick([h], `交付方式：${HOW_LABEL[h]}`))}>
@@ -709,7 +709,11 @@ function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
       <td>
         {run ? (
           <>
-            <span className="br-how" title={run.beyond.length ? `判断点之外：${run.beyond.join('、')}` : undefined}><i style={{ background: HOW_VAR[run.how] }} />{HOW_LABEL[run.how]}</span>
+            {run.how === 'pending' && r.local_only ? (
+              <span className="br-how" title="只在这台机器上做，不交给运行机：合并以后算「只在本机」"><i style={{ background: HOW_VAR.local }} />{HOW_LABEL.local}（还没合并）</span>
+            ) : (
+              <span className="br-how" title={run.beyond.length ? `判断点之外：${run.beyond.join('、')}` : undefined}><i style={{ background: HOW_VAR[run.how] }} />{HOW_LABEL[run.how]}</span>
+            )}
             {(run.at_points || run.outside) ? (
               <div className="cto-was"><span className="br-nw">人介入 {run.at_points + run.outside} 次</span>{run.outside ? <span className="br-nw">（判断点外 {run.outside}）</span> : null}</div>
             ) : null}

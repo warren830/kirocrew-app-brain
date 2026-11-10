@@ -36,7 +36,7 @@ function localWorld(): { ov: Overview; status: Status } {
     waits: { who: 'you', text: '已认领，还没开工', line: null, raw: '', do: 'start', since: ov.at - 3 * 3600, where: 'app' } })
   ov.rows = [reply('DEMO-1', '计算器减法'), claim('DEMO-2', 'AGENTS.md 缺仓库简介'), reply('DEMO-3', '计算器乘法'), claim('DEMO-4', 'add 的测试'), claim('DEMO-5', '仓库说明')]
   ov.overlaps = [{ keys: ['DEMO-1', 'DEMO-3'], paths: ['calc.py'] }]
-  ov.cto = { ...ov.cto, sentence: '这个仓库只在本机做，不交给运行机。人介入了 2 次（本机做的也算），2 次落在判断点上。有 credits 的 2 个需求，平均每个 43.4 credits。', unattended: [0, 0], runs: [{ key: 'DEMO-1', repo: 'r1', how: 'local', beyond: [], at_points: 1, outside: 0, credits: 49.8, merged_at: null }, { key: 'DEMO-3', repo: 'r1', how: 'local', beyond: [], at_points: 1, outside: 0, credits: 37, merged_at: null }],
+  ov.cto = { ...ov.cto, sentence: '这个仓库只在本机做，不交给运行机。人介入了 2 次（本机做的也算），2 次落在判断点上。有 credits 的 2 个需求，平均每个 43.4 credits。', unattended: [0, 0], runs: [{ key: 'DEMO-1', repo: 'r1', how: 'pending', beyond: [], at_points: 1, outside: 0, credits: 49.8, merged_at: null }, { key: 'DEMO-3', repo: 'r1', how: 'pending', beyond: [], at_points: 1, outside: 0, credits: 37, merged_at: null }],
     weekly: ov.cto.weekly.map((w) => ({ ...w, unattended: 0, people: 0, local: 0, pending: 0 })) }
   ov.counts = { claimed: 3, local: 2 }
   return { ov, status }
@@ -120,11 +120,12 @@ describe('交付总览', () => {
     expect(hero.textContent!.split('只在本机做')).toHaveLength(2) // the backend's sentence says it; the page does not say it again
     expect(screen.getByTestId('ov-local-tag')).toHaveTextContent('只在本机')
     expect(screen.getByTestId('ov-unattended')).toHaveTextContent('这次不需要')
-    expect(screen.getByRole('article', { name: '无人值守' })).toHaveTextContent('只在本机2')
+    // not 「还没评 2」 under it: in a repo done only here nothing is judged for 无人值守, now or later
+    expect(screen.getByRole('article', { name: '无人值守' })).not.toHaveTextContent('还没评')
     expect(screen.queryByRole('button', { name: /从远端取最新/ })).toBeNull()
     const flow = screen.getByTestId('flow')
     expect(flow.querySelector('[data-lane="runner"]')).toBeNull()
-    expect(within(flow).getByTestId('flow-runner-off')).toHaveTextContent('这次不需要：这个仓库只在本机做')
+    expect(within(flow).getByTestId('flow-runner-off')).toHaveTextContent('这次不需要：这个仓库只在本机做，不交给运行机')
     expect(within(flow).getByTestId('flow-stats')).not.toHaveTextContent('运行机')
     expect(flow).not.toHaveTextContent('交给运行机以后就不在本机做了')
     // 每周合并 with nothing merged: one line, no chart
@@ -132,6 +133,16 @@ describe('交付总览', () => {
     expect(within(screen.getByRole('region', { name: '每周合并' })).queryByRole('group', { name: '图或表格' })).toBeNull()
     // both overlapping requirements are the same person's: nobody to talk it over with
     expect(screen.getByTestId('overlaps')).toHaveTextContent('都是 ychchen 的：先合一个，再做另一个，免得冲突')
+  })
+
+  test('全部 over two repos done only here: the runner band says both, not 这个仓库', async () => {
+    const { ov, status } = localWorld()
+    status.repos = [status.repos[0], { ...status.repos[0], id: 'r2', name: 'oms-brain', path: '/w/oms-brain' }]
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props({ status })} />)
+    const flow = await screen.findByTestId('flow')
+    expect(within(flow).getByTestId('flow-runner-off')).toHaveTextContent('这次不需要：这 2 个仓库都只在本机做，不交给运行机')
+    expect(flow).not.toHaveTextContent('这个仓库')
   })
 
   test('轮到你: an idle session is the person’s turn, not 「AI 在本机做」; Lean’s review is 等审查, a claim 等开工; each has its step and how long it has waited', async () => {
@@ -166,7 +177,8 @@ describe('交付总览', () => {
     expect(within(rowOf(table, 'DEMO-3')).getByTestId('lean-cell')).toHaveTextContent('做完 4 · 跳过 6 · 下一步：发布')
     expect(within(rowOf(table, 'DEMO-3')).getByTestId('lean-cell')).not.toHaveTextContent('11/11')
     expect(within(rowOf(table, 'DEMO-2')).getByTestId('lean-cell')).toHaveTextContent(/^还没开工$/)
-    expect(rowOf(table, 'DEMO-3')).toHaveTextContent('只在本机')
+    expect(rowOf(table, 'DEMO-3')).toHaveTextContent('只在本机（还没合并）人介入 1 次')
+    expect(rowOf(table, 'DEMO-3')).not.toHaveTextContent('还没评')
     expect(rowOf(table, 'DEMO-3')).not.toHaveTextContent('本机做完')
     expect(within(rowOf(table, 'DEMO-3')).getByRole('button', { name: '开审查会话' })).toBeInTheDocument()
     expect(within(yours.querySelector('li[data-key="DEMO-3"]') as HTMLElement).getByRole('button', { name: '开审查会话' })).toBeInTheDocument()
