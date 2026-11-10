@@ -265,7 +265,7 @@ describe('设置', () => {
       label: '', why: '', suggest: '', error: '' }
     const ask: RepoMe = { name: null, source: 'none', gitlab: 'https://gitlab.example.com', text: '', ask: true, label: '你的 GitLab 用户名',
       why: '这个仓库用 GitLab：认领和交接都按这个名字认人，要和你在 GitLab 上的用户名一样', suggest: 'alice', error: '' }
-    s.me = { user: null, token: false, how: 'GitLab token（没有）' }
+    s.me = { user: null, token: false, how: 'GitLab 令牌（没有）' }
     s.repos = [{ ...s.repos[0], me: login }, { ...s.repos[0], id: 'r2', path: '/Users/alice/workplace/shop-web', name: 'shop-web', me: ask }]
     const after = fx.status()
     installFixtureRoutes({ [`POST ${API}/me/name`]: () => ({ ok: true, text: '这个仓库的 git config brain.user 设成了 alice',

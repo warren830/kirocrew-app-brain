@@ -447,7 +447,7 @@ def test_add_installed_and_pending_repos_then_merge_and_pull(tmp_path, home):
     assert got["ready"]["status"]["repos"][0]["ok"] is True
     r2 = got["pending"]["status"]["repos"][1]
     # the install listed it by itself (SETUP-18): 加入列表 afterwards only says so
-    assert got["pending"]["id"] == "r2" and got["pending"]["text"] == "已经在列表里了（r2）"
+    assert got["pending"]["id"] == "r2" and got["pending"]["text"] == "已经在列表里了"
     assert r2["path"] == str(repo.resolve()) and r2["ok"] is False and r2["error"] == "" and r2["kit"] is None
     assert r2["pending"]["state"] == "branch" and r2["pending"]["text"] == "装在 brain/install 分支上，还没推送：合进 main 以后生效"
     assert "推送并开 MR" in r2["pending"]["next"]

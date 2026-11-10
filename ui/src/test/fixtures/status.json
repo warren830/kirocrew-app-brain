@@ -93,7 +93,7 @@
   "me": {
     "user": "alice",
     "token": true,
-    "how": "GitLab token（有）；alice（你在这个仓库的名字）"
+    "how": "GitLab 令牌（有）；alice（你在这个仓库的名字）"
   },
   "team": {
     "enabled": false,

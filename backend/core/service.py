@@ -1120,8 +1120,8 @@ class Service:
         env = os.environ.get("BRAIN_USER", "").strip().lower()
         first = next((x["me"] for x in repos if x["me"] and x["me"]["name"]), None)
         me = env or (first["name"] if first else None)
-        how = "GitLab token（%s）" % ("有" if token else "没有") + (
-            "；环境变量 BRAIN_USER = %s" % env if env else "；%s" % first["text"] if first else "")
+        how = "GitLab 令牌（%s）" % ("有" if token else "没有") + (
+            "；这台机器的环境变量里设的 %s" % env if env else "；%s" % first["text"] if first else "")
         return {"app": {"name": self.name, "version": VERSION, "team": self.team is not None},
                 "brainkit": {"path": info["path"], "ok": info["ok"], "version": info["version"], "error": info["error"],
                              "modules": info["modules"]},
@@ -1425,7 +1425,7 @@ class Service:
         top = await self._import_top(body.get("path"))
         rid = importer.listed_id(top, self.settings["repos"])
         if rid:
-            return {"ok": True, "id": rid, "text": "已经在列表里了（%s）" % rid, "status": await self.status()}
+            return {"ok": True, "id": rid, "text": "已经在列表里了", "status": await self.status()}
         token = await asyncio.to_thread(self._token_present)
 
         def state() -> tuple[bool, dict[str, Any] | None, str]:

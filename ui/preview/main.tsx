@@ -473,7 +473,7 @@ function importRoutes() {
       if (b.kit && job.result) {
         // what installer.kit_line says about the kit the form wrote
         const k: KitForm = { ...job.result.kit, ...b.kit }
-        const line = [`需求号 ${k.req_prefix}-n`, `跟踪 ${k.tracker}`, `默认分支 ${k.default_branch}`,
+        const line = [`需求号 ${k.req_prefix}-n`, k.tracker === 'jira' ? '用 Jira' : '不用 Jira', `默认分支 ${k.default_branch}`,
           ...(k.gitlab_project ? [`GitLab ${k.gitlab_project}（${k.gitlab_base}）`] : []), ...(k.team ? [`团队 ${k.team}`] : [])].join(' · ')
         job.result = { ...job.result, kit: k }
         job.steps = job.steps.map((x) => (x.id === 'kit' ? { ...x, detail: line } : x))
