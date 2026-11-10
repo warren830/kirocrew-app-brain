@@ -496,6 +496,9 @@ describe('需求看板', () => {
     expect(card).toHaveTextContent('做什么：在上面「切换需求」里换一个，或者回交付总览找。')
     expect(screen.getByTestId('br-board')).not.toHaveTextContent(/404|r1 ·/)
     expect(screen.queryByTestId('kt-graph')).toBeNull()
+    // the crumb says the key and links nothing: there is no 需求详情 of it to open
+    expect(crumb().queryByRole('button', { name: 'PAY-9' })).toBeNull()
+    expect(crumb().getByTestId('kt-where-key')).toHaveTextContent('PAY-9')
     fireEvent.click(within(card).getByRole('button', { name: '回交付总览' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'overview', repo: 'r1' })
     expect(boardCalls({ repo: 'r1', key: 'PAY-9' })).toHaveLength(1)

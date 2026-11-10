@@ -209,7 +209,8 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
           <nav className="kit-crumb kt-where" aria-label="位置" data-testid="kt-where">
             <button type="button" onClick={onBack ?? (() => go({ kind: 'overview' }))}>{fromName}</button>
             <span aria-hidden="true">›</span>
-            <button type="button" onClick={toDetail} title="需求详情">{entry.key}</button>
+            {/* a key the repo does not have has no 需求详情 to go to: said, not linked */}
+            {gone ? <span data-testid="kt-where-key">{entry.key}</span> : <button type="button" onClick={toDetail} title="需求详情">{entry.key}</button>}
             <span aria-hidden="true">›</span>
             <b>需求看板{focus && board ? ` · ${board.actors.find((a) => a.key === focus)?.title ?? ''}` : ''}{rp.on ? ' · 回放' : ''}</b>
           </nav>
