@@ -19,7 +19,7 @@ import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, useAction, usePoll } from '../api'
 import { RoleIcon } from '../board/RoleIcon'
 import { HOW, HOW_LABEL, HOW_VAR, MiniCredits, MiniPeople, MiniUnattended, MiniWho, WHO_VAR, WeeklyChart, fmt, slash } from '../cto/charts'
-import { COL_NAME, Flow, LANE_NAME, StepButton, colOf, laneOf, stepOf, waitedText, type Col, type Lane } from '../cto/Flow'
+import { COL_NAME, Flow, LANE_NAME, StepButton, colOf, homeOf, laneOf, stepOf, waitedText, type Col, type Lane } from '../cto/Flow'
 import { ago, fmtCredits } from '../format'
 import type { OverviewEntry, View } from '../nav'
 import type { CtoNumbers, CtoRun, EvalMetric, EvalView, Funnel, Overview, RefreshResult, ReqState, RepoInfo, Requirement } from '../types'
@@ -141,13 +141,16 @@ type RepoCount = { open: number; you: number }
 
 const isOpen = (r: Requirement) => r.state !== 'merged' && r.state !== 'closed'
 const idOf = (r: { repo: string; key: string }) => `${r.repo}/${r.key}`
+/** the runner's rows of projects this machine does not list: no repo pill holds them, so one more pill does */
+const ELSEWHERE: LedgerPick = { id: 'elsewhere', label: '没导入的项目', keep: (r) => homeOf(r) === 'runner' }
 
 /** A repo pill's counts: its requirements in progress, and those that wait on you (a merge to write back into the
- * Brain too, as 轮到你 lists them); 'all' among *ids*: every row. */
+ * Brain too, as 轮到你 lists them), a row on the runner under its repo (homeOf; 'runner': a project not listed here);
+ * 'all' among *ids*: every row. */
 function repoCounts(rows: Requirement[], ids: string[]): Record<string, RepoCount> {
   const counts: Record<string, RepoCount> = Object.fromEntries(ids.map((id) => [id, { open: 0, you: 0 }]))
   for (const r of rows) {
-    for (const id of ids.includes('all') ? [r.repo, 'all'] : [r.repo]) {
+    for (const id of ids.includes('all') ? [homeOf(r), 'all'] : [homeOf(r)]) {
       const c = (counts[id] ??= { open: 0, you: 0 })
       if (isOpen(r)) c.open += 1
       if (r.waits.who === 'you' && r.state !== 'closed') c.you += 1
@@ -221,6 +224,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
   }
   const repoName = (id: string) => repos.find((x) => x.id === id)?.name
   const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
+  const elsewhere = pillCounts.runner
   // nothing here can be handed over: no origin to push to, or no GitLab for the bridge (the backend's local_only rule)
   const localOnly = scope.length > 0 && scope.every((r) => r.remote === false || !(r.kit?.gitlab_base && r.kit?.gitlab_project))
   const manyRepos = repo === 'all' && repos.length > 1
@@ -301,6 +305,13 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
             )
           })}
         </nav>
+          {elsewhere && elsewhere.open + elsewhere.you > 0 && (
+            <button type="button" aria-pressed={pick?.id === ELSEWHERE.id} data-testid="pill-elsewhere" title="运行机在做的、这台机器没导入的项目：点一下在全部的交付清单里看它们"
+              onClick={() => { if (repo !== 'all') pickRepo('all'); filterTo(ELSEWHERE) }}>
+              <b>{ELSEWHERE.label}</b>
+              <span>进行中 {elsewhere.open}{elsewhere.you > 0 && <span className="is-you"> · 轮到你 {elsewhere.you}</span>}</span>
+            </button>
+          )}
       )}
 
       {empty && noKit && (
@@ -373,7 +384,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
                     </td></tr>
                   )}
                   {rows.slice(0, limit).map((r) => (
-                    <Row key={idOf(r)} r={r} at={data.at} run={runsBy.get(idOf(r))} ev={data.eval} repoName={manyRepos ? repoName(r.repo) : undefined}
+                    <Row key={idOf(r)} r={r} at={data.at} run={runsBy.get(idOf(r))} ev={data.eval} repoName={manyRepos ? repoName(homeOf(r)) : undefined}
                       onOpen={() => toBoard(r)} onItem={() => toItem(r)} onReplay={() => toBoard(r, true)} onGo={go} />
                   ))}
                 </tbody>
@@ -448,7 +459,7 @@ function YourTurn({ rows, at, repoName, onGo, onOpen, onAll }: {
         {rows.slice(0, SHOWN).map((r) => {
           const step = stepOf(r)
           const waited = waitedText(r, at)
-          const name = repoName(r.repo)
+          const name = repoName(homeOf(r))
           return (
             <li key={idOf(r)} data-key={r.key}>
               {step && <StepButton step={step} onGo={onGo} />}

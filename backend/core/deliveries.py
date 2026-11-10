@@ -72,6 +72,7 @@ def base_row(repo_id: str, f: dict[str, Any], *, local_only: bool = False) -> di
     lean = lean_view.summary(f.get("stages") or lean_view.stages([]))
     return {
         "repo": repo_id, "key": f["key"], "title": title or f["key"], "owner": f.get("owner"),
+        "home": None,        # a runner row: the listed repo (r1 …) of its GitLab project, filled in by the service
         "source": str(claim.get("source") or "product"), "state": "claimed", "state_label": STATE_LABEL["claimed"],
         "where": f.get("where") or "claim", "branch": f.get("branch"), "intent": run.get("intent"),
         "lean": lean, "stage": lean_view.stage_text(lean), "waits": waits("nobody", "none", ""),

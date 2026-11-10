@@ -52,7 +52,8 @@
       "src/refund/id.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-2-1c4e"
+    "session_url": "/chat?sid=brain-PAY-2-1c4e",
+    "home": null
   },
   "branch": "ai/alice/PAY-2-refund-id",
   "base": "main",

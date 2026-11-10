@@ -514,6 +514,31 @@ describe('交付总览', () => {
     expect(apiCalls.filter((c) => c.path === `${API}/overview?repo=all`)).toHaveLength(1)
   })
 
+  test('team mode: a row on the runner counts in its repo’s pill and card; one of a project not listed here has its own pill, and the pills add up to 全部', async () => {
+    const user = userEvent.setup()
+    const status = fx.status()
+    status.app.team = true
+    status.repos = [status.repos[0], { ...status.repos[0], id: 'r3', name: 'shop-order', path: '/w/shop-order' }]
+    const all = fx.overview()
+    const base = all.rows[0]
+    const onRunner = (key: string, home: string | null): Requirement => ({ ...base, repo: 'runner', home, key, title: `${key} 在运行机上`, state: 'running', state_label: '运行机在跑',
+      waits: { who: 'runner', text: '运行机在跑', line: null, raw: '', do: 'none', since: null, where: null }, mr: null, run_ids: [`RUN-${key}-1`], overlap: [], open_questions: [] })
+    all.rows = [...all.rows, onRunner('ORD-10', 'r3'), onRunner('PAY-9', 'r1'), onRunner('WEB-1', null)]
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => all })
+    render(<OverviewView entry={{}} {...props({ status })} />)
+    const pills = await screen.findByRole('navigation', { name: '仓库' })
+    await waitFor(() => expect(within(pills).getByRole('button', { name: /^全部/ })).toHaveTextContent('全部进行中 8 · 轮到你 2'))
+    expect(within(pills).getByRole('button', { name: /^shop-pay/ })).toHaveTextContent('shop-pay进行中 6 · 轮到你 2')
+    expect(within(pills).getByRole('button', { name: /^shop-order/ })).toHaveTextContent('shop-order进行中 1')
+    const elsewhere = within(pills).getByTestId('pill-elsewhere')
+    expect(elsewhere).toHaveTextContent('没导入的项目进行中 1')
+    // the card on the runner says its repo, as the repo's own cards do
+    expect(cardOf(screen.getByTestId('flow'), 'ORD-10')).toHaveTextContent('shop-order')
+    await user.click(elsewhere)
+    expect(keysOf(screen.getByTestId('req-table'))).toEqual(['WEB-1'])
+    expect(screen.getByTestId('ledger-pick')).toHaveTextContent('没导入的项目')
+  })
+
   test('opened with a state in the URL, only those rows show; a filter with no rows says so', async () => {
     const user = userEvent.setup()
     installFixtureRoutes()

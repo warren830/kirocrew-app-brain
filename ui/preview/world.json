@@ -224,7 +224,8 @@
      "src/export/csv.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-3-7f3a"
+    "session_url": "/chat?sid=brain-PAY-3-7f3a",
+    "home": null
    },
    {
     "repo": "r1",
@@ -287,7 +288,8 @@
      "src/statement/"
     ],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r1",
@@ -347,7 +349,8 @@
      "src/callback/"
     ],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r1",
@@ -403,7 +406,8 @@
      "web/refund/"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-7-2b9f"
+    "session_url": "/chat?sid=brain-PAY-7-2b9f",
+    "home": null
    },
    {
     "repo": "r1",
@@ -453,7 +457,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r1",
@@ -507,7 +512,8 @@
      "src/refund/id.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-2-1c4e"
+    "session_url": "/chat?sid=brain-PAY-2-1c4e",
+    "home": null
    },
    {
     "repo": "r1",
@@ -557,7 +563,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r1",
@@ -613,7 +620,8 @@
      "web/refund/"
     ],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r1",
@@ -665,7 +673,8 @@
      "src/refund/stats/"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-1-3d8e"
+    "session_url": "/chat?sid=brain-PAY-1-3d8e",
+    "home": null
    },
    {
     "repo": "r3",
@@ -717,7 +726,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r3",
@@ -769,7 +779,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r3",
@@ -821,7 +832,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r3",
@@ -873,7 +885,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r3",
@@ -923,7 +936,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r3",
@@ -975,7 +989,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r3",
@@ -1027,7 +1042,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r3",
@@ -1079,7 +1095,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r3",
@@ -1131,7 +1148,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r3",
@@ -1187,7 +1205,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    {
     "repo": "r4",
@@ -1239,7 +1258,8 @@
      "tools/price"
     ],
     "local_only": true,
-    "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+    "session_url": "/chat?sid=brain-TOOL-1-5a2c",
+    "home": null
    }
   ],
   "overlaps": [
@@ -1736,7 +1756,8 @@
        "src/export/csv.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+      "session_url": "/chat?sid=brain-PAY-3-7f3a",
+      "home": null
      },
      {
       "repo": "r1",
@@ -1799,7 +1820,8 @@
        "src/statement/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -1859,7 +1881,8 @@
        "src/callback/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -1915,7 +1938,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+      "session_url": "/chat?sid=brain-PAY-7-2b9f",
+      "home": null
      },
      {
       "repo": "r1",
@@ -1965,7 +1989,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -2019,7 +2044,8 @@
        "src/refund/id.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+      "session_url": "/chat?sid=brain-PAY-2-1c4e",
+      "home": null
      },
      {
       "repo": "r1",
@@ -2069,7 +2095,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -2125,7 +2152,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -2177,7 +2205,8 @@
        "src/refund/stats/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+      "session_url": "/chat?sid=brain-PAY-1-3d8e",
+      "home": null
      },
      {
       "repo": "r3",
@@ -2229,7 +2258,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -2281,7 +2311,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -2333,7 +2364,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -2385,7 +2417,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -2435,7 +2468,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -2487,7 +2521,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -2539,7 +2574,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -2591,7 +2627,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -2643,7 +2680,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -2699,7 +2737,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r4",
@@ -2751,7 +2790,8 @@
        "tools/price"
       ],
       "local_only": true,
-      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c",
+      "home": null
      }
     ],
     "overlaps": [
@@ -3246,7 +3286,8 @@
        "src/export/csv.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+      "session_url": "/chat?sid=brain-PAY-3-7f3a",
+      "home": null
      },
      {
       "repo": "r1",
@@ -3309,7 +3350,8 @@
        "src/statement/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -3369,7 +3411,8 @@
        "src/callback/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -3425,7 +3468,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+      "session_url": "/chat?sid=brain-PAY-7-2b9f",
+      "home": null
      },
      {
       "repo": "r1",
@@ -3475,7 +3519,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -3529,7 +3574,8 @@
        "src/refund/id.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+      "session_url": "/chat?sid=brain-PAY-2-1c4e",
+      "home": null
      },
      {
       "repo": "r1",
@@ -3579,7 +3625,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -3635,7 +3682,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -3687,7 +3735,8 @@
        "src/refund/stats/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+      "session_url": "/chat?sid=brain-PAY-1-3d8e",
+      "home": null
      }
     ],
     "overlaps": [
@@ -4294,7 +4343,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -4346,7 +4396,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -4398,7 +4449,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -4450,7 +4502,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -4500,7 +4553,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -4552,7 +4606,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -4604,7 +4659,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -4656,7 +4712,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -4708,7 +4765,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -4764,7 +4822,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      }
     ],
     "overlaps": [],
@@ -5175,7 +5234,8 @@
        "tools/price"
       ],
       "local_only": true,
-      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c",
+      "home": null
      }
     ],
     "overlaps": [],
@@ -5407,6 +5467,7 @@
       "key": "PAY-9",
       "title": "PAY-9",
       "owner": null,
+      "home": "r1",
       "source": "product",
       "state": "handed_over",
       "state_label": "已交接",
@@ -5463,6 +5524,7 @@
       "key": "PAY-4",
       "title": "对账单按商户拆分",
       "owner": "carol",
+      "home": "r1",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -5521,6 +5583,7 @@
       "key": "PAY-5",
       "title": "退款回调失败重试",
       "owner": "alice",
+      "home": "r1",
       "source": "product",
       "state": "acceptance",
       "state_label": "等验收",
@@ -5579,6 +5642,7 @@
       "key": "ORD-10",
       "title": "订单状态推送到企业微信",
       "owner": "erin",
+      "home": "r3",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -5919,7 +5983,8 @@
        "src/export/csv.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+      "session_url": "/chat?sid=brain-PAY-3-7f3a",
+      "home": null
      },
      {
       "repo": "r1",
@@ -5982,7 +6047,8 @@
        "src/statement/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -6042,7 +6108,8 @@
        "src/callback/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -6098,7 +6165,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+      "session_url": "/chat?sid=brain-PAY-7-2b9f",
+      "home": null
      },
      {
       "repo": "r1",
@@ -6148,7 +6216,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -6202,7 +6271,8 @@
        "src/refund/id.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+      "session_url": "/chat?sid=brain-PAY-2-1c4e",
+      "home": null
      },
      {
       "repo": "r1",
@@ -6252,7 +6322,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -6308,7 +6379,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -6360,7 +6432,8 @@
        "src/refund/stats/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+      "session_url": "/chat?sid=brain-PAY-1-3d8e",
+      "home": null
      },
      {
       "repo": "r3",
@@ -6412,7 +6485,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -6464,7 +6538,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -6516,7 +6591,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -6568,7 +6644,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -6618,7 +6695,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -6670,7 +6748,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -6722,7 +6801,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -6774,7 +6854,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -6826,7 +6907,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -6882,7 +6964,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r4",
@@ -6934,7 +7017,8 @@
        "tools/price"
       ],
       "local_only": true,
-      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c",
+      "home": null
      }
     ],
     "overlaps": [
@@ -7180,7 +7264,8 @@
        "src/export/csv.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+      "session_url": "/chat?sid=brain-PAY-3-7f3a",
+      "home": null
      },
      {
       "repo": "r1",
@@ -7243,7 +7328,8 @@
        "src/statement/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -7303,7 +7389,8 @@
        "src/callback/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -7359,7 +7446,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+      "session_url": "/chat?sid=brain-PAY-7-2b9f",
+      "home": null
      },
      {
       "repo": "r1",
@@ -7409,7 +7497,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -7463,7 +7552,8 @@
        "src/refund/id.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+      "session_url": "/chat?sid=brain-PAY-2-1c4e",
+      "home": null
      },
      {
       "repo": "r1",
@@ -7513,7 +7603,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -7569,7 +7660,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -7621,7 +7713,8 @@
        "src/refund/stats/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+      "session_url": "/chat?sid=brain-PAY-1-3d8e",
+      "home": null
      }
     ],
     "overlaps": [
@@ -8032,7 +8125,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -8084,7 +8178,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -8136,7 +8231,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -8188,7 +8284,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -8238,7 +8335,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -8290,7 +8388,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -8342,7 +8441,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -8394,7 +8494,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -8446,7 +8547,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -8502,7 +8604,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      }
     ],
     "overlaps": [],
@@ -8723,7 +8826,8 @@
        "tools/price"
       ],
       "local_only": true,
-      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c",
+      "home": null
      }
     ],
     "overlaps": [],
@@ -8899,6 +9003,7 @@
       "key": "PAY-9",
       "title": "PAY-9",
       "owner": null,
+      "home": "r1",
       "source": "product",
       "state": "handed_over",
       "state_label": "已交接",
@@ -8955,6 +9060,7 @@
       "key": "PAY-4",
       "title": "对账单按商户拆分",
       "owner": "carol",
+      "home": "r1",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -9013,6 +9119,7 @@
       "key": "PAY-5",
       "title": "退款回调失败重试",
       "owner": "alice",
+      "home": "r1",
       "source": "product",
       "state": "acceptance",
       "state_label": "等验收",
@@ -9071,6 +9178,7 @@
       "key": "ORD-10",
       "title": "订单状态推送到企业微信",
       "owner": "erin",
+      "home": "r3",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -9348,7 +9456,8 @@
        "src/export/csv.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+      "session_url": "/chat?sid=brain-PAY-3-7f3a",
+      "home": null
      },
      {
       "repo": "r1",
@@ -9404,7 +9513,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+      "session_url": "/chat?sid=brain-PAY-7-2b9f",
+      "home": null
      },
      {
       "repo": "r1",
@@ -9454,7 +9564,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -9508,7 +9619,8 @@
        "src/refund/id.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+      "session_url": "/chat?sid=brain-PAY-2-1c4e",
+      "home": null
      },
      {
       "repo": "r1",
@@ -9558,7 +9670,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -9614,7 +9727,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -9666,7 +9780,8 @@
        "src/refund/stats/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+      "session_url": "/chat?sid=brain-PAY-1-3d8e",
+      "home": null
      },
      {
       "repo": "r3",
@@ -9718,7 +9833,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -9770,7 +9886,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -9822,7 +9939,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -9874,7 +9992,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -9924,7 +10043,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -9976,7 +10096,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -10028,7 +10149,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -10080,7 +10202,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -10132,7 +10255,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r4",
@@ -10184,13 +10308,15 @@
        "tools/price"
       ],
       "local_only": true,
-      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c",
+      "home": null
      },
      {
       "repo": "runner",
       "key": "PAY-9",
       "title": "PAY-9",
       "owner": null,
+      "home": "r1",
       "source": "product",
       "state": "handed_over",
       "state_label": "已交接",
@@ -10247,6 +10373,7 @@
       "key": "PAY-4",
       "title": "对账单按商户拆分",
       "owner": "carol",
+      "home": "r1",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -10305,6 +10432,7 @@
       "key": "PAY-5",
       "title": "退款回调失败重试",
       "owner": "alice",
+      "home": "r1",
       "source": "product",
       "state": "acceptance",
       "state_label": "等验收",
@@ -10363,6 +10491,7 @@
       "key": "ORD-10",
       "title": "订单状态推送到企业微信",
       "owner": "erin",
+      "home": "r3",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -10907,7 +11036,8 @@
        "src/export/csv.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+      "session_url": "/chat?sid=brain-PAY-3-7f3a",
+      "home": null
      },
      {
       "repo": "r1",
@@ -10963,7 +11093,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+      "session_url": "/chat?sid=brain-PAY-7-2b9f",
+      "home": null
      },
      {
       "repo": "r1",
@@ -11013,7 +11144,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -11067,7 +11199,8 @@
        "src/refund/id.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+      "session_url": "/chat?sid=brain-PAY-2-1c4e",
+      "home": null
      },
      {
       "repo": "r1",
@@ -11117,7 +11250,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -11173,7 +11307,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -11225,7 +11360,183 @@
        "src/refund/stats/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+      "session_url": "/chat?sid=brain-PAY-1-3d8e",
+      "home": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-9",
+      "title": "PAY-9",
+      "owner": null,
+      "home": "r1",
+      "source": "product",
+      "state": "handed_over",
+      "state_label": "已交接",
+      "where": "runner",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "bridge",
+       "text": "签名服务在签接手合同",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": null,
+       "where": null,
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": 1794146340.0,
+      "mr": {
+       "iid": 53,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/53",
+       "state": null
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-PAY-9-1"
+      ],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-4",
+      "title": "对账单按商户拆分",
+      "owner": "carol",
+      "home": "r1",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/carol/PAY-4-merchant-split",
+      "intent": "261105-merchant-split",
+      "lean": {
+       "stage": "functional-design",
+       "stage_label": "功能设计",
+       "stage_n": 6,
+       "stage_state": "started",
+       "done": 5,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 3,
+       "next": {
+        "id": "functional-design",
+        "label": "功能设计",
+        "n": 6
+       }
+      },
+      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "waits": {
+       "who": "product",
+       "text": "等产品在 MR 上回答 D-2（设计）",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": 1794135600.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "对账单按商户拆成一户一份，大商户按小时切。",
+      "credits": 6.1,
+      "updated_at": 1794135600.0,
+      "mr": {
+       "iid": 41,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-4-1",
+      "run_ids": [
+       "RUN-PAY-4-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-2"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-5",
+      "title": "退款回调失败重试",
+      "owner": "alice",
+      "home": "r1",
+      "source": "product",
+      "state": "acceptance",
+      "state_label": "等验收",
+      "where": "runner",
+      "branch": "ai/alice/PAY-5-callback-retry",
+      "intent": "261104-callback-retry",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "started",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "product",
+       "text": "等产品在 MR 上验收 D-3（approve / reject）",
+       "line": null,
+       "raw": "",
+       "do": "accept",
+       "since": 1794056400.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "退款回调失败自动重试，第 6 次转人工处理。",
+      "credits": 24.2,
+      "updated_at": 1794052800.0,
+      "mr": {
+       "iid": 44,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-5-1",
+      "run_ids": [
+       "RUN-PAY-5-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-3"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
      }
     ],
     "overlaps": [
@@ -11350,7 +11661,16 @@
        "rule": "完成的 run 花的 credits 合计 ÷ 正确交付数；只用来诊断，不设上限"
       }
      ],
-     "queue": [],
+     "queue": [
+      {
+       "key": "PAY-4",
+       "intent": "261105-merchant-split",
+       "reasons": [
+        "验收被退回 1 次",
+        "判断点之外有人介入 2 次（交接后推代码）"
+       ]
+      }
+     ],
      "skipped": [
       {
        "key": "PAY-1",
@@ -11380,18 +11700,18 @@
     "counts": {
      "claimed": 2,
      "local": 2,
-     "handed_over": 1,
+     "handed_over": 2,
      "rejected": 1,
      "running": 0,
-     "parked": 0,
-     "acceptance": 0,
+     "parked": 1,
+     "acceptance": 1,
      "merged": 1,
      "closed": 0
     },
     "errors": [],
     "cto": {
      "available": true,
-     "sentence": "交给运行机的 1 个需求里，0 个交接以后没人插手就做完了。人介入了 5 次（本机做的也算），5 次落在判断点上。有 credits 的 5 个需求，平均每个 15.1 credits。",
+     "sentence": "交给运行机的 1 个需求里，0 个交接以后没人插手就做完了。人介入了 5 次（本机做的也算），5 次落在判断点上。有 credits 的 7 个需求，平均每个 15.1 credits。",
      "ref": "远端的 main 分支",
      "unattended": [
       0,
@@ -11415,8 +11735,8 @@
      },
      "credits": {
       "per_req": 15.1,
-      "total": 75.7,
-      "reqs": 5
+      "total": 106.0,
+      "reqs": 7
      },
      "runs": [
       {
@@ -11823,7 +12143,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -11875,7 +12196,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -11927,7 +12249,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -11979,7 +12302,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -12029,7 +12353,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -12081,7 +12406,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -12133,7 +12459,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -12185,7 +12512,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -12231,6 +12559,64 @@
       "worktree": null,
       "run_ids": [
        "RUN-ORD-9-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null,
+      "home": null
+     },
+     {
+      "repo": "runner",
+      "key": "ORD-10",
+      "title": "订单状态推送到企业微信",
+      "owner": "erin",
+      "home": "r3",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/erin/ORD-10-wecom-push",
+      "intent": "261106-wecom-push",
+      "lean": {
+       "stage": "code-generation",
+       "stage_label": "代码生成",
+       "stage_n": 9,
+       "stage_state": "started",
+       "done": 8,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 6,
+       "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+       }
+      },
+      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "waits": {
+       "who": "people",
+       "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": null,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "订单状态变化时推送到企业微信，失败自动重试。",
+      "credits": 7.4,
+      "updated_at": 1794146160.0,
+      "mr": {
+       "iid": 19,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/19",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-ORD-10-1",
+      "run_ids": [
+       "RUN-ORD-10-1"
       ],
       "sessions": 1,
       "overlap": [],
@@ -12361,7 +12747,7 @@
      "handed_over": 0,
      "rejected": 0,
      "running": 0,
-     "parked": 0,
+     "parked": 1,
      "acceptance": 0,
      "merged": 9,
      "closed": 0
@@ -12369,7 +12755,7 @@
     "errors": [],
     "cto": {
      "available": true,
-     "sentence": "交给运行机的 7 个需求里，5 个交接以后没人插手就做完了。人介入了 40 次（本机做的也算），39 次落在判断点上。有 credits 的 9 个需求，平均每个 18.8 credits。",
+     "sentence": "交给运行机的 7 个需求里，5 个交接以后没人插手就做完了。人介入了 40 次（本机做的也算），39 次落在判断点上。有 credits 的 10 个需求，平均每个 17.7 credits。",
      "ref": "远端的 main 分支",
      "unattended": [
       5,
@@ -12397,9 +12783,9 @@
       ]
      },
      "credits": {
-      "per_req": 18.8,
-      "total": 169.5,
-      "reqs": 9
+      "per_req": 17.7,
+      "total": 176.9,
+      "reqs": 10
      },
      "runs": [
       {
@@ -12648,7 +13034,8 @@
        "tools/price"
       ],
       "local_only": true,
-      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c",
+      "home": null
      }
     ],
     "overlaps": [],
@@ -12880,6 +13267,7 @@
       "key": "PAY-9",
       "title": "PAY-9",
       "owner": null,
+      "home": "r1",
       "source": "product",
       "state": "handed_over",
       "state_label": "已交接",
@@ -12936,6 +13324,7 @@
       "key": "PAY-4",
       "title": "对账单按商户拆分",
       "owner": "carol",
+      "home": "r1",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -12994,6 +13383,7 @@
       "key": "PAY-5",
       "title": "退款回调失败重试",
       "owner": "alice",
+      "home": "r1",
       "source": "product",
       "state": "acceptance",
       "state_label": "等验收",
@@ -13052,6 +13442,7 @@
       "key": "ORD-10",
       "title": "订单状态推送到企业微信",
       "owner": "erin",
+      "home": "r3",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -13392,7 +13783,8 @@
        "src/export/csv.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+      "session_url": "/chat?sid=brain-PAY-3-7f3a",
+      "home": null
      },
      {
       "repo": "r1",
@@ -13448,7 +13840,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+      "session_url": "/chat?sid=brain-PAY-7-2b9f",
+      "home": null
      },
      {
       "repo": "r1",
@@ -13498,7 +13891,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -13552,7 +13946,8 @@
        "src/refund/id.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+      "session_url": "/chat?sid=brain-PAY-2-1c4e",
+      "home": null
      },
      {
       "repo": "r1",
@@ -13602,7 +13997,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -13658,7 +14054,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -13710,7 +14107,8 @@
        "src/refund/stats/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+      "session_url": "/chat?sid=brain-PAY-1-3d8e",
+      "home": null
      },
      {
       "repo": "r3",
@@ -13762,7 +14160,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -13814,7 +14213,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -13866,7 +14266,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -13918,7 +14319,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -13968,7 +14370,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -14020,7 +14423,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -14072,7 +14476,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -14124,7 +14529,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -14176,7 +14582,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r4",
@@ -14228,13 +14635,15 @@
        "tools/price"
       ],
       "local_only": true,
-      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c",
+      "home": null
      },
      {
       "repo": "runner",
       "key": "PAY-9",
       "title": "PAY-9",
       "owner": null,
+      "home": "r1",
       "source": "product",
       "state": "handed_over",
       "state_label": "已交接",
@@ -14291,6 +14700,7 @@
       "key": "PAY-4",
       "title": "对账单按商户拆分",
       "owner": "carol",
+      "home": "r1",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -14349,6 +14759,7 @@
       "key": "PAY-5",
       "title": "退款回调失败重试",
       "owner": "alice",
+      "home": "r1",
       "source": "product",
       "state": "acceptance",
       "state_label": "等验收",
@@ -14407,6 +14818,7 @@
       "key": "ORD-10",
       "title": "订单状态推送到企业微信",
       "owner": "erin",
+      "home": "r3",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -14702,7 +15114,8 @@
        "src/export/csv.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+      "session_url": "/chat?sid=brain-PAY-3-7f3a",
+      "home": null
      },
      {
       "repo": "r1",
@@ -14758,7 +15171,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+      "session_url": "/chat?sid=brain-PAY-7-2b9f",
+      "home": null
      },
      {
       "repo": "r1",
@@ -14808,7 +15222,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -14862,7 +15277,8 @@
        "src/refund/id.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+      "session_url": "/chat?sid=brain-PAY-2-1c4e",
+      "home": null
      },
      {
       "repo": "r1",
@@ -14912,7 +15328,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -14968,7 +15385,8 @@
        "web/refund/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r1",
@@ -15020,7 +15438,183 @@
        "src/refund/stats/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+      "session_url": "/chat?sid=brain-PAY-1-3d8e",
+      "home": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-9",
+      "title": "PAY-9",
+      "owner": null,
+      "home": "r1",
+      "source": "product",
+      "state": "handed_over",
+      "state_label": "已交接",
+      "where": "runner",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "bridge",
+       "text": "签名服务在签接手合同",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": null,
+       "where": null,
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": 1794146340.0,
+      "mr": {
+       "iid": 53,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/53",
+       "state": null
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-PAY-9-1"
+      ],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-4",
+      "title": "对账单按商户拆分",
+      "owner": "carol",
+      "home": "r1",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/carol/PAY-4-merchant-split",
+      "intent": "261105-merchant-split",
+      "lean": {
+       "stage": "functional-design",
+       "stage_label": "功能设计",
+       "stage_n": 6,
+       "stage_state": "started",
+       "done": 5,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 3,
+       "next": {
+        "id": "functional-design",
+        "label": "功能设计",
+        "n": 6
+       }
+      },
+      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "waits": {
+       "who": "product",
+       "text": "等产品在 MR 上回答 D-2（设计）",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": 1794135600.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "对账单按商户拆成一户一份，大商户按小时切。",
+      "credits": 6.1,
+      "updated_at": 1794135600.0,
+      "mr": {
+       "iid": 41,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-4-1",
+      "run_ids": [
+       "RUN-PAY-4-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-2"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-5",
+      "title": "退款回调失败重试",
+      "owner": "alice",
+      "home": "r1",
+      "source": "product",
+      "state": "acceptance",
+      "state_label": "等验收",
+      "where": "runner",
+      "branch": "ai/alice/PAY-5-callback-retry",
+      "intent": "261104-callback-retry",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "started",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "product",
+       "text": "等产品在 MR 上验收 D-3（approve / reject）",
+       "line": null,
+       "raw": "",
+       "do": "accept",
+       "since": 1794056400.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "退款回调失败自动重试，第 6 次转人工处理。",
+      "credits": 24.2,
+      "updated_at": 1794052800.0,
+      "mr": {
+       "iid": 44,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-5-1",
+      "run_ids": [
+       "RUN-PAY-5-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-3"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
      }
     ],
     "overlaps": [
@@ -15095,25 +15689,25 @@
     "counts": {
      "claimed": 2,
      "local": 2,
-     "handed_over": 1,
+     "handed_over": 2,
      "rejected": 1,
      "running": 0,
-     "parked": 0,
-     "acceptance": 0,
+     "parked": 1,
+     "acceptance": 1,
      "merged": 1,
      "closed": 0
     },
     "errors": [],
     "cto": {
      "available": false,
-     "sentence": "有 credits 的 5 个需求，平均每个 15.1 credits。",
+     "sentence": "有 credits 的 7 个需求，平均每个 15.1 credits。",
      "ref": null,
      "unattended": null,
      "stepped_in": null,
      "credits": {
       "per_req": 15.1,
-      "total": 75.7,
-      "reqs": 5
+      "total": 106.0,
+      "reqs": 7
      },
      "runs": [],
      "weekly": [
@@ -15431,7 +16025,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -15483,7 +16078,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -15535,7 +16131,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -15587,7 +16184,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -15637,7 +16235,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -15689,7 +16288,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -15741,7 +16341,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -15793,7 +16394,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
      },
      {
       "repo": "r3",
@@ -15839,6 +16441,64 @@
       "worktree": null,
       "run_ids": [
        "RUN-ORD-9-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null,
+      "home": null
+     },
+     {
+      "repo": "runner",
+      "key": "ORD-10",
+      "title": "订单状态推送到企业微信",
+      "owner": "erin",
+      "home": "r3",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/erin/ORD-10-wecom-push",
+      "intent": "261106-wecom-push",
+      "lean": {
+       "stage": "code-generation",
+       "stage_label": "代码生成",
+       "stage_n": 9,
+       "stage_state": "started",
+       "done": 8,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 6,
+       "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+       }
+      },
+      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "waits": {
+       "who": "people",
+       "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": null,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "订单状态变化时推送到企业微信，失败自动重试。",
+      "credits": 7.4,
+      "updated_at": 1794146160.0,
+      "mr": {
+       "iid": 19,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/19",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-ORD-10-1",
+      "run_ids": [
+       "RUN-ORD-10-1"
       ],
       "sessions": 1,
       "overlap": [],
@@ -15907,7 +16567,7 @@
      "handed_over": 0,
      "rejected": 0,
      "running": 0,
-     "parked": 0,
+     "parked": 1,
      "acceptance": 0,
      "merged": 9,
      "closed": 0
@@ -15915,14 +16575,14 @@
     "errors": [],
     "cto": {
      "available": false,
-     "sentence": "有 credits 的 9 个需求，平均每个 18.8 credits。",
+     "sentence": "有 credits 的 10 个需求，平均每个 17.7 credits。",
      "ref": null,
      "unattended": null,
      "stepped_in": null,
      "credits": {
-      "per_req": 18.8,
-      "total": 169.5,
-      "reqs": 9
+      "per_req": 17.7,
+      "total": 176.9,
+      "reqs": 10
      },
      "runs": [],
      "weekly": [
@@ -16066,7 +16726,8 @@
        "tools/price"
       ],
       "local_only": true,
-      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c",
+      "home": null
      }
     ],
     "overlaps": [],
@@ -16242,6 +16903,7 @@
       "key": "PAY-9",
       "title": "PAY-9",
       "owner": null,
+      "home": "r1",
       "source": "product",
       "state": "handed_over",
       "state_label": "已交接",
@@ -16298,6 +16960,7 @@
       "key": "PAY-4",
       "title": "对账单按商户拆分",
       "owner": "carol",
+      "home": "r1",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -16356,6 +17019,7 @@
       "key": "PAY-5",
       "title": "退款回调失败重试",
       "owner": "alice",
+      "home": "r1",
       "source": "product",
       "state": "acceptance",
       "state_label": "等验收",
@@ -16414,6 +17078,7 @@
       "key": "ORD-10",
       "title": "订单状态推送到企业微信",
       "owner": "erin",
+      "home": "r3",
       "source": "product",
       "state": "parked",
       "state_label": "停下等回答",
@@ -17399,7 +18064,8 @@
      "src/refund/id.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-2-1c4e"
+    "session_url": "/chat?sid=brain-PAY-2-1c4e",
+    "home": null
    },
    "branch": "ai/alice/PAY-2-refund-id",
    "base": "main",
@@ -19353,7 +20019,8 @@
      "src/export/csv.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-3-7f3a"
+    "session_url": "/chat?sid=brain-PAY-3-7f3a",
+    "home": null
    },
    "branch": "ai/alice/PAY-3-refund-export",
    "base": "main",
@@ -20753,7 +21420,8 @@
      "src/statement/"
     ],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/carol/PAY-4-merchant-split",
    "base": "main",
@@ -21904,7 +22572,8 @@
      "src/callback/"
     ],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/alice/PAY-5-callback-retry",
    "base": "main",
@@ -23359,7 +24028,8 @@
      "web/refund/"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-7-2b9f"
+    "session_url": "/chat?sid=brain-PAY-7-2b9f",
+    "home": null
    },
    "branch": "ai/alice/PAY-7-refund-reason",
    "base": "main",
@@ -24372,7 +25042,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": null,
    "base": "main",
@@ -24764,7 +25435,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": null,
    "base": "main",
@@ -25162,7 +25834,8 @@
      "web/refund/"
     ],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/alice/PAY-10-refund-confirm",
    "base": "main",
@@ -26112,7 +26785,8 @@
      "src/refund/stats/"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-1-3d8e"
+    "session_url": "/chat?sid=brain-PAY-1-3d8e",
+    "home": null
    },
    "branch": "ai/alice/PAY-1-refund-stats",
    "base": "main",
@@ -27028,7 +27702,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/erin/ORD-1-order-1",
    "base": "main",
@@ -28524,7 +29199,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/dave/ORD-2-order-2",
    "base": "main",
@@ -30121,7 +30797,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/erin/ORD-3-order-3",
    "base": "main",
@@ -31761,7 +32438,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/dave/ORD-4-order-4",
    "base": "main",
@@ -33279,7 +33957,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/erin/ORD-5-order-5",
    "base": "main",
@@ -34275,7 +34954,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/dave/ORD-6-order-6",
    "base": "main",
@@ -35964,7 +36644,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/erin/ORD-7-order-7",
    "base": "main",
@@ -37473,7 +38154,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/dave/ORD-8-order-8",
    "base": "main",
@@ -39157,7 +39839,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/erin/ORD-9-order-9",
    "base": "main",
@@ -40770,7 +41453,8 @@
     "open_questions": [],
     "expected_paths": [],
     "local_only": false,
-    "session_url": null
+    "session_url": null,
+    "home": null
    },
    "branch": "ai/erin/ORD-10-wecom-push",
    "base": "main",
@@ -41852,7 +42536,8 @@
      "tools/price"
     ],
     "local_only": true,
-    "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+    "session_url": "/chat?sid=brain-TOOL-1-5a2c",
+    "home": null
    },
    "branch": "ai/alice/TOOL-1-price-import",
    "base": "main",
@@ -42436,6 +43121,7 @@
     "key": "PAY-9",
     "title": "PAY-9",
     "owner": null,
+    "home": "r1",
     "source": "product",
     "state": "handed_over",
     "state_label": "已交接",
@@ -42840,6 +43526,7 @@
     "key": "PAY-4",
     "title": "对账单按商户拆分",
     "owner": "carol",
+    "home": "r1",
     "source": "product",
     "state": "parked",
     "state_label": "停下等回答",
@@ -43978,6 +44665,7 @@
     "key": "PAY-5",
     "title": "退款回调失败重试",
     "owner": "alice",
+    "home": "r1",
     "source": "product",
     "state": "acceptance",
     "state_label": "等验收",
@@ -45435,6 +46123,7 @@
     "key": "PAY-2",
     "title": "退款单号校验",
     "owner": "alice",
+    "home": null,
     "source": "product",
     "state": "merged",
     "state_label": "已合并",
@@ -47406,6 +48095,7 @@
     "key": "ORD-10",
     "title": "订单状态推送到企业微信",
     "owner": "erin",
+    "home": "r3",
     "source": "product",
     "state": "parked",
     "state_label": "停下等回答",
@@ -48601,7 +49291,8 @@
      "src/export/csv.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-3-7f3a"
+    "session_url": "/chat?sid=brain-PAY-3-7f3a",
+    "home": null
    },
    "where_label": "本机的工作目录",
    "run": {
@@ -49197,6 +49888,7 @@
     "key": "PAY-9",
     "title": "PAY-9",
     "owner": null,
+    "home": "r1",
     "source": "product",
     "state": "handed_over",
     "state_label": "已交接",
@@ -49394,6 +50086,7 @@
     "key": "PAY-4",
     "title": "对账单按商户拆分",
     "owner": "carol",
+    "home": "r1",
     "source": "product",
     "state": "parked",
     "state_label": "停下等回答",
@@ -49847,6 +50540,7 @@
     "key": "PAY-5",
     "title": "退款回调失败重试",
     "owner": "alice",
+    "home": "r1",
     "source": "product",
     "state": "acceptance",
     "state_label": "等验收",
@@ -50357,6 +51051,7 @@
     "key": "PAY-2",
     "title": "退款单号校验",
     "owner": "alice",
+    "home": null,
     "source": "product",
     "state": "merged",
     "state_label": "已合并",
@@ -50992,6 +51687,7 @@
     "key": "ORD-10",
     "title": "订单状态推送到企业微信",
     "owner": "erin",
+    "home": "r3",
     "source": "product",
     "state": "parked",
     "state_label": "停下等回答",

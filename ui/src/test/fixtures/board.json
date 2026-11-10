@@ -53,7 +53,8 @@
       "src/export/csv.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-3-7f3a"
+    "session_url": "/chat?sid=brain-PAY-3-7f3a",
+    "home": null
   },
   "branch": "ai/alice/PAY-3-refund-export",
   "base": "main",

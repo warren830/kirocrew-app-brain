@@ -446,7 +446,8 @@ class Service:
 
     def _team_split(self, mine: list[tuple[str, dict[str, Any], dict[str, Any]]], snap: dict[str, Any]
                     ) -> tuple[list[tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]], set[tuple[str, str]]]:
-        """Team mode, one row per requirement: the runner's requirements listed as its own (_team_rows'), and the
+        """Team mode, one row per requirement: the runner's requirements listed as its own (_team_rows'), each with
+        the listed repo of its GitLab project (row ``home``, None when this machine does not list it), and the
         (repo id, key) of this machine's rows (*mine*: repo id, facts, row) they stand for (deliveries.runner_takes)."""
         team = self._team_rows(snap)
         rid_of: dict[str, str] = {}
@@ -459,6 +460,7 @@ class Service:
             rid = rid_of.get(str(t[1].get("project") or ""))
             f, row = by.get((rid, t[0]["key"]), (None, None)) if rid else (None, None)
             if deliveries.runner_takes(f, row, t[0]):
+                t[0]["home"] = rid
                 keep.append(t)
                 if f is not None:
                     taken.add((rid, t[0]["key"]))
@@ -511,8 +513,8 @@ class Service:
                 said = re.search(r"[\u4e00-\u9fff]", err)
                 errors.append({"repo": rid, "error": err if said else "读不了这个仓库：在「导入仓库」里检查它，那里会说哪里不对",
                                "raw": path if said else "%s：%s" % (path, err)})
-        if which in ("all", "runner"):
-            for row, f, decs in runner:
+        for row, f, decs in runner:   # a repo's view has what the runner does for it, as 全部 and the runner's do
+            if which in ("all", "runner", row["home"]):
                 rows.append(row)
                 all_decisions += [dict(d, key=row["key"]) for d in detail.decisions(f.get("decisions_text"), "decisions.md", [])]
                 for d in decs:

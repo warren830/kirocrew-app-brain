@@ -125,6 +125,9 @@ export interface MrRef { iid: number; url: string | null; state: string | null }
 export interface Requirement {
   /** repo id from /status (r1, r2 …); team-mode rows use 'runner' */
   repo: string
+  /** a team-mode row on the runner: the listed repo (r1 …) of its GitLab project, whose view and pill hold it; null
+   * when this machine does not list that project, and for every other row. The backend always sends it */
+  home?: string | null
   key: string
   title: string
   owner: string | null

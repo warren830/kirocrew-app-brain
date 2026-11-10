@@ -585,6 +585,8 @@ def main() -> None:
     status = json.loads((FIX / "status.json").read_text(encoding="utf-8"))
     status["crew"]["rows"] = crew_rows()
     status["crew"]["fix"] = {"agent": True, "engine": False}
+    for r_ in ov["rows"] + [det["row"]]:
+        r_.setdefault("home", None)                                     # deliveries.base_row: a runner row's only
     rows = {r["key"]: r for r in ov["rows"]}
     for q in ov["eval"]["queue"]:
         q["reasons"] = [deliveries.eval_reason(x) for x in q["reasons"]]
@@ -955,7 +957,7 @@ def main() -> None:
         ids = [x for x in ("r1", "r3", "r4") if repo in ("all", x)]
         o = copy.deepcopy(ov)
         o["rows"] = [r_ for r_ in all_rows if r_["repo"] in ids and not (team and (r_["repo"], r_["key"]) in taken)] + (
-            copy.deepcopy(runner_rows) if team and repo in ("all", "runner") else [])
+            [copy.deepcopy(r_) for r_ in runner_rows if repo in ("all", "runner", r_["home"])] if team else [])
         o["overlaps"] = [x for x in ov["overlaps"] if any(r_["key"] == x["keys"][0] for r_ in o["rows"])]
         o["counts"] = deliveries.counts(o["rows"])
         o["errors"] = [e for e in ov["errors"] if repo in ("all", e["repo"])]
@@ -1042,6 +1044,7 @@ def main() -> None:
         mine = next((r_ for r_ in all_rows if (r_["repo"], r_["key"]) == (rid, key)), None)
         own = next((x for x in reqs.get(rid, []) if x.key == key), None)
         if deliveries.runner_takes(own.facts() if own and mine else None, mine, row_t):
+            row_t["home"] = rid
             team_entries.append({"row": row_t, "decisions": decs, "mr_url": url})
             runner_rows.append(row_t)
             if mine is not None:
