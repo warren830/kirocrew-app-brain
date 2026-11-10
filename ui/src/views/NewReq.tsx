@@ -550,7 +550,7 @@ function CheckResult({ c, stale }: { c: IntakeCheck; stale: boolean }) {
           {c.files?.map((f) => (
             <li key={f.id} className={`nr-file${f.refused ? ' is-refused' : ''}`} data-file={f.id}>
               <b><RoleIcon role="file" size={15} />{f.name}</b>
-              {f.refused ? <span className="nr-file-no">没收：{f.refused}</span>
+              {f.refused ? <span className="nr-file-no"><span className="br-chip tone-warn">没收</span>{f.refused}</span>
                 : f.items.length > 0 ? <ul>{f.items.map((t, i) => <li key={i}>{t}</li>)}</ul>
                   : <span className="br-dim br-small">没找到要处理的</span>}
             </li>
@@ -746,7 +746,8 @@ const NR_CSS = `
 .nr-file > b { display: flex; align-items: center; gap: 6px; color: var(--text-strong); word-break: break-all; }
 .nr-file ul { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; font-size: .88em; color: var(--text); }
 .nr-file.is-refused { border-style: dashed; border-color: color-mix(in srgb, var(--kt-warn) 60%, var(--border)); }
-.nr-file-no { font-size: .88em; color: var(--kt-warn); font-weight: 650; }
+.nr-file-no { display: flex; align-items: baseline; gap: 6px; font-size: .88em; color: var(--kt-warn); font-weight: 650; }
+.nr-file-no > .br-chip { flex: none; }
 .nr-review { display: grid; gap: 6px; padding: 10px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--kt-warn) 60%, var(--border));
   background: color-mix(in srgb, var(--kt-warn) 8%, var(--card)); }
 .nr-review-head { display: inline-flex; align-items: center; gap: 8px; }
