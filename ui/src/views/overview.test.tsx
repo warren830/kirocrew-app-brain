@@ -56,7 +56,7 @@ describe('交付总览', () => {
     expect(cards).toEqual(['无人值守', '人介入', '每个需求的 credits', '决定 · 谁定的'])
     expect(screen.getByTestId('ov-unattended')).toHaveTextContent(/^0\/1$/)
     expect(screen.getByTestId('ov-people')).toHaveTextContent(/^5次$/)
-    expect(screen.getByRole('article', { name: '人介入' })).toHaveTextContent('5 次落在判断点上（批准、驳回、回答），0 次在判断点之外 · 本机做的也算')
+    expect(screen.getByRole('article', { name: '人介入' })).toHaveTextContent('5 次落在判断点上（批准、退回、回答），0 次在判断点之外 · 本机做的也算')
     expect(screen.getByTestId('ov-credits')).toHaveTextContent(/^21\.1$/)
     expect(screen.getByRole('article', { name: '每个需求的 credits' })).toHaveTextContent('有 credits 的 4 个需求，合计 84.3')
     expect(screen.getByRole('article', { name: '每个需求的 credits' })).not.toHaveTextContent('token')
@@ -124,7 +124,8 @@ describe('交付总览', () => {
   test('while brain-kit works the eval out (the backend’s computing flag), the page says 正在算, not 还没有', async () => {
     const ov = fx.overview()
     ov.cto = { ...ov.cto, available: false, unattended: null, stepped_in: null }
-    ov.eval = { ...ov.eval, available: false, error: '正在算交付评估…', raw: '', metrics: [], queue: [], skipped: [], notes: [], ...{ computing: true } }
+    ov.eval = { ...ov.eval, available: false, error: '正在算交付评估…', raw: '', metrics: [], queue: [], skipped: [], notes: [], computing: true }
+    ov.funnel = { ...ov.funnel, source: 'app' }   // no evaluation yet: the backend counts the decisions itself
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
     render(<OverviewView entry={{}} {...props()} />)
     const hero = await screen.findByTestId('ov-hero')
@@ -134,6 +135,23 @@ describe('交付总览', () => {
     expect(screen.getByRole('article', { name: '人介入' })).toHaveTextContent('brain-kit 正在算评估，算好就出来')
     expect(screen.getByTestId('eval-computing')).toHaveTextContent('正在算')
     expect(screen.getByTestId('eval-batch')).not.toHaveTextContent('还没有评估模块')
+    // the app's own count of the decisions stands in meanwhile, and brain-kit's comes out different: no number that jumps
+    expect(screen.getByTestId('funnel-total')).toHaveTextContent(/^正在算$/)
+    expect(screen.getByTestId('funnel-card')).toHaveTextContent('brain-kit 正在算评估，算好就出来')
+  })
+
+  test('the funnel says 正在算 only while its number is the app’s stand-in: brain-kit’s own (being redone) stays, no evaluate module keeps the app’s', async () => {
+    const ov = fx.overview()
+    ov.funnel = { ...ov.funnel, source: 'app' }
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    const { unmount } = render(<OverviewView entry={{}} {...props()} />)
+    expect(await screen.findByTestId('funnel-total')).toHaveTextContent(/^15个决定$/)   // nothing computing
+    unmount()
+    const again = fx.overview()
+    again.eval = { ...again.eval, computing: true }
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => again })
+    render(<OverviewView entry={{}} {...props()} />)
+    expect(await screen.findByTestId('funnel-total')).toHaveTextContent(/^15个决定$/)   // brain-kit's, from the last time
   })
 
   test('a repo with no remote: said once at the top, 无人值守 and the runner fold to 这次不需要, no 从远端取最新', async () => {
@@ -389,6 +407,19 @@ describe('交付总览', () => {
     expect(raw).toHaveTextContent("KeyError: 'runs'")
   })
 
+  test('a repo the backend says in words: its words, and its own (the exception, the path) under 细节', async () => {
+    const ov = fx.overview()
+    ov.errors = [{ repo: 'r1', error: '读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对', raw: "KeyError: 'runs' while reading runs/PAY-3/run.json" }]
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props()} />)
+    const banner = await screen.findByTestId('repo-error')
+    expect(banner).toHaveTextContent('shop-pay：读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对')
+    const raw = within(banner).getByText('细节').closest('details') as HTMLDetailsElement
+    expect(raw.open).toBe(false)
+    expect(raw).toHaveTextContent("KeyError: 'runs'")
+    expect(within(banner).getByRole('button', { name: '去导入仓库' })).toBeInTheDocument()
+  })
+
   test('a summary shows no Markdown and no internal ids: `code` as code, the ids on hover, 规模 in Chinese, no 「现在：」', () => {
     const s = plainSummary('给 `calc.py` 加乘法 `multiply(a, b)`，返回 `a * b`（D01#S002 · 097f2e9e）（规模 small）。现在：Lean 在「构建测试」做完，在本地开发（还没交接）。')
     expect(s.parts).toEqual([
@@ -618,7 +649,7 @@ describe('交付总览', () => {
     expect(card).toHaveTextContent('15个决定')
     expect(card).toHaveTextContent('人定了 4 个 · 数字来自 brain-kit 的评估 · 没合并的需求也算')
     // beside 人介入 5 次, 人定了 4 个 says it counts something else
-    expect(within(card).getByTestId('funnel-vs-people')).toHaveTextContent('人定的 4 个是决定表里的条数；「人介入 5 次」数的是人做的动作（批准、驳回、回答），所以两个数不一样')
+    expect(within(card).getByTestId('funnel-vs-people')).toHaveTextContent('人定的 4 个是决定表里的条数；「人介入 5 次」数的是人做的动作（批准、退回、回答），所以两个数不一样')
     expect(Array.from(card.querySelectorAll('[data-row]')).map((r) => r.getAttribute('data-row'))).toEqual(['person', 'check', 'brain', 'unclassified', 'unknown'])
     expect(card.querySelector('[data-row="person"]')).toHaveTextContent(/^人4$/)
     expect(within(card).getByRole('img', { name: /^决定：人 4，检查定的 5，照 Brain 3，AI 自己定的 0，/ })).toBeInTheDocument()

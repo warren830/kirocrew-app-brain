@@ -201,7 +201,7 @@ describe('设置', () => {
     expect(p.go).toHaveBeenCalledWith({ kind: 'import', path: '/Users/alice/workplace/shop-web' })
     const me = screen.getByRole('region', { name: '你是谁' })
     expect(me).toHaveTextContent('alice')
-    expect(me).toHaveTextContent('GitLab token 有')
+    expect(me).toHaveTextContent('GitLab 令牌 有')
     expect(me).not.toHaveTextContent('glpat')
     const crew = screen.getByRole('region', { name: 'KiroCrew' })
     expect(crew).toHaveTextContent('brain-dev 的设置缺 Lean 的拦截：调用工具前')

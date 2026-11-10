@@ -43,8 +43,8 @@ import { TRACKER_NAME } from '../vocab'
 import type { ViewProps } from './props'
 
 export const HERO_TEXT = '把一个项目仓库导进来：先只读地检查它；没装 brain-kit 的，默认直接装在当前分支并提交，当天就能开需求（团队仓库推送以后就能开；也可以装到新分支、开 MR，合并以后才能开）；装好就自动加入列表，交付总览和开需求就能用它了。'
-export const SAFE_INPLACE = '只提交安装写的文件，你自己没提交的改动不碰；用你自己的 git 身份提交，你的 git hook 照常跑；不会自己推送。'
-export const SAFE_BRANCH = '只装在新分支上：从默认分支建，放在单独的工作目录里（设置里「每个需求的工作目录」下面）。你现在的检出、分支和改动都不动。提交用你自己的 git 身份，你的 git hook 照常跑。'
+export const SAFE_INPLACE = '只提交安装写的文件，你自己没提交的改动不碰；用你自己的 git 身份提交，提交时跑的 git 检查照常跑；不会自己推送。'
+export const SAFE_BRANCH = '只装在新分支上：从默认分支建，放在单独的工作目录里（设置里「每个需求的工作目录」下面）。你现在的检出、分支和改动都不动。提交用你自己的 git 身份，提交时跑的 git 检查照常跑。'
 const GLYPH: Record<Level, string> = { OK: '✓', WARN: '!', FAIL: '✗' }
 const CHANGE: Record<FileChange['change'], string> = { added: '新增', modified: '改动', deleted: '删除', other: '其他' }
 const CHANGE_TONE: Record<FileChange['change'], Tone> = { added: 'ok', modified: 'warn', deleted: 'bad', other: 'idle' }
@@ -280,7 +280,7 @@ function CloneForm({ defaults, ms, onCloned }: { defaults: ImportDefaults | null
         <div className="br-field is-full">
           <label htmlFor="imp-url">仓库地址</label>
           <input id="imp-url" type="text" className="br-mono" value={url} placeholder="git@gitlab.example.com:组/仓库.git" onChange={(e) => setUrl(e.target.value)} />
-          <p className="br-hint">SSH 或 https 地址。别把密码或 token 写进地址：这里不会弹窗问密码。</p>
+          <p className="br-hint">SSH 或 https 地址。别把密码或令牌写进地址：这里不会弹窗问密码。</p>
         </div>
         <div className="br-field">
           <label htmlFor="imp-parent">放在哪个目录下</label>
@@ -817,7 +817,7 @@ function PublishBox({ path, p, primary = false, onDone }: { path: string; p: Pen
             会把分支 <code>{p.branch}</code> 推到远端（<code>{p.remote_url}</code>）
             {p.gitlab_project ? <>，再在 GitLab 的 <code>{p.gitlab_project}</code> 上开 MR：<code>{p.branch}</code> → <code>{p.target}</code>。</> : '。这个仓库的 brain-kit 设置没写 GitLab 项目：MR 要你自己开。'}
           </p>
-          {p.gitlab_project && !p.can_open_mr && <p className="br-hint">这台机器上没有 GitLab token：只推送，MR 用给出的命令或链接自己开。</p>}
+          {p.gitlab_project && !p.can_open_mr && <p className="br-hint">这台机器上没有 GitLab 令牌：只推送，MR 用给出的命令或链接自己开。</p>}
           <div className="br-row">
             <button type="button" className="br-btn is-primary" disabled={pub.busy} onClick={() => void send()}>{pub.busy ? '正在推送…' : '确定推送'}</button>
             <button type="button" className="br-btn" disabled={pub.busy} onClick={() => setAsking(false)}>取消</button>

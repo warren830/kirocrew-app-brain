@@ -32,7 +32,7 @@ import { Inline } from './Markdown'
 import type { ViewProps } from './props'
 import { EntryChip, MrDescCard, QuestionCard, ReviewButton, ReviewSay, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
-import { NotFound, ReqSwitch } from './ReqSwitch'
+import { NotFound, OnRunner, ReqSwitch, useOnRunner } from './ReqSwitch'
 
 export { EntryChip, MR_DESC_COPY_HINT, MrDescCard, QuestionCard, mrDescSource } from './Question'
 export { PART_LABEL, PART_VAR, valueStream, type Part, type StreamSeg } from './Stream'
@@ -280,6 +280,8 @@ export function DetailView({ entry, onBack, onSwitch, onMissing, ...props }: {
   const x = d.data
   const board = b.data
   const missing = !x && d.status === 404
+  const onRunner = useOnRunner(entry.repo, entry.key, props.status, props.pollMs)
+  const pick = onSwitch ?? ((repo: string, key: string) => props.go({ kind: 'item', repo, key }))
   useEffect(() => {
     if (missing || x) onMissing?.(missing)
   }, [missing, !!x]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -298,15 +300,15 @@ export function DetailView({ entry, onBack, onSwitch, onMissing, ...props }: {
           <b>{entry.key}</b>
         </nav>
         <span className="cto-grow" />
-        <ReqSwitch repo={entry.repo} reqKey={entry.key} status={props.status} pollMs={props.pollMs}
-          onPick={onSwitch ?? ((repo, key) => props.go({ kind: 'item', repo, key }))} />
+        <ReqSwitch repo={entry.repo} reqKey={entry.key} status={props.status} pollMs={props.pollMs} onPick={pick} />
         <div className="cto-item-act">
           {x && <button type="button" className="kt-btn is-primary" onClick={() => toBoard()}>需求看板 ↗</button>}
           {x && x.row.state === 'merged' && <button type="button" className="kt-btn" onClick={() => toBoard({ replay: true })}>▶ 回放 ↗</button>}
           {onBack && <button type="button" className="kt-btn" onClick={onBack}>← 返回{from}</button>}
         </div>
       </div>
-      {missing ? <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} backName={back.name} onBack={back.go} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
+      {onRunner && <OnRunner reqKey={entry.key} what="需求详情" onOpen={() => pick('runner', entry.key)} />}
+      {missing ? !onRunner && <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} backName={back.name} onBack={back.go} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
       {x && (
         <Page x={x} board={board} live={live} entry={entry} props={props} opened={opened} localOnly={x.row.local_only ?? repoInfo?.remote === false}
           onOpened={(r) => { setOpened(r); after() }} after={after} toBoard={toBoard} />
@@ -1003,21 +1005,21 @@ function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt, picked }:
 
 function QuestionsCard({ x, repo, reqKey, onAnswered, waiter }: { x: RequirementDetail; repo: string; reqKey: string; onAnswered: () => void; waiter: string | null }) {
   // questions asked straight in the session (「Q1 选 A」 in decisions.md) are not park.json's or the MR's
-  const asked = x.decisions.flatMap((d) => [...d.text.matchAll(/\bQ(\d+)\b/g)].map((m) => ({ q: `Q${m[1]}`, d: d.id })))
+  const asked = x.decisions.flatMap((d) => (d.asked ?? []).map((q) => ({ q, d: d.id })))
   const qs = [...new Set(asked.map((a) => a.q))]
   const ds = [...new Set(asked.map((a) => a.d))]
+  const inSession = `会话里直接问的（${qs.join('、')}），回答记在决定 ${ds.join('、')} 里。`
   return (
     <section className="cto-card" aria-label="问题和回答">
       <div className="cto-chart-head"><h3>问题和回答</h3><span className="cto-dim">{x.questions.length} 个 · 能在这里回答的才有回答框</span></div>
       {x.questions.length === 0 ? (
         <p className="br-empty">
-          {qs.length
-            ? `问题都是在会话里直接问的（${qs.join('、')}），回答记在决定 ${ds.join('、')} 里。这里只列停下来等回答的和 MR 上的问题。`
-            : '没有停下来问过人。'}
+          {qs.length ? `问题都是${inSession}这里只列停下来等回答的和 MR 上的问题。` : '没有停下来问过人。'}
         </p>
       ) : (
         <div className="br-stack">
           {x.questions.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={repo} reqKey={reqKey} onAnswered={onAnswered} waiter={waiter} />)}
+          {qs.length > 0 && <p className="cto-dim" style={{ margin: 0 }}>另有{inSession}</p>}
         </div>
       )}
     </section>

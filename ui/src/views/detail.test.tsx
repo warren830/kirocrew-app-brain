@@ -296,6 +296,30 @@ describe('需求详情', () => {
     })
   })
 
+  test('team mode, a requirement handed to the runner opened at its repo: it says so and opens the runner’s 需求详情; never that it is not there', async () => {
+    const o = fx.overview()
+    o.rows = o.rows.map((r) => (r.key === 'PAY-4' ? { ...r, repo: 'runner', where: 'runner' } : r))
+    const s = fx.status()
+    s.app.team = true
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => o })
+    const { go } = renderDetail({ repo: 'r1', key: 'PAY-4', from: 'overview' }, { status: s })
+    const note = await screen.findByTestId('on-runner')
+    expect(note).toHaveTextContent('PAY-4 已交给运行机交付总览把它列在运行机下，以那边的为准。')
+    expect(document.body).not.toHaveTextContent(/shop-pay (仓库)?里没有/)
+    fireEvent.click(within(note).getByRole('button', { name: '打开运行机上的需求详情' }))
+    expect(go).toHaveBeenCalledWith({ kind: 'item', repo: 'runner', key: 'PAY-4' })
+    cleanup()
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => o, [`GET ${API}/requirements/*`]: () => { throw apiError(404, 'not_found', '没有这个需求') } })
+    renderDetail({ repo: 'r1', key: 'PAY-4', from: 'overview' }, { status: s })
+    expect(await screen.findByTestId('on-runner')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '没有这个需求' })).toBeNull()
+    cleanup()
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => o })
+    renderDetail({ repo: 'r1', key: 'PAY-4', from: 'overview' })   // not team mode: no runner, nothing to say
+    await screen.findByRole('region', { name: '此刻' })
+    expect(screen.queryByTestId('on-runner')).toBeNull()
+  })
+
   test('a requirement that is not there: which repo, what to do, back where it was opened from (as the crumb); no HTTP code, no 需求看板', async () => {
     installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => { throw apiError(404, 'not_found', '没有这个需求') } })
     const { go, onBack } = renderDetail({ repo: 'r1', key: 'PAY-99', from: 'todo' })
@@ -480,17 +504,34 @@ describe('需求详情', () => {
     expect(within(clarify).queryByRole('list', { name: '选项' })).toBeNull()   // its options are the form's
   })
 
-  test('no questions here, but the decisions say Q1, Q2 were answered: it says they were asked in the session', async () => {
+  test('no questions here, but the decisions record the answers to Q1, Q2 (in their why): it says they were asked in the session', async () => {
     withDetail((d) => {
       d.questions = []
-      d.decisions[0].text = '不是数字的输入照 Python（Q1 选 A）'
-      d.decisions[1].text = '零规则不特别处理（Q2 选 A）'
+      d.decisions[0].why = 'Q1 答"按推荐"'
+      d.decisions[0].asked = ['Q1']
+      d.decisions[1].why = 'Q2 答"按推荐"'
+      d.decisions[1].asked = ['Q2']
     })
     renderDetail()
     const card = await screen.findByRole('region', { name: '问题和回答' })
     expect(card).toHaveTextContent('0 个')
-    expect(card).toHaveTextContent('问题都是在会话里直接问的（Q1、Q2），回答记在决定 D-1、D-2 里。')
+    expect(card).toHaveTextContent('问题都是会话里直接问的（Q1、Q2），回答记在决定 D-1、D-2 里。')
     expect(card).not.toHaveTextContent('没有停下来问过人')
+  })
+
+  test('questions here and some asked in the session too: both are said', async () => {
+    withDetail((d) => { d.decisions[2].asked = ['Q1'] })
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '问题和回答' })
+    expect(within(card).getAllByTestId('question')).toHaveLength(fx.detail().questions.length)
+    expect(card).toHaveTextContent('另有会话里直接问的（Q1），回答记在决定 D-3 里。')
+  })
+
+  test('no question anywhere: it says nobody was asked', async () => {
+    withDetail((d) => { d.questions = []; d.decisions.forEach((x) => { x.asked = [] }) })
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '问题和回答' })
+    expect(card).toHaveTextContent('没有停下来问过人。')
   })
 
   test('决定: the stage by its name, who settled it in words (vouchers in the hover), every Brain cite opens the Brain view', async () => {
