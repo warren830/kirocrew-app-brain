@@ -257,7 +257,7 @@ export function Intro({ board, onStart }: { board: ReqBoard; onStart?: () => voi
             开工以后，这里一屏看完它怎么走：本机的 brain-dev 会话带着 AI-DLC Lean 推进，需求和设计由{who}在会话里自己批准；交给运行机以后，桥核对交接，签名服务签合同，运行机无人值守地做，有问题停下来在 MR 上问人；检查过了，产品在 MR 上验收；合并以后，学到的东西写回 Brain。
           </p>
         )}
-        <p className="kt-empty-punch">人只在判断点上出手：批准、回答、验收。</p>
+        <p className="kt-empty-punch">{only ? '人只在判断点上出手：批准需求、设计和发布，回答问题。' : '人只在判断点上出手：批准、回答、验收。'}</p>
       </div>
       <ol className={`kt-team-intro is-phased br-way${only ? ' is-local' : ''}`} aria-label="一个需求的路，从左到右">
         {way.map((ph) => (
