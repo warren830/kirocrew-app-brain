@@ -128,6 +128,8 @@ export const BOARD_EXTRA_CSS = `
 /* the graph keeps its text readable: an app too narrow for it scrolls the graph sideways (layout.ts graphWidth); the
    hidden part's edge fades and says so */
 .br-graph-view { position: relative; }
+/* its smallest words are 12 px too, so at that scale nothing on the graph is under 10 px (BOARD-31) */
+.br-board .kt-graph-svg :is(.kt-orch-sub, .kt-rail-n, .kt-phase-stages, .kt-roster-title, .kt-roster-item text) { font-size: 12px; }
 .br-graph-scroll { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 .br-graph-view::before, .br-graph-view::after { content: ''; position: absolute; top: 0; bottom: 0; width: 56px; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 2; }
 .br-graph-view::before { left: 0; background: linear-gradient(90deg, var(--card), transparent); }

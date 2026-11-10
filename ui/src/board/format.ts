@@ -70,11 +70,12 @@ export const EVENT_META: Record<BoardEventKind, { icon: string; label: string; t
 /** The words of the places an event travels between (actor keys are named by their actors, 'person' by personPlace). */
 export const PLACE: Record<string, string> = { branch: '运行分支', checks: '检查' }
 
-const ON_MR: ReadonlySet<string> = new Set(['approve', 'reject', 'request'])
+/** what a person does that, after the hand-over, happens on the MR: the runner's questions, their answers, approvals */
+const ON_MR: ReadonlySet<string> = new Set(['approve', 'reject', 'request', 'question', 'answer'])
 
-/** Who an event's 'person' end is: on the MR (a question the bridge put there, its answer, an approval after the
- * hand-over) whoever answers there, 产品 for the release and its acceptance, else the MR; on this machine's way the
- * owner, 「你」 only for the person looking (UI问题清单 BOARD-11). */
+/** Who an event's 'person' end is: on the MR (a question the bridge put there or the runner asked, its answer, an
+ * approval after the hand-over) whoever answers there, 产品 for the release and its acceptance, else the MR; on this
+ * machine's way the owner, 「你」 only for the person looking (UI问题清单 BOARD-11). */
 export function personPlace(e: Pick<BoardEvent, 'kind' | 'from' | 'to' | 'at' | 'text'>, b: Pick<ReqBoard, 'person' | 'events'>): string {
   const hand = b.events.find((x) => x.kind === 'handover')?.at
   const mr = e.from === 'bridge' || e.to === 'bridge' || (ON_MR.has(e.kind) && hand !== undefined && e.at > hand)

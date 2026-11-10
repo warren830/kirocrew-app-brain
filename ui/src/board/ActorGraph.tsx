@@ -251,13 +251,17 @@ function GraphDefs() {
   )
 }
 
-/** A phase's words for this requirement, the ones its introduction uses: a repo done only here approves its release in
- * the session (检查 · 发布, no 验收 on an MR); a design Lean skipped is not approved. */
-function phaseWords(p: GraphLayout['phases'][number], board: ReqBoard): { title: string; sub: string } {
-  const only = localOnly(board)
-  if (p.key === 'check' && only) return { title: '检查 · 发布', sub: '自动检查 · 发布审批' }
-  if (p.key === 'local' && board.actors.find((a) => a.key === 'design')?.status === 'skipped') return { title: p.title, sub: 'brain-dev 会话 · 需求审批' }
-  return { title: p.title, sub: p.sub }
+/** A phase's number and words for this requirement, the ones its introduction (Header.tsx WAY / LOCAL_WAY) uses: a repo
+ * done only here has no runner phase to count (its band is unnumbered) and approves its release in the session (2 检查 ·
+ * 发布, no 验收 on an MR, then 3 回写); a design Lean skipped is not approved. */
+function phaseWords(p: GraphLayout['phases'][number], board: ReqBoard): { n: string; title: string; sub: string } {
+  if (localOnly(board)) {
+    if (p.key === 'runner') return { n: '', title: p.title, sub: p.sub }
+    if (p.key === 'check') return { n: '2', title: '检查 · 发布', sub: '自动检查 · 发布审批' }
+    if (p.key === 'land') return { n: '3', title: p.title, sub: p.sub }
+  }
+  if (p.key === 'local' && board.actors.find((a) => a.key === 'design')?.status === 'skipped') return { n: p.n, title: p.title, sub: 'brain-dev 会话 · 需求审批' }
+  return { n: p.n, title: p.title, sub: p.sub }
 }
 
 function Phases({ board, lay, byKey, reducedMotion }: { board: ReqBoard; lay: GraphLayout; byKey: Map<string, Actor>; reducedMotion: boolean }) {
@@ -265,7 +269,7 @@ function Phases({ board, lay, byKey, reducedMotion }: { board: ReqBoard; lay: Gr
   return (
     <g className="kt-phases" aria-hidden="true">
       {lay.phases.map((p) => {
-        if (!p.used && p.key !== 'init') return <FoldedBand key={p.key} p={p} lay={lay} why={p.key === 'runner' ? why : ''} />
+        if (!p.used && p.key !== 'init') return <FoldedBand key={p.key} p={p} n={phaseWords(p, board).n} lay={lay} why={p.key === 'runner' ? why : ''} />
         const keys = p.key === 'init' ? [] : lay.stages.filter((s) => s.phase === p.key).flatMap((s) => s.keys)
         const actors = keys.map((k) => byKey.get(k)).filter((a): a is Actor => !!a)
         const live = actors.some((a) => LIVE.has(a.status))
@@ -279,7 +283,7 @@ function Phases({ board, lay, byKey, reducedMotion }: { board: ReqBoard; lay: Gr
           <g key={p.key} className={`kt-phase${off ? ' is-unused' : ''}${live || (person && board.person.status === 'awaiting_approval') ? ' is-live' : ''}${done ? ' is-done' : ''}`} data-phase={p.key}>
             <rect className="kt-phase-band" x={p.x1} y={8} width={p.x2 - p.x1} height={lay.rail.y - 34} rx={18} />
             <text className="kt-phase-title" x={cx} y={30} textAnchor="middle">
-              {p.n} {words.title}
+              {words.n ? `${words.n} ` : ''}{words.title}
             </text>
             <text className="kt-phase-stages" x={cx} y={48} textAnchor="middle">{clip(words.sub, Math.max(6, (p.x2 - p.x1) / 13))}</text>
             {off && <text className="kt-phase-note" x={cx} y={lay.rail.y / 2 + 10} textAnchor="middle">这次不需要</text>}
@@ -299,12 +303,12 @@ function Phases({ board, lay, byKey, reducedMotion }: { board: ReqBoard; lay: Gr
 
 /** A phase not on this requirement's way, folded (the sample's 「1 构思 · 这次不需要」): its words sit above the
  * nodes' rows, clear of the edges that cross it. */
-function FoldedBand({ p, lay, why }: { p: GraphLayout['phases'][number]; lay: GraphLayout; why: string }) {
+function FoldedBand({ p, n, lay, why }: { p: GraphLayout['phases'][number]; n: string; lay: GraphLayout; why: string }) {
   const cx = (p.x1 + p.x2) / 2
   return (
     <g className="kt-phase is-unused is-folded" data-phase={p.key} data-testid="kt-phase-folded">
       <rect className="kt-phase-band" x={p.x1} y={8} width={p.x2 - p.x1} height={lay.rail.y - 34} rx={14} />
-      <text className="kt-phase-title" x={cx} y={30} textAnchor="middle">{p.n} {p.short}</text>
+      <text className="kt-phase-title" x={cx} y={30} textAnchor="middle">{n ? `${n} ` : ''}{p.short}</text>
       <text className="kt-phase-note" x={cx} y={58} textAnchor="middle">这次不需要</text>
       {why && <text className="kt-phase-stages" x={cx} y={76} textAnchor="middle">{why}</text>}
     </g>

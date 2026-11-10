@@ -9,6 +9,16 @@ import { beltKey } from './diff'
 import { fmtAgo } from './format'
 import { useServerNow } from './hooks'
 import { RoleIcon } from './RoleIcon'
+import { ExtLink } from '../ui'
+import { ACT } from '../vocab'
+
+/** An empty belt, said by why it is empty: no commit yet; a run whose working copy is on the runner, not here (its
+ * commits are on the MR); a requirement brain-kit could not read the record of (the page's note says what to do). */
+function beltEmpty(b: Pick<ReqBoard, 'source' | 'row'>): string {
+  if (b.source === 'trace') return '运行分支上还没有提交'
+  if (b.row.where === 'runner' && !b.row.worktree) return '运行机的工作目录不在这台机器上，这里读不到它的提交'
+  return '这里读不到运行分支的提交：brain-kit 没读出这个需求的记录'
+}
 
 export function Conveyor({ board, fresh, focus, onActor }: { board: ReqBoard; fresh: ReadonlySet<string>; focus: string | null; onActor: (k: string) => void }) {
   const now = useServerNow()
@@ -35,7 +45,10 @@ export function Conveyor({ board, fresh, focus, onActor }: { board: ReqBoard; fr
         </span>
       </header>
       {board.belt.length === 0 ? (
-        <p className="kt-dim kt-wall-empty">{board.source === 'trace' ? '运行分支上还没有提交' : '这里还读不到运行分支的提交：图上只画了 Lean 自己记下的事'}</p>
+        <p className="kt-dim kt-wall-empty">
+          {beltEmpty(board)}
+          {board.source !== 'trace' && board.row.mr && <> <ExtLink href={board.row.mr.url}>{ACT.viewMr}</ExtLink></>}
+        </p>
       ) : (
         <ol className={`kt-belt${older ? ' has-older' : ''}`} ref={belt} onScroll={(e) => setOlder(e.currentTarget.scrollLeft > 4)}>
           <li className="kt-belt-end is-base" title="运行分支从这里出发">从 <code>{board.base}</code></li>

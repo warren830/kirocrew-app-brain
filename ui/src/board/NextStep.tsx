@@ -131,7 +131,7 @@ function StepRow({ s, onBrain, onDetail, repo, reqKey, board }: { s: Step; onBra
       </div>
       <div className="br-next-acts">
         {s.review && <ReviewButton repo={repo} reqKey={reqKey} liveSlot={slot} worktree={board.row.worktree} />}
-        {session && <button type="button" className={`kt-btn${s.review ? '' : ' is-primary'}`} onClick={() => navigate(session)}>{ACT.openSession}</button>}
+        {session && !s.review && <button type="button" className="kt-btn is-primary" onClick={() => navigate(session)}>{SESSION_ACT[s.do] ?? ACT.openSession}</button>}
         {!s.session && !s.line && (s.do === 'reply' || s.do === 'tool') && onDetail && (
           <button type="button" className="kt-btn" onClick={onDetail} title="需求详情里能开一个新会话">去需求详情开会话</button>
         )}
@@ -141,6 +141,10 @@ function StepRow({ s, onBrain, onDetail, repo, reqKey, board }: { s: Step; onBra
     </div>
   )
 }
+
+/** The step taken in the session, by its one name (REST-18): an idle session 去回话; Lean's review is never one of these
+ * (开审查会话 opens a new session: the one that wrote the code may not review it). */
+const SESSION_ACT: Partial<Record<WaitDo, string>> = { reply: DO_NAME.reply, tool: DO_NAME.tool }
 
 /** The step taken on the MR, by its one name (REST-18); any other MR link only looks (看 MR). */
 const MR_ACT: Partial<Record<WaitDo, string>> = { answer: ACT.answerOnMr, accept: ACT.acceptOnMr, label_handoff: DO_NAME.label_handoff }

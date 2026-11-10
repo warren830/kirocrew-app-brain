@@ -97,7 +97,7 @@ describe('需求看板', () => {
     expect(await within(line).findByText('已复制')).toBeInTheDocument()
     fireEvent.click(within(line).getByRole('button', { name: '打开会话' }))
     expect(steps[2]).toHaveTextContent('会话里有一个工具调用等你批准')
-    fireEvent.click(within(steps[2]).getByRole('button', { name: '打开会话' }))
+    fireEvent.click(within(steps[2]).getByRole('button', { name: '去批准工具调用' }))
     expect(navigations).toEqual([b.accept.step.session_url, b.actors[0].session!.url])
     expect(apiCalls.filter((c) => c.method !== 'GET')).toEqual([])
   })
@@ -564,7 +564,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     expect(raw).toHaveTextContent('run.json not found in working tree')
   })
 
-  test('an idle session: the step says what to say and where, 打开会话 right there; the lane draws the wait as a wait', async () => {
+  test('an idle session: the step says what to say and where, 去回话 right there; the lane draws the wait as a wait', async () => {
     const b = idle()
     installFixtureRoutes(boardRoute(() => structuredClone(b)))
     renderBoard()
@@ -572,7 +572,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     const strip = region('你要做的一步')
     expect(strip).toHaveTextContent('已经等了 11 小时 30 分')
     expect(strip).toHaveTextContent(b.accept.step.text)
-    fireEvent.click(within(strip).getByRole('button', { name: '打开会话' }))
+    fireEvent.click(within(strip).getByRole('button', { name: '去回话' }))
     // the chip under the session says the same step and opens the session too, never 去回答
     fireEvent.click(within(graph).getByRole('button', { name: '本机会话：去回话' }))
     expect(navigations).toEqual([b.accept.step.session_url, b.actors[0].session!.url])
@@ -660,6 +660,8 @@ describe('需求看板 · 轮到谁、做什么', () => {
     expect(strip).toHaveTextContent('先开一个新会话做审查（这个会话写了代码，不能自己审）')
     expect(strip).toHaveTextContent('开审查会话会把 Lean 的审查要求发给新会话')
     expect(within(strip).queryByTestId('type-line')).toBeNull()
+    // never the session that wrote the code under another name (REST-18)
+    expect(within(strip).queryByRole('button', { name: /^(去回话|打开会话)$/ })).toBeNull()
     const fold = within(strip).getByTestId('review-say')
     expect(fold.tagName).toBe('DETAILS')
     expect(fold).toHaveTextContent(`细节：开审查会话对新会话说的那一句${said}`)
@@ -678,7 +680,7 @@ describe('需求看板 · 轮到谁、做什么', () => {
     renderBoard()
     const graph = await loaded()
     const band = within(graph).getByTestId('kt-phase-folded')
-    expect(band).toHaveTextContent('2 运行机这次不需要只在本机做')
+    expect(band).toHaveTextContent(/^运行机这次不需要只在本机做$/)
     for (const k of ['handover', 'bridge', 'signer', 'runner']) expect(graph.querySelector(`g.kt-node[data-role="${k}"]`)).toBeNull()
     expect(graph.querySelector('g.kt-node[data-role="ci"]')).not.toBeNull()
     expect(screen.getByTestId('br-local-only')).toHaveTextContent('这个仓库只在本机做')
@@ -997,7 +999,9 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     const t = Math.max(...b.events.map((e) => e.at))
     const ev = (seq: number, dt: number, kind: ReqBoard['events'][number]['kind'], from: string, to: string, text: string) => ({ seq, at: t + dt, kind, from, to, text, detail: false, src: null })
     b.events.push(ev(900, 10, 'handover', 'local', 'handover', '交给运行机'), ev(901, 20, 'question', 'bridge', 'person', 'D-1 在 MR 上问人：验收'),
-      ev(902, 30, 'approve', 'person', 'release', '产品在 MR 上批准了发布'), ev(903, 40, 'answer', 'person', 'bridge', 'D-2 回答了：approve'))
+      ev(902, 30, 'approve', 'person', 'release', '产品在 MR 上批准了发布'), ev(903, 40, 'answer', 'person', 'bridge', 'D-2 回答了：approve'),
+      ev(904, 50, 'question', 'runner', 'person', '停下问人：验收'), ev(905, 60, 'question', 'runner', 'person', '停下问人：澄清'),
+      ev(906, 70, 'answer', 'person', 'runner', '澄清的问题回答了，接着做'))
     return b
   }
 
@@ -1010,6 +1014,10 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     expect(placeOf(901)).toEqual(['产品'])
     expect(placeOf(902)).toEqual(['产品'])
     expect(placeOf(903)).toEqual(['MR'])
+    // the runner's own questions after the hand-over are asked on the MR too, and answered there
+    expect(placeOf(904)).toEqual(['产品'])
+    expect(placeOf(905)).toEqual(['MR'])
+    expect(placeOf(906)).toEqual(['MR'])
     expect(screen.getByTestId('kt-feed').querySelectorAll('[data-testid="kt-ev-place"]').length).toBeGreaterThan(3)
     expect([...screen.getByTestId('kt-feed').querySelectorAll('[data-testid="kt-ev-place"]')].map((e) => e.textContent)).not.toContain('你')
     cleanup()
@@ -1018,6 +1026,7 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     await loaded()
     expect(placeOf(claim)).toEqual(['你'])
     expect(placeOf(902)).toEqual(['产品'])
+    expect(placeOf(904)).toEqual(['产品'])
   })
 
   test('a wait that is over says whom it was on, by the same rule as the one going on (等产品, 等你)', async () => {
@@ -1097,17 +1106,34 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     renderBoard()
     await loaded()
     const belt = screen.getByTestId('kt-conveyor')
-    expect(belt).toHaveTextContent('这里还读不到运行分支的提交：图上只画了 Lean 自己记下的事')
+    expect(belt).toHaveTextContent('这里读不到运行分支的提交：brain-kit 没读出这个需求的记录')
     expect(belt).not.toHaveTextContent(/trace|模块/)
   })
 
-  test('a repo done only here: the graph names its phases as its introduction does (认领, 检查 · 发布), no 验收', async () => {
+  test('a run whose working directory is on the runner: the conveyor says that is why, and links the MR', async () => {
+    const b = fx.board()
+    Object.assign(b, { source: 'app', belt: [] })
+    Object.assign(b.row, { where: 'runner', worktree: null, mr: { iid: 9, url: 'https://gitlab.example.com/x/-/merge_requests/9', state: 'opened' } })
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    await loaded()
+    const belt = screen.getByTestId('kt-conveyor')
+    expect(belt).toHaveTextContent('运行机的工作目录不在这台机器上，这里读不到它的提交')
+    expect(within(belt).getByRole('link', { name: '看 MR' })).toHaveAttribute('href', b.row.mr!.url)
+  })
+
+  test('a repo done only here: the graph numbers and names its phases as its introduction does (2 检查 · 发布, 3 回写), no 验收', async () => {
     installFixtureRoutes(boardRoute(() => structuredClone(localOnly())))
     renderBoard()
     const graph = await loaded()
     const phases = [...graph.querySelectorAll('.kt-phase-title')].map((t) => t.textContent)
-    expect(phases).toContain('0 认领')
-    expect(phases).toContain('3 检查 · 发布')
-    expect(phases).not.toContain('3 检查 · 验收')
+    expect(phases).toEqual(['0 认领', '1 本机 · Lean', '运行机', '2 检查 · 发布', '3 回写'])
+    cleanup()
+    const b = fx.board()
+    Object.assign(b.row, { state: 'claimed', state_label: '已认领', local_only: true })
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    const intro = await screen.findByTestId('br-board-intro')
+    expect([...intro.querySelectorAll('.kt-intro-phase-head b')].map((x) => x.textContent)).toEqual(['0 认领', '1 本机 · Lean', '2 检查 · 发布', '3 回写'])
   })
 })
