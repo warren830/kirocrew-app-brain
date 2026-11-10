@@ -2,6 +2,7 @@
 mode), overlaps, the decision funnel's fallback."""
 
 import json
+import re
 import time
 
 import pytest
@@ -122,7 +123,19 @@ def test_team_states_from_the_ledger():
     assert (r["state_label"], r["waits"]["text"]) == ("已合并", "MR 已合并，运行结束")    # not 「运行机在跑」
     r = row()
     deliveries.team_classify(r, {"state": "signing", "run_id": "RUN-PAY-1-1"}, [], None)
-    assert "签接手合同" in r["waits"]["text"] and "RUN-PAY-1-1" in r["waits"]["text"]
+    assert "签接手合同" in r["waits"]["text"] and "RUN-" not in r["waits"]["text"]
+    # who answers a question on the runner: park.json's ask, as a person's row of it says (the owner by name)
+    for ask, who, text in (("product", "product", "等产品在 MR 上回答 D-2（设计）"), ("owner", "people", "等carol在 MR 上回答 D-2（设计）"),
+                           ("security", "people", "等人在 MR 上回答 D-2（设计）")):
+        r = dict(row(), owner="carol")
+        deliveries.team_classify(r, {"state": "dispatched"}, [{"id": "D-2", "state": "open", "kind": "design"}],
+                                 {"status": "waiting", "kind": "design", "ask": ask})
+        assert (r["waits"]["who"], r["waits"]["text"]) == (who, text), r["waits"]
+    for st in ("send_unknown", "void", "invalid"):
+        r = row()
+        deliveries.team_classify(r, {"state": st if st == "send_unknown" else "dispatched", "slot": "run-pay-1-1"},
+                                 [] if st == "send_unknown" else [{"id": "D-5", "state": st}], {"status": "waiting"})
+        assert not re.search(r"park\.json|\brun\b|slot|run-pay", r["waits"]["text"]), r["waits"]["text"]
 
 
 def test_overlaps_and_the_funnel_fallback():

@@ -40,8 +40,8 @@ NOT_LABELLED_RAW = "MR 上要有标签 %s。再交接一次：在这个需求的
 # bridge process is posting it right now, 72b278e)
 NOT_POSTED = ("posting", "asking")
 STUCK_DECISION = {"refused": "%s 的回答签名服务不签：看运行机页的拒签原因",
-                  "void": "%s 作废（问题没绑上这次推送和 park.json）：run 要重新推送才会重新提问",
-                  "invalid": "%s 发不出去（park.json 不对）：run 要改好重新推送"}
+                  "void": "%s 作废（问题和这次推送对不上）：运行机要重新推送一次才会重新提问",
+                  "invalid": "%s 发不出去（AI 停下来写的问题不对）：运行机要改好再推送一次"}
 
 
 def park_waiting(park: Any) -> bool:
@@ -257,28 +257,34 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
     if st == "failed":
         return put("rejected", "people", "redo_handoff", "工作区没建成，要人看一下", where="mr")
     if st == "signing":
-        return put("handed_over", "bridge", "none", "签名服务在签接手合同（%s 先占着）" % (run_row.get("run_id") or "run 号"))
+        return put("handed_over", "bridge", "none", "签名服务在签接手合同")
     if st in ("spooled", "ready"):
         return put("handed_over", "runner", "none", "运行机在准备工作区")
     if st == "send_unknown":
-        return put("running", "people", "none", "消息送没送到不清楚：要人看一下会话 %s" % (run_row.get("slot") or ""))
+        return put("running", "people", "none", "不知道消息送到运行机没有：去 KiroCrew 看一下它的会话")
     if open_d:
         d = open_d[-1]
         since = lean_view.epoch(d.get("created"))
         if d.get("kind") == "acceptance":
             return put("acceptance", "product", "accept", mr_ask("product", "验收", d["id"], approval=True),
                        where="mr", since=since)
-        return put("parked", "people", "answer", mr_ask("people", KIND_LABEL.get(str(d.get("kind")), str(d.get("kind"))),
-                                                       d["id"], approval=bool(d.get("lean_request"))),
+        # who answers: the decision's ask, else the question park.json asks it about (as a person's row says it); the
+        # owner is named here, never 你 (the runner's page has no reader to be the owner)
+        ask = str(d.get("ask") or (park.get("ask") if park_waiting(park) else "") or "")
+        who = ASK_WHO.get(ask, "people")
+        who = "people" if who == "you" else who
+        return put("parked", who, "answer", mr_ask(who, KIND_LABEL.get(str(d.get("kind")), str(d.get("kind"))), d["id"],
+                                                   approval=bool(d.get("lean_request")),
+                                                   owner=row.get("owner") if ask == "owner" else None),
                    where="mr", since=since)
     if posting:
-        return put("parked", "bridge", "none", "run 停下了：等桥把问题贴到 MR 上")
+        return put("parked", "bridge", "none", "运行机停下来问人了：等桥把问题贴到 MR 上")
     last = mine[-1] if mine else None
     if last and last.get("state") in STUCK_DECISION and (park is None or park_waiting(park)) and \
             (not run_row.get("last_sha") or not last.get("sha") or last["sha"] == run_row["last_sha"]):
         return put("parked", "people", "answer", STUCK_DECISION[last["state"]] % last["id"], where="mr")
     if park_waiting(park):
-        return put("parked", "bridge", "none", "run 停下了：等桥把问题贴到 MR 上")
+        return put("parked", "bridge", "none", "运行机停下来问人了：等桥把问题贴到 MR 上")
     return put("running", "runner", "none", "运行机在跑")
 
 
