@@ -26,6 +26,8 @@ from . import bk
 from .constants import WORK_ROOT
 
 MAX_REPOS = 20
+TEAM_FIELD = {"bridge_config": "桥的配置文件", "runnerd_config": "运行机的配置文件"}     # 设置's labels
+AGAIN = "：刷新页面再存一次"
 
 
 def defaults() -> dict[str, Any]:
@@ -64,7 +66,7 @@ def check(data: Any) -> tuple[dict[str, Any], list[str]]:
     probs: list[str] = []
     out = defaults()
     if not isinstance(data, dict):
-        return out, ["设置必须是一个 JSON 对象"]
+        return out, ["设置的格式不对" + AGAIN]
     if "brainkit" in data:
         p = _path(data["brainkit"])
         if p and not os.path.isabs(p):
@@ -73,7 +75,7 @@ def check(data: Any) -> tuple[dict[str, Any], list[str]]:
             out["brainkit"] = p
     repos = data.get("repos", [])
     if not isinstance(repos, list) or not all(isinstance(r, str) for r in repos):
-        probs.append("repos 是项目目录的列表")
+        probs.append("仓库列表的格式不对" + AGAIN)
         repos = []
     seen = []
     for r in repos[:MAX_REPOS]:
@@ -92,16 +94,16 @@ def check(data: Any) -> tuple[dict[str, Any], list[str]]:
         home = os.path.realpath(os.path.expanduser("~"))
         rp = os.path.realpath(p) if p else ""
         if p and not os.path.isabs(p):
-            probs.append("工作区根目录要写绝对路径")
+            probs.append("「每个需求的工作目录」要写绝对路径")
         elif rp and not any(rp == os.path.join(home, w) or rp.startswith(os.path.join(home, w) + os.sep)
                             for w in ("workplace", "workplaces", "workspace", "workspaces")):
-            probs.append("工作区根目录要在 ~/workplace 或 ~/workspace 下面（KiroCrew 只让 agent 在那里干活）")
+            probs.append("「每个需求的工作目录」要在 ~/workplace 或 ~/workspace 下面（KiroCrew 只让 AI 在那里干活）")
         elif p:
             out["work_root"] = p
     team = data.get("team")
     if team is not None:
         if not isinstance(team, dict):
-            probs.append("team 是一个对象")
+            probs.append("运行机的设置格式不对" + AGAIN)
         else:
             t = out["team"]
             t["enabled"] = team.get("enabled") is True
@@ -109,9 +111,9 @@ def check(data: Any) -> tuple[dict[str, Any], list[str]]:
             for k in ("bridge_config", "runnerd_config"):
                 p = _path(team.get(k, ""))
                 if p and not os.path.isabs(p):
-                    probs.append("team.%s 要写绝对路径" % k)
+                    probs.append("「%s」要写绝对路径" % TEAM_FIELD[k])
                     continue
                 t[k] = p
             if t["enabled"] and not t["bridge_config"]:
-                probs.append("打开运行机模式要填 team.bridge_config")
+                probs.append("勾了「这台机器是团队运行机」，就要填「%s」" % TEAM_FIELD["bridge_config"])
     return out, probs

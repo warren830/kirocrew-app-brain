@@ -76,7 +76,7 @@ def test_settings_are_checked_before_they_are_saved(tmp_path, home):
     resp = call(r[("POST", "/settings")], json_body={"repos": ["relative/path"], "work_root": "/tmp/elsewhere",
                                                      "team": {"enabled": True}})
     assert resp.status == 400 and "绝对路径" in resp.body["error"] and "workplace" in resp.body["error"]
-    assert "team.bridge_config" in resp.body["error"]
+    assert "就要填「桥的配置文件」" in resp.body["error"]       # 设置's own label, not team.bridge_config
     assert not (tmp_path / "data" / "settings.json").exists()
 
 
