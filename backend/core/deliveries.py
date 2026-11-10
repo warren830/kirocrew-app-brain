@@ -403,7 +403,7 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
              ledger_path: str | None = None, vouchers_dir: str | None = None) -> tuple[dict[str, Any], dict | None]:
     """(EvalView, the funnel from brainkit.evaluate or None). Without the module: available false."""
     view = {"available": False, "error": "", "raw": "", "ref": ref, "metrics": [], "queue": [], "skipped": [],
-            "notes": []}
+            "notes": [], "note_rows": []}
     if not bk.has("evaluate"):
         view["error"] = NO_EVALUATE
         view["raw"] = str(bk.info()["module_errors"].get("evaluate") or "")[:2000]

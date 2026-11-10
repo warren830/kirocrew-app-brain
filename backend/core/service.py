@@ -570,7 +570,7 @@ class Service:
                 threading_start(self._eval_compute, rid, sha, credits)
         if not views:
             return {"available": False, "error": "正在算交付评估…" if ids else "没有仓库", "raw": "", "ref": None,
-                    "metrics": [], "queue": [], "skipped": [], "notes": [], "computing": bool(ids)}, None
+                    "metrics": [], "queue": [], "skipped": [], "notes": [], "note_rows": [], "computing": bool(ids)}, None
         ref = deliveries.branch_words([(v.pop("_name"), v.get("ref")) for v in views])
         if len(views) == 1:
             return dict(views[0], ref=ref, computing=computing), (dict(funnels[0]) if funnels else None)
@@ -612,7 +612,7 @@ class Service:
         except Exception as exc:  # noqa: BLE001
             self._eval[rid] = (sha, time.monotonic(), {"available": False, "error": "交付评估没算成：原话在细节里",
                                                         "raw": str(exc)[:2000], "ref": None, "metrics": [],
-                                                        "queue": [], "skipped": [], "notes": []}, None)
+                                                        "queue": [], "skipped": [], "notes": [], "note_rows": []}, None)
         finally:
             self._eval_running.discard(rid)
 

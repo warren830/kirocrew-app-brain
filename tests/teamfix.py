@@ -22,7 +22,7 @@ from urllib.parse import parse_qsl, unquote, urlsplit
 import pytest
 
 from appkit import BRAINKIT, ROOT, sh
-from brainfix import brain, make_project, start_in_worktree
+from brainfix import brain, filled_notes, make_project, start_in_worktree
 
 P = "grp/repo"
 BRANCH = "ai/alice/PAY-1-refund"
@@ -199,6 +199,12 @@ def keypair(d):
     return key, allowed
 
 
+
+def handoff_unlabelled(wt) -> None:
+    """`brain handoff --no-label`: pushed, nothing handed over. brain-kit R1-26 (0829fe0) exits 1 for it, older ones 0."""
+    p = brain(wt, "handoff", "--no-label", check=False)
+    assert p.returncode in (0, 1) and "NOT labelled" in p.stdout + p.stderr, p.stdout + p.stderr
+
 def make_world(tmp_path, home, monkeypatch, *, bridge_user="brain-bridge", signer_cfg=None):
     kit = {"gitlab": {"base": "https://gl.example", "project": P}, "bot_users": ["brain-bot"],
            "bot_emails": ["brain-bot@noreply.invalid"]}
@@ -209,9 +215,9 @@ def make_world(tmp_path, home, monkeypatch, *, bridge_user="brain-bridge", signe
     wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "repo" / "refund", "refund", "退款")
     intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
     st = wt / "aidlc-docs" / intent / "aidlc-state.md"
-    st.write_text(st.read_text().replace("Status: Inception: starting", "Status: Construction step 2 of 4"))
+    st.write_text(filled_notes(st.read_text(), "Status: Construction step 2 of 4"))
     sh("git", "-C", wt, "commit", "-qam", "notes")
-    brain(wt, "handoff", "--no-label")
+    handoff_unlabelled(wt)
     bare = tmp_path / "repo-origin.git"
     gl = GitLab(bare)
     (tmp_path / "keys").mkdir()
@@ -279,7 +285,7 @@ def push_park(path, park=PARK):
 def hand_off(world):
     """alice runs `brain handoff --no-label` again in her worktree: a new hand-over commit (run.json and nothing else,
     on top of the branch), pushed. The label is hers to add (``world["gl"].label("alice")``)."""
-    brain(world["wt"], "handoff", "--no-label")
+    handoff_unlabelled(world["wt"])
     return sh("git", "-C", world["wt"], "rev-parse", "HEAD").stdout.strip()
 
 

@@ -9,7 +9,7 @@ import subprocess
 import time
 
 from appkit import mod
-from brainfix import (PY, brain, lean, make_project, make_service, needs_brainkit, request_requirements, run, sh,
+from brainfix import (filled_notes, PY, brain, lean, make_project, make_service, needs_brainkit, request_requirements, run, sh,
                       start_in_worktree)
 
 board = mod("board")
@@ -83,7 +83,7 @@ def test_an_approved_requirement_handed_over_and_one_merged(tmp_path, home):
     sh("git", "-C", wt, "add", "-A")
     sh("git", "-C", wt, "commit", "-qm", "refund: the CSV export")
     state = wt / "aidlc-docs" / intent / "aidlc-state.md"
-    state.write_text(state.read_text().replace("Status: Inception: starting", "Status: Construction step 2 of 4"))
+    state.write_text(filled_notes(state.read_text(), "Status: Construction step 2 of 4"))
     sh("git", "-C", wt, "commit", "-qam", "notes")
     brain(wt, "handoff", "--no-push")
     wt2 = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "done", "done", "做完了")
