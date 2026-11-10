@@ -394,10 +394,12 @@ function Header({ x, localOnly }: { x: RequirementDetail; localOnly: boolean }) 
 
 /** A path that breaks only after a 「/」, never inside a name. */
 function PathText({ path }: { path: string }) {
-  const parts = path.split('/')
+  const parts = path.split('/').map((p, i) => (i ? `/${p}` : p))
+  // a folder's trailing 「/」 stays with its name
+  if (parts.length > 1 && parts[parts.length - 1] === '/') parts.splice(-2, 2, `${parts[parts.length - 2]}/`)
   return (
     <code className="br-path" title={path}>
-      {parts.map((p, i) => <span key={i}><span>{i ? `/${p}` : p}</span><wbr /></span>)}
+      {parts.map((p, i) => <span key={i}><span>{p}</span><wbr /></span>)}
     </code>
   )
 }
