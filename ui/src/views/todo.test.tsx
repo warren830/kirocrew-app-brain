@@ -188,6 +188,19 @@ describe('待办', () => {
     t.items = [...t.items, CHILD, PARENT]
     return t
   }
+  test('a closed requirement whose branch or MR is still there: its own group, yellow, after 没交出去的交接', async () => {
+    const left = item({ kind: 'closed_leftover', key: 'PAY-9', title: '旧的退款导出',
+      text: '需求关了，分支 ai/alice/PAY-9-x 还在：用不着就删掉分支（本地 git branch -D ai/alice/PAY-9-x；远端 git push origin --delete ai/alice/PAY-9-x）' })
+    installFixtureRoutes({ [`GET ${API}/todo`]: () => { const t = fx.todo(); t.items = [...t.items, left]; return t } })
+    renderTodo()
+    await screen.findByRole('region', { name: '关了的需求还留着分支或 MR' })
+    const names = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+    expect(names.indexOf('关了的需求还留着分支或 MR')).toBe(names.indexOf('没交出去的交接') + 1)
+    const g = group('关了的需求还留着分支或 MR')
+    expect(g).toHaveTextContent('git branch -D ai/alice/PAY-9-x')
+    expect(within(g).getByTestId('todo-item')).toHaveClass('is-warn')
+  })
+
   const STARTED: ChildStartResult = {
     ok: true, key: 'PAY-3', branch: 'ai/alice/PAY-3-web', worktree: '/Users/alice/.brain/worktrees/shop-pay/PAY-3', on: null, text: '开工了：PAY-3',
     blocked: [], can_on: null, problem: null, output: 'Started PAY-3', slot: 'brain-PAY-3-a1b2', url: '/chat?sid=brain-PAY-3-a1b2', session_error: '',

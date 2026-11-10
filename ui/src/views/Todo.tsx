@@ -34,6 +34,7 @@ const GROUPS: Group[] = [
   { kind: 'parent_release', heading: '等评审、发布的大需求', icon: 'release', tone: 'wait', hint: '小需求都合并了' },
   { kind: 'handoff_rejected', heading: '接手被拒', icon: 'handover', tone: 'bad', hint: '改好再交接' },
   { kind: 'handoff_unlabelled', heading: '没交出去的交接', icon: 'handover', tone: 'warn', hint: 'MR 上没有交接标签' },
+  { kind: 'closed_leftover', heading: '关了的需求还留着分支或 MR', icon: 'settings', tone: 'warn', hint: '用不着就删掉、关掉' },
   { kind: 'crew', heading: 'KiroCrew 的问题', icon: 'settings', tone: 'bad', hint: '修好了才能开工' },
 ]
 const TONE_WORD: Record<GroupTone, string> = { wait: '等你', bad: '被拒或坏了', warn: '看一眼' }

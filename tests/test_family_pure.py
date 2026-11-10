@@ -152,3 +152,28 @@ def test_todo_lists_a_small_one_you_can_start_and_a_big_one_ready_to_release():
     texts = {i["key"]: i["text"] for i in got["items"]}
     assert texts["PAY-3"] == "PAY-1 的小需求（web）你认领了，依赖都合进来了：可以开工"
     assert texts["PAY-1"].startswith("小需求都合进来了（3/3）：在大需求的分支上评审、lean release，再批 RELEASE")
+
+
+def test_todo_a_closed_requirement_whose_branch_or_mr_is_still_there():
+    """The user's decision (2026-11-10): a requirement closed with `brain intent close` is closed; its owner is told
+    that its run branch / MR is still there. Not for someone else's, not when nothing is left, not for an MR closed."""
+    todo = mod("todo")
+
+    def entry(key, where, mr=None, own=True, closed=True):
+        row = {"repo": "r1", "key": key, "title": key, "mr": mr, "updated_at": None, "state": "closed", "waits": {},
+               "family": None, "branch": "ai/alice/%s-x" % key}
+        f = {"approvals": [], "park": None, "where": where, "claim": {"closed": {"reason": "不做了"}} if closed else {}}
+        return {"row": row, "facts": f, "session": None, "mr": mr, "own": own, "has_session": False, "can_post": False}
+
+    got = todo.build([entry("PAY-1", "branch"),
+                      entry("PAY-2", "claim", mr={"iid": 7, "state": "opened", "url": "u"}),
+                      entry("PAY-3", "worktree", mr={"iid": 8, "state": "opened", "url": "u"}),
+                      entry("PAY-4", "claim"),                               # nothing left
+                      entry("PAY-5", "branch", own=False),                   # someone else's
+                      entry("PAY-6", "branch", closed=False)], team=False, crew_rows=[])   # MR closed, not the claim
+    texts = {i["key"]: i["text"] for i in got["items"] if i["kind"] == "closed_leftover"}
+    assert set(texts) == {"PAY-1", "PAY-2", "PAY-3"}, texts
+    assert texts["PAY-1"] == ("需求关了，分支 ai/alice/PAY-1-x 还在：用不着就删掉分支（本地 git branch -D ai/alice/PAY-1-x；"
+                              "远端 git push origin --delete ai/alice/PAY-1-x）")
+    assert texts["PAY-2"] == "需求关了，MR !7 还在：用不着就关掉 MR"
+    assert texts["PAY-3"].startswith("需求关了，分支 ai/alice/PAY-3-x、MR !8 还在：")
