@@ -6,11 +6,13 @@
  * (`waits.do`, stepOf). Column names, lane names and 「+N 个」 filter the ledger (onCell). In a repo done only on this
  * machine the runner's column and lane fold to a narrow 「这次不需要」.
  */
+import { useNavigate } from '@kirocrew/app-sdk'
 import { RoleIcon } from '../board/RoleIcon'
 import type { View } from '../nav'
 import type { Requirement, WaitWho } from '../types'
 import { ago, fmtCredits, fmtWaited } from '../format'
-import { ACT, DO_NAME, WAIT_NAME, waitsOn } from '../vocab'
+import { ACT, DO_NAME, PHRASE_BREAK, waitName, waitsOn } from '../vocab'
+import { ReviewButton } from '../views/Question'
 
 export type Col = '需求' | '设计' | '构建' | '交给运行机' | '发布验收' | '已合并'
 export type Lane = 'you' | 'people' | 'agent' | 'runner'
@@ -51,11 +53,13 @@ export function laneOf(r: Requirement): Lane {
 }
 
 /** The one step a person takes on a requirement that waits on them: the button's words and where it goes (a view of
- * this app, or the MR). null: it does not wait on you, or the backend did not say the step. */
-export type Step = { label: string; view?: View; href?: string }
+ * this app, the MR, its idle session, or 开审查会话 right here). null: it does not wait on you, or the backend did not say the step. */
+export type Step = { label: string; view?: View; href?: string; session?: string; review?: { repo: string; key: string; slot: string | null; worktree: string | null } }
 export function stepOf(r: Requirement): Step | null {
   const d = r.waits.do
   if (r.waits.who !== 'you' || !d || d === 'none' || d === 'watch') return null
+  if (r.waits.review) return { label: ACT.review, review: { repo: r.repo, key: r.key, slot: slotOf(r.session_url), worktree: r.worktree } }
+  if ((d === 'reply' || d === 'tool') && r.session_url) return { label: DO_NAME[d], session: r.session_url }
   if (d === 'start') return { label: DO_NAME.start, view: { kind: 'new', repo: r.repo, key: r.key, title: r.title } }
   if (d === 'answer' && r.waits.where === 'mr' && r.mr?.url) return { label: ACT.answerOnMr, href: r.mr.url }
   if (d === 'write_back') return { label: DO_NAME.write_back, view: { kind: 'brain', repo: r.repo, reflect: r.key } }
@@ -68,13 +72,28 @@ export function waitedText(r: Requirement, at: number): string {
   return typeof s === 'number' && Number.isFinite(s) ? `已等 ${fmtWaited(at - s)}` : ''
 }
 
+/** The session a KiroCrew chat URL opens (/chat?sid=<slot>). */
+const slotOf = (url: string | null | undefined): string | null => (url ? new URLSearchParams(url.split('?')[1] ?? '').get('sid') : null)
+
 export function StepButton({ step, onGo, primary = true }: { step: Step; onGo: (v: View) => void; primary?: boolean }) {
+  const navigate = useNavigate()
   const cls = `kt-btn is-small${primary ? ' is-primary' : ''} br-step`
   const stop = (e: { stopPropagation: () => void }) => e.stopPropagation()
-  if (step.href) {
-    return <a className={cls} href={step.href} target="_blank" rel="noopener noreferrer" onClick={stop}>{step.label} ↗</a>
+  if (step.review) {
+    const x = step.review
+    return <span className="br-step br-review" onClick={stop} onKeyDown={stop}><ReviewButton repo={x.repo} reqKey={x.key} liveSlot={x.slot} worktree={x.worktree} /></span>
   }
-  return <button type="button" className={cls} onClick={(e) => { stop(e); if (step.view) onGo(step.view) }}>{step.label} ↗</button>
+  if (step.href) {
+    return <a className={cls} href={step.href} target="_blank" rel="noopener noreferrer" onClick={stop} aria-label={`${step.label} ↗`}><StepWords text={step.label} /></a>
+  }
+  return <button type="button" className={cls} aria-label={`${step.label} ↗`} onClick={(e) => { stop(e); if (step.session) navigate(step.session); else if (step.view) onGo(step.view) }}><StepWords text={step.label} /></button>
+}
+
+/** A step's words and its ↗, broken on a narrow card only between their phrases (改好后 | 重新交接 ↗, where
+ * PHRASE_BREAK says), never inside one. */
+function StepWords({ text }: { text: string }) {
+  const at = PHRASE_BREAK[text] ?? 0
+  return <>{at > 0 && <span className="br-nw">{text.slice(0, at)}</span>}<span className="br-nw">{text.slice(at)} ↗</span></>
 }
 
 type Handlers = {
@@ -109,7 +128,7 @@ function Card({ r, at, hl, repoName, h }: { r: Requirement; at: number; hl: stri
 
 const PER_CELL = 3
 
-export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }: {
+export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, repos = 1, ...h }: {
   rows: Requirement[]
   at: number
   hl: string | null
@@ -117,6 +136,8 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
   repoName: (id: string) => string | undefined
   /** every repo here is done only on this machine: the runner's column and lane are 「这次不需要」 */
   localOnly?: boolean
+  /** how many repos the board shows (the band says 这个仓库 or 这 N 个仓库) */
+  repos?: number
 } & Handlers) {
   const live = rows.filter((r) => colOf(r) && colOf(r) !== '已合并')
   // a merge that still waits on you (回写 Brain) stays on the board however old it is
@@ -128,7 +149,7 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
   const yours = inLane('you')
   const mergedYours = merged.filter((r) => laneOf(r) === 'you')
   const byDo = Object.entries(yours.reduce<Record<string, number>>((m, r) => {
-    const w = r.waits.do ? WAIT_NAME[r.waits.do] : ''
+    const w = waitName(r.waits)
     return w ? { ...m, [w]: (m[w] ?? 0) + 1 } : m
   }, {}))
   const longest = yours.map((r) => r.waits.since).filter((s): s is number => typeof s === 'number').sort((a, b) => a - b)[0]
@@ -158,7 +179,7 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
           <div className={`cto-kb-h${localOnly && key === '交给运行机' ? ' is-off' : ''}`} key={key}>
             <button type="button" onClick={() => h.onCell(key)} title={`在下方交付清单里看「${name}」这一列`}>
               <div><b>{name}</b>{!(localOnly && key === '交给运行机') && <span className="cto-n">{count(key)}</span>}</div>
-              <div className="cto-st">{localOnly && key === '交给运行机' ? '这次不需要' : sub}</div>
+              <div className="cto-st">{localOnly && key === '交给运行机' ? '这次不需要' : sub.split(' · ').map((x, i) => <span key={x}>{i > 0 && ' · '}<span className="br-nw">{x}</span></span>)}</div>
             </button>
           </div>
         ))}
@@ -169,7 +190,7 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
         {localOnly && (
           <div className="br-kband" data-testid="flow-runner-off">
             <span className="br-lane-name"><RoleIcon role="runner" size={15} />运行机在跑</span>
-            <span>这次不需要：这个仓库只在本机做，不交给运行机</span>
+            <span>这次不需要：{repos > 1 ? `这 ${repos} 个仓库都只在本机做` : '这个仓库只在本机做'}，不交给运行机</span>
           </div>
         )}
       </div>
