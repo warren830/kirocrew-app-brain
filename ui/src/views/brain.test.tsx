@@ -67,6 +67,9 @@ describe('Brain', () => {
     // the type filter: a chip per type the file has, with its count; the same chip again shows all
     const types = within(tech).getByRole('group', { name: '按类型筛' })
     expect(within(types).getAllByRole('button').map((b) => b.textContent)).toEqual(['全部 3', '决定 1', '准则 1', '坑 1'])
+    // plain words only, hover included: no 「按 id」, no brain-kit's type names (decision, guideline, …)
+    expect(screen.getByLabelText('按文字筛')).toHaveAttribute('placeholder', '按条目号、文字、来源筛')
+    expect([...tech.querySelectorAll('[title]')].map((e) => e.getAttribute('title')).filter((t) => /[a-z]{4,}/.test(t ?? ''))).toEqual([])
     await user.click(within(types).getByRole('button', { name: '准则 1' }))
     expect(within(types).getByRole('button', { name: '准则 1' })).toHaveAttribute('aria-pressed', 'true')
     expect(within(tech).getAllByRole('article').map((a) => a.dataset.entryId)).toEqual(['T-12'])

@@ -276,7 +276,7 @@ export function BrainPage({ entry, ...props }: { entry: BrainEntryRef } & ViewPr
                     <label className="bv-search" htmlFor="brain-text">
                       <span className="br-sr">按文字筛</span>
                       <Icon name="Search" size={14} />
-                      <input id="brain-text" type="text" placeholder="按 id、文字、来源筛" value={text} onChange={(e) => setText(e.target.value)} />
+                      <input id="brain-text" type="text" placeholder="按条目号、文字、来源筛" value={text} onChange={(e) => setText(e.target.value)} />
                     </label>
                     <TypeChips file={file} type={type} onType={setType} />
                   </div>
@@ -448,7 +448,7 @@ function TypeChips({ file, type, onType }: { file: BrainFileView; type: string; 
     <div className="bv-types" role="group" aria-label="按类型筛">
       <button type="button" className="bv-type" aria-pressed={type === ''} onClick={() => onType('')}>全部 <b>{all.length}</b></button>
       {types.map((t) => (
-        <button key={t} type="button" className="bv-type" aria-pressed={type === t} title={t} onClick={() => onType(type === t ? '' : t)}>
+        <button key={t} type="button" className="bv-type" aria-pressed={type === t} onClick={() => onType(type === t ? '' : t)}>
           {TYPE_LABEL[t] ?? t} <b>{all.filter((e) => e.type === t).length}</b>
         </button>
       ))}
@@ -462,7 +462,7 @@ function EntryCard({ e, hl }: { e: BrainEntry; hl: boolean }) {
     <article className={`bv-entry${hl ? ' is-hl' : ''}${e.candidate ? ' is-cand' : ''}`} data-entry-id={e.id} aria-current={hl ? 'true' : undefined} aria-label={e.id}>
       <div className="bv-entry-top">
         <b className="br-key">{e.id}</b>
-        <span className="br-chip tone-info" title={e.type}>{TYPE_LABEL[e.type] ?? e.type}</span>
+        <span className="br-chip tone-info">{TYPE_LABEL[e.type] ?? e.type}</span>
         <span className="br-tag">{SIDE_LABEL[e.side] ?? e.side}</span>
         {e.rel && REL_ON_CARD.has(e.rel.split(' ')[0]) && <span className="br-tag">{relLabel(e.rel)}</span>}
         <span className="br-grow" />
