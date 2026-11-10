@@ -706,6 +706,17 @@ const METRIC_SHORT: Record<string, string> = {
   credits_per_success: '每交付对一个需求花的 credits',
 }
 
+/** Each eval number's whole rule, in the app's words (brain-kit's own has Lean's approval kinds and its field names). */
+const METRIC_RULE: Record<string, string> = {
+  autonomy: '交接以后，除了必经的审批（需求、设计、计划、发布审批和验收），没有人做过任何事，而且交付正确',
+  delivery: '一次通过验收，合并后 14 天内没有回滚、修复提交，也没有新认领的缺陷',
+  judgment: '判断点是 Lean 的审批口令和等人回答的问题（本机会话里的、MR 上的）',
+  repeat_rate: '同一条纠正又被提出的次数 ÷ 全部纠正（越低越好）',
+  useful: '被引用过的 Brain 条目 ÷ 现有的条目',
+  staleness: '过时的引用 + 同名的术语 + 这一期被覆盖或撤回的条目',
+  credits_per_success: '做完的运行花的 credits 合计 ÷ 交付正确的需求数；只用来看钱花在哪，不设上限',
+}
+
 function metricValue(v: EvalMetric['value']): string | null {
   if (v === null) return null
   if (Array.isArray(v)) return v[1] > 0 ? `${v[0]}/${v[1]}` : null
@@ -743,7 +754,7 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
             {ev.metrics.map((m) => {
               const v = metricValue(m.value)
               return (
-                <div key={m.id} className="br-metric" data-metric={m.id} title={m.rule}>
+                <div key={m.id} className="br-metric" data-metric={m.id} title={METRIC_RULE[m.id] ?? m.rule}>
                   <span>{m.label}</span>
                   <b className={v === null ? 'is-none' : undefined}>{v ?? '还没有'}</b>
                   <small>{METRIC_SHORT[m.id] ?? m.rule}</small>
@@ -817,7 +828,7 @@ function RefreshButton({ repos, onDone }: { repos: RepoInfo[]; onDone: () => voi
       {act.error && (
         <span className="br-small br-bad-text" role="alert">没取成：{act.error}。做什么：看看网络、远端地址和你的权限，再点一次</span>
       )}
-      <button type="button" className="br-btn is-small" disabled={act.busy} onClick={() => void run()} title={`git fetch：读远端最新的分支和默认分支（${repos.map((r) => r.name).join('、')}）`}>
+      <button type="button" className="br-btn is-small" disabled={act.busy} onClick={() => void run()} title={`从远端读最新的分支和默认分支（${repos.map((r) => r.name).join('、')}），这里的数字跟着更新`}>
         <Icon name="RefreshCw" size={13} />{act.busy ? '正在取…' : '从远端取最新'}
       </button>
     </span>

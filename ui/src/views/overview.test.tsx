@@ -437,6 +437,7 @@ describe('交付总览', () => {
     render(<OverviewView entry={{}} {...props()} />)
     await screen.findByTestId('req-table')
     const before = apiCalls.filter((c) => c.path.startsWith(`${API}/overview`)).length
+    expect(screen.getByRole('button', { name: '从远端取最新' }).title).not.toMatch(/git|fetch/)
     await user.click(screen.getByRole('button', { name: '从远端取最新' }))
     expect(await screen.findByTestId('refresh-result')).toHaveTextContent(/^已经从远端取到最新。$/)
     expect(apiCalls.filter((c) => c.method === 'POST')).toEqual([{ method: 'POST', path: `${API}/refresh`, body: { repo: 'r1' } }])
@@ -478,7 +479,9 @@ describe('交付总览', () => {
     const batch = await screen.findByTestId('eval-batch')
     expect(batch).toHaveTextContent('这一批：远端的 main 分支上已经有记录的需求 · 不跟着交付清单的筛选变')
     expect(batch.querySelector('[data-metric="autonomy"]')).toHaveTextContent(/^自主度2\/3交接以后没人插手、交付也正确的$/)
-    expect(batch.querySelector('[data-metric="autonomy"]')).toHaveAttribute('title', fx.overview().eval.metrics[0].rule)
+    // each whole rule on hover, in the app's words: no Lean approval kinds, no brain-kit field names
+    expect(batch.querySelector('[data-metric="autonomy"]')).toHaveAttribute('title', '交接以后，除了必经的审批（需求、设计、计划、发布审批和验收），没有人做过任何事，而且交付正确')
+    for (const m of batch.querySelectorAll('[data-metric]')) expect(m.getAttribute('title')).not.toMatch(/[A-Z]{3,}|park|correction|run\b/)
     expect(batch.querySelector('[data-metric="staleness"]')).toHaveTextContent(/^过时与冲突2/)
     expect(batch.querySelector('[data-metric="repeat_rate"]')).toHaveTextContent(/^重复纠正率还没有/)
     expect(batch.querySelector('[data-metric="credits_per_success"]')).toHaveTextContent(/^每个正确交付的 credits还没有/)
