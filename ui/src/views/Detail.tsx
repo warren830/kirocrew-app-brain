@@ -90,6 +90,7 @@ export const DETAIL_CSS = `
 .br-detail .br-detail-facts dt { font-size: .86em; }
 .br-detail .br-detail-facts dd { overflow-wrap: anywhere; }
 .br-detail :is(.br-path > span, .br-nowrap) { white-space: nowrap; }
+.br-detail .br-phrase { display: inline-block; max-width: 100%; }
 .br-detail .br-rawlist { margin: 6px 0 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; }
 .br-detail .br-rawlist dd { margin: 0; overflow-wrap: anywhere; }
 .br-detail .br-stagecells { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; list-style: none; margin: 0; padding: 0; }
@@ -791,9 +792,20 @@ function ChecksCard({ board, localOnly, sent, blocked, onBoard }: {
   )
 }
 
-/** A sentence of names (「还剩 发布审批、签接手合同」) that wraps between its names, never inside one. */
-function Phrases({ text }: { text: string }) {
-  return <>{text.split(/(?<=[、 ])/).map((w, i) => <span key={i} className="br-nowrap">{w}</span>)}</>
+/** A sentence of names (「等你：代码生成计划审批 · 还剩 发布审批、签接手合同」) that wraps between its pieces (after 「、」,
+ * 「：」, 「 · 」), never inside one; a piece longer than the whole line wraps inside itself instead of running past the
+ * card's edge. */
+export function Phrases({ text }: { text: string }) {
+  const pieces = text.match(/.+?(?:、|：| · |$)/g) ?? []
+  return (
+    <>
+      {pieces.map((p, i) => (
+        <span key={i}>
+          <span className="br-phrase">{p.endsWith(' · ') ? p.slice(0, -1) : p}</span>{p.endsWith(' · ') ? ' ' : ''}
+        </span>
+      ))}
+    </>
+  )
 }
 
 function SplitBar({ split }: { split: { p: Part; s: number }[] }) {

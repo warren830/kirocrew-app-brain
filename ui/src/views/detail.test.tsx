@@ -848,6 +848,11 @@ describe('需求详情', () => {
     const card = await screen.findByRole('article', { name: '检查' })
     // it waits on the person looking: 等你, as everywhere
     await waitFor(() => expect(within(card).getByTestId('checks-say')).toHaveTextContent('没过：引用的 Brain 条目 · 等你：代码生成计划审批 · 还剩 发布审批、自动检查'))
+    // it wraps between its pieces only, each name whole in one piece (a piece wider than the card wraps inside itself:
+    // nothing runs past the card's edge)
+    const pieces = [...within(card).getByTestId('checks-say').querySelectorAll('.br-phrase')].map((x) => x.textContent)
+    expect(pieces).toEqual(['没过：', '引用的 Brain 条目 ·', '等你：', '代码生成计划审批 ·', '还剩 发布审批、', '自动检查'])
+    expect(within(card).getByTestId('checks-say').querySelector('.br-nowrap')).toBeNull()
     expect(card).toHaveTextContent('查的是：Lean 审批 · Brain')
     expect(card).toHaveClass('is-bad')
   })
