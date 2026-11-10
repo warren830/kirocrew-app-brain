@@ -1073,7 +1073,7 @@ describe('需求详情', () => {
     const items = within(tl).getAllByTestId('tl-item')
     expect(items.find((i) => i.textContent?.startsWith('21:00'))).toHaveTextContent(/^21:00交接桥接手了 · 第 1 次运行$/)
     const hand = items.find((i) => i.textContent?.startsWith('20:00'))!
-    expect(hand).toHaveTextContent(/^20:00交接交接 · alice$/)
+    expect(hand).toHaveTextContent(/^20:00交接交接 · 你$/) // alice is the owner reading her own page
     expect(hand.title).toBe('提交 d138dc559626')
     expect(card).not.toHaveTextContent('RUN-PAY-3-1')
     expect(tl).not.toHaveTextContent(/RUN-PAY-3-1|d138dc559626/)
