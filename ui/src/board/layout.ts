@@ -10,6 +10,10 @@
  * Edges leave a node's right side and enter the next one's left side; an edge between two nodes of one column runs
  * straight down; an edge that skips columns runs across them above or below their nodes.
  *
+ * A phase none of whose actors is on this requirement's way (a repo done only here never goes to the runner) folds into
+ * a narrow grey band of its own (the sample's 「1 构思 · 这次不需要」): its actors get no node, the other columns its room,
+ * and the way runs across the band.
+ *
  * The run branch is a rail along the bottom: each actor that commits drops into it in its own lane just right of its
  * column, the hand-over commit is a dot of its own, the merge into the default branch the rail's green end; the check
  * ring (the check wall's passed / total) sits at the rail's right end, like the sample's test station.
@@ -52,17 +56,20 @@ export interface StageInfo {
   x: number
   keys: string[]
   phase: string
+  /** its phase is folded: no nodes, no room, nothing to route around */
+  folded?: boolean
 }
 
 export interface PhaseBand {
   key: string
   n: string
   title: string
-  en: string
   sub: string
   x1: number
   x2: number
   used: boolean
+  /** its short title, for a folded band */
+  short: string
 }
 
 export interface EdgeGeom {
@@ -87,12 +94,14 @@ export interface GraphLayout {
 }
 
 /** The phases of a requirement's way, left to right (the bands' titles). */
-export const PHASES: ReadonlyArray<{ key: string; n: string; title: string; en: string; sub: string }> = [
-  { key: 'local', n: '1', title: '本机 · Lean', en: 'Local', sub: 'brain-dev 会话 · 需求和设计审批' },
-  { key: 'runner', n: '2', title: '交给运行机', en: 'Team runner', sub: 'brain handoff · 桥核对 · 签名 · brain-run' },
-  { key: 'check', n: '3', title: '检查 · 验收', en: 'Checks', sub: 'verify · 发布审批 · 验收' },
-  { key: 'land', n: '4', title: '回写', en: 'Brain', sub: '合并以后 · brain reflect' },
+export const PHASES: ReadonlyArray<{ key: string; n: string; title: string; sub: string; short: string }> = [
+  { key: 'local', n: '1', title: '本机 · Lean', sub: 'brain-dev 会话 · 需求和设计审批', short: '本机' },
+  { key: 'runner', n: '2', title: '交给运行机', sub: '交接 · 桥核对 · 签名 · 运行机做', short: '运行机' },
+  { key: 'check', n: '3', title: '检查 · 验收', sub: '自动检查 · 发布审批 · 验收', short: '检查' },
+  { key: 'land', n: '4', title: '回写', sub: '合并以后 · 回写 Brain', short: '回写' },
 ]
+/** A folded phase's band. */
+export const GREY_W = 92
 
 /** Each actor's column (0 = the first right of the person), its height in half row steps from the top row (0 top, 2
  * middle, 4 bottom; 1 and 3 for a pair), its place in its column (0 the upper) and its phase. */
@@ -198,6 +207,7 @@ function routeEdge(a: NodeBox, b: NodeBox, stages: StageInfo[], nodes: Map<strin
   const pts: Pt[] = [start]
   for (let s = a.stage + 1; s < b.stage; s++) {
     const st = stages[s]
+    if (st.folded) continue
     const t = (st.x - start.x) / (end.x - start.x || 1)
     let y = start.y + (end.y - start.y) * t
     const bands = st.keys
@@ -237,23 +247,57 @@ export function edgesOf(keys: ReadonlySet<string>, direct: boolean): [string, st
     ['local', 'req'], ['local', 'design'], ['req', 'handover'], ['design', 'handover'], ['handover', 'bridge'],
     ['bridge', 'signer'], ['signer', 'runner'], ['runner', 'ci'], ['ci', 'release'], ['release', 'reflect'],
   ]
-  if (direct) all.push(['design', 'ci'])
+  // the runner's part folded away: the approvals lead straight to the checks
+  if (!keys.has('handover')) all.push(['req', 'ci'], ['design', 'ci'])
+  else if (direct) all.push(['design', 'ci'])
   return all.filter(([a, b]) => keys.has(a) && keys.has(b))
 }
 
-export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [string, string]>, rosterRows = 0): GraphLayout {
-  const W = GW
+/** The phases to fold: every actor of theirs is off this requirement's way. */
+export function foldedPhases(actors: ReadonlyArray<{ key: string; status: string }>): string[] {
+  return PHASES.map((p) => p.key).filter((ph) => {
+    const of = actors.filter((a) => SLOTS[a.key]?.phase === ph)
+    return of.length > 0 && of.every((a) => a.status === 'skipped')
+  })
+}
+
+/** The graph is never drawn smaller than this (UI问题清单 BOARD-31: its 12 px lines stay about 10 px on screen): an app
+ * too narrow for the full width gets a narrower layout first (its columns closer, down to MIN_STEP apart); when even the
+ * narrowest one does not fit, the graph keeps this scale and scrolls sideways (ActorGraph). The text never changes. */
+export const SCALE = 0.84
+/** two columns this far apart at the closest: a node, the commit lane right of it, room for the edges */
+const MIN_STEP = NODE_W + 34
+
+/** The layout's width for a graph *avail* px wide (null: not measured, the full width) with *fold* folded. */
+export function graphWidth(avail: number | null | undefined, fold: ReadonlyArray<string> = []): number {
+  if (!avail) return GW
+  const open = COLS - fold.reduce((n, ph) => n + (SLOTS_BY_PHASE[ph]?.length ?? 0), 0)
+  const bands = PHASES.filter((p) => fold.includes(p.key)).length
+  const narrowest = PAD_X + NODE_W / 2 + ORCH_W + Math.max(0, open - 1) * MIN_STEP + bands * GREY_W + 70 + NODE_W / 2
+  return Math.round(Math.min(GW, Math.max(narrowest, avail / SCALE)))
+}
+
+export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [string, string]>, rosterRows = 0, fold: ReadonlyArray<string> = [], width = GW): GraphLayout {
+  const W = width
+  const folded = new Set(fold)
   const left = PAD_X + NODE_W / 2 + ORCH_W
   const right = W - (70 + NODE_W / 2)
-  const step = (right - left) / (COLS - 1)
-  const stages: StageInfo[] = Array.from({ length: COLS }, (_, i) => ({ index: i, x: round(left + i * step), keys: [], phase: '' }))
+  const open = Array.from({ length: COLS }, (_, i) => i).filter((i) => !folded.has(PHASE_OF_COL[i]))
+  const bands = PHASES.filter((p) => folded.has(p.key)).length
+  const step = (right - left - bands * GREY_W) / Math.max(1, open.length - 1)
+  // a folded phase's columns take no room; the band it folds into takes GREY_W
+  const colX = (i: number) => {
+    const before = PHASES.filter((p) => folded.has(p.key) && SLOTS_BY_PHASE[p.key][0] < i).length
+    return round(left + Math.max(0, open.indexOf(i)) * step + before * GREY_W)
+  }
+  const stages: StageInfo[] = Array.from({ length: COLS }, (_, i) => ({ index: i, x: colX(i), keys: [], phase: '', folded: folded.has(PHASE_OF_COL[i]) }))
   const yTop = TOP + NODE_H / 2
   const yBot = yTop + 2 * ROW_GAP
   const nodes = new Map<string, NodeBox>()
   const mergeX = new Map<string, number>()
   for (const key of keys) {
     const s = SLOTS[key]
-    if (!s) continue
+    if (!s || folded.has(s.phase)) continue
     const st = stages[s.col]
     st.keys.push(key)
     st.phase = s.phase
@@ -275,23 +319,38 @@ export function layoutGraph(keys: string[], edgeList: ReadonlyArray<readonly [st
   const station = { x: W - 42, y: railY, r: STATION_R }
   const phases: PhaseBand[] = []
   for (const p of PHASES) {
+    if (folded.has(p.key)) continue
     const cols = stages.filter((s) => SLOTS_BY_PHASE[p.key]?.includes(s.index))
     if (!cols.length) continue
     phases.push({ ...p, x1: round(cols[0].x - NODE_W / 2 - 14), x2: round(cols[cols.length - 1].x + NODE_W / 2 + 14), used: cols.some((c) => c.keys.length > 0) })
   }
   for (let i = 1; i < phases.length; i++) {
+    const gap = PHASES.findIndex((p) => p.key === phases[i].key) - PHASES.findIndex((p) => p.key === phases[i - 1].key) > 1
+    if (gap) continue
     const m = (phases[i - 1].x2 - 14 + phases[i].x1 + 14) / 2
     phases[i - 1].x2 = round(Math.min(phases[i - 1].x2, m - 4))
     phases[i].x1 = round(Math.max(phases[i].x1, m + 4))
   }
+  // each folded phase: a grey band in the gap it leaves (centred), or right after the last band
+  for (const p of PHASES.filter((x) => folded.has(x.key))) {
+    const at = PHASES.indexOf(p)
+    const prev = phases.filter((b) => PHASES.findIndex((x) => x.key === b.key) < at).sort((a, b) => b.x2 - a.x2)[0]
+    const next = phases.filter((b) => PHASES.findIndex((x) => x.key === b.key) > at).sort((a, b) => a.x1 - b.x1)[0]
+    const from = prev ? prev.x2 : left - NODE_W / 2
+    const to = next ? next.x1 : Math.min(W - 8, from + GREY_W + 4)
+    const mid = (from + to) / 2
+    phases.push({ ...p, x1: round(mid - (GREY_W - 12) / 2), x2: round(mid + (GREY_W - 12) / 2), used: false })
+  }
+  phases.sort((a, b) => a.x1 - b.x1)
   // 0 认领: the person, at the far left, as the sample's orchestrator
-  phases.unshift({ key: 'init', n: '0', title: '你', en: 'Owner', sub: '认领 · 文档过五关 · 开工', x1: 8, x2: round((phases[0]?.x1 ?? 200) - 8), used: true })
+  phases.unshift({ key: 'init', n: '0', title: '认领', sub: '认领 · 文档过五关 · 开工', short: '认领', x1: 8, x2: round((phases[0]?.x1 ?? 200) - 8), used: true })
   const orch = { x: round(PAD_X + ORCH_W / 2 - 10), y: TOP + ORCH_BOX.h / 2 - 6 }
   return { width: W, height: railY + 44, nodes, stages, edges, rail: { x1: PAD_X, x2: station.x - STATION_R, y: railY }, station, mergeX, phases, orch }
 }
 
 /** The columns of each phase band. */
 const SLOTS_BY_PHASE: Record<string, number[]> = { local: [0, 1], runner: [2, 3], check: [4], land: [5] }
+const PHASE_OF_COL: string[] = ['local', 'local', 'runner', 'runner', 'check', 'land']
 
 // ---------------------------------------------------------------------------------------------
 // anchors and the routes particles take

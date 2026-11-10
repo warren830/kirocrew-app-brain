@@ -160,6 +160,44 @@ def default_parent(work_root: str) -> str:
     return os.path.join(os.path.realpath(os.path.expanduser("~")), "workplace")
 
 
+MAX_FOUND = 40
+
+
+def found_repos(listed: list[str], work_root: str) -> list[dict[str, Any]]:
+    """The git checkouts under ~/workplace and ~/workspace (two levels down), for 导入仓库 to pick from instead of typing
+    a path: {path, name, installed (a .brain/kit.json), listed}. The requirement worktrees under *work_root* and links
+    are left out. Read only: a directory listing and a stat per entry, no git."""
+    home = os.path.realpath(os.path.expanduser("~"))
+    skip = os.path.realpath(os.path.expanduser(work_root)) if work_root else ""
+    mine = {os.path.realpath(os.path.expanduser(x)) for x in listed}
+    out: list[dict[str, Any]] = []
+
+    def scan(d: str, depth: int) -> None:
+        try:
+            names = sorted(os.listdir(d))
+        except OSError:
+            return
+        for n in names:
+            full = os.path.join(d, n)
+            if n.startswith(".") or os.path.islink(full) or not os.path.isdir(full):
+                continue
+            if skip and (full == skip or full.startswith(skip + os.sep)):
+                continue
+            if os.path.exists(os.path.join(full, ".git")):
+                out.append({"path": full, "name": n, "installed": os.path.isfile(os.path.join(full, KIT)),
+                            "listed": full in mine})
+            elif depth > 1:
+                scan(full, depth - 1)
+            if len(out) >= MAX_FOUND:
+                return
+
+    for w in WORK_DIRS:
+        root = os.path.join(home, w)
+        if os.path.isdir(root) and not os.path.islink(root):
+            scan(root, 2)
+    return out[:MAX_FOUND]
+
+
 # ---- git ----------------------------------------------------------------------------------------------------------- #
 
 def run_quiet(cmd: list[str], cwd: str, timeout: float, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
@@ -528,7 +566,7 @@ def pending_state(top: str, rec: dict[str, Any] | None, *, token: bool = False) 
             if ref.startswith("refs/remotes/") and not has_at(g, "refs/heads/" + d, KIT):
                 ok, why = pull_check(g, d)
                 p = _pending("merged", short, rec, origin, d, token, "已经合进 %s，这个目录还没更新" % short,
-                             "点「拉取」更新这个目录（git pull --ff-only）" if ok else why)
+                             "点「拉取」更新这个目录" if ok else why)
                 p.update(word="要拉取", pull={"ok": ok, "why": why})
             elif cur != d:
                 p = _pending("merged", short, rec, origin, d, token, "已经合进 %s，这个目录在 %s 上" % (d, cur or "别的提交"),
@@ -665,7 +703,7 @@ def merge_check(g: Git, branch: str, base_sha: str | None, d: str) -> tuple[bool
     if base_sha and head != base_sha:
         if g.ok("merge-base", "--is-ancestor", head, base_sha):
             return False, "本机的 %s 比装的时候用的旧（装时是 %s）：先拉取，再合并" % (d, base_sha[:8])
-        return False, "%s 在装的时候是 %s，后来有了新提交（现在是 %s）：快进不了。可以直接装在 %s 上" % (
+        return False, "%s 在装完以后又有了新提交（装时 %s，现在 %s），这个安装分支合不进去了：在「导入仓库」里改成直接装在 %s 上" % (
             d, base_sha[:8], head[:8], d)
     if not g.ok("merge-base", "--is-ancestor", head, tip):
         return False, "%s 和 %s 分开了：快进不了" % (d, branch)
@@ -699,9 +737,11 @@ def choices(top: str, *, purpose: str = "install", cfg: dict[str, Any] | None = 
     In place (the default, as brain-kit's own CLI does it): in the checkout, on its branch, committed there; not when the
     checkout is on no branch, is in the middle of a merge or rebase, or has uncommitted changes that touch what brain
     install writes (then only the install's own paths would be committed, and the person's changes stay as they are).
-    A new branch (and an MR) is offered when the checkout has uncommitted changes or the repo has a remote, and it is
-    the recommended one for a repo with a remote (a team repo: its default branch is usually protected) or when in
-    place cannot be done. Read only."""
+    A new branch (and an MR) is offered when the checkout has uncommitted changes or the repo has a remote. In place is
+    the recommended install whenever it can be done (a requirement can be opened today: at once without a remote,
+    after 推送 with one, since `brain start` branches from origin's default branch); a new branch is recommended when
+    in place cannot be done, and for a kit update of a repo with a remote (the team's MR). Each line says what the way
+    costs. Read only."""
     g = Git(top)
     cur = g.out("symbolic-ref", "-q", "--short", "HEAD") or None
     d = str((cfg or {}).get("default_branch") or "") or (default_branch(g)[0] or "")
@@ -718,19 +758,23 @@ def choices(top: str, *, purpose: str = "install", cfg: dict[str, Any] | None = 
     elif not cur:
         why = "检出现在不在任何分支上（detached HEAD）：先切到一个分支"
     elif overlap:
-        why = "你没提交的改动碰到了 brain install 要写的文件（%s）：直接装会混在一起" % _names(overlap)
+        why = "你没提交的改动碰到了安装要写的文件（%s）：先提交或收起来（git stash），才能直接装" % _names(overlap)
     else:
         why = ""
     upgrade = purpose == "upgrade"
     verb = "更新" if upgrade else "装"
-    line = "%s在你现在的检出里，提交在 %s 上，%s" % (verb, cur or "当前分支", "马上生效" if upgrade else "马上能用")
+    tgt = d or "默认分支"
+    # what a requirement needs: `brain start` makes its branch from origin/<default> when there is an origin
+    if origin is None:
+        line = "%s在你现在的检出里，提交在 %s 上，%s" % (verb, cur or "当前分支", "马上生效" if upgrade else "马上能开需求")
+    else:
+        line = "%s在你现在的检出里，提交在 %s 上；推送到 origin 以后%s（这会直接改团队的 %s，没有 MR 评审）" % (
+            verb, cur or "当前分支", "生效" if upgrade else "就能开需求", tgt)
     if cur and d and cur != d:
         line += "（%s 不是默认分支 %s：合进 %s 以后，app 给需求建的工作目录里才有）" % (cur, d, d)
     if dirty and not overlap:
-        line += "；只提交 brain install 写的文件，你自己没提交的改动不动"
-    if origin is not None:
-        line += "；不会自己推送"
-    base = "origin/" + d if origin is not None and d else (d or "默认分支")
+        line += "；只提交安装写的文件，你自己没提交的改动不动"
+    base = "origin/" + d if origin is not None and d else tgt
     options = [{"mode": "inplace", "title": "直接%s在 %s" % (verb, cur) if cur else "直接%s在当前分支" % verb,
                 "line": line, "ok": not why, "why": why}]
     if origin is not None or dirty or why:
@@ -738,10 +782,14 @@ def choices(top: str, *, purpose: str = "install", cfg: dict[str, Any] | None = 
                         "title": ("%s新分支，开 MR 给团队看" % ("更新到" if upgrade else "装到")) if origin is not None else
                         ("%s新分支" % ("更新到" if upgrade else "装到")),
                         "line": "从 %s 建新分支，放在单独的工作目录里，不动你的检出；%s" % (
-                            base, "推送、开 MR 给团队看，合进 %s 以后生效" % (d or "默认分支") if origin is not None else
-                            "在本机合进 %s 以后生效（「合并到 %s」）" % (d or "默认分支", d or "默认分支")),
+                            base, ("推送、开 MR 给团队看，MR 合进 %s 以后%s" % (tgt, "才生效" if upgrade else "才能开需求"))
+                            if origin is not None else "在本机合进 %s 以后%s（「合并到 %s」）" % (
+                                tgt, "才生效" if upgrade else "才能开需求", tgt)),
                         "ok": True, "why": ""})
-    return {"options": options, "recommend": "inplace" if not why and origin is None else "branch", "current": cur,
+    # a first install: the way that lets the person open a requirement today (in place) whenever it can be done; a kit
+    # update of a team repo, which works already: the team's MR
+    rec = "inplace" if not why and (purpose == "install" or origin is None) else "branch"
+    return {"options": options, "recommend": rec, "current": cur,
             "target": d, "remote_url": (origin or {}).get("url") or "", "dirty": dirty[:10], "overlap": overlap[:10]}
 
 
@@ -852,7 +900,7 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
     origin = origin_of(g)
     out["origin"] = origin
     if origin is None:
-        checks.append(row("origin", "WARN", "origin", "没有 origin", "推送和开 MR 要它：git remote add origin <地址>"))
+        checks.append(row("origin", "OK", "origin", "没有 origin：这个仓库只在本机做（要推送、开 MR 时再加远端）"))
     elif origin["project"]:
         checks.append(row("origin", "OK", "origin", "%s（GitLab %s，项目 %s）" % (origin["url"], origin["base"],
                                                                               origin["project"])))
@@ -863,9 +911,14 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
     if files is None:
         checks.append(row("clean", "WARN", "工作区", "看不出来（git status 没在 %d 秒内结束）" % STATUS_TIMEOUT_S, ""))
     elif n:
+        if has_kit:
+            todo = "不影响导入"
+        elif any(touches(f, write_targets(None)) for f in (status_map(g) or {})):
+            todo = "它们碰到了安装要写的文件：先提交或收起来（git stash）才能直接装；或者装到新分支（在单独的工作目录里装）"
+        else:
+            todo = "不用管：直接装只提交安装写的文件，你没提交的这些改动原样留着"
         checks.append(row("clean", "WARN", "工作区", "有 %d 个改动没提交：%s%s" % (n, "、".join(files), " …" if n > len(files)
-                                                                               else ""),
-                          "不影响：安装在单独的工作目录里做，你的检出不会动"))
+                                                                               else ""), todo))
     else:
         checks.append(row("clean", "OK", "工作区", "没有没提交的改动"))
     rec = records.get(top)
@@ -889,33 +942,39 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
             checks.append(row("kit", "WARN", "brain-kit", "装了，已提交，但 %s 上还没有" % (d or "默认分支"),
                               "合并到 %s：app 给每个需求建的工作目录从那里来" % (d or "默认分支")))
         elif changed:
-            checks.append(row("kit", "WARN", "brain-kit", "装了，但 .brain/kit.json 有没提交的改动", "改完记得提交"))
+            checks.append(row("kit", "WARN", "brain-kit", "装了，但 brain-kit 的设置有没提交的改动", "改完记得提交"))
         else:
-            checks.append(row("kit", "OK", "brain-kit", "装了，已提交（.brain/kit.json）"))
+            checks.append(row("kit", "OK", "brain-kit", "装了，已提交"))
     elif pend:
         out["kit"]["state"] = pend["state"]
-        checks.append(row("kit", "WARN", "brain-kit", pend["text"], pend["next"]))
+        checks.append(row("kit", "WARN", "brain-kit", pend["text"] + (
+            "（AI-DLC Lean、Brain 文件、AGENTS.md 都在分支上）" if pend["state"] == "branch" else ""), pend["next"]))
     elif not bk.ok():
-        checks.append(row("kit", "FAIL", "brain-kit", "没装（没有 .brain/kit.json），app 现在也没装载 brain-kit，装不了",
+        checks.append(row("kit", "FAIL", "brain-kit", "还没装 brain-kit，app 现在也没装载 brain-kit，装不了",
                           "先在设置里写对 brain-kit 的位置"))
     else:
-        checks.append(row("kit", "FAIL", "brain-kit", "没装（没有 .brain/kit.json）", "下面就能装：默认直接装在当前分支并提交"))
+        # the start of an import, not a fault: one row, its level WARN only for older pages (the page shows it as the
+        # next step); Lean, the Brain files and AGENTS.md come with the install
+        checks.append(row("kit", "WARN", "brain-kit", "还没装（会一起装上 AI-DLC Lean、Brain 文件、AGENTS.md）",
+                          "下一步：在下面装上"))
         got = base_ref(g, d) if d else None
         links = symlinks_on_targets(g, got[1]) if got else []
         if links:
             out["kit"]["state"] = "blocked"
-            checks.append(row("links", "FAIL", "符号链接", "仓库里 %s 是符号链接：brain install 会顺着它写到别处" %
+            checks.append(row("links", "FAIL", "符号链接", "仓库里 %s 是符号链接：安装会顺着它写到别处" %
                               "、".join(links), "先把它换成普通的目录或文件，提交，再检查"))
-    todo = "在仓库里重跑 brain install" if has_kit else "装 brain-kit 时一起装上"
-    lean_ok = os.path.isfile(os.path.join(top, LEAN_SCRIPT)) and os.path.isfile(os.path.join(top, LEAN_CONFIG))
-    checks.append(row("lean", "OK", "AI-DLC Lean", "装了（%s）" % LEAN_SCRIPT) if lean_ok else
-                  row("lean", "FAIL", "AI-DLC Lean", "没装", todo))
-    bdir = str((cfg or {}).get("brain_dir") or "brain")
-    missing = [n for n in ((cfg or {}).get("brain_files") or BRAIN_FILES) if not os.path.isfile(os.path.join(top, bdir, n))]
-    checks.append(row("brain", "OK", "Brain 文件", "%s/ 下的 %d 个文件都在" % (bdir, len(BRAIN_FILES))) if not missing else
-                  row("brain", "FAIL", "Brain 文件", "缺 %s" % "、".join("%s/%s" % (bdir, m) for m in missing), todo))
-    checks.append(row("agents", "OK", "AGENTS.md", "有") if os.path.isfile(os.path.join(top, "AGENTS.md")) else
-                  row("agents", "FAIL", "AGENTS.md", "没有", todo))
+    if has_kit:     # what brain install put in the checkout (before an install, or on its branch: the kit row says it)
+        todo = "重装 brain-kit 会补上：在「设置」的 KiroCrew 里点「%s」" % problems.FIX_BUTTON["kit"]
+        lean_ok = os.path.isfile(os.path.join(top, LEAN_SCRIPT)) and os.path.isfile(os.path.join(top, LEAN_CONFIG))
+        checks.append(row("lean", "OK", "AI-DLC Lean", "装了（%s）" % LEAN_SCRIPT) if lean_ok else
+                      row("lean", "FAIL", "AI-DLC Lean", "没装", todo))
+        bdir = str((cfg or {}).get("brain_dir") or "brain")
+        missing = [n for n in ((cfg or {}).get("brain_files") or BRAIN_FILES)
+                   if not os.path.isfile(os.path.join(top, bdir, n))]
+        checks.append(row("brain", "OK", "Brain 文件", "%s/ 下的 %d 个文件都在" % (bdir, len(BRAIN_FILES))) if not missing
+                      else row("brain", "FAIL", "Brain 文件", "缺 %s" % "、".join("%s/%s" % (bdir, m) for m in missing), todo))
+        checks.append(row("agents", "OK", "AGENTS.md", "有") if os.path.isfile(os.path.join(top, "AGENTS.md")) else
+                      row("agents", "FAIL", "AGENTS.md", "没有", todo))
     rid = listed_id(top, listed)
     out["listed"] = rid
     checks.append(row("listed", "OK", "列表", "已经在列表里（%s）" % rid if rid else "还不在列表里"))
@@ -925,7 +984,7 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
     me = out["me"] = identity.of(top, base, token=token)
     checks.append(row("me", "OK", "你是谁", me["text"]) if me["name"] or me["source"] == "token" else
                   row("me", "WARN", "你是谁", me["error"] or "brain-kit 还不知道你是谁：认领需求时要用",
-                      "在下面填%s，存进这个仓库的 git config brain.user" % me["label"] if me["ask"] else ""))
+                      "在下面填上%s，点「保存」" % me["label"] if me["ask"] else ""))
     def crew_rows() -> dict[str, Any]:
         team = None if team_of is None else ([top] if cfg and team_of(top, cfg) else [])
         return crewcheck.checks([top] if cfg else [], team_paths=team)
@@ -944,6 +1003,12 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
         out["next"] = "add"
     elif pend:
         out["next"] = "pending"
+    if pend and pend["state"] == "branch" and not pend["pushed"] and not pend["mr_url"] and not (pend["merge"] or {}).get("ok"):
+        # the install branch can no longer go in (the default branch moved on, …): installing in place instead is
+        # offered; inplace.install drops the unpushed install branch once its own commit is in
+        again = choices(top)
+        if again["options"][0]["ok"]:
+            out["install"] = dict(again, options=again["options"][:1], recommend="inplace")
     return out
 
 

@@ -12,13 +12,13 @@
     },
     {
       "id": "install",
-      "label": "跑 brain install（更新 kit 文件）",
+      "label": "更新 kit 文件",
       "state": "ok",
       "detail": "brain-kit 0.1.0"
     },
     {
       "id": "doctor",
-      "label": "跑 brain doctor",
+      "label": "自检",
       "state": "ok",
       "detail": "10 项通过，3 项注意，0 项没过"
     },
@@ -54,16 +54,16 @@
       "rows": [
         {
           "level": "OK",
-          "text": "kit.json 没问题（需求号 PAY-n，跟踪 none）",
+          "text": "这个仓库的 brain-kit 设置没问题（需求号 PAY-n，不用 Jira）",
           "todo": "",
           "fix": null,
           "repo": null,
           "raw": "kit config valid (.brain/kit.json), tracker none, keys PAY-<n>"
         },
         {
-          "level": "WARN",
-          "text": "Lean 的 hook 在这里还没跑过",
-          "todo": "不用管：在这个仓库里开过 brain-dev 会话（信任工作区）以后就有了",
+          "level": "OK",
+          "text": "Lean 的 hook 在这里还没跑过：开过 brain-dev 会话以后就有了",
+          "todo": "",
           "fix": null,
           "repo": null,
           "raw": "AI-DLC Lean doctor: hooks have never run here: start `kiro-cli --v3` in this folder and trust the workspace"
@@ -139,22 +139,6 @@
           "fix": null,
           "repo": null,
           "raw": "kirocrew kirocrew 0.11.2 (not pinned)"
-        },
-        {
-          "level": "WARN",
-          "text": "没有 ~/.kiro/agents/brain-dev.json",
-          "todo": "点「修复」装上 brain-kit 带的版本：没有它，Lean 的 hook 在 KiroCrew 里不会跑",
-          "fix": "agent",
-          "repo": null,
-          "raw": "KiroCrew: ~/.kiro/agents/brain-dev.json missing; Lean's hooks will not run in KiroCrew (run `brain crew-agent`)"
-        },
-        {
-          "level": "OK",
-          "text": "KiroCrew 引擎：kas",
-          "todo": "",
-          "fix": null,
-          "repo": null,
-          "raw": "KiroCrew engine: kas"
         }
       ],
       "output": "OK   kit config valid (.brain/kit.json), tracker none, keys PAY-<n>\nWARN AI-DLC Lean doctor: hooks have never run here: start `kiro-cli --v3` in this folder and trust the workspace\nOK   Lean does not count runs/ as code (aidlc-docs/lean.json fingerprint_exclude)\nOK   brain-dev model: claude-opus-5.5 (want claude-opus-5.5)\nOK   brain-dev forbidden tools: none\nOK   Brain files in brain/: all present\nOK   AGENTS.md at repo root\nOK   .brain-materials/ is git-ignored (materials never get committed)\nWARN no origin remote: Brain freshness not checked\nOK   kiro-cli kiro-cli 3.1.0 (not pinned)\nOK   kirocrew kirocrew 0.11.2 (not pinned)\nWARN KiroCrew: ~/.kiro/agents/brain-dev.json missing; Lean's hooks will not run in KiroCrew (run `brain crew-agent`)\nOK   KiroCrew engine: kas"

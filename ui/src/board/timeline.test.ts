@@ -188,7 +188,7 @@ describe('replayAt', () => {
       prev = now
     }
     expect(prev).toEqual(counts(b))
-    expect(prev).toMatchObject({ events: 50, belt: 11, passed: 9, rounds: 2 })
+    expect(prev).toMatchObject({ events: 49, belt: 11, passed: 9, rounds: 2 })
   })
 
   it('shows a check cell only once it is decided, with its final status', () => {
@@ -223,17 +223,32 @@ describe('replayAt', () => {
     expect(r.person).toMatchObject({ status: 'running', doing: 'AI 在做' })
   })
 
-  it('while 发布 waits for its approval, the person waits with its words and 验收 waits too', () => {
+  it('while 发布 waits for the product’s approval, it waits on the product (not 等你), the person is told, and 验收 waits too', () => {
     const r = replayAt(fx.boardMerged(), RELEASE_ASKED + 20)
-    expect(r.actors.find((a) => a.key === 'release')).toMatchObject({ status: 'awaiting_approval', doing: '等你批准发布', since: RELEASE_ASKED })
-    expect(r.person).toMatchObject({ status: 'awaiting_approval', doing: '等你批准发布' })
+    expect(r.actors.find((a) => a.key === 'release')).toMatchObject({ status: 'awaiting_approval', doing: '等人在 MR 上批准发布', since: RELEASE_ASKED })
+    expect(r.row.waits).toMatchObject({ who: 'product', text: '等人在 MR 上批准发布' })
+    expect(r.person).toMatchObject({ status: 'waiting', doing: '等人在 MR 上批准发布' })
     expect(r.accept.state).toBe('waiting')
+  })
+
+  it('a wait on the person looking is theirs: 等你, and their node asks', () => {
+    const r = replayAt(fx.boardMerged(), 1793629860 + 20)
+    expect(r.actors.find((a) => a.key === 'req')).toMatchObject({ status: 'awaiting_approval', doing: '等你批准需求' })
+    expect(r.row.waits.who).toBe('you')
+    expect(r.person).toMatchObject({ status: 'awaiting_approval', doing: '等你批准需求' })
   })
 
   it('验收 is accepted once 发布 is approved', () => {
     const b = fx.boardMerged()
     expect(replayAt(b, RELEASE_OK - 1).accept.state).toBe('waiting')
     expect(replayAt(b, RELEASE_OK).accept.state).toBe('accepted')
+  })
+
+  it('counts Lean’s stages the live board’s way: a moment before the end, the numbers the board says', () => {
+    for (const b of [fx.board(), fx.boardMerged()]) {
+      const { lean } = replayAt(b, replaySpan(b).end - 0.5).row
+      expect([lean.done_n, lean.skipped_n, lean.next], b.row.key).toEqual([b.row.lean.done_n, b.row.lean.skipped_n, b.row.lean.next])
+    }
   })
 
   it('offers nothing to do: no line to type, no step, no facts or credits', () => {
@@ -243,5 +258,28 @@ describe('replayAt', () => {
       expect(r.accept.step).toEqual({ text: '', who: '', line: null, mr_url: null, session_url: null })
       expect(r.accept.done).toBeNull()
     }
+  })
+})
+
+describe('replayAt: what was there then', () => {
+  it('a session is there once it was opened, never before 开工; what it cost is known at the end; the MR comes with the hand-over', () => {
+    const b = fx.board()
+    const claim = b.events.find((e) => e.kind === 'claim')!.at
+    expect(b.sessions[0].opened_at).toBeLessThanOrEqual(claim) // the record says so; a claim has no session
+    expect(replayAt(b, claim + 1).actors.find((a) => a.key === 'local')!.session).toBeNull()
+    const opened = b.events.find((e) => e.kind === 'session')!.at
+    const before = replayAt(b, opened - 1)
+    expect(before.actors.find((a) => a.key === 'local')!.session).toBeNull()
+    expect(before.sessions).toEqual([])
+    expect(before.credits.total).toBeNull()
+    expect(before.row.credits).toBeNull()
+    const after = replayAt(b, opened + 60)
+    expect(after.actors.find((a) => a.key === 'local')!.session).toEqual(b.actors.find((a) => a.key === 'local')!.session)
+    expect(after.sessions).toHaveLength(1)
+    expect(after.credits.total).toBeNull()
+    const m = fx.boardMerged()
+    const hand = m.events.find((e) => e.kind === 'handover')!.at
+    expect(replayAt(m, hand - 1).row.mr).toBeNull()
+    expect(replayAt(m, hand + 1).row.mr).toEqual(m.row.mr)
   })
 })

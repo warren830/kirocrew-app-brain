@@ -12,19 +12,19 @@
     },
     {
       "id": "install",
-      "label": "跑 brain install",
+      "label": "装 brain-kit 的文件",
       "state": "ok",
       "detail": "brain-kit 0.1.0"
     },
     {
       "id": "kit",
-      "label": "写 kit.json",
+      "label": "写这个仓库的设置",
       "state": "ok",
-      "detail": "需求号 REFUND-n · 跟踪 none · 默认分支 main · GitLab shop/refund（https://gitlab.example.com） · 团队 退款组"
+      "detail": "需求号 REFUND-n · 不用 Jira · 默认分支 main · GitLab shop/refund（https://gitlab.example.com） · 团队 退款组"
     },
     {
       "id": "doctor",
-      "label": "跑 brain doctor",
+      "label": "自检",
       "state": "ok",
       "detail": "10 项通过，3 项注意，0 项没过"
     },
@@ -60,16 +60,16 @@
       "rows": [
         {
           "level": "OK",
-          "text": "kit.json 没问题（需求号 PAY-n，跟踪 none）",
+          "text": "这个仓库的 brain-kit 设置没问题（需求号 PAY-n，不用 Jira）",
           "todo": "",
           "fix": null,
           "repo": null,
           "raw": "kit config valid (.brain/kit.json), tracker none, keys PAY-<n>"
         },
         {
-          "level": "WARN",
-          "text": "Lean 的 hook 在这里还没跑过",
-          "todo": "不用管：在这个仓库里开过 brain-dev 会话（信任工作区）以后就有了",
+          "level": "OK",
+          "text": "Lean 的 hook 在这里还没跑过：开过 brain-dev 会话以后就有了",
+          "todo": "",
           "fix": null,
           "repo": null,
           "raw": "AI-DLC Lean doctor: hooks have never run here: start `kiro-cli --v3` in this folder and trust the workspace"

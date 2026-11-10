@@ -18,16 +18,27 @@
         "stage_n": 9,
         "stage_state": "started",
         "done": 8,
-        "total": 11
+        "total": 11,
+        "done_n": 4,
+        "skipped_n": 4,
+        "next": {
+          "id": "code-generation",
+          "label": "代码生成",
+          "n": 9
+        }
       },
-      "stage": "9/11 代码生成",
+      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
       "waits": {
         "who": "you",
-        "text": "等你批准 refund-api 的代码计划（在会话里自己打一行）",
+        "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
         "line": "approve PLAN 5d1e7a90",
-        "raw": ""
+        "raw": "",
+        "do": "approve",
+        "since": 1794146040.0,
+        "where": "session",
+        "review": false
       },
-      "summary": "退款单可以导出成 CSV，给财务对账用（规模 M）。现在：Lean 在「代码生成」（refund-api）进行中，在本地开发（还没交接）。",
+      "summary": "退款单可以导出成 CSV，给财务对账用（规模中）。",
       "credits": 12.4,
       "updated_at": 1794146040,
       "mr": null,
@@ -41,7 +52,9 @@
       "expected_paths": [
         "src/refund/",
         "src/export/csv.py"
-      ]
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-3-7f3a"
     },
     {
       "repo": "r1",
@@ -55,21 +68,32 @@
       "branch": "ai/carol/PAY-4-merchant-split",
       "intent": "261105-merchant-split",
       "lean": {
-        "stage": "application-design",
-        "stage_label": "应用设计",
-        "stage_n": 4,
+        "stage": "functional-design",
+        "stage_label": "功能设计",
+        "stage_n": 6,
         "stage_state": "started",
-        "done": 3,
-        "total": 11
+        "done": 5,
+        "total": 11,
+        "done_n": 2,
+        "skipped_n": 3,
+        "next": {
+          "id": "functional-design",
+          "label": "功能设计",
+          "n": 6
+        }
       },
-      "stage": "4/11 应用设计",
+      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
       "waits": {
         "who": "product",
-        "text": "停在 D-2：等产品在 MR 上回答",
+        "text": "等产品在 MR 上回答 D-2（设计）",
         "line": null,
-        "raw": ""
+        "raw": "",
+        "do": "answer",
+        "since": 1794135600.0,
+        "where": "mr",
+        "review": false
       },
-      "summary": "退款到账后给商户发通知（规模 S）。现在：Lean 在「代码生成」进行中，已交给团队运行机，等人在 MR 上回答澄清问题。",
+      "summary": "对账单按商户拆成一户一份，大商户按小时切。",
       "credits": null,
       "updated_at": 1794135600,
       "mr": {
@@ -91,7 +115,9 @@
       "expected_paths": [
         "src/refund/ledger.py",
         "src/statement/"
-      ]
+      ],
+      "local_only": false,
+      "session_url": null
     },
     {
       "repo": "r1",
@@ -110,16 +136,27 @@
         "stage_n": 11,
         "stage_state": "started",
         "done": 10,
-        "total": 11
+        "total": 11,
+        "done_n": 4,
+        "skipped_n": 6,
+        "next": {
+          "id": "release",
+          "label": "发布",
+          "n": 11
+        }
       },
-      "stage": "11/11 发布",
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
       "waits": {
-        "who": "you",
-        "text": "等你验收：在 MR 上回答 D-3",
+        "who": "product",
+        "text": "等产品在 MR 上验收 D-3（approve / reject）",
         "line": null,
-        "raw": ""
+        "raw": "",
+        "do": "accept",
+        "since": 1794056400.0,
+        "where": "mr",
+        "review": false
       },
-      "summary": "周报加上退款金额一栏（规模 S）。现在：Lean 在「发布」进行中，已交给团队运行机，等人在 MR 上回答验收问题。",
+      "summary": "退款回调失败自动重试，第 6 次转人工处理。",
       "credits": 31.0,
       "updated_at": 1794052800,
       "mr": {
@@ -138,7 +175,9 @@
       ],
       "expected_paths": [
         "src/callback/"
-      ]
+      ],
+      "local_only": false,
+      "session_url": null
     },
     {
       "repo": "r1",
@@ -152,21 +191,32 @@
       "branch": "ai/alice/PAY-7-refund-reason",
       "intent": "261106-refund-reason",
       "lean": {
-        "stage": "build-and-test",
-        "stage_label": "构建和测试",
-        "stage_n": 10,
+        "stage": "release",
+        "stage_label": "发布",
+        "stage_n": 11,
         "stage_state": "todo",
-        "done": 9,
-        "total": 11
+        "done": 10,
+        "total": 11,
+        "done_n": 4,
+        "skipped_n": 6,
+        "next": {
+          "id": "release",
+          "label": "发布",
+          "n": 11
+        }
       },
-      "stage": "10/11 构建和测试（下一步）",
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
       "waits": {
         "who": "you",
-        "text": "接手被拒：标签是 bob 打的，不是负责人 alice；run.json 里没有交接记录",
+        "text": "接手被拒：标签是 bob 打的，不是负责人 alice",
         "line": null,
-        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice; run.json has no hand-over (run `brain handoff`)"
+        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
+        "do": "redo_handoff",
+        "since": 1794129840.0,
+        "where": "session",
+        "review": false
       },
-      "summary": "退款超过一万要两人复核（规模 M）。现在：Lean 在「构建测试」做完，已交给团队运行机。",
+      "summary": "退款时选原因，原因列表在后台维护。",
       "credits": 18.2,
       "updated_at": 1794128400,
       "mr": {
@@ -181,7 +231,9 @@
       "open_questions": [],
       "expected_paths": [
         "web/refund/"
-      ]
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-7-2b9f"
     },
     {
       "repo": "r1",
@@ -200,14 +252,25 @@
         "stage_n": null,
         "stage_state": null,
         "done": 0,
-        "total": 11
+        "total": 11,
+        "done_n": 0,
+        "skipped_n": 0,
+        "next": {
+          "id": "reverse-engineering",
+          "label": "逆向工程",
+          "n": 1
+        }
       },
       "stage": null,
       "waits": {
         "who": "people",
-        "text": "已认领，还没开工",
+        "text": "等 carol 开工",
         "line": null,
-        "raw": ""
+        "raw": "",
+        "do": "start",
+        "since": 1793973600.0,
+        "where": "app",
+        "review": false
       },
       "summary": null,
       "credits": null,
@@ -218,7 +281,9 @@
       "sessions": 0,
       "overlap": [],
       "open_questions": [],
-      "expected_paths": []
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
     },
     {
       "repo": "r1",
@@ -237,16 +302,23 @@
         "stage_n": 11,
         "stage_state": "done",
         "done": 11,
-        "total": 11
+        "total": 11,
+        "done_n": 5,
+        "skipped_n": 6,
+        "next": null
       },
-      "stage": "11/11 发布（做完）",
+      "stage": "做完 5 · 跳过 6 · 全部做完",
       "waits": {
         "who": "nobody",
-        "text": "已合并",
+        "text": "已合并，在观察合并后的 14 天（到 11-17）",
         "line": null,
-        "raw": ""
+        "raw": "",
+        "do": "watch",
+        "since": 1793661540.0,
+        "where": null,
+        "review": false
       },
-      "summary": "对账单按自然日切分（规模 S）。现在：Lean 在「发布」做完，已交给团队运行机，RELEASE 已批。",
+      "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
       "credits": 22.7,
       "updated_at": 1793663640,
       "mr": {
@@ -263,7 +335,9 @@
       "open_questions": [],
       "expected_paths": [
         "src/refund/id.py"
-      ]
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-2-1c4e"
     }
   ],
   "overlaps": [
@@ -288,27 +362,27 @@
       },
       {
         "id": "check",
-        "label": "确定性检查",
+        "label": "检查定的",
         "count": 5
       },
       {
         "id": "brain",
-        "label": "Brain 条目（引用）",
+        "label": "照 Brain",
         "count": 3
       },
       {
         "id": "agent",
-        "label": "agent 自己定（权限内）",
+        "label": "AI 自己定的",
         "count": 1
       },
       {
         "id": "unclassified",
-        "label": "没归类（Who 不是规定的写法）",
+        "label": "没归类",
         "count": 1
       },
       {
         "id": "unknown",
-        "label": "看不出（Who 空着）",
+        "label": "看不出是谁定的",
         "count": 1
       }
     ],
@@ -328,7 +402,7 @@
   "eval": {
     "available": true,
     "error": "",
-    "ref": "main",
+    "ref": "远端的 main 分支",
     "metrics": [
       {
         "id": "autonomy",
@@ -394,7 +468,7 @@
         "intent": "261105-merchant-split",
         "reasons": [
           "验收被驳回 1 次",
-          "判断点之外有人介入 2 次（push_after_handover）"
+          "判断点之外有人介入 2 次（交接后推代码）"
         ]
       }
     ],
@@ -407,7 +481,8 @@
     "notes": [
       "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
       "PAY-2：已知交付有问题，14 天还没满，先不算"
-    ]
+    ],
+    "raw": ""
   },
   "counts": {
     "claimed": 1,
@@ -423,13 +498,13 @@
   "errors": [
     {
       "repo": "r2",
-      "error": "还没装 brain-kit（没有 .brain/kit.json）：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
     }
   ],
   "cto": {
     "available": true,
-    "sentence": "交给运行机的 1 个需求里，0 个交接以后没人插手就做完了；人介入 5 次，5 次落在判断点上；每个需求平均 21.1 credits。",
-    "ref": "origin/main",
+    "sentence": "交给运行机的 1 个需求里，0 个交接以后没人插手就做完了。人介入了 5 次（本机做的也算），5 次落在判断点上。有 credits 的 4 个需求，平均每个 21.1 credits。",
+    "ref": "远端的 main 分支",
     "unattended": [
       0,
       1

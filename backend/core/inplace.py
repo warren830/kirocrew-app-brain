@@ -26,15 +26,14 @@ from .constants import GIT_BIN
 from .importer import (GIT_TIMEOUT_S, KIT, ImportFail, Records, choices, default_branch, git_failure, last_lines,
                        origin_of, quiet_env, run_quiet, status_map, symlinks_on_targets, tail, touches, write_targets)
 from .installer import (COMMIT_TIMEOUT_S, DOCTOR_TIMEOUT_S, INSTALL_TIMEOUT_S, LEAN_AUDIT, MAX_FILES, PUSH_TIMEOUT_S,
-                        UP_TO_DATE, _kit_of, brain_env, commit_failure, commit_message, doctor_rows, kit_data, kit_form,
-                        kit_line)
+                        UP_TO_DATE, _kit_of, brain_env, commit_failure, commit_message, doctor_rows, install_branch_ok,
+                        kit_data, kit_form, kit_line, worktrees_of)
 from .intake import brain_cmd
 from .repo import Git
 
-INSTALL_STEPS = (("check", "看能不能直接装"), ("install", "跑 brain install"), ("kit", "写 kit.json"),
-                 ("doctor", "跑 brain doctor"), ("commit", "提交"))
-UPGRADE_STEPS = (("check", "看能不能直接装"), ("install", "跑 brain install（更新 kit 文件）"), ("doctor", "跑 brain doctor"),
-                 ("commit", "提交"))
+INSTALL_STEPS = (("check", "看能不能直接装"), ("install", "装 brain-kit 的文件"), ("kit", "写这个仓库的设置"),
+                 ("doctor", "自检"), ("commit", "提交"))
+UPGRADE_STEPS = (("check", "看能不能直接装"), ("install", "更新 kit 文件"), ("doctor", "自检"), ("commit", "提交"))
 MAX_WATCH = 2000      # the person's uncommitted files watched for a change during the install (size, mtime)
 
 
@@ -103,6 +102,8 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
     upgrade; the record lives only until the commit went through."""
     upgrade = purpose == "upgrade"
     g = Git(top)
+    stuck = records.get(top)       # an earlier install on a branch that could not go in: dropped after this commit
+    stuck = stuck if not upgrade and isinstance(stuck, dict) and stuck.get("mode") != "inplace" else None
     origin = origin_of(g)
     head = g.out("rev-parse", "-q", "--verify", "HEAD^{commit}") or None
     cur = g.out("symbolic-ref", "-q", "--short", "HEAD")
@@ -186,7 +187,7 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
     fails = sum(1 for r in rows if r["level"] == "FAIL")
     warns = sum(1 for r in rows if r["level"] == "WARN")
     if not rows:
-        step("doctor", "warn", "brain doctor 没给出结果（退出码 %d）" % p.returncode)
+        step("doctor", "warn", "自检没给出结果（退出码 %d）" % p.returncode)
     else:
         step("doctor", "warn" if fails else "ok", "%d 项通过，%d 项注意，%d 项没过" % (len(rows) - fails - warns, warns, fails))
 
@@ -209,11 +210,35 @@ def install(top: str, kit: dict[str, str] | None, records: Records, step: Callab
                                                                    "fail": fails},
                       "at": time.time(), "pushed": False, "commit": None, "brainkit": bk.info().get("version")})
     res["commit"] = commit(top, records, step, purpose=purpose)
+    if stuck and res["commit"]["ok"]:
+        gone = drop_branch_install(top, stuck, c["target"])
+        if gone:
+            res["commit"]["text"] += "\n另外删掉了没推送的那次安装：%s。" % "、".join(gone)
     if moved:
         res["commit"]["text"] += "\n另外：你没提交的 %s 在安装时变了，没提交它，看一下。" % "、".join(moved[:5])
     if upgrade:
         res["text"] = done_text(res)
     return res
+
+
+def drop_branch_install(top: str, rec: dict[str, Any], default: str) -> list[str]:
+    """The install branch (and its worktree) of an earlier install that could not be merged, once brain-kit is
+    committed in place: only the app's own branch, only when it was never pushed; its worktree only when clean (no
+    --force). What went, said in words."""
+    g = Git(top)
+    b, wt = str(rec.get("branch") or ""), rec.get("worktree")
+    if rec.get("pushed") or rec.get("mr_url") or not install_branch_ok(b, default):
+        return []
+    if g.ok("rev-parse", "-q", "--verify", "refs/remotes/origin/" + b):
+        return []
+    gone = []
+    if wt and os.path.isdir(wt) and os.path.realpath(wt) in worktrees_of(top):
+        if g.run("worktree", "remove", wt, timeout=60).returncode != 0:
+            return gone            # a change in it: the branch stays with it
+        gone.append("工作目录 %s" % wt)
+    if g.ok("rev-parse", "-q", "--verify", "refs/heads/" + b) and g.run("branch", "-D", b, timeout=30).returncode == 0:
+        gone.append("分支 %s" % b)
+    return gone
 
 
 def done_text(res: dict[str, Any]) -> str:

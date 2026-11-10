@@ -29,7 +29,7 @@ def test_saving_settings_reloads_repos_and_reports_bad_ones(tmp_path, home):
     assert first["repos"] == [] and first["brainkit"]["ok"] and first["brainkit"]["modules"]["trace"] is True
     st = saved["status"]
     assert [r["ok"] for r in st["repos"]] == [True, False] and st["repos"][0]["kit"]["req_prefix"] == "PAY"
-    assert "kit.json" in st["repos"][1]["error"]
+    assert "还没装 brain-kit" in st["repos"][1]["error"] and "导入仓库" in st["repos"][1]["error"]
     assert json.loads((tmp_path / "data" / "settings.json").read_text())["repos"][1] == str(plain.resolve())
     assert view["errors"] and view["errors"][0]["repo"] == "r2"
 

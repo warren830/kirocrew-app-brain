@@ -1,12 +1,13 @@
 """开需求: the five gates' dry run (brain-kit's findings verbatim), the start in its own worktree, the brain-dev
 session (strict agent, in the worktree, a kickoff of ids only), and the refusals."""
 
+import asyncio
 import json
 
 import pytest
 
 from appkit import mod
-from brainfix import FakeGateway, install_brain_dev, make_project, make_service, needs_brainkit, run
+from brainfix import FakeGateway, brain, install_brain_dev, make_project, make_service, needs_brainkit, run, sh
 
 pytestmark = needs_brainkit
 AppError = mod("httpkit").AppError
@@ -45,14 +46,72 @@ def test_the_dry_run_lists_every_finding_verbatim_and_what_would_stop_the_start(
 
     (tmp_path / "b").mkdir(), (tmp_path / "c").mkdir(), (tmp_path / "d").mkdir()
     nxt, first, fixed, unsure, no_consent = run(go())
-    assert nxt == {"repo": "r1", "key": "PAY-1", "tracker": "none", "prefix": "PAY", "error": ""}
-    assert first["ok"] is False and any(b.startswith("门 3：") for b in first["blocking"])
+    assert nxt == {"repo": "r1", "key": "PAY-1", "tracker": "none", "prefix": "PAY", "error": "",
+                   "allow_confidential": False, "push": None}
+    # what stops it is said as what to do on the page; brain-kit's words (its CLI flags) only in blocking_raw
+    assert first["ok"] is False and first["blocking"][0].startswith("第 3 关：找到金额")
+    assert "在第 3 关选「原样保留」或「换成占位符」" in first["blocking"][0] and "--business" not in first["blocking"][0]
+    assert first["blocking_raw"][0].startswith("门 3：") and "--business" in first["blocking_raw"][0]
     assert first["findings"] and first["findings"][0].startswith("- **D01 ")
     assert fixed["ok"] is True and not fixed["blocking"] and "个人信息（已打码）" in fixed["findings"][0]
+    assert fixed["files"][0]["name"].endswith("退款需求.md") and "电话 1 处：已打码" in fixed["files"][0]["items"]
     assert fixed["package"] == "PKG-PAY-1-1" and fixed["classification"] == "internal" and fixed["segments"] >= 1
-    assert unsure["ok"] is False and any(b.startswith("门 2：") for b in unsure["blocking"])
-    assert no_consent["error"].startswith("门 1")
+    assert unsure["ok"] is False and unsure["blocking"][0].startswith("第 2 关：这个仓库不收机密材料（你选的是「不确定」）")
+    assert "allow_confidential" not in unsure["blocking"][0] and "--exclude" not in unsure["blocking"][0]
+    assert no_consent["error"] == "第 1 关：勾上「我是作者，或已取得作者同意」"
     assert "13812345678" not in json.dumps([first, fixed])  # the masked value never comes back
+
+
+def test_a_requirement_claimed_already_is_started_with_its_own_key(tmp_path, home):
+    """需求看板 / 需求详情 send a claimed requirement to 开需求 with its key: `brain start --key` takes the person's own
+    claim (no new key); someone else's says whose it is, in words."""
+    repo = make_project(tmp_path)
+    brain(repo, "claim", "--title", "只认领")                        # PAY-1, alice's
+    brain(repo, "claim", "--title", "鲍勃的", env={"BRAIN_USER": "bob"})  # PAY-2, bob's
+    svc = make_service(tmp_path, [repo])
+    start = {"repo": "r1", "slug": "refund", "docs": [], "paths": [], "open_session": False, "trust": True}
+
+    async def go():
+        await svc.start()
+        try:
+            nxt = await svc.intake_next("r1")
+            mine = await svc.intake_start(dict(start, key="PAY-1", title="只认领"))
+            theirs = await svc.intake_start(dict(start, key="PAY-2", title="鲍勃的", slug="other"))
+            return nxt, mine, theirs
+        finally:
+            await svc.stop()
+
+    nxt, mine, theirs = run(go())
+    assert nxt["key"] == "PAY-3"
+    assert mine["ok"] and mine["key"] == "PAY-1" and mine["branch"] == "ai/alice/PAY-1-refund"
+    assert theirs["ok"] is False and theirs["problem"]["text"] == "PAY-2 是 bob 认领的"
+    assert "只有 bob 能开工" in theirs["problem"]["todo"] and "claimed by bob" in theirs["problem"]["raw"]
+    assert theirs["me"] is None          # who you are is not the question here: 你是谁 is not asked
+
+
+def test_an_install_in_place_not_pushed_yet_asks_for_the_push_before_a_start(tmp_path, home):
+    """`brain start` branches from origin's default branch: brain-kit committed on main here only is not there yet."""
+    repo = make_project(tmp_path, origin=True)
+    sh("git", "-C", repo, "reset", "-q", "--hard", "HEAD~1")              # origin/main before brain-kit…
+    sh("git", "-C", repo, "push", "-q", "--force", "origin", "main")
+    sh("git", "-C", repo, "reset", "-q", "--hard", "HEAD@{1}")            # …and main here with it
+    sh("git", "-C", repo, "fetch", "-q", "origin")
+    svc = make_service(tmp_path, [repo])
+
+    async def go():
+        await svc.start()
+        try:
+            before = await svc.intake_next("r1")
+            sh("git", "-C", repo, "push", "-q", "origin", "main")
+            sh("git", "-C", repo, "fetch", "-q", "origin")
+            after = await svc.intake_next("r1")
+            return before, after
+        finally:
+            await svc.stop()
+
+    before, after = run(go())
+    assert before["push"] == {"branch": "main", "remote_url": sh("git", "-C", repo, "remote", "get-url", "origin").stdout.strip()}
+    assert after["push"] is None
 
 
 def test_start_makes_a_worktree_runs_brain_start_and_opens_brain_dev_there(tmp_path, home):

@@ -179,13 +179,23 @@ def _human_label(h: dict[str, Any]) -> str:
     return str(kind or "人")
 
 
+# brainkit.trace's hand-over records and the bridge's question states, said as the board says them
+HANDOVER_LABEL = {"requested": "交接", "voucher": "签名服务签了接手合同", "bridge accepted": "桥接手了",
+                  "bridge rejected": "桥拒绝接手"}
+DECISION_SAID = {"open": "%s 在 MR 上问人", "posting": "%s 等桥贴到 MR 上", "asking": "%s 等桥贴到 MR 上",
+                 "answered": "%s 回答了", "delivered": "%s 回答了，桥签好送回运行机", "delivery_unknown": "%s 回答了，送没送到不清楚",
+                 "refused": "%s 的回答签名服务不签", "void": "%s 作废了", "invalid": "%s 发不出去"}
+
+
 def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
     """Timeline items from brainkit.trace.build's record (who is a username, a pseudonym or a role, never an email)."""
     items = []
     for s in t.get("stages") or []:
+        stage, _, unit = str(s.get("id", "")).partition("/")     # brainkit.trace: <stage>/<unit> for a unit's stage
         items.append({"at": s.get("at"), "kind": "stage",
-                      "label": "%s：%s" % (lean_view.STAGE_LABEL.get(str(s.get("id", "")).split("/")[0], s.get("id")),
-                                          {"started": "开始", "done": "完成", "skipped": "跳过"}.get(s.get("state"), s.get("state"))),
+                      "label": "%s：%s" % (lean_view.STAGE_LABEL.get(stage, stage),
+                                          {"started": "开始", "done": "完成", "skipped": "跳过"}.get(s.get("state"), s.get("state")))
+                      + ("（%s）" % unit if unit else ""),
                       "detail": s.get("note"), "who": None, "src": s.get("src")})
     for h in t.get("humans") or []:
         items.append({"at": h.get("at"), "kind": "human", "label": _human_label(h), "detail": h.get("voucher_id"),
@@ -200,23 +210,26 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                       "label": ("运行机提交" if c.get("by") == "bot" else "提交") + ("（只改记录）" if c.get("records_only") else ""),
                       "detail": detail, "who": c.get("who"), "src": c.get("src")})
     for b in a.get("blocked") or []:
-        items.append({"at": b.get("at"), "kind": "blocked", "label": "Lean 拦下（%s）" % (b.get("gate") or "?"),
+        items.append({"at": b.get("at"), "kind": "blocked", "label": "%s：%s" % (lean_view.BLOCKED, lean_view.block_rule(b.get("gate"))),
                       "detail": b.get("path") or b.get("tool"), "who": None, "src": b.get("src")})
     for h in a.get("handovers") or []:
-        label = {"requested": "交接", "voucher": "桥签了接手合同"}.get(h.get("kind"), "桥：%s" % h.get("kind"))
+        label = HANDOVER_LABEL.get(str(h.get("kind")), "桥记下了这次交接")
         items.append({"at": h.get("at"), "kind": "handover", "label": label,
-                      "detail": h.get("run_id") or h.get("reason") or h.get("commit"), "who": h.get("by"), "src": h.get("src")})
+                      "detail": h.get("run_id") or h.get("reason") or str(h.get("commit") or "")[:12] or None, "who": h.get("by"),
+                      "src": h.get("src")})
     for q in a.get("questions") or []:
+        what = KIND_LABEL.get(str(q.get("kind")), "问题")
         items.append({"at": q.get("at"), "kind": "question",
-                      "label": "park：%s（%s）" % (KIND_LABEL.get(str(q.get("kind")), q.get("kind") or "?"), q.get("status") or "?"),
+                      "label": "%s的问题回答了，接着做" % what if q.get("status") == "answered" else "停下问人：%s" % what,
                       "detail": q.get("lean_request"), "who": None, "src": q.get("src")})
     for d in t.get("decisions") or []:
         if d.get("source") == "bridge":
             items.append({"at": d.get("at") or d.get("asked_at"), "kind": "decision",
-                          "label": "%s %s" % (d.get("id"), d.get("state") or ""), "detail": d.get("choice"),
+                          "label": DECISION_SAID.get(str(d.get("state")), "%s 在 MR 上问人") % d.get("id"),
+                          "detail": d.get("choice"),
                           "who": d.get("who"), "src": ", ".join(d.get("src") or [])[:200] or None})
     for r in (t.get("checks") or {}).get("verify") or []:
-        items.append({"at": r.get("at"), "kind": "verify", "label": "verify %s" % ("通过" if r.get("ok") else "没过"),
+        items.append({"at": r.get("at"), "kind": "verify", "label": "自动检查%s" % ("通过" if r.get("ok") else "没过"),
                       "detail": None, "who": None, "src": r.get("src")})
     m = ((t.get("outcome") or {}).get("merged_at") or {})
     if m.get("value"):
@@ -241,19 +254,22 @@ def _iso_minute(ts: Any) -> str:
 
 def timeline(repo_path: str, cfg: dict[str, Any], key: str, *, ref: str | None, events: list[dict[str, Any]],
              credits: Any = None, ledger_path: str | None = None, vouchers_dir: str | None = None,
-             allowed_signers: str | None = None, app_events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+             allowed_signers: str | None = None, app_events: list[dict[str, Any]] | None = None,
+             has_run: bool = True) -> dict[str, Any]:
+    """The timeline: brainkit.trace's record, else the Lean ledger's. A requirement only claimed has no run to trace
+    (nothing recorded yet is not an error)."""
     out = {"source": "app", "items": [], "missing": [], "error": "", "brain": None, "cost": None, "trace": None}
-    if bk.has("trace"):
+    if has_run and bk.has("trace"):
         try:
             from .deliveries import _call
             t = _call(bk.m("trace").build, repo_path, cfg, key, ref=ref, ledger_path=ledger_path,
                       vouchers_dir=vouchers_dir, credits=credits, allowed_signers=allowed_signers)
             out.update(source="trace", items=trace_timeline(t), missing=[str(x)[:200] for x in t.get("missing") or []],
                        brain=t.get("brain"), cost=t.get("cost"), trace=t)
-        except Exception as exc:  # noqa: BLE001
-            out["error"] = "brainkit.trace 读不出这个需求：%s" % str(exc).split("\n", 1)[0][:200]
-    else:
-        out["error"] = "brain-kit 还没有 trace 模块：时间线只有 Lean 的记录"
+        except Exception:  # noqa: BLE001 - said in Chinese; the Lean ledger's items stand in
+            out["error"] = "brain-kit 读不出这个需求的完整记录：下面只有 Lean 自己记下的事"
+    elif has_run:
+        out["error"] = "brain-kit 还没有 trace 模块：时间线只有 Lean 的记录（在设置里换新一点的 brain-kit）"
     if out["source"] == "app":
         out["items"] = lean_view.stage_events(events)
     out["items"] += app_events or []

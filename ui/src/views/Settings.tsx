@@ -1,16 +1,19 @@
 /**
  * 设置, in the sample board's look: what the app sees (GET /status) as cards — brain-kit (found or not, its version and
- * modules), who this machine says you are (a token is only said to be there, never shown), the team runner's status;
- * each repo with its state, path and kit, 「移出列表」 (the app's list only: no file changes, after a confirm) and
- * 「导入仓库」 (how a repo gets in); KiroCrew's checks with their fix buttons — and the settings form in its own card:
- * where brain-kit is, where worktrees go, team mode (POST /settings, which keeps the repo list as it is).
+ * what its optional parts do), 你是谁 (a token is only said to be there, never shown), the team runner's status; each
+ * repo with its state (said by its reason), path and settings, 「移出列表」 (the app's list only: no file changes, after
+ * a confirm) and 「导入仓库」 (how a repo gets in); KiroCrew's checks with their fix buttons — and the settings form in
+ * its own card: where brain-kit is, where worktrees go, team mode (only a checkbox until it is on; POST /settings,
+ * which keeps the repo list as it is). Without a usable brain-kit, its place is asked first, at the top, with why and
+ * where to get one.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppApi } from '@kirocrew/app-sdk'
 import { paths, useAction, usePoll } from '../api'
 import { ago } from '../format'
 import type { RemoveResult, RepoInfo, Settings, Status } from '../types'
-import { CheckRows, Flow, IMPORT_FLOW, LEVEL_TONE, LoadState, MeLine, PendingRepo, RoleIcon } from '../ui'
+import { CheckRows, CommandLine, Flow, IMPORT_FLOW, LEVEL_TONE, LoadState, MeLine, PendingRepo, RoleIcon, brainkitProblem } from '../ui'
+import { ACT, MODULE_NAME, TRACKER_NAME } from '../vocab'
 import type { ViewProps } from './props'
 import { SIGNER_SAME_USER } from './Team'
 
@@ -22,16 +25,33 @@ type Form = Omit<Settings, 'repos'>
 const formOf = (s: Settings): Form => ({ brainkit: s.brainkit, work_root: s.work_root, team: { ...s.team } })
 const settingsOf = (f: Form): Form => ({ brainkit: f.brainkit.trim(), work_root: f.work_root.trim(), team: { ...f.team } })
 
+/** the team runner's two config files (brain-kit's bridge.json and runnerd.json): the field's label, what is typed */
 const TEAM_FIELDS: [Exclude<keyof Settings['team'], 'enabled' | 'dev_same_user'>, string, string][] = [
-  ['bridge_config', 'bridge 的配置', 'bridge.json'],
-  ['runnerd_config', 'runnerd 的配置', 'runnerd.json'],
+  ['bridge_config', '桥的配置文件', '…/bridge.json'],
+  ['runnerd_config', '运行机的配置文件', '…/runnerd.json'],
 ]
+
+/** A repo's state in one word, by its reason (RepoInfo.error is the backend's sentence). */
+export function repoWord(r: RepoInfo): { word: string; tone: 'ok' | 'wait' | 'bad' | 'idle' } {
+  if (r.ok) return { word: '能用', tone: 'ok' }
+  if (r.pending) return { word: r.pending.word || '在分支上', tone: 'wait' }
+  if (/还没装 brain-kit/.test(r.error)) return { word: '没装', tone: 'idle' }
+  if (/找不到这个目录/.test(r.error)) return { word: '找不到目录', tone: 'bad' }
+  if (/brain-kit 没装载/.test(r.error)) return { word: '等 brain-kit', tone: 'idle' }
+  if (/kit\.json|设置/.test(r.error)) return { word: '设置有问题', tone: 'bad' }
+  return { word: '读不了', tone: 'bad' }
+}
 
 export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps) {
   const api = useAppApi()
   const got = usePoll<Settings>(paths.settings(), 0)
   const [form, setForm] = useState<Form | null>(null)
   const [saved, setSaved] = useState(false)
+  const kitRef = useRef<HTMLInputElement | null>(null)
+  const noKit = !!status && !status.brainkit.ok
+  useEffect(() => {
+    if (noKit && form) kitRef.current?.focus()
+  }, [noKit, !!form]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (got.data && !form) setForm(formOf(got.data))
   }, [got.data]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -51,6 +71,46 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
   }
   const onImport = (path?: string) => go({ kind: 'import', ...(path ? { path } : {}) })
 
+  const kitField = form && (
+    <div className="br-field">
+      <label htmlFor="set-brainkit">brain-kit 在哪</label>
+      <input id="set-brainkit" ref={kitRef} type="text" className="br-mono" value={form.brainkit} onChange={(e) => edit({ brainkit: e.target.value })} />
+      <p className="br-hint">brain-kit 检出的目录（里面有 brainkit/）。app 只读它，不改它。</p>
+    </div>
+  )
+  const saveRow = (
+    <div className="br-row">
+      <button type="submit" className="br-btn is-primary" disabled={save.busy}>{save.busy ? '正在保存…' : '保存'}</button>
+      {saved && <span className="br-ok-text" role="status">已保存</span>}
+      {save.result && !save.result.ok && <span className="br-bad-text" role="status">没保存成：看上面的状态</span>}
+      {save.error && <span className="br-error" role="alert">{save.error}</span>}
+    </div>
+  )
+  const kitProblem = status && noKit ? brainkitProblem(status.brainkit.error, status.brainkit.path) : null
+  const kitCard = kitProblem && status && (
+    <section className="br-card st-kitfix is-bad" aria-label="找不到 brain-kit" data-testid="settings-no-brainkit">
+      <header>
+        <RoleIcon role="blocked" size={18} />
+        <h3>{kitProblem.text}</h3>
+        {status.brainkit.path && <code className="st-path" title={status.brainkit.path}>{status.brainkit.path}</code>}
+      </header>
+      <p className="st-kitfix-todo"><b>做什么</b>{kitProblem.todo}</p>
+      {kitProblem.cmd && <CommandLine cmd={kitProblem.cmd} />}
+      {form && (
+        <form className="br-form" onSubmit={(e) => { e.preventDefault(); void submit() }}>
+          {kitField}
+          {saveRow}
+        </form>
+      )}
+      {kitProblem.raw && (
+        <details className="br-raw">
+          <summary>细节：app 读 brain-kit 时的原话</summary>
+          <pre>{kitProblem.raw}</pre>
+        </details>
+      )}
+    </section>
+  )
+
   const formCard = (
     <section className="br-card st-form" aria-label="设置">
       <header>
@@ -62,15 +122,11 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
       {form && (
         <form className="br-form" onSubmit={(e) => { e.preventDefault(); void submit() }}>
           <div className="st-fields">
-            <div className="br-field">
-              <label htmlFor="set-brainkit">brain-kit 在哪</label>
-              <input id="set-brainkit" type="text" className="br-mono" value={form.brainkit} onChange={(e) => edit({ brainkit: e.target.value })} />
-              <p className="br-hint">app 只读它，不改它。</p>
-            </div>
+            {!kitCard && kitField}
             <div className="br-field">
               <label htmlFor="set-work">每个需求的工作目录放在哪</label>
               <input id="set-work" type="text" className="br-mono" value={form.work_root} onChange={(e) => edit({ work_root: e.target.value })} />
-              <p className="br-hint">要在 ~/workplace 或 ~/workspace 下面：KiroCrew 只让 agent 在那里干活。</p>
+              <p className="br-hint">要在 ~/workplace 或 ~/workspace 下面：KiroCrew 的会话只能在这两个目录里干活。</p>
             </div>
           </div>
           <fieldset className={`br-fieldset st-team${form.team.enabled ? ' is-on' : ''}`}>
@@ -80,29 +136,32 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
                 <input type="checkbox" aria-describedby="set-team-hint" checked={form.team.enabled} onChange={(e) => editTeam({ enabled: e.target.checked })} />
                 <b>这台机器是团队运行机</b>
               </label>
-              <p className="br-hint" id="set-team-hint">跑桥：看 MR 上的交接，派给运行机会话</p>
+              <p className="br-hint" id="set-team-hint">只有给团队跑交接的那台机器才勾：它看 MR 上的交接，派给运行机会话。普通组员不用管。</p>
             </div>
-            <div className="st-fields">
-              {TEAM_FIELDS.map(([k, label, hint]) => (
-                <div key={k} className="br-field">
-                  <label htmlFor={`set-${k}`}>{label}</label>
-                  <input id={`set-${k}`} type="text" className="br-mono" value={form.team[k]} placeholder={hint} onChange={(e) => editTeam({ [k]: e.target.value })} />
-                  {k === 'bridge_config' && <p className="br-hint">{BRIDGE_HINT}。签名服务的目录和公钥都写在这里面。</p>}
+            {form.team.enabled && (
+              <>
+                <div className="st-fields" data-testid="team-fields">
+                  {TEAM_FIELDS.map(([k, label, hint]) => (
+                    <div key={k} className="br-field">
+                      <label htmlFor={`set-${k}`}>{label}</label>
+                      <input id={`set-${k}`} type="text" className="br-mono" value={form.team[k]} placeholder={hint} onChange={(e) => editTeam({ [k]: e.target.value })} />
+                      <p className="br-hint">{k === 'bridge_config' ? '桥看 MR、发回答用的设置：签名服务的目录和公钥都写在这里面，不写签名私钥。' : '运行机派会话用的设置。'}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <label className="br-check">
-              <input type="checkbox" checked={form.team.dev_same_user} onChange={(e) => editTeam({ dev_same_user: e.target.checked })} />
-              <span>本机试用：签名器和 app 用同一个系统用户</span>
-            </label>
-            {form.team.dev_same_user && <p className="br-banner br-small" role="note" data-testid="same-user-warning">{SAME_USER_WARNING}</p>}
+                <details className="br-raw">
+                  <summary>细节：桥的配置文件里，签名服务那一段怎么写</summary>
+                  <pre>{BRIDGE_HINT}</pre>
+                </details>
+                <label className="br-check">
+                  <input type="checkbox" checked={form.team.dev_same_user} onChange={(e) => editTeam({ dev_same_user: e.target.checked })} />
+                  <span>本机试用：签名器和 app 用同一个系统用户</span>
+                </label>
+                {form.team.dev_same_user && <p className="br-banner br-small" role="note" data-testid="same-user-warning">{SAME_USER_WARNING}</p>}
+              </>
+            )}
           </fieldset>
-          <div className="br-row">
-            <button type="submit" className="br-btn is-primary" disabled={save.busy}>{save.busy ? '正在保存…' : '保存'}</button>
-            {saved && <span className="br-ok-text" role="status">已保存</span>}
-            {save.result && !save.result.ok && <span className="br-bad-text" role="status">没保存成：看上面的状态</span>}
-            {save.error && <span className="br-error" role="alert">{save.error}</span>}
-          </div>
+          {saveRow}
         </form>
       )}
     </section>
@@ -115,13 +174,14 @@ export function SettingsView({ status, setStatus, reloadStatus, go }: ViewProps)
         <RoleIcon role="settings" size={26} className="st-top-icon" />
         <div className="br-view-head">
           <h2>设置</h2>
-          <p>这台机器上的 app：brain-kit、你是谁、仓库、KiroCrew、团队运行机</p>
+          <p>这台机器上的 app：brain-kit、{ACT.me}、仓库、KiroCrew、团队运行机</p>
         </div>
       </header>
+      {kitCard}
       {status && <StatCards status={status} onTeam={() => go({ kind: 'team' })} />}
       <div className="st-main">
         <div className="st-col">
-          {status && <ReposCard repos={status.repos} onImport={onImport} onRemoved={setStatus} onChanged={reloadStatus} />}
+          {status && <ReposCard repos={status.repos} kitOk={status.brainkit.ok} onImport={onImport} onRemoved={setStatus} onChanged={reloadStatus} />}
           {formCard}
         </div>
         <div className="st-col">
@@ -151,22 +211,32 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
         </div>
         <div><span className="br-kpi-big">{s.brainkit.version ?? '—'}</span><span className="br-kpi-of">版本</span></div>
         <code className="st-path" title={s.brainkit.path}>{s.brainkit.path || '—'}</code>
-        <div className="st-mods" aria-label="模块">
-          {(Object.entries(s.brainkit.modules) as [string, boolean][]).map(([m, ok]) => (
-            <span key={m} className={`br-chip tone-${ok ? 'ok' : 'idle'}${ok ? '' : ' is-off'}`}><i aria-hidden="true">{ok ? '✓' : '–'}</i>{m} {yes(ok)}</span>
-          ))}
-        </div>
-        {s.brainkit.error && <p className="br-error br-small">{s.brainkit.error}</p>}
+        {s.brainkit.ok && (
+          <div className="st-mods" aria-label="能做的事">
+            {(Object.entries(s.brainkit.modules) as [string, boolean][]).map(([m, ok]) => (
+              <span key={m} className={`br-chip tone-${ok ? 'ok' : 'idle'}${ok ? '' : ' is-off'}`} title={m}><i aria-hidden="true">{ok ? '✓' : '–'}</i>{MODULE_NAME[m] ?? m} {yes(ok)}</span>
+            ))}
+          </div>
+        )}
+        {!s.brainkit.ok && <p className="br-bad-text br-small">{brainkitProblem(s.brainkit.error).text}：在上面改</p>}
       </section>
 
-      <section className={`br-kpi st-stat ${user && !asks ? 'is-good' : 'is-warn'}`} aria-label="我是谁">
+      <section className={`br-kpi st-stat ${user && !asks ? 'is-good' : 'is-warn'}`} aria-label={ACT.me}>
         <div className="st-stat-head">
           <RoleIcon role="person" size={18} />
-          <span className="br-kpi-label">我是谁</span>
+          <span className="br-kpi-label">{ACT.me}</span>
         </div>
         <div><span className="br-kpi-big st-user">{user || '没设置'}</span></div>
-        {asks > 0 && <p className="br-warn-text br-small">{asks} 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」里填上</p>}
-        {!user && !s.repos.some((r) => r.me) && <p className="br-warn-text br-small">在终端里：<code>git config --global brain.user 你的用户名</code></p>}
+        {asks > 0 && <p className="br-warn-text br-small">{asks} 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」那一行看一眼名字，点「保存」</p>}
+        {!user && !s.repos.some((r) => r.me) && (
+          <div className="st-ask">
+            <p className="br-warn-text br-small">导入仓库时会问你的名字，在那里填上，点「保存」。</p>
+            <details className="br-raw">
+              <summary>细节：在终端里一次设好（把最后的名字换成你的 GitLab 用户名）</summary>
+              <CommandLine cmd="git config --global brain.user 你的用户名" />
+            </details>
+          </div>
+        )}
         <div className="st-mods">
           <span className={`br-chip tone-${s.me.token ? 'ok' : 'warn'}`}><i aria-hidden="true">{s.me.token ? '✓' : '!'}</i>GitLab token {yes(s.me.token)}</span>
         </div>
@@ -188,20 +258,26 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
               <span className={`br-chip tone-${s.team.signer.refused ? 'bad' : 'idle'}`}>拒签 {s.team.signer.refused}</span>
               <button type="button" className="br-btn is-small" onClick={onTeam}>看运行机</button>
             </div>
-            {s.team.loop_error && <p className="br-bad-text br-pre br-small"><b>上一轮出错：</b>{s.team.loop_error}</p>}
+            {s.team.loop_error && (
+              <div className="st-ask">
+                <p className="br-bad-text br-small">上一轮有一步没成：点「看运行机」看是哪一步</p>
+                <details className="br-raw"><summary>细节</summary><pre>{s.team.loop_error}</pre></details>
+              </div>
+            )}
           </>
         ) : (
-          <div className="br-kpi-note st-how">这台机器只在本机开发。要当团队运行机，在下面的设置里打开团队模式。</div>
+          <div className="br-kpi-note st-how">这台机器只在本机开发，不用开。</div>
         )}
         {s.team.same_user && <p className="br-warn-text br-small" role="alert">{SIGNER_SAME_USER}</p>}
-        {s.team.error && <p className="br-error br-small">{s.team.error}</p>}
+        {s.team.enabled && s.team.error && <p className="br-error br-small">{s.team.error}</p>}
       </section>
     </div>
   )
 }
 
-function ReposCard({ repos, onImport, onRemoved, onChanged }: {
+function ReposCard({ repos, kitOk, onImport, onRemoved, onChanged }: {
   repos: RepoInfo[]
+  kitOk: boolean
   onImport: (path?: string) => void
   onRemoved: (s: Status) => void
   onChanged: () => void
@@ -223,7 +299,7 @@ function ReposCard({ repos, onImport, onRemoved, onChanged }: {
         </div>
       ) : (
         <ul className="st-repos">
-          {repos.map((r) => <RepoRow key={r.path} r={r} onImport={onImport} onRemoved={onRemoved} onChanged={onChanged} />)}
+          {repos.map((r) => <RepoRow key={r.path} r={r} kitOk={kitOk} onImport={onImport} onRemoved={onRemoved} onChanged={onChanged} />)}
         </ul>
       )}
     </section>
@@ -231,9 +307,11 @@ function ReposCard({ repos, onImport, onRemoved, onChanged }: {
 }
 
 /** One repo of the list: whether the app can use it, why not, what waits (the install branch), and 「移出列表」 after a
- * confirm that says what it does (the app's list only: no file, branch or worktree changes). */
-function RepoRow({ r, onImport, onRemoved, onChanged }: {
+ * confirm that says what it does (the app's list only: no file, branch or worktree changes). Without brain-kit
+ * (*kitOk* false) nothing can be read or installed: its place, at the top, is the one thing to do. */
+function RepoRow({ r, kitOk, onImport, onRemoved, onChanged }: {
   r: RepoInfo
+  kitOk: boolean
   onImport: (path?: string) => void
   onRemoved: (s: Status) => void
   onChanged: () => void
@@ -245,34 +323,47 @@ function RepoRow({ r, onImport, onRemoved, onChanged }: {
     const x = await rm.run()
     if (x) onRemoved(x.status)
   }
-  const state = r.ok ? 'ok' : r.pending ? 'wait' : 'bad'
+  const { word, tone } = repoWord(r)
+  const state = r.ok ? 'ok' : r.pending ? 'wait' : tone === 'idle' ? 'idle' : 'bad'
+  const waitsForKit = !kitOk && tone === 'idle'
   return (
     <li className={`st-repo is-${state}`} data-repo={r.id}>
       <div className="st-repo-top">
         <span className="st-repo-icon"><RoleIcon role="file" size={18} /></span>
-        <b className="st-repo-name">{r.name}</b>
-        <span className={`br-chip tone-${state}`}>{r.ok ? '能用' : r.pending ? r.pending.word || '在分支上' : '读不到'}</span>
-        <code className="st-path" title={r.path}>{r.path}</code>
-        <span className="br-grow" />
-        {!asking && <button type="button" className="br-btn is-small" onClick={() => setAsking(true)}>移出列表</button>}
+        <div className="st-repo-id">
+          <span className="st-repo-line">
+            <b className="st-repo-name">{r.name}</b>
+            <span className={`br-chip tone-${tone}`}>{word}</span>
+          </span>
+          <code className="st-path" title={r.path}>{r.path}</code>
+        </div>
+        {!asking && <button type="button" className="br-btn is-small st-repo-rm" onClick={() => setAsking(true)}>移出列表</button>}
       </div>
       {r.kit && (
         <div className="st-kit">
           <span className="br-tag">需求号 <b>{r.kit.req_prefix}-n</b></span>
-          <span className="br-tag">跟踪 <b>{r.kit.tracker}</b></span>
+          <span className="br-tag">跟踪 <b>{TRACKER_NAME[r.kit.tracker] ?? r.kit.tracker}</b></span>
           <span className="br-tag">默认分支 <b>{r.kit.default_branch}</b></span>
-          <span className="br-tag" title={r.kit.gitlab_base}>GitLab <b>{r.kit.gitlab_project}</b></span>
+          {r.kit.gitlab_project
+            ? <span className="br-tag" title={r.kit.gitlab_base}>GitLab <b>{r.kit.gitlab_project}</b></span>
+            : <span className="br-tag">不用 GitLab</span>}
         </div>
       )}
       {r.error && (
         <div className="st-repo-why">
-          <span className="br-bad-text">{r.error}</span>
-          <button type="button" className="br-btn is-small" onClick={() => onImport(r.path)}>去检查</button>
+          {waitsForKit || /没装载/.test(r.error)
+            ? <span className="br-dim" data-testid="repo-waits-kit">{word === '没装' ? '还没装 brain-kit：先在最上面写对 brain-kit 的位置，才能装' : 'brain-kit 没装载：先在最上面写对 brain-kit 的位置，这个仓库就能读了'}</span>
+            : (
+              <>
+                <span className={tone === 'bad' ? 'br-bad-text' : 'br-dim'}>{r.error}</span>
+                <button type="button" className="br-btn is-small" onClick={() => onImport(r.path)}>{tone === 'idle' ? '去装' : '去检查'}</button>
+              </>
+            )}
         </div>
       )}
       {r.pending && <PendingRepo repo={r} onOpen={() => onImport(r.path)} onDone={onChanged} />}
       {r.me && (
-        <div className="st-me"><span className="br-dim br-small">你是谁</span><MeLine path={r.path} me={r.me} onSaved={(x) => onRemoved(x.status)} /></div>
+        <div className="st-me"><span className="br-dim br-small">{ACT.me}</span><MeLine path={r.path} me={r.me} onSaved={(x) => onRemoved(x.status)} /></div>
       )}
       {asking && (
         <div className="br-confirm is-danger" role="group" aria-label={`移出 ${r.name}`}>
@@ -314,10 +405,11 @@ function CrewCard({ crew, onFixed }: { crew: Status['crew']; onFixed: () => void
 }
 
 const ST_CSS = `
+.st-root { container: st / inline-size; }
 .st-top { display: flex; align-items: center; gap: .6em 1em; flex-wrap: wrap; }
 .st-top-icon { color: var(--accent); }
 .st-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 1100px) { .st-stats { grid-template-columns: minmax(0, 1fr); } }
+@container st (max-width: 900px) { .st-stats { grid-template-columns: minmax(0, 1fr); } }
 .st-stat { gap: .5em; }
 .st-stat.is-good { border-color: var(--kit-ok); }
 .st-stat.is-broken { border-color: var(--kit-bad); }
@@ -333,7 +425,7 @@ const ST_CSS = `
 .st-mods .br-chip.is-off { opacity: .75; border-style: dashed; }
 .st-how { white-space: normal; }
 .st-main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: var(--kit-gap-block, 16px); align-items: start; }
-@media (max-width: 1100px) { .st-main { grid-template-columns: minmax(0, 1fr); } }
+@container st (max-width: 1000px) { .st-main { grid-template-columns: minmax(0, 1fr); } }
 .st-col { display: grid; gap: var(--kit-gap-block, 16px); min-width: 0; align-content: start; }
 .st-repos { list-style: none; margin: 0; padding: 0; display: grid; gap: .6em; }
 .st-repo { display: grid; gap: .5em; padding: .75em .9em; border-radius: var(--kit-r-cell, 10px); border: 1px solid var(--border); background: var(--bg-elevated, var(--card));
@@ -341,10 +433,19 @@ const ST_CSS = `
 .st-repo.is-ok { --st-c: var(--kt-ok); }
 .st-repo.is-wait { --st-c: var(--kt-approve); border-color: var(--kit-wait); }
 .st-repo.is-bad { --st-c: var(--kt-bad); border-color: var(--kit-bad); }
-.st-repo-top { display: flex; align-items: center; gap: .4em .7em; flex-wrap: wrap; min-width: 0; }
-.st-repo-icon { display: inline-grid; place-items: center; color: var(--st-c, var(--muted)); }
+.st-repo.is-idle { --st-c: var(--muted); }
+.st-repo-top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: .2em .7em; min-width: 0; }
+.st-repo-icon { display: inline-grid; place-items: center; color: var(--st-c, var(--muted)); padding-top: .15em; }
+.st-repo-id { display: grid; gap: .15em; min-width: 0; }
+.st-repo-line { display: flex; align-items: center; gap: .4em .7em; flex-wrap: wrap; min-width: 0; }
 .st-repo-name { color: var(--text-strong); font-size: 1.05em; }
-.st-repo-top .st-path { flex: 0 1 auto; max-width: 28em; }
+.st-repo-rm { align-self: start; }
+.st-kitfix { gap: .7em; }
+.st-kitfix header h3 { color: var(--kt-bad); }
+.st-kitfix-todo { margin: 0; }
+.st-kitfix-todo b { color: var(--muted); font-weight: 650; margin-right: .5em; }
+.st-ask { display: grid; gap: .35em; justify-items: start; }
+.st-ask p { margin: 0; }
 .st-kit { display: flex; flex-wrap: wrap; gap: .35em; }
 .st-kit .br-tag { color: var(--muted); }
 .st-kit .br-tag b { color: var(--text-strong); font-weight: 650; margin-left: .3em; }

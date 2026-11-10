@@ -2,6 +2,8 @@
 cli.runner_kit_problems, crew_hook_problem, doctor_checks, crew_checks, mrdesc.write_problem / exclude_fix, brainlint,
 the bridge's verify, the signer), the fallbacks, the levels, and the runner-only severity. No brain-kit, no git."""
 
+import re
+
 import pytest
 
 from appkit import mod
@@ -38,9 +40,23 @@ def test_the_older_adapter_is_fail_for_a_team_repo_and_a_reminder_for_a_local_on
     assert team["text"] == local["text"] == ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）"
     assert (team["level"], local["level"], unknown["level"]) == ("FAIL", "WARN", "FAIL")
     assert team["fix"] == local["fix"] == "kit" and team["repo"] == REPO
-    assert "park.json" in team["todo"] and "修复" in team["todo"]
-    assert local["todo"].startswith("只有把需求交给运行机时才要紧") and "修复" in local["todo"]
+    assert "没法停下来问人" in team["todo"] and "点「重装 kit 文件」" in team["todo"]
+    # a repo done only here: what this machine's own sessions lack, never the runner's park.json
+    assert "不会拦下工具调用" in local["todo"] and "park.json" not in local["todo"] and "运行机" not in local["todo"]
+    assert "点「重装 kit 文件」" in local["todo"]
     assert team["raw"] == local["raw"] == OLDER                 # brain-kit's words, never dropped
+
+
+def test_an_adapter_that_can_ask_already_is_said_by_what_it_still_lacks():
+    """oms-brain's (version 2, brain-kit wants 3): the run can ask a person; what is missing is the refusal after the
+    kit's own files changed. Saying 「写不了 park.json」 there would be wrong."""
+    raw = (".kiro/brain/lean-hook.py is an older adapter (version 2, needs 3): it does not refuse tool calls after the kit's "
+           "own files (.kiro/, .brain/kit.json, gates/) were changed; run `brain install` and commit it on main through an MR")
+    team = ok_row(P.row("FAIL", raw, repo=REPO, team=True))
+    local = ok_row(P.row("FAIL", raw, repo=REPO, team=False))
+    assert team["text"] == ".kiro/brain/lean-hook.py 是旧版（第 2 版，要第 3 版）"
+    for r in (team, local):
+        assert "不会拦下工具调用" in r["todo"] and "park.json" not in r["todo"] and "点「重装 kit 文件」" in r["todo"]
 
 
 def test_the_users_example_with_the_apps_older_prefix_is_mapped_too():
@@ -59,7 +75,7 @@ def test_not_committed_is_fail_everywhere_with_the_kit_fix(raw, text):
     for team in (True, False, None):
         r = ok_row(P.row("FAIL", raw, repo=REPO, team=team))
         assert (r["level"], r["text"], r["fix"], r["raw"]) == ("FAIL", text, "kit", raw)
-        assert "默认分支" in r["todo"] and "修复" in r["todo"]
+        assert "默认分支" in r["todo"] and "点「重装 kit 文件」" in r["todo"]
 
 
 def test_lean_counting_the_run_records_as_code():
@@ -86,10 +102,9 @@ def test_the_handoff_refusals_brain_prints():
 # ---- brain doctor's lines (doctor_checks, crew_checks) --------------------------------------------------------------- #
 
 DOCTOR = [
-    ("OK", "kit config valid (.brain/kit.json), tracker none, keys PAY-<n>", "kit.json 没问题（需求号 PAY-n，跟踪 none）", None),
+    ("OK", "kit config valid (.brain/kit.json), tracker none, keys PAY-<n>", "这个仓库的 brain-kit 设置没问题（需求号 PAY-n，不用 Jira）",
+     None),
     ("OK", "AI-DLC Lean doctor: ok", "AI-DLC Lean 自检通过", None),
-    ("WARN", "AI-DLC Lean doctor: hooks have never run here: start `kiro-cli --v3` in this folder and trust the workspace",
-     "Lean 的 hook 在这里还没跑过", None),
     ("WARN", "AI-DLC Lean doctor: something else Lean says", "AI-DLC Lean 自检有提醒", None),
     ("OK", "Lean does not count runs/ as code (aidlc-docs/lean.json fingerprint_exclude)", "Lean 不把 runs/ 下的记录算成代码",
      None),
@@ -112,10 +127,10 @@ DOCTOR = [
     ("FAIL", "AGENTS.md at repo root", "仓库根目录没有 AGENTS.md", "kit"),
     ("OK", ".brain-materials/ is git-ignored (materials never get committed)", ".brain-materials/ 不进 git", None),
     ("FAIL", ".brain-materials/ is git-ignored (materials never get committed)", ".brain-materials/ 没被 git 忽略", "kit"),
-    ("WARN", "cannot fetch origin/main: Brain freshness unknown", "取不到 origin/main：不知道 Brain 是不是最新", None),
-    ("OK", "Brain vs origin/main: same", "Brain 和 origin/main 一样", None),
-    ("WARN", "Brain vs origin/main: differs, merge or rebase", "Brain 和 origin/main 不一样", None),
-    ("WARN", "no origin remote: Brain freshness not checked", "没有 origin：没查 Brain 是不是最新", None),
+    ("WARN", "cannot fetch origin/main: Brain freshness unknown", "取不到远端的 main：不知道 Brain 是不是最新", None),
+    ("OK", "Brain vs origin/main: same", "Brain 和远端 main 上的一样", None),
+    ("WARN", "Brain vs origin/main: differs, merge or rebase", "Brain 和远端 main 上的不一样", None),
+    ("WARN", "no origin remote: Brain freshness not checked", "没有远端：没查 Brain 是不是最新", None),
     ("WARN", "kiro-cli not found on PATH", "PATH 里找不到 kiro-cli", None),
     ("WARN", "kirocrew not found on PATH", "PATH 里找不到 kirocrew", None),
     ("FAIL", "kiro-cli version kiro-cli 3.0.1, pinned 3.1", "kiro-cli 版本是 kiro-cli 3.0.1，要 3.1", None),
@@ -138,10 +153,32 @@ DOCTOR = [
 ]
 
 
+def test_hooks_that_never_ran_right_after_an_install_are_a_note_not_a_warning():
+    """SETUP-28: brain doctor warns about it, there is nothing to do: an OK row, not counted as 注意."""
+    r = ok_row(P.row("WARN", "AI-DLC Lean doctor: hooks have never run here: start `kiro-cli --v3` in this folder and trust "
+                             "the workspace"))
+    assert (r["level"], r["todo"]) == ("OK", "") and r["text"].startswith("Lean 的 hook 在这里还没跑过：")
+
+
+def test_every_fix_row_names_the_button_the_page_shows():
+    """UI问题清单 #12: 做什么 says 点「<the button's name>」, never a 「修复」 no button is called; no brain-dev.json at all is
+    「装上 brain-dev」."""
+    raws = [r for _, r, _, f in DOCTOR if f] + [OLDER, WRITE_PROBLEM,
+                                              ".kiro/aidlc-lean/aidlc_lean.py is not committed: AI-DLC Lean; commit it on main"
+                                              " through an MR"]
+    rows = [P.agent_missing(), P.agent_lacks([("preToolUse", "PreToolUse")]), P.engine("kiro")] + \
+        [P.row("FAIL", raw, repo=REPO, team=team) for raw in raws for team in (True, False)]
+    names = set(P.FIX_BUTTON.values()) | {P.AGENT_NEW}
+    for r in (x for x in rows if x["fix"]):
+        assert "「修复」" not in r["todo"], r
+        named = [n for n in names if "点「%s」" % n in r["todo"]]
+        assert named == [P.AGENT_NEW if r["text"] == "没有 ~/.kiro/agents/brain-dev.json" else P.FIX_BUTTON[r["fix"]]], r
+
+
 @pytest.mark.parametrize("level, raw, text, fix", DOCTOR)
 def test_brain_doctors_lines(level, raw, text, fix):
     r = ok_row(P.row(level, raw, repo=REPO))
-    assert (r["level"], r["text"], r["fix"], r["raw"]) == (level, text, fix, raw)
+    assert (r["level"], r["text"], r["fix"], r["raw"].split("\n在终端里：")[0]) == (level, text, fix, raw)
     assert bool(r["todo"]) == (level != "OK")
     if fix == "kit":
         assert P.row(level, raw)["fix"] is None        # in an install worktree (no repo): nothing to reinstall into
@@ -167,7 +204,8 @@ def test_the_apps_own_rows():
     assert P.agent_unreadable("的 hooks 格式认不出")["text"] == "brain-dev.json的 hooks 格式认不出"
     lacks = ok_row(P.agent_lacks([("userPromptSubmit", "UserPromptSubmit"), ("preToolUse", "PreToolUse")]))
     assert lacks["text"] == "brain-dev.json 缺 Lean 的 hook：发消息、调用工具前" and lacks["fix"] == "agent"
-    assert "userPromptSubmit、preToolUse" in lacks["todo"] and "别的 hook 和设置都不动" in lacks["todo"]
+    assert lacks["todo"] == "点「补上 Lean 的 hook」：只补上缺的（发消息、调用工具前），别的 hook 和设置都不动"
+    assert lacks["raw"] == "缺的 hook：userPromptSubmit、preToolUse"          # the trigger names only under 细节
     assert ok_row(P.agent_ok(0))["text"] == P.AGENT_OK
     assert P.agent_ok(2)["text"] == P.AGENT_OK + "（另有 2 个别的 hook，留着不动）"
     custom = ok_row(P.agent_custom(["model"]))
@@ -177,7 +215,7 @@ def test_the_apps_own_rows():
     assert (other["level"], other["fix"]) == ("WARN", "engine") and "kas" in other["todo"]
     assert ok_row(P.engine(None, "no_kirocrew"))["text"] == "找不到 kirocrew 命令"
     failed = ok_row(P.engine(None, "failed", "[Errno 13] Permission denied"))
-    assert failed["level"] == "WARN" and failed["raw"] == "[Errno 13] Permission denied"
+    assert failed["level"] == "WARN" and failed["raw"].startswith("[Errno 13] Permission denied\n")
     git = ok_row(P.repo_unreadable(REPO, "fatal: not a git repository"))
     assert git["repo"] == REPO and git["raw"] == "fatal: not a git repository" and git["level"] == "FAIL"
     assert ok_row(P.crew_timeout(60))["level"] == "WARN"
@@ -188,7 +226,6 @@ def test_the_apps_own_rows():
 LINT = [
     ("FAIL", "TECH.md:12: id T-PAY-1-1 already used at TECH.md:3", "brain/TECH.md 第 12 行：条目号 T-PAY-1-1 重复了"),
     ("FAIL", "TECH.md:4: bad id 'T-1x' (want e.g. T-OMS-12-1)", "brain/TECH.md 第 4 行：条目号 T-1x 不对"),
-    ("WARN", "PRODUCT.md:2: legacy sequential id P-7; new entries use <side>-<KEY>-<n>", "brain/PRODUCT.md 第 2 行：P-7 是旧式条目号"),
     ("FAIL", "TECH.md:9: entry T-PAY-1-2 has no text", "brain/TECH.md 第 9 行：条目 T-PAY-1-2 没有正文"),
     ("FAIL", "TECH.md:9: type must be one of pitfall, convention, decision (TECH)",
      "brain/TECH.md 第 9 行：类型不对：TECH 里只能用 pitfall, convention, decision"),
@@ -225,6 +262,44 @@ def test_brain_lint_lines(level, raw, text):
     assert r["todo"]
 
 
+COMMAND = (r"brain (?:handoff|reflect|claim|entry|start|crew-agent)\b|lean verify|git (?:pull|push|fetch|rebase|remote)\b|"
+           r"kirocrew config|D01#S|PKG-|（gate）|每个 run")
+
+
+def test_what_to_do_is_said_in_words_never_a_command_or_a_code_name():
+    """REST-29: a 做什么 line says the step; a command a person types is in a copy line or under 细节, never here."""
+    rows = [P.lint(lv, raw) for lv, raw, _ in LINT] + [P.reason(raw) for raw, _ in REASONS] + \
+        [P.row(lv, raw, repo=REPO) for lv, raw, _, _ in DOCTOR] + [P.engine(None, "failed", "x"), P.engine("kiro")]
+    assert [r["todo"] for r in rows if re.search(COMMAND, r["todo"])] == []
+    # the command that does it is kept with brain-kit's words, for a person who wants the terminal
+    pull = P.row("WARN", "Brain vs origin/main: differs, merge or rebase")
+    assert pull["raw"] == "Brain vs origin/main: differs, merge or rebase\n在终端里：git pull" and "拉进" in pull["todo"]
+    assert P.row("WARN", "no origin remote: Brain freshness not checked")["raw"].endswith("git remote add origin <地址>")
+
+
+def legacy(where, eid):
+    return "%s: legacy sequential id %s; new entries use <side>-<KEY>-<n>" % (where, eid)
+
+
+def test_the_old_entry_ids_are_one_quiet_note_that_says_the_new_pattern_in_words():
+    """brain lint warns about every entry id from before <side>-<KEY>-<n>: on a Brain of old entries that filled half
+    the page and counted as 提醒 that need nothing. They are one OK note, at the end, naming them all."""
+    real = "TECH.md:14: T-PAY-2-1 came back 2 times: make it a gate (a check that fails), not more text"
+    olds = [legacy("PRODUCT.md:13", "P-7"), legacy("PROJECT.md:11", "J-3"), legacy("TECH.md:11", "T-12")]
+    got = P.lint_rows(["TECH.md:20: source '见群聊' is not a reference (D01#S003)"], olds[:2] + [real] + olds[2:],
+                      repo=REPO, prefix="ORD")
+    assert [r["level"] for r in got["errors"]] == ["FAIL"]
+    assert [r["level"] for r in got["warnings"]] == ["WARN", "OK"]
+    note = ok_row(got["warnings"][-1])
+    assert note["text"] == "P-7、J-3、T-12 是旧式条目号，不用改。新条目的编号是 字母-需求号-序号，比如 P-ORD-3-1"
+    assert note["todo"] == "" and note["raw"] == "\n".join(olds) and note["repo"] == REPO
+    many = P.lint_rows([], [legacy("TECH.md:%d" % i, "T-%d" % i) for i in range(1, 13)])["warnings"]
+    assert len(many) == 1 and many[0]["text"].startswith("T-1、T-2、T-3、T-4、T-5、T-6、T-7、T-8 等 12 条是旧式条目号")
+    assert "比如 P-PAY-3-1" in many[0]["text"]
+    assert ok_row(P.lint("WARN", olds[0]))["level"] == "OK"
+    assert P.lint_rows([], [real]) == {"errors": [], "warnings": [P.lint("WARN", real)]}
+
+
 def test_an_unknown_lint_line_keeps_its_where():
     r = ok_row(P.lint("FAIL", "TECH.md:12: something brain-kit learns tomorrow"))
     assert r["text"] == "brain/TECH.md 第 12 行：格式不对" and r["raw"] == "TECH.md:12: something brain-kit learns tomorrow"
@@ -248,7 +323,7 @@ REASONS = [
     ("alice is not in brain-authz identities", "alice 不在 brain-authz 的身份表里"),
     ("PAY-3 has no claim (branch claim/PAY-3); run `brain claim`", "PAY-3 没认领"),
     ("run.json missing at 0123456789ab", "这次提交里没有 run.json"),
-    ("run.json has no hand-over (run `brain handoff`)", "run.json 里没有交接记录"),
+    ("run.json has no hand-over (run `brain handoff`)", "这个分支还没交接过"),
     ("run.json: intent must be a Lean intent folder name (yymmdd-slug)", "run.json 有问题"),
     ("the MR head 0123456789ab is a merge, not the hand-over commit `brain handoff` makes: run it again",
      "MR 最新的提交是一个合并，不是交接提交"),
@@ -281,7 +356,7 @@ def test_handover_and_signer_reasons(raw, text):
 
 def test_reasons_joined_for_one_field_keep_the_raw():
     text, raw = P.reasons_text(["run.json has no hand-over (run `brain handoff`)", "MR 不是打开的", ""])
-    assert text == "run.json 里没有交接记录；MR 不是打开的"
+    assert text == "这个分支还没交接过；MR 不是打开的"
     assert raw == "run.json has no hand-over (run `brain handoff`); MR 不是打开的"
 
 
@@ -307,7 +382,7 @@ def test_a_chinese_line_nobody_mapped_is_shown_as_it_is():
 def test_levels_are_normalized_and_whitespace_folded():
     assert P.row("fail", "AI-DLC Lean not installed")["level"] == "FAIL"
     assert P.row("bogus", "AI-DLC Lean not installed")["level"] == "WARN"
-    assert P.row("OK", "  Brain vs   origin/main:\n same ")["text"] == "Brain 和 origin/main 一样"
+    assert P.row("OK", "  Brain vs   origin/main:\n same ")["text"] == "Brain 和远端 main 上的一样"
     assert P.row("WARN", "")["text"] == "brain-kit 提醒了一件事"
     # a runner-only problem said at WARN becomes FAIL for a team repo; an OK row stays OK whoever it is for
     assert P.row("WARN", OLDER, repo=REPO, team=True)["level"] == "FAIL"

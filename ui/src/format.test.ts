@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ago, fmtAgo, fmtCredits, fmtIso, fmtRate, fmtSpan, isoDay, lines, splitPaths } from './format'
-import { errorStatus, errorText } from './api'
+import { errorRaw, errorStatus, errorText, httpProblem } from './api'
 
 describe('format', () => {
   it('formats spans and ages', () => {
@@ -41,14 +41,27 @@ describe('format', () => {
 })
 
 describe('errorText: the SDK rejects with `API <status>: <body>`', () => {
-  it('says the backend’s own error, or what the status means', () => {
+  it('says the backend’s own Chinese words, or what the status means; never English', () => {
     expect(errorText(new Error('API 409: {"error": "PAY-3 已经有人认领了", "code": "claimed"}'))).toBe('PAY-3 已经有人认领了（409）')
-    expect(errorText(new Error('API 401: '))).toBe('需要登录 KiroCrew dashboard（401）')
-    expect(errorText(new Error('API 403: nope'))).toBe('没有权限：只接受 dashboard 主人本人的请求（403）')
-    expect(errorText(new Error('API 404: Not Found'))).toBe('后端还没有这个接口（404）')
-    expect(errorText(new Error('API 500: boom'))).toBe('请求失败（500）：boom')
-    expect(errorText(new Error('Failed to fetch'))).toBe('Failed to fetch')
+    expect(errorText(new Error('API 403: {"error": "这些接口只接受 dashboard 主人本人的请求", "code": "owner_only"}'))).toBe('这些接口只接受 dashboard 主人本人的请求（403）')
+    // KiroCrew's host when the dashboard login is gone
+    expect(errorText(new Error('API 403: {"error": "Token required"}'))).toBe('登录过期了（403）')
+    expect(errorText(new Error('API 401: '))).toBe('登录过期了（401）')
+    expect(errorText(new Error('API 404: Not Found'))).toBe('app 的后端和页面版本对不上（404）')
+    expect(errorText(new Error('API 500: boom'))).toBe('app 的后端出错了（500）')
+    expect(errorText(new Error('API 502: 网关没回话'))).toBe('网关没回话（502）')
+    expect(errorText(new TypeError('Failed to fetch'))).toBe('连不上 app 的后端')
+    expect(errorText(new TypeError('Load failed'))).toBe('连不上 app 的后端')
+    expect(errorText(new Error('读不到进度'))).toBe('读不到进度')
+    expect(errorRaw(new Error('API 403: {"error": "Token required"}'))).toBe('API 403: {"error": "Token required"}')
     expect(errorStatus(new Error('API 502: x'))).toBe(502)
     expect(errorStatus('nothing')).toBe(0)
+  })
+  it('says what to do for a status: the login, no answer, the version, the backend', () => {
+    expect(httpProblem(403)).toEqual({ text: '登录过期了', todo: '重新打开 KiroCrew 仪表盘，登录以后点「再试一次」' })
+    expect(httpProblem(401).text).toBe('登录过期了')
+    expect(httpProblem(0).text).toBe('连不上 app 的后端')
+    expect(httpProblem(404).text).toBe('app 的后端和页面版本对不上')
+    expect(httpProblem(503).text).toBe('app 的后端出错了')
   })
 })

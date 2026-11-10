@@ -19,11 +19,26 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from . import bk
+from . import bk, lean_view, problems
 from .constants import KEY_RE, PYTHON_BIN, SLUG_RE
 from .repo import Repo, parse_branch
 
 CLASSES = ("public", "internal", "confidential", "secret", "unsure")
+KIT = ".brain/kit.json"
+CLASS_ZH = {"public": "公开", "internal": "内部", "confidential": "机密", "secret": "绝密", "unsure": "不确定"}
+# brain-kit's finding kinds (intake/checks.py), as a person says them
+KIND_ZH = {"hkid": "香港身份证号", "cnid": "身份证号", "phone": "电话", "email": "邮箱", "card": "卡号", "person": "人名",
+           "private_key": "私钥", "cloud_key": "云访问密钥", "bearer": "令牌", "token": "令牌", "kv_secret": "密码",
+           "secret": "密码", "amount": "金额", "company": "公司名", "contract": "合同号", "url": "链接",
+           "approval_line": "像审批的行", "injection": "像指令的句子"}
+# a finding part's label (intake/package.py build) → what happened to it
+PART_ZH = {"个人信息": "已打码", "密钥": "已打码，请换一把新的", "像指令的行": "已标成引用，不会被当成指令",
+           "链接": "只收了地址，没收链接里的内容"}
+PART_RE = re.compile(r"^(?P<label>[^（\s]+)（(?P<how>[^）]*)）\s*(?P<kinds>.+)$")
+KINDS_RE = re.compile(r"(?P<k>[a-z_:]+)×(?P<n>\d+)")
+LINE_RE = re.compile(r"^- \*\*(?P<id>D\d+) (?P<name>.+?)\*\*：(?P<rest>.*)$")
+# gates that stop (blocking) and hard stops (error) as brain-kit says them → what to do on this page
+GATE_ZH: list[tuple["re.Pattern[str]", Any]] = []
 # brain-kit's review part of a file's finding line (intake.package.build, 72b278e): 请你确认 N 处（…）：「…」、「…」
 REVIEW_RE = re.compile(r"请你确认 [0-9]+ 处（[^）]*）：「.*?」(?:、「.*?」)*(?=；|$)")
 FILE_RE = re.compile(r"^- \*\*(.+?)\*\*：")
@@ -37,8 +52,13 @@ class IntakeError(Exception):
 
 
 def next_key(repo: Repo) -> dict[str, Any]:
+    """What 开需求 needs to know about *repo* before a start: the key a start would claim (tracker none), whether gate 2
+    takes confidential material here (kit.json intake.allow_confidential), and *push*: the default branch has
+    brain-kit in this checkout only, not on origin, where `brain start` makes the requirement's branch from (an in-place
+    install not pushed yet): {branch, remote_url} for 「推送」, None when nothing waits."""
     cfg = repo.cfg
-    out = {"repo": repo.id, "key": None, "tracker": cfg["tracker"], "prefix": cfg["req_prefix"], "error": ""}
+    out = {"repo": repo.id, "key": None, "tracker": cfg["tracker"], "prefix": cfg["req_prefix"], "error": "",
+           "allow_confidential": bool((cfg.get("intake") or {}).get("allow_confidential")), "push": unpushed(repo)}
     if cfg["tracker"] != "none":
         return out
     rx = re.compile(r"^refs/(?:heads|remotes/origin)/claim/%s-([1-9][0-9]*)$" % re.escape(cfg["req_prefix"]))
@@ -46,6 +66,18 @@ def next_key(repo: Repo) -> dict[str, Any]:
                                                                           "refs/remotes/origin/claim/")) if m}
     out["key"] = "%s-%d" % (cfg["req_prefix"], max(taken or {0}) + 1)
     return out
+
+
+def unpushed(repo: Repo) -> dict[str, str] | None:
+    d = repo.cfg["default_branch"]
+    url = repo.git.out("remote", "get-url", "origin")
+    if not url or not repo.git.ok("rev-parse", "-q", "--verify", "refs/remotes/origin/%s^{commit}" % d):
+        return None
+    if repo.git.ok("cat-file", "-e", "refs/remotes/origin/%s:%s" % (d, KIT)):
+        return None
+    if not repo.git.ok("cat-file", "-e", "refs/heads/%s:%s" % (d, KIT)):
+        return None
+    return {"branch": d, "remote_url": url}
 
 
 def _lines(v: Any, limit: int = MAX_DOCS) -> list[str]:
@@ -106,12 +138,12 @@ def clean_body(repo: Repo, body: dict[str, Any], *, start: bool) -> dict[str, An
             raise IntakeError("找不到：%s" % d)
     cls = str(body.get("classification") or "")
     if docs and cls not in CLASSES:
-        raise IntakeError("门 2：选一个密级（公开、内部、机密、绝密、不确定）")
+        raise IntakeError("第 2 关：选一个密级（公开、内部、机密、绝密、不确定）")
     business = str(body.get("business") or "")
     if business not in ("", "keep", "mask"):
-        raise IntakeError("门 3：商业敏感内容选「原样保留」或「换成占位符」")
+        raise IntakeError("第 3 关：金额、公司名、合同号选「原样保留」或「换成占位符」")
     if docs and body.get("consent") is not True:
-        raise IntakeError("门 1：确认你是作者，或已取得作者同意")
+        raise IntakeError("第 1 关：勾上「我是作者，或已取得作者同意」")
     exclude = _lines(body.get("exclude"), 30)
     paths = expected_paths(body.get("paths"))
     for p in paths:
@@ -125,7 +157,7 @@ def clean_body(repo: Repo, body: dict[str, Any], *, start: bool) -> dict[str, An
 def check(repo: Repo, body: dict[str, Any], me: str | None) -> dict[str, Any]:
     """brain-kit's dry run of the five gates (blocking: call it in a thread)."""
     out = {"ok": False, "key": None, "package": None, "classification": None, "segments": 0, "sources": 0,
-           "findings": [], "review": [], "blocking": [], "refused": [], "error": ""}
+           "findings": [], "review": [], "blocking": [], "blocking_raw": [], "files": [], "refused": [], "error": ""}
     try:
         b = clean_body(repo, body, start=False)
     except IntakeError as exc:
@@ -144,17 +176,99 @@ def check(repo: Repo, body: dict[str, Any], me: str | None) -> dict[str, Any]:
                         classification=b["classification"], business=b["business"] or None,
                         kit_intake=repo.cfg["intake"], dry_run=True, exclude=b["exclude"])
     except bk.brain_error() as exc:
-        out["error"] = str(exc)
+        out["error"] = gate_text(str(exc))
+        out["blocking_raw"] = [str(exc)]
         return out
     except (OSError, ValueError) as exc:
         out["error"] = "读不了文档：%s" % str(exc)[:300]
         return out
-    out.update(ok=not rep.get("blocking"), package=rep.get("package"), classification=rep.get("classification"),
+    raw = [str(x) for x in rep.get("blocking") or []]
+    out.update(ok=not raw, package=rep.get("package"), classification=rep.get("classification"),
                segments=int(rep.get("segments") or 0), sources=int(rep.get("sources") or 0),
-               findings=[str(x) for x in rep.get("findings") or []], blocking=[str(x) for x in rep.get("blocking") or []],
+               findings=[str(x) for x in rep.get("findings") or []], blocking=[gate_text(x) for x in raw],
+               blocking_raw=raw,
                refused=[{"id": str(r.get("id")), "name": str(r.get("name")), "reason": str(r.get("reason"))}
                         for r in rep.get("refused") or []])
     out["review"] = review_items(out["findings"])
+    out["files"] = file_items(out["findings"], b["business"])
+    return out
+
+
+def _kinds(text: str) -> str:
+    """'phone×2, email×1' → '电话 2 处、邮箱 1 处'; {'amount': 4} (brain-kit's summary) too."""
+    pairs = [(m.group("k"), m.group("n")) for m in KINDS_RE.finditer(text)] or \
+        re.findall(r"'([a-z_]+)': (\d+)", text)
+    return "、".join("%s %s 处" % (KIND_ZH.get(k, k), n) for k, n in pairs) or text
+
+
+def _what(text: str) -> str:
+    """brain-kit's 「D03.pdf=confidential」 / 「你选的是 unsure」 said plainly."""
+    out = []
+    for part in [x.strip() for x in text.split(",") if x.strip()]:
+        m = re.match(r"^(?P<f>.+)=(?P<c>[a-z]+)$", part)
+        if m:
+            out.append("%s 标着%s" % (m.group("f"), CLASS_ZH.get(m.group("c"), m.group("c"))))
+            continue
+        m = re.match(r"^你选的是 (?P<c>[a-z]+)$", part)
+        out.append("你选的是「%s」" % CLASS_ZH.get(m.group("c"), m.group("c")) if m else part)
+    return "、".join(out)
+
+
+GATE_ZH += [(re.compile(rx), fn) for rx, fn in (
+    (r"^门 2：材料按机密处理（(?P<w>.*)），而 intake\.allow_confidential 是 false",
+     lambda g: "第 2 关：这个仓库不收机密材料（%s）。请产品写一份脱敏摘要再交，或者把这份写进「不收这些文件」" % _what(g["w"])),
+    (r"^门 2：材料是绝密（(?P<w>.*)），不收", lambda g: "第 2 关：绝密材料不收（%s）：只交脱敏摘要" % _what(g["w"])),
+    (r"^门 2：--classification", lambda g: "第 2 关：选一个密级"),
+    (r"^门 3：找到商业敏感内容 (?P<s>.*?)，请选 --business",
+     lambda g: "第 3 关：找到%s：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」" % _kinds(g["s"])),
+    (r"^门 5：(?P<f>.+?) 里有私钥或云访问密钥", lambda g: "第 5 关：%s 里有私钥或云访问密钥，整份不收：先从文档里删掉，再换一把新密钥"
+     % g["f"]),
+    (r"^门 1：确认你是作者", lambda g: "第 1 关：勾上「我是作者，或已取得作者同意」"),
+    (r"^没有可收的文件$", lambda g: "没有可收的文件：文档是空的，或者都被「不收这些文件」排除了"),
+)]
+
+
+def gate_text(line: str) -> str:
+    """One of brain-kit's gate lines (or hard stops) as the page action; a line nobody mapped as it is."""
+    s = str(line or "")
+    for rx, fn in GATE_ZH:
+        m = rx.match(s)
+        if m:
+            return fn({k: (v or "") for k, v in m.groupdict().items()})
+    return s
+
+
+def file_items(findings: list[str], business: str) -> list[dict[str, Any]]:
+    """brain-kit's finding lines, one per file, said plainly: {id, name, items (what was found and what happened to
+    it), review (请你确认: '' when none), refused (why the file was not taken: '' when it was)}."""
+    out = []
+    for line in findings:
+        m = LINE_RE.match(line)
+        if not m:
+            continue
+        rest = m.group("rest")
+        f = {"id": m.group("id"), "name": m.group("name"), "items": [], "review": "", "refused": ""}
+        if rest.startswith("没收——"):
+            f["refused"] = rest[len("没收——"):]
+            out.append(f)
+            continue
+        rv = REVIEW_RE.search(rest)
+        if rv:
+            f["review"] = rv.group(0)
+            rest = rest[:rv.start()] + rest[rv.end():]
+        for part in [x.strip() for x in rest.split("；") if x.strip() and x.strip() != "无"]:
+            pm = PART_RE.match(part)
+            if pm and pm.group("label") in PART_ZH:
+                f["items"].append("%s：%s" % (_kinds(pm.group("kinds")), PART_ZH[pm.group("label")]))
+            elif pm and pm.group("label") == "商业敏感":
+                f["items"].append("%s：%s" % (_kinds(pm.group("kinds")), "已换成占位符" if business == "mask" else "原样保留"))
+            elif re.match(r"^隐藏内容 \d+ 处", part):
+                f["items"].append("看不见的内容 %s 处：单独放着，不当需求用" % re.findall(r"\d+", part)[0])
+            elif re.match(r"^图片 \d+ 张", part):
+                f["items"].append("图片 %s 张：图片里的字读不出来，涉及图片的地方要你确认" % re.findall(r"\d+", part)[0])
+            else:
+                f["items"].append(part)
+        out.append(f)
     return out
 
 
@@ -189,7 +303,7 @@ def start(repo: Repo, body: dict[str, Any], work_root: str) -> dict[str, Any]:
            "url": None, "session_error": "", "problem": None, "me": None}
     b = clean_body(repo, body, start=True)
     if b["docs"] and not b["consent"]:
-        raise IntakeError("门 1：确认你是作者，或已取得作者同意")
+        raise IntakeError("第 1 关：勾上「我是作者，或已取得作者同意」")
     wt = _worktree_for(repo, work_root, b["slug"])
     wt.parent.mkdir(parents=True, exist_ok=True)
     d = repo.cfg["default_branch"]
@@ -229,6 +343,7 @@ def start(repo: Repo, body: dict[str, Any], work_root: str) -> dict[str, Any]:
         if not parsed:  # nothing was started in it: no worktree is left behind
             repo.git.run("worktree", "remove", "--force", str(wt))
         out["output"] = out["output"] or "brain start 失败（退出码 %d）" % code
+        out["problem"] = problems.start_row(out["output"], repo=repo.path)
         repo.invalidate()
         return out
     key = parsed["key"]
@@ -243,7 +358,7 @@ def start(repo: Repo, body: dict[str, Any], work_root: str) -> dict[str, Any]:
     return out
 
 
-INTENT_RE = re.compile(r"^[0-9]{6}-[a-z0-9][a-z0-9-]{0,80}$")
+INTENT_RE = lean_view.INTENT_RE
 PKG_RE = re.compile(r"^PKG-[A-Z][A-Z0-9]{0,9}-[1-9][0-9]{0,6}-[1-9][0-9]{0,4}$")
 APPROVAL_LINE_RE = re.compile(r"(?im)^[ \t>*-]*(approve|approved|reject|批准|同意|驳回|拒绝)\b")
 
@@ -260,4 +375,16 @@ def kickoff(key: str, branch: str, intent: str | None, materials: list[str]) -> 
              "按 brain-dev 的步骤开始：先读 AGENTS.md 和 brain/ 下的四个文件，再读 runs/%s/run.json" % key
              + ("" if not pkgs else "，然后读材料包 .brain-materials/%s/toc.md" % pkgs[0]) + "。",
              "有问题一次问完，每题带推荐答案。"]
+    return "\n".join(l for l in lines if not APPROVAL_LINE_RE.match(l))
+
+
+def review_task(key: str, branch: str, intent: str | None) -> str:
+    """The first message to a requirement's review session: Lean's review line for its intent (lean_view.review_line),
+    ids only, checked like kickoff's (no approval line can get in). '' when run.json names no usable intent."""
+    line = lean_view.review_line(intent)
+    if not line:
+        return ""
+    key = key if KEY_RE.match(key or "") else "?"
+    branch = branch if parse_branch(branch or "", branch.split("/", 1)[0] if branch else "ai") else "?"
+    lines = ["这是需求 %s 的审查会话：新开的，没写过这次的代码。分支 %s，Lean intent %s。" % (key, branch, intent), line]
     return "\n".join(l for l in lines if not APPROVAL_LINE_RE.match(l))

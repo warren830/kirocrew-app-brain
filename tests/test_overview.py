@@ -39,9 +39,15 @@ def test_every_requirement_shows_where_it_is_and_what_it_waits_on(tmp_path, home
     assert one["state"] == "local" and one["where"] == "worktree" and one["worktree"] == str(wt1)
     assert one["waits"]["who"] == "you" and one["waits"]["line"] == line and line.startswith("approve REQUIREMENTS ")
     assert one["lean"]["stage"] == "requirements" and one["lean"]["stage_label"] == "需求分析" and one["lean"]["total"] == 11
-    assert one["lean"]["stage_n"] == 2 and one["lean"]["stage_state"] == "started" and one["stage"] == "2/11 需求分析"
+    assert one["lean"]["stage_n"] == 2 and one["lean"]["stage_state"] == "started"
+    assert one["stage"] == "做完 0 · 跳过 1 · 下一步：需求分析" and one["lean"]["next"]["label"] == "需求分析"
+    assert (one["waits"]["do"], one["waits"]["where"]) == ("approve", "session") and one["waits"]["since"]
     assert rows["PAY-2"]["state"] == "local" and rows["PAY-2"]["waits"]["line"] is None
     assert rows["PAY-3"]["state"] == "claimed" and rows["PAY-3"]["title"] == "只认领"
+    # a claim not started waits for its owner to start it, here in the app, since the claim (not since now)
+    w3 = rows["PAY-3"]["waits"]
+    assert (w3["who"], w3["do"], w3["where"], w3["text"]) == ("you", "start", "app", "已认领，还没开工") and w3["since"]
+    assert all(r["local_only"] for r in rows.values())      # no remote: done only on this machine
     # overlap: src/pay contains src/pay/report
     assert view["overlaps"] == [{"keys": ["PAY-1", "PAY-2"], "paths": ["src/pay", "src/pay/report"]}] or \
         view["overlaps"][0]["keys"] == ["PAY-1", "PAY-2"]

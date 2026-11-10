@@ -66,6 +66,17 @@ export const STATE_LABEL: Record<ReqState, string> = {
 /** Who the requirement waits on right now. */
 export type WaitWho = 'you' | 'agent' | 'runner' | 'bridge' | 'product' | 'builder' | 'people' | 'nobody'
 
+/**
+ * The step whoever `who` is takes now (UI问题清单 #1: one judgment, every view reads it: 待办, the badges, 交付总览's
+ * lanes, the board): approve (a Lean approval line, in the session), reply (the local session is idle: your turn to
+ * talk), tool (a tool call in the session waits for approval), start (claimed, no run yet: 开工), answer (a question:
+ * in the session for a local run, on the MR for a handed-over one), accept (acceptance), redo_handoff (the hand-over
+ * was refused), label_handoff (pushed without its label), write_back (merged with new knowledge to write back into
+ * the Brain), watch (merged, in its 14 days: nobody's turn), none (nothing to do: AI or the runner at work, or done).
+ */
+export type WaitDo = 'approve' | 'reply' | 'tool' | 'start' | 'answer' | 'accept' | 'redo_handoff' | 'label_handoff'
+  | 'write_back' | 'watch' | 'none'
+
 export interface Waits {
   who: WaitWho
   /** one short Chinese sentence, e.g. 「等你批准需求（在会话里自己打一行）」 */
@@ -75,6 +86,16 @@ export interface Waits {
   /** what text was made from, verbatim, for debugging (shown folded): a refused hand-over's reasons as the bridge wrote
    * them on the MR (text has them in short Chinese, backend/core/problems.py); '' otherwise. The backend always sends it */
   raw?: string
+  /** the step (see WaitDo). The backend always sends it; optional only so older literals compile */
+  do?: WaitDo
+  /** since when it waits like this (epoch s): the moment the session went idle, the approval was asked, the claim was
+   * made, the question was asked; null when unknown. The backend always sends it */
+  since?: number | null
+  /** where the step is taken: the local session, the MR, this app (开需求 / 待办), nowhere. The backend always sends it */
+  where?: 'session' | 'mr' | 'app' | null
+  /** the reply is Lean's review in a NEW session (开审查会话: the session that wrote the code may not review it), not a
+   * turn in the open one. The backend always sends it */
+  review?: boolean
 }
 
 export interface LeanSummary {
@@ -91,6 +112,11 @@ export interface LeanSummary {
   /** stages done or skipped / 11 */
   done: number
   total: number
+  /** UI问题清单 #8, the one way to say the progress (vocab.leanProgress): stages done, stages skipped, and the next one
+   * to do (null: every stage done or skipped). The backend always sends them */
+  done_n?: number
+  skipped_n?: number
+  next?: { id: string; label: string; n: number } | null
 }
 
 export interface MrRef { iid: number; url: string | null; state: string | null }
@@ -134,6 +160,12 @@ export interface Requirement {
   open_questions: string[]
   /** expected paths from run.json (overlap warnings come from these) */
   expected_paths: string[]
+  /** its repo has no remote: it is done only on this machine, never handed over (no runner, no MR). The backend
+   * always sends it */
+  local_only?: boolean
+  /** its brain-dev session on this machine (KiroCrew's chat URL: 打开会话), null when there is none. The backend always
+   * sends it */
+  session_url?: string | null
 }
 
 // ---------------------------------------------------------------- GET /status
@@ -153,6 +185,8 @@ export interface RepoInfo {
   pending: PendingInstall | null
   /** who brain-kit says the person is there (a loaded repo; null otherwise) */
   me: RepoMe | null
+  /** it has an origin: requirements may be handed over, 从远端取最新 works. The backend always sends it */
+  remote?: boolean
 }
 
 /**
@@ -179,7 +213,11 @@ export interface RepoMe {
 
 /** POST /me/name: git config brain.user <name> in that repo (brain-kit's USER_RE, lowercased; no token, ever). */
 export interface MeNameBody { path: string; name: string }
-export interface MeNameResult { ok: true; text: string; me: RepoMe; status: Status }
+export interface MeNameResult {
+  ok: true; text: string; me: RepoMe; status: Status
+  /** the command it ran (git config brain.user <name>), for 细节 */
+  raw?: string
+}
 
 export interface Status {
   app: { name: string; version: string; team: boolean }
@@ -291,7 +329,12 @@ export interface ImportDefaults {
   /** a GitLab token is on this machine (never the token) */
   token: boolean
   brainkit_ok: boolean
+  /** the checkouts found on this machine to pick from (importer.found_repos) */
+  found: FoundRepo[]
 }
+/** A git checkout under ~/workplace or ~/workspace that 导入仓库 offers to pick (importer.found_repos), sent as
+ * ImportDefaults' `found` once the backend's GET /import/defaults has it */
+export interface FoundRepo { path: string; name: string; installed: boolean; listed: boolean }
 
 /** One row of 检查: ✓ OK, ! WARN (worth knowing, stops nothing), ✗ FAIL; why, and what to do. */
 export interface ImportCheck { id: string; level: Level; label: string; why: string; todo: string }
@@ -510,6 +553,8 @@ export interface EvalView {
   /** brain-kit's notes on the numbers, verbatim (credits it could not attribute to a run, deliveries already known
    * wrong whose 14 days are not over …) */
   notes: string[]
+  /** brain-kit's own words behind error (for 细节); '' when none. The backend always sends it */
+  raw?: string
 }
 
 /**
@@ -699,7 +744,10 @@ export interface RequirementDetail {
 
 // ---------------------------------------------------------------- POST /requirements/{repo}/{key}/session, /answer
 
-export interface OpenSessionBody { trust?: boolean; kickoff?: boolean }
+export interface OpenSessionBody { trust?: boolean; kickoff?: boolean
+  /** 开审查会话: a NEW brain-dev session in the worktree to review the code (the session that wrote it may not review it,
+   * Lean's next step says so), never the live one; its first message the review line Lean wrote */
+  review?: boolean }
 export interface OpenSessionResult { ok: boolean; slot: string; url: string }
 /**
  * choice: an option id (A–H), or 'approve' / 'reject' for a question without options. id: the question's D-<n> when it
@@ -719,7 +767,14 @@ export const CLASS_LABEL: Record<Classification, string> = {
   unsure: '不确定（按机密处理）',
 }
 
-export interface IntakeNext { repo: string; key: string | null; tracker: string; prefix: string; error: string }
+export interface IntakeNext {
+  repo: string; key: string | null; tracker: string; prefix: string; error: string
+  /** kit.json intake.allow_confidential: gate 2 takes confidential material here (brain-kit's default: no) */
+  allow_confidential?: boolean
+  /** brain-kit is on the default branch in this checkout only, not on origin, where `brain start` branches from (an
+   * in-place install not pushed yet): 推送 first. null: nothing waits */
+  push?: { branch: string; remote_url: string } | null
+}
 
 export interface IntakeBody {
   repo: string
@@ -753,8 +808,12 @@ export interface IntakeCheck {
    * a password but may as well be a word. Not masked and not stopping anything: if it is one, change the document
    * and check again */
   review: string[]
-  /** gates that would stop the start, verbatim */
+  /** gates that would stop the start, said as what to do on this page (「第 2 关：这个仓库不收机密材料…」) */
   blocking: string[]
+  /** the same, as brain-kit said them (shown folded) */
+  blocking_raw?: string[]
+  /** the findings per file, said plainly: what was found and what happened to it, 请你确认, why a file was not taken */
+  files?: { id: string; name: string; items: string[]; review: string; refused: string }[]
   refused: { id: string; name: string; reason: string }[]
   /** a hard stop before any finding (no consent, nothing to take in …), verbatim */
   error: string
@@ -826,10 +885,15 @@ export interface BrainView {
     runs: { intent: string; key: string; loaded: number | null; cited: string[]; stale: string[]; unknown: string[] }[]
     never_cited: string[]
     repeats_any: [string, number][]
+    /** the numbers above count the runs merged into the default branch only; these runs are not merged yet, read where
+     * 需求详情 reads them (their worktree, else their branch), with its numbers. The backend always sends it */
+    unmerged?: { key: string; loaded: number | null; cited: string[]; where: 'worktree' | 'branch' }[]
   }
   /** requirements whose run can be reflected (they have a decisions.md) */
   reflect: { key: string; title: string; state: ReqState }[]
   error: string
+  /** brain-kit's own words when it could not read the Brain or its use (`error` says it in Chinese): for 细节 */
+  raw?: string
 }
 
 export interface ReflectOp { kind: string; target: string | null; file: string | null; type: string | null; section: string | null; src: string[]; text: string }
@@ -845,6 +909,9 @@ export interface ReflectPreview {
   /** at least one op that is more than sources added: --apply would open a branch */
   substantive: boolean
   error: string
+  /** what brain-kit said, verbatim (notes, warnings, problems and error are its words in Chinese): for 细节. The backend
+   * always sends it */
+  raw?: string[]
 }
 export interface ReflectApplyBody { repo: string; key: string; push: boolean }
 export interface ReflectApplyResult {
@@ -853,12 +920,20 @@ export interface ReflectApplyResult {
   branch: string | null
   /** the worktree brain-kit wrote the new brain/<KEY>-reflect-<n> branch in (the person's own checkout is not touched) */
   worktree: string | null
+  /** with push: the MR brain-kit opened (null: none, e.g. no GitLab token); pushed: the branch is on the remote. The
+   * backend always sends them */
+  mr_url?: string | null
+  pushed?: boolean
 }
 
 // ---------------------------------------------------------------- GET /todo
 
 /** handoff_unlabelled: pushed, but its MR carries no hand-over label (nothing was handed over) */
+/** reply: a local session idle, your turn to talk (opens it); start: claimed by you, no run yet (开工) */
 export type TodoKind = 'lean_approval' | 'question' | 'clarify' | 'acceptance' | 'handoff_rejected' | 'handoff_unlabelled' | 'crew'
+  | 'reply' | 'start'
+  /** write_back: merged, its Brain proposals not written back yet (回写 Brain) */
+  | 'write_back'
 export interface TodoItem {
   kind: TodoKind
   repo: string
@@ -866,6 +941,9 @@ export interface TodoItem {
   title: string
   /** what to do, one sentence */
   text: string
+  /** reply: the row's waits.review, Lean's review in a NEW session (开审查会话), not a turn in this one. The backend
+   * always sends it */
+  review?: boolean
   /** lean_approval: the exact line the person types themselves in that session (the app never sends it) */
   line: string | null
   approval: string | null
@@ -948,7 +1026,13 @@ export interface TeamLoopResult { ok: boolean; summary: Record<string, number>; 
 
 // ---------------------------------------------------------------- POST /refresh {repo}
 
-export interface RefreshResult { ok: boolean; text: string }
+export interface RefreshResult {
+  ok: boolean
+  /** what happened and what to do, plain Chinese */
+  text: string
+  /** git's own words when the fetch failed (shown folded under 细节); '' otherwise */
+  raw?: string
+}
 
 // ---------------------------------------------------------------- GET /board/{repo}/{key}: 需求看板
 
@@ -988,7 +1072,8 @@ export interface Actor {
   /** when its status began */
   since: number | null
   /** its status over time, oldest first: what 回放 shows at a moment */
-  history: { at: number; status: ActorStatus; doing: string }[]
+  /** who: whom a wait for a person was on (Waits.who), so the replay says 等你 only for you; null otherwise */
+  history: { at: number; status: ActorStatus; doing: string; who?: WaitWho | null }[]
   /** its lane's time track */
   spans: ActorSpan[]
   marks: ActorMark[]
@@ -1036,6 +1121,10 @@ export interface BeltItem {
   records_only: boolean
   /** the actor whose lane it drops into the rail from: local, runner, handover */
   actor: ActorKey
+  /** the files it changed, with lines added and removed (git show --numstat; A added, M modified, D deleted, R renamed):
+   * the lanes' 改动 block (UI问题清单 BOARD-21). Absent from a backend that does not read them: the lane shows the
+   * commits and their file counts */
+  changes?: { path: string; added: number; removed: number; status: 'A' | 'M' | 'D' | 'R' }[]
 }
 
 /** One cell of the check wall: a Lean approval, a verify check, the bridge's and the signer's checks, Brain lint, the
@@ -1047,8 +1136,10 @@ export interface CheckCell {
   label: string
   /** in the inspector line: 需求审批（REQUIREMENTS） */
   name: string
-  /** pass, fail, wait (waits for a person), skip (not run, not needed yet) */
-  status: 'pass' | 'fail' | 'wait' | 'skip'
+  /** pass, fail, wait (waits for a person), skip (not run, not needed yet), watch (the 14 days after the merge, still
+   * running: nobody's turn), not_needed (not on this requirement's way: a stage Lean skipped, the runner of a repo done
+   * only here) */
+  status: 'pass' | 'fail' | 'wait' | 'skip' | 'watch' | 'not_needed'
   /** when it was decided (null: not yet) */
   at: number | null
   /** one plain line */
@@ -1060,6 +1151,8 @@ export interface CheckWall {
   passed: number
   failed: number
   total: number
+  /** the checks not reached yet, by name (「发布审批」): 「目前 3 项都过 · 还剩 发布」. The backend always sends it */
+  todo?: string[]
   at: number | null
   /** verify rounds: passed / failed checks over time (the sparkline) */
   history: { at: number; passed: number; failed: number }[]

@@ -44,7 +44,7 @@ export default defineConfig({
     alias: [
       { find: '@kirocrew/app-sdk/ui', replacement: stub('app-sdk-ui.tsx') },
       { find: '@kirocrew/app-sdk', replacement: stub('app-sdk.tsx') },
-      { find: 'lucide-react', replacement: stub('lucide.tsx') },
+      { find: 'lucide-react', replacement: stub('lucide-preview.tsx') },
     ],
   },
   build: {

@@ -3,5 +3,7 @@
   "key": "PAY-8",
   "tracker": "none",
   "prefix": "PAY",
-  "error": ""
+  "error": "",
+  "allow_confidential": false,
+  "push": null
 }

@@ -105,7 +105,8 @@ def pull(top: str, records: Records) -> dict[str, Any]:
     if p.returncode != 0:
         low = (p.stderr + p.stdout).lower()
         if "not possible to fast-forward" in low or "diverg" in low:
-            out["text"] = "本机的 %s 和 origin/%s 分开了：快进不了。在终端里处理（比如 git pull --rebase），再点「拉取」" % (d, d)
+            out["text"] = "本机的 %s 和远端的 %s 各有新提交：没法直接拉取。先在终端里把两边合到一起（细节里有命令），再点「拉取」" % (d, d)
+            out["output"] = "在终端里：git pull --rebase\n\n" + out["output"]
         else:
             out["text"] = git_failure(p, "拉取", origin.get("url") or "")[1]
         return out

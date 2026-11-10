@@ -43,35 +43,14 @@
       "level": "WARN",
       "label": "工作区",
       "why": "有 1 个改动没提交：README.md",
-      "todo": "不影响：安装在单独的工作目录里做，你的检出不会动"
+      "todo": "不用管：直接装只提交安装写的文件，你没提交的这些改动原样留着"
     },
     {
       "id": "kit",
-      "level": "FAIL",
+      "level": "WARN",
       "label": "brain-kit",
-      "why": "没装（没有 .brain/kit.json）",
-      "todo": "下面就能装：默认直接装在当前分支并提交"
-    },
-    {
-      "id": "lean",
-      "level": "FAIL",
-      "label": "AI-DLC Lean",
-      "why": "没装",
-      "todo": "装 brain-kit 时一起装上"
-    },
-    {
-      "id": "brain",
-      "level": "FAIL",
-      "label": "Brain 文件",
-      "why": "缺 brain/PRODUCT.md、brain/TECH.md、brain/IMPROVEMENT.md、brain/PROJECT.md",
-      "todo": "装 brain-kit 时一起装上"
-    },
-    {
-      "id": "agents",
-      "level": "FAIL",
-      "label": "AGENTS.md",
-      "why": "没有",
-      "todo": "装 brain-kit 时一起装上"
+      "why": "还没装（会一起装上 AI-DLC Lean、Brain 文件、AGENTS.md）",
+      "todo": "下一步：在下面装上"
     },
     {
       "id": "listed",
@@ -85,7 +64,7 @@
       "level": "WARN",
       "label": "你是谁",
       "why": "brain-kit 还不知道你是谁：认领需求时要用",
-      "todo": "在下面填你的 GitLab 用户名，存进这个仓库的 git config brain.user"
+      "todo": "在下面填上你的 GitLab 用户名，点「保存」"
     }
   ],
   "crew": {
@@ -93,7 +72,7 @@
       {
         "level": "FAIL",
         "text": "没有 ~/.kiro/agents/brain-dev.json",
-        "todo": "点「修复」装上 brain-kit 带的版本：没有它，Lean 的 hook 在 KiroCrew 里不会跑",
+        "todo": "点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的 hook 在 KiroCrew 里不会跑",
         "fix": "agent",
         "repo": null,
         "raw": ""
@@ -136,17 +115,17 @@
         "title": "直接装在 main",
         "ok": true,
         "why": "",
-        "line": "装在你现在的检出里，提交在 main 上，马上能用；只提交 brain install 写的文件，你自己没提交的改动不动；不会自己推送"
+        "line": "装在你现在的检出里，提交在 main 上；推送到 origin 以后就能开需求（这会直接改团队的 main，没有 MR 评审）；只提交安装写的文件，你自己没提交的改动不动"
       },
       {
         "mode": "branch",
         "title": "装到新分支，开 MR 给团队看",
         "ok": true,
         "why": "",
-        "line": "从 origin/main 建新分支，放在单独的工作目录里，不动你的检出；推送、开 MR 给团队看，合进 main 以后生效"
+        "line": "从 origin/main 建新分支，放在单独的工作目录里，不动你的检出；推送、开 MR 给团队看，MR 合进 main 以后才能开需求"
       }
     ],
-    "recommend": "branch",
+    "recommend": "inplace",
     "current": "main",
     "target": "main",
     "remote_url": "git@gitlab.example.com:shop/refund.git",
@@ -169,7 +148,7 @@
     "text": "",
     "ask": true,
     "label": "你的 GitLab 用户名",
-    "why": "这个仓库用 GitLab：认领的分支 ai/<名字>/… 和交接都按这个名字认人，要和你在 GitLab 上的用户名一样",
+    "why": "这个仓库用 GitLab：认领和交接都按这个名字认人，要和你在 GitLab 上的用户名一样",
     "suggest": "alice",
     "error": ""
   },

@@ -3,6 +3,7 @@
 
 import json
 
+from appkit import mod
 from brainfix import brain, make_project, make_service, needs_brainkit, run, sh, start_in_worktree
 
 pytestmark = needs_brainkit
@@ -39,19 +40,25 @@ def test_entries_usage_lint_and_reflect(tmp_path, home):
         await svc.start()
         try:
             view = await svc.brain("r1")
+            item = await svc.requirement("r1", "PAY-1")
             prev = await svc.reflect_preview("r1", "PAY-1")
             applied = await svc.reflect_apply("r1", "PAY-1", push=False)
             again = await svc.reflect_preview("r1", "PAY-1")
-            return view, prev, applied, again
+            return view, item, prev, applied, again
         finally:
             await svc.stop()
 
-    view, prev, applied, again = run(go())
+    view, item, prev, applied, again = run(go())
     tech = next(f for f in view["files"] if f["key"] == "TECH")
     assert tech["count"] == 1 and tech["sections"][0]["title"] == "外部系统"
     e = tech["sections"][0]["entries"][0]
     assert e["id"] == "T-PAY-9-1" and e["type"] == "pitfall" and e["src"] == ["D-1"] and "自然日" in e["text"]
     assert view["lint"]["errors"] == [] and view["ref"] == "main"
+    # the run is not merged: the Brain's numbers (merged runs only) leave it out, and it is listed on its own with the
+    # numbers 需求详情 shows for it
+    assert view["usage"]["runs"] == [] and view["usage"]["useful"] == [0, 1]
+    assert view["usage"]["unmerged"] == [{"key": "PAY-1", "loaded": 1, "cited": ["T-PAY-9-1"], "where": "worktree"}]
+    assert (item["brain"]["loaded"], item["brain"]["cited"]) == (1, ["T-PAY-9-1"])
     assert [r["key"] for r in view["reflect"]] == ["PAY-1"]
     assert prev["error"] == "" and prev["problems"] == [] and prev["substantive"] is True
     assert [(o["kind"], o["file"], o["type"], o["section"]) for o in prev["ops"]] == [("new", "TECH", "pitfall", "外部系统")]
@@ -63,7 +70,10 @@ def test_entries_usage_lint_and_reflect(tmp_path, home):
     assert sh("git", "-C", wt_reflect, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip() == "brain/PAY-1-reflect-1"
     assert wt_reflect.startswith(str(home / ".brain" / "worktrees")) and "brain-PAY-1-reflect-1" in wt_reflect
     assert sh("git", "-C", repo, "status", "--porcelain", "--untracked-files=no").stdout.strip() == ""
-    assert again["ops"] == [] and any("already" in n for n in again["notes"])  # the same proposal is not written twice
+    # the same proposal is not written twice; brain-kit's English is said in Chinese, its own words kept for 细节
+    assert again["ops"] == [] and again["notes"] == ["第 13 行的提议已经在回写分支 brain/PAY-1-reflect-1 上了（MR 还没合并），跳过"]
+    assert again["raw"] == ["proposal at line 13: already on brain/PAY-1-reflect-1 (MR not merged yet), skipped"]
+    assert applied["mr_url"] is None and applied["pushed"] is False
 
 
 def test_a_bad_proposal_is_a_problem_in_the_preview(tmp_path, home):
@@ -82,4 +92,40 @@ def test_a_bad_proposal_is_a_problem_in_the_preview(tmp_path, home):
             await svc.stop()
 
     prev = run(go())
-    assert prev["problems"] and "fantasy" in prev["problems"][0]
+    assert prev["problems"] and prev["problems"][0].startswith("第 ") and "类型不对：技术只收 原则、" in prev["problems"][0], prev
+    assert "fantasy" in prev["raw"][-1]
+
+
+def test_reflect_says_brainkit_in_chinese_and_any_other_english_points_to_the_details():
+    bv = mod("brainview")
+    assert bv.reflect_says("proposal at line 27: already in the Brain as P-DEMO-1-1, skipped") == \
+        "第 27 行的提议 Brain 里已经有了（P-DEMO-1-1），跳过"
+    assert bv.reflect_says("D-3 (V-1a2b) was rejected, but no correction or repeats proposal cites it") == \
+        "D-3 被否了（凭证 V-1a2b），可是没有一条纠正或「又出现」的提议提到它"
+    assert bv.reflect_says("T-PAY-2-1 只加来源，不改文字") == "T-PAY-2-1 只加来源，不改文字"
+    assert bv.reflect_says("a sentence nobody translated") == "brain-kit 说了一句这里还没翻译的话：原话在「细节」里"
+
+
+def test_brain_kit_failing_to_read_the_use_is_said_in_words_its_own_in_raw(tmp_path, home, monkeypatch):
+    """REST-29: 「Brain 用量读不出来」 says what still shows; brain-kit's exception is kept for 细节, not in the sentence."""
+    repo = make_project(tmp_path)
+    brain(repo, "entry", "add", "TECH", "pitfall", "--key", "PAY-9", "--src", "D-1", "--text", "对账文件按自然日切分。")
+    sh("git", "-C", repo, "add", "-A")
+    sh("git", "-C", repo, "commit", "-qm", "brain entry")
+    svc = make_service(tmp_path, [repo])
+
+    def broken(*a, **k):
+        raise RuntimeError("usage.collect: cannot read runs/PAY-1/run.json at refs/heads/main")
+
+    async def go():
+        await svc.start()
+        try:
+            monkeypatch.setattr(mod("bk").m("usage"), "collect", broken)
+            return await svc.brain("r1")
+        finally:
+            await svc.stop()
+
+    view = run(go())
+    assert view["error"] == mod("brainview").NO_USAGE and "run.json" not in view["error"]
+    assert view["raw"] == "usage.collect: cannot read runs/PAY-1/run.json at refs/heads/main"
+    assert [e["id"] for f in view["files"] for s in f["sections"] for e in s["entries"]] == ["T-PAY-9-1"]

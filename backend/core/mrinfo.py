@@ -38,7 +38,7 @@ OPT_RE = re.compile(r"^([A-H])\. (.*)$")
 
 
 def parse_notes(notes: list[dict[str, Any]], bridge_user: str | None = None) -> dict[str, Any]:
-    """{questions: [...], rejected_reason, rejected_raw} from an MR's notes, oldest first. *bridge_user*: kit.json's
+    """{questions: [...], rejected_reason, rejected_raw, rejected_at} from an MR's notes, oldest first. *bridge_user*: kit.json's
     bridge_user (only its notes count); unknown: every note is read. rejected_reason: the bridge's reasons in short
     Chinese (problems.reason), rejected_raw: as the bridge wrote them."""
     dec = bk.m("bridge.decisions")
@@ -46,7 +46,7 @@ def parse_notes(notes: list[dict[str, Any]], bridge_user: str | None = None) -> 
     desc_title = str(getattr(dec, "DESC_TITLE", "") or "**变更说明**")
     delivered_re = re.compile(DELIVERED_FMT % getattr(dec, "USER", r"[a-z0-9][a-z0-9._-]*"))
     qs: dict[str, dict[str, Any]] = {}
-    rejected, rejected_raw = None, None
+    rejected, rejected_raw, rejected_at = None, None, None
     for n in notes:
         if n.get("system"):
             continue
@@ -110,10 +110,11 @@ def parse_notes(notes: list[dict[str, Any]], bridge_user: str | None = None) -> 
         if first.startswith(REJECT_HEAD):
             reasons = [x[2:].strip() for x in body.split("\n")[1:] if x.startswith("- ")]
             rejected, rejected_raw = problems.reasons_text(reasons, 500)
-            rejected = rejected or None
+            rejected, rejected_at = rejected or None, n.get("created_at")
         elif first.startswith("AI 已接手"):
-            rejected, rejected_raw = None, None
-    return {"questions": list(qs.values()), "rejected_reason": rejected, "rejected_raw": rejected_raw}
+            rejected, rejected_raw, rejected_at = None, None, None
+    return {"questions": list(qs.values()), "rejected_reason": rejected, "rejected_raw": rejected_raw,
+            "rejected_at": rejected_at}
 
 
 class MrCache:

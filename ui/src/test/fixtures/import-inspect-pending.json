@@ -43,35 +43,14 @@
       "level": "OK",
       "label": "工作区",
       "why": "没有没提交的改动",
-      "todo": ""
+      "todo": "不用管：直接装只提交安装写的文件，你没提交的这些改动原样留着"
     },
     {
       "id": "kit",
       "level": "WARN",
       "label": "brain-kit",
-      "why": "安装在 brain/install 分支上，合并后生效",
+      "why": "装在 brain/install 分支上，还没推送：合进 main 以后生效（AI-DLC Lean、Brain 文件、AGENTS.md 都在分支上）",
       "todo": "推送并开 MR（在「导入仓库」里），合并以后就能用了"
-    },
-    {
-      "id": "lean",
-      "level": "FAIL",
-      "label": "AI-DLC Lean",
-      "why": "没装",
-      "todo": "装 brain-kit 时一起装上"
-    },
-    {
-      "id": "brain",
-      "level": "FAIL",
-      "label": "Brain 文件",
-      "why": "缺 brain/PRODUCT.md、brain/TECH.md、brain/IMPROVEMENT.md、brain/PROJECT.md",
-      "todo": "装 brain-kit 时一起装上"
-    },
-    {
-      "id": "agents",
-      "level": "FAIL",
-      "label": "AGENTS.md",
-      "why": "没有",
-      "todo": "装 brain-kit 时一起装上"
     },
     {
       "id": "listed",
@@ -85,7 +64,7 @@
       "level": "WARN",
       "label": "你是谁",
       "why": "brain-kit 还不知道你是谁：认领需求时要用",
-      "todo": "在下面填你的 GitLab 用户名，存进这个仓库的 git config brain.user"
+      "todo": "在下面填上你的 GitLab 用户名，点「保存」"
     }
   ],
   "crew": {
@@ -93,7 +72,7 @@
       {
         "level": "FAIL",
         "text": "没有 ~/.kiro/agents/brain-dev.json",
-        "todo": "点「修复」装上 brain-kit 带的版本：没有它，Lean 的 hook 在 KiroCrew 里不会跑",
+        "todo": "点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的 hook 在 KiroCrew 里不会跑",
         "fix": "agent",
         "repo": null,
         "raw": ""
@@ -165,7 +144,7 @@
     "text": "",
     "ask": true,
     "label": "你的 GitLab 用户名",
-    "why": "这个仓库用 GitLab：认领的分支 ai/<名字>/… 和交接都按这个名字认人，要和你在 GitLab 上的用户名一样",
+    "why": "这个仓库用 GitLab：认领和交接都按这个名字认人，要和你在 GitLab 上的用户名一样",
     "suggest": "alice",
     "error": ""
   },

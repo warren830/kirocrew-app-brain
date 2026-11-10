@@ -34,14 +34,26 @@ STAGES = (
 STAGE_LABEL = {s[0]: s[1] for s in STAGES}
 STAGE_N = {s[0]: i for i, s in enumerate(STAGES, 1)}
 STAGE_STATE = {"STAGE_STARTED": "started", "STAGE_COMPLETED": "done", "STAGE_SKIPPED": "skipped"}
+PASSED_OVER = "Lean 没记这一步，直接往后做了"
 APPROVAL_EVENTS = ("APPROVAL_REQUESTED", "APPROVED", "REJECTED", "APPROVAL_REFUSED")
 KIND_LABEL = {"REQUIREMENTS": "需求", "DESIGN": "设计", "INCEPTION": "需求和设计", "PLAN": "代码生成计划",
               "RELEASE": "发布"}
+# Lean's BLOCKED gates (aidlc_lean.py block()) and tools, in words
+BLOCK_GATE = {"records": "记录文件只能由 Lean 自己写", "protected": "受保护的文件", "danger": "危险命令", "intent": "还没选需求",
+              "contract": "别的团队的文件：要先开变更请求", "verify": "还没过自动检查", "requirements": "需求还没批",
+              "design": "设计还没批", "inception": "需求和设计还没批", "ideation": "构思还没批", "released": "已经发布了"}
+BLOCK_TOOL = {"fs_write": "写文件", "write": "写文件", "execute_bash": "跑命令", "shell": "跑命令", "bash": "跑命令"}
+BLOCKED = "Lean 拦下了一个不该做的改动"
 CHECKBOX_RE = re.compile(rb"(?m)^([ \t]*[-*] )\[[xX ]\]")
 PLAN_RE = re.compile(r"/construction/plans/[^/]+-code-generation-plan\.md$")
 
 Reader = Callable[[str], Optional[bytes]]   # repo-relative path -> bytes or None
 Lister = Callable[[str], list]              # repo-relative prefix -> repo-relative paths
+
+
+def block_rule(gate: Any) -> str:
+    """Which of Lean's rules a BLOCKED record broke, in words."""
+    return BLOCK_GATE.get(str(gate or ""), "它的规则不让")
 
 
 def epoch(ts: Any) -> float | None:
@@ -108,13 +120,20 @@ def stages(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "units": [{"unit": u, "state": s} for u, s in units] if per_unit else [],
                     "note": str(note)[:300] if isinstance(note, str) else None,
                     "at": latest.get("_at") if latest else (whole.get("_at") if whole else None)})
+    # a stage Lean went past without a word (a later one is recorded) was not on this intent's way: skipped
+    last = max((r["n"] for r in out if r["state"] != "todo"), default=0)
+    for r in out:
+        if r["state"] == "todo" and r["n"] < last:
+            r.update(state="skipped", note=PASSED_OVER)
     return out
 
 
 def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """The current stage of Lean's 11 (the row the overview shows, the same stages the detail view lists): the one
     furthest along that is started; else the next one to do after the last one done or skipped; else (nothing left
-    after it) that last one, done. None only when Lean has recorded no stage at all."""
+    after it) that last one, done. None only when Lean has recorded no stage at all. done_n / skipped_n / next say
+    the progress the one way the app says it (ui/src/vocab.ts leanProgress): next is the stage to do now (the
+    started one, else the first not reached), None once every stage is done or skipped."""
     started = [r for r in rows if r["state"] == "started"]
     cur = started[-1] if started else None
     if cur is None:
@@ -123,20 +142,65 @@ def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             last = max(done_n)
             cur = next((r for r in rows if r["state"] == "todo" and r["n"] > last), None) or \
                 next(r for r in rows if r["n"] == last)
+    nxt = cur if cur and cur["state"] in ("started", "todo") else \
+        None if cur else next((r for r in rows if r["state"] == "todo"), None)
     return {"stage": cur["id"] if cur else None, "stage_label": cur["label"] if cur else None,
             "stage_n": cur["n"] if cur else None, "stage_state": cur["state"] if cur else None,
-            "done": sum(1 for r in rows if r["state"] in ("done", "skipped")), "total": len(rows)}
-
-
-STAGE_HINT = {"todo": "（下一步）", "done": "（做完）", "skipped": "（做完）"}
+            "done": sum(1 for r in rows if r["state"] in ("done", "skipped")), "total": len(rows),
+            "done_n": sum(1 for r in rows if r["state"] == "done"),
+            "skipped_n": sum(1 for r in rows if r["state"] == "skipped"),
+            "next": {"id": nxt["id"], "label": nxt["label"], "n": nxt["n"]} if nxt else None}
 
 
 def stage_text(lean: dict[str, Any]) -> str | None:
-    """``9/11 代码生成``; ``3/11 用户故事（下一步）``; ``11/11 发布（做完）``; None before Lean recorded a stage."""
+    """「做完 4 · 跳过 6 · 下一步：发布」, as ui/src/vocab.ts leanProgress says it; None before Lean recorded a stage."""
     if not lean.get("stage_n"):
         return None
-    return "%d/%d %s%s" % (lean["stage_n"], lean["total"], lean.get("stage_label") or lean.get("stage") or "",
-                           STAGE_HINT.get(str(lean.get("stage_state")), ""))
+    parts = ["做完 %d" % lean["done_n"]] + (["跳过 %d" % lean["skipped_n"]] if lean.get("skipped_n") else [])
+    parts.append("下一步：%s" % lean["next"]["label"] if lean.get("next") else "全部做完")
+    return " · ".join(parts)
+
+
+REVIEW_DOC = "construction/build-and-test/review.md"   # Lean's release review (skill aidlc-lean-release)
+INTENT_RE = re.compile(r"^[0-9]{6}-[a-z0-9][a-z0-9-]{0,80}$")
+# what Lean's release skill tells the person to say in a new chat: the review is made by a context that did not write
+# the code (and is not told how by the one that did)
+REVIEW_LINE = ("Review intent %s against its requirements, design and plans, using the diff, and write "
+               "construction/build-and-test/review.md.")
+
+
+def review_line(intent: Any) -> str | None:
+    """Lean's review line for *intent* (run.json is agent-writable: an intent not in Lean's format gets none)."""
+    return REVIEW_LINE % intent if isinstance(intent, str) and INTENT_RE.match(intent) else None
+
+
+def review_current(review_at: float | None, exists: bool, evs: list[dict[str, Any]]) -> bool:
+    """Lean's review_is_current: review.md is there and newer than the last verify. A review read at a commit has no
+    time of its own (*review_at* None): its being there counts."""
+    if not exists:
+        return False
+    verified = [e["_at"] for e in evs if e.get("event") == "VERIFY" and isinstance(e.get("_at"), (int, float))]
+    return review_at is None or not verified or review_at > max(verified)
+
+
+def idle_step(rows: list[dict[str, Any]], *, review_ok: bool, default_branch: str) -> str:
+    """What the person tells an idle local session, from Lean's state: the stage it stopped in, or the next one (the
+    release starts with a review in a new session: the one that wrote the code cannot review it)."""
+    lean = summary(rows)
+    nxt = lean["next"]
+    if nxt is None:
+        return "Lean 的阶段都做完了：可以把分支合并进 %s 了" % default_branch
+    if lean["stage_state"] == "started":
+        return "「%s」做到一半，会话停下了：看它最后问了什么，回它" % nxt["label"]
+    before = [r for r in rows if r["state"] in ("done", "skipped") and r["n"] < nxt["n"]]
+    if not before:
+        return "会话停下了，Lean 还没记下阶段：看它最后说了什么，回它"
+    prev = max(before, key=lambda r: r["n"])["label"]
+    if nxt["id"] == "release":
+        if review_ok:
+            return "审查写好了，下一步是发布：回会话让它接着发布（它会请你批准发布）"
+        return "%s做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）" % prev
+    return "%s做完了，下一步是%s：在会话里让它接着做" % (prev, nxt["label"])
 
 
 def _approval_sha(path: str, raw: bytes | None) -> str | None:
@@ -258,14 +322,14 @@ def stage_events(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
             kind = str(d.get("kind") or "")
             verb = {"APPROVAL_REQUESTED": "请求批准", "APPROVED": "批准", "REJECTED": "驳回",
                     "APPROVAL_REFUSED": "审批口令没被接受"}[ev]
-            out.append({"at": at, "kind": "approval", "label": "%s %s" % (verb, KIND_LABEL.get(kind, kind)),
+            out.append({"at": at, "kind": "approval", "label": verb + KIND_LABEL.get(kind, kind),
                         "detail": ("sha %s" % str(d.get("sha256"))[:8]) if d.get("sha256") else (d.get("check") or None),
                         "who": None, "src": src})
         elif ev == "BLOCKED":
-            out.append({"at": at, "kind": "blocked", "label": "Lean 拦下（%s）" % (d.get("gate") or "?"),
+            out.append({"at": at, "kind": "blocked", "label": "%s：%s" % (BLOCKED, block_rule(d.get("gate"))),
                         "detail": str(d.get("path") or d.get("tool") or "")[:120] or None, "who": None, "src": src})
         elif ev == "VERIFY":
-            out.append({"at": at, "kind": "verify", "label": "verify %s" % ("通过" if d.get("ok") else "没过"),
+            out.append({"at": at, "kind": "verify", "label": "自动检查%s" % ("通过" if d.get("ok") else "没过"),
                         "detail": None, "who": None, "src": src})
         elif ev in ("SESSION_START", "HUMAN_TURN"):
             out.append({"at": at, "kind": "session", "label": "会话开始" if ev == "SESSION_START" else "人发了一条消息",

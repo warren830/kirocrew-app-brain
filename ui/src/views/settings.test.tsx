@@ -90,7 +90,7 @@ describe('设置', () => {
     const pick = await within(crew).findByTestId('mode-pick')
     const rec = pick.querySelector('[data-mode="branch"]') as HTMLElement
     expect(rec).toHaveTextContent('更新到新分支，开 MR 给团队看推荐')
-    expect(pick.querySelector('[data-mode="inplace"]')).toHaveTextContent('更新在你现在的检出里，提交在 main 上，马上生效；不会自己推送')
+    expect(pick.querySelector('[data-mode="inplace"]')).toHaveTextContent('更新在你现在的检出里，提交在 main 上；推送到 origin 以后生效（这会直接改团队的 main，没有 MR 评审）')
     await user.click(within(pick).getByRole('button', { name: '直接更新在 main' }))
     expect(apiCalls.find((c) => c.path === `${API}/import/upgrade`)?.body).toEqual({ path: '/Users/alice/workplace/shop-pay', mode: 'inplace' })
     expect(await within(crew).findByText(job.result!.text)).toBeInTheDocument()
@@ -144,14 +144,24 @@ describe('设置', () => {
     expect(within(r2).queryByTestId('push-box')).toBeNull()
   })
 
-  test('team mode asks for bridge.json and runnerd.json only: the signer is named inside bridge.json, never a key', async () => {
+  test('team mode off is one checkbox, no red; on, it asks for bridge.json and runnerd.json only (the signer inside bridge.json, folded)', async () => {
+    const user = userEvent.setup()
+    const s = fx.status()
+    s.team = { ...s.team, enabled: false, error: '运行机模式没打开' }
     installFixtureRoutes({})
-    render(<SettingsView {...props()} />)
+    render(<SettingsView {...props({ status: s })} />)
     await screen.findByLabelText('brain-kit 在哪')
     const team = screen.getByText('团队模式').closest('fieldset') as HTMLElement
+    expect(within(team).queryAllByRole('textbox')).toEqual([])
+    expect(team).not.toHaveTextContent('bridge')
+    expect(screen.getByRole('region', { name: '团队运行机' })).not.toHaveTextContent('运行机模式没打开')
+    await user.click(within(team).getByRole('checkbox', { name: '这台机器是团队运行机' }))
     expect(within(team).getAllByRole('textbox').map((x) => x.id)).toEqual(['set-bridge_config', 'set-runnerd_config'])
-    expect(team).toHaveTextContent('"signer": {"type": "spool"')
-    expect(team).toHaveTextContent('不写 signing_key')
+    expect(within(team).getByLabelText('桥的配置文件')).toHaveAttribute('placeholder', '…/bridge.json')
+    expect(within(team).getByLabelText('运行机的配置文件')).toHaveAttribute('placeholder', '…/runnerd.json')
+    expect(within(team).getByText(/"signer": \{"type": "spool"/).closest('details')).not.toHaveAttribute('open')
+    expect(team.textContent?.replace(within(team).getByText(/"signer"/).textContent ?? '', '')).not.toMatch(/bridge |runnerd /) // the code names only under 细节
+    expect(team).toHaveTextContent('不写签名私钥')
   })
 
   test('the same-user trial shows its warning; a save that fails shows errorText', async () => {
@@ -160,6 +170,7 @@ describe('设置', () => {
     render(<SettingsView {...props()} />)
     await screen.findByLabelText('brain-kit 在哪')
     expect(screen.queryByTestId('same-user-warning')).toBeNull()
+    await user.click(screen.getByRole('checkbox', { name: '这台机器是团队运行机' }))
     await user.click(screen.getByRole('checkbox', { name: '本机试用：签名器和 app 用同一个系统用户' }))
     expect(screen.getByTestId('same-user-warning')).toHaveTextContent('只适合本机试用')
     await user.click(screen.getByRole('button', { name: '保存' }))
@@ -173,21 +184,22 @@ describe('设置', () => {
     render(<SettingsView {...p} />)
     const kit = screen.getByRole('region', { name: 'brain-kit' })
     expect(kit).toHaveTextContent('0.1.0')
-    expect(kit).toHaveTextContent('evaluate 有')
-    expect(kit).toHaveTextContent('golden 没有')
+    expect(kit).toHaveTextContent('交付评估 有')                                          // what the part does, not its module name
+    expect(kit).toHaveTextContent('标准考题 没有')
+    expect(kit).not.toHaveTextContent('evaluate')
     expect(within(kit).getByText('找到了')).toHaveClass('tone-ok')
     expect(screen.getByRole('region', { name: '团队运行机' })).toHaveTextContent('没开')
     const repos = screen.getByRole('region', { name: '仓库' })
     const r1 = repos.querySelector('[data-repo="r1"]') as HTMLElement
     expect(r1).toHaveClass('is-ok')
-    expect(Array.from(r1.querySelectorAll('.st-kit .br-tag')).map((t) => t.textContent)).toEqual(['需求号 PAY-n', '跟踪 none', '默认分支 main', 'GitLab shop/shop-pay'])
+    expect(Array.from(r1.querySelectorAll('.st-kit .br-tag')).map((t) => t.textContent)).toEqual(['需求号 PAY-n', '跟踪 不用 Jira', '默认分支 main', 'GitLab shop/shop-pay'])
     expect(within(r1).getByText('能用')).toHaveClass('tone-ok')
     const r2 = repos.querySelector('[data-repo="r2"]') as HTMLElement
-    expect(r2).toHaveClass('is-bad')
-    expect(within(r2).getByText('读不到')).toHaveClass('tone-bad')
-    await user.click(within(r2).getByRole('button', { name: '去检查' }))
+    expect(r2).not.toHaveClass('is-bad')                                                // not installed is no fault
+    expect(within(r2).getByText('没装')).toHaveClass('tone-idle')
+    await user.click(within(r2).getByRole('button', { name: '去装' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'import', path: '/Users/alice/workplace/shop-web' })
-    const me = screen.getByRole('region', { name: '我是谁' })
+    const me = screen.getByRole('region', { name: '你是谁' })
     expect(me).toHaveTextContent('alice')
     expect(me).toHaveTextContent('GitLab token 有')
     expect(me).not.toHaveTextContent('glpat')
@@ -195,7 +207,7 @@ describe('设置', () => {
     expect(crew).toHaveTextContent('brain-dev.json 缺 Lean 的 hook：调用工具前')
     expect(within(crew).getByRole('img', { name: '1 正常，1 注意，1 有问题' })).toBeInTheDocument()
     expect(crew).toHaveClass('is-bad')
-    await user.click(within(crew).getByRole('button', { name: /brain-dev 的 Lean hook/ }))
+    await user.click(within(crew).getByRole('button', { name: '补上 Lean 的 hook' }))
     expect(await within(crew).findByText('装好了 ~/.kiro/agents/brain-dev.json')).toBeInTheDocument()
     expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/crew/fix`, body: { what: 'agent' } })
     expect(p.reloadStatus).toHaveBeenCalled()
@@ -227,23 +239,42 @@ describe('设置', () => {
     await user.click(within(card).getByRole('button', { name: '看运行机' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'team' })
   })
+
+  test('a round that failed and a name never set: said in words; the step’s own words and the command apart', () => {
+    const s = fx.status()
+    s.app.team = true
+    s.team = { ...fx.team().status, loop_error: 'poll: HTTPError 502 Bad Gateway' }
+    s.me = { ...s.me, user: null }
+    s.repos = s.repos.map((r) => ({ ...r, me: null }))
+    installFixtureRoutes({})
+    render(<SettingsView {...props({ status: s })} />)
+    const runner = screen.getByRole('region', { name: '团队运行机' })
+    expect(runner).toHaveTextContent('上一轮有一步没成：点「看运行机」看是哪一步')
+    expect(runner.querySelector('details pre')).toHaveTextContent('poll: HTTPError 502 Bad Gateway')
+    expect(runner.querySelector('details')).not.toHaveAttribute('open')
+    const who = screen.getByRole('region', { name: '你是谁' })
+    expect(who).toHaveTextContent('导入仓库时会问你的名字，在那里填上，点「保存」。')
+    const cmd = within(who).getByTestId('cmd-line')                                       // the command, folded under 细节
+    expect(cmd).toHaveTextContent('git config --global brain.user 你的用户名复制')
+    expect(cmd.closest('details')).not.toHaveAttribute('open')
+  })
   test('你是谁 per repo: the login name without GitLab; 「你的 GitLab 用户名」 where brain-kit would not know, saved into that repo', async () => {
     const user = userEvent.setup()
     const s = fx.status()
     const login: RepoMe = { name: 'alice', source: 'login', gitlab: '', text: 'alice（这台机器的登录名：这个仓库不用 GitLab）', ask: false,
       label: '', why: '', suggest: '', error: '' }
     const ask: RepoMe = { name: null, source: 'none', gitlab: 'https://gitlab.example.com', text: '', ask: true, label: '你的 GitLab 用户名',
-      why: '这个仓库用 GitLab：认领的分支 ai/<名字>/… 和交接都按这个名字认人，要和你在 GitLab 上的用户名一样', suggest: 'alice', error: '' }
+      why: '这个仓库用 GitLab：认领和交接都按这个名字认人，要和你在 GitLab 上的用户名一样', suggest: 'alice', error: '' }
     s.me = { user: null, token: false, how: 'GitLab token（没有）' }
     s.repos = [{ ...s.repos[0], me: login }, { ...s.repos[0], id: 'r2', path: '/Users/alice/workplace/shop-web', name: 'shop-web', me: ask }]
     const after = fx.status()
     installFixtureRoutes({ [`POST ${API}/me/name`]: () => ({ ok: true, text: '这个仓库的 git config brain.user 设成了 alice',
-      me: { ...ask, name: 'alice', source: 'git', text: 'alice（git config brain.user）', ask: false }, status: after }) })
+      me: { ...ask, name: 'alice', source: 'git', text: 'alice（这个仓库里记下的名字）', ask: false }, status: after }) })
     const p = props({ status: s })
     render(<SettingsView {...p} />)
-    const kpi = screen.getByRole('region', { name: '我是谁' })
+    const kpi = screen.getByRole('region', { name: '你是谁' })
     expect(kpi).toHaveTextContent('alice')
-    expect(kpi).toHaveTextContent('1 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」里填上')
+    expect(kpi).toHaveTextContent('1 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」那一行看一眼名字，点「保存」')
     const card = screen.getByRole('region', { name: '仓库' })
     const r1 = card.querySelector('[data-repo="r1"]') as HTMLElement
     expect(within(r1).getByTestId('me-line')).toHaveTextContent('alice（这台机器的登录名：这个仓库不用 GitLab）')
@@ -255,7 +286,65 @@ describe('设置', () => {
     await user.click(within(who).getByRole('button', { name: '保存' }))
     await waitFor(() => expect(p.setStatus).toHaveBeenCalledWith(after))
     expect(apiCalls.find((c) => c.path === `${API}/me/name`)?.body).toEqual({ path: '/Users/alice/workplace/shop-web', name: 'alice' })
-    expect(within(r2).getByTestId('me-line')).toHaveTextContent('alice（git config brain.user）已保存')
+    expect(within(r2).getByTestId('me-line')).toHaveTextContent('alice（这个仓库里记下的名字）已保存')
     for (const c of apiCalls) expect(JSON.stringify(c.body ?? '')).not.toMatch(/token/i)    // nothing asks for a token
+  })
+
+  test('no brain-kit: its place is asked first, at the top, focused, with why (by the reason) and where to get one', async () => {
+    const missing = fx.status()
+    missing.brainkit = { ...missing.brainkit, ok: false, version: null, error: '这里没有 brain-kit（找不到 /Users/alice/src/brain-kit/brainkit/__init__.py）' }
+    missing.repos[0] = { ...missing.repos[0], ok: false, error: 'brain-kit 没装载', me: null }
+    installFixtureRoutes({})
+    const { unmount } = render(<SettingsView {...props({ status: missing })} />)
+    const card = screen.getByTestId('settings-no-brainkit')
+    expect(card).toHaveTextContent('找不到 brain-kit')
+    expect(card).toHaveTextContent('做什么在设置的「brain-kit 在哪」写上它的目录，点「保存」')
+    expect(within(card).getByTestId('cmd-line')).toHaveTextContent('git clone https://github.com/warren830/brain-kit.git ~/brain-kit复制')
+    const input = await within(card).findByLabelText('brain-kit 在哪')
+    await waitFor(() => expect(input).toHaveFocus())
+    expect(screen.getAllByLabelText('brain-kit 在哪')).toHaveLength(1)                  // not a second time in the form below
+    expect(card.compareDocumentPosition(screen.getByRole('region', { name: '仓库' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // a repo that waits for brain-kit points at that card, not at 导入仓库
+    const waiting = screen.getByRole('region', { name: '仓库' }).querySelector<HTMLElement>('li[data-repo="r1"]') as HTMLElement
+    expect(waiting).toHaveTextContent('等 brain-kit')
+    expect(waiting).toHaveTextContent('brain-kit 没装载：先在最上面写对 brain-kit 的位置，这个仓库就能读了')
+    expect(within(waiting).queryByRole('button', { name: /去检查|去装/ })).toBeNull()
+    expect(within(waiting).getByTestId('repo-waits-kit').parentElement?.children).toHaveLength(1)   // one line, no gap before its colon
+    // nor can one without brain-kit be installed now: no 去装 to a page that cannot install it
+    const bare = screen.getByRole('region', { name: '仓库' }).querySelector<HTMLElement>('li[data-repo="r2"]') as HTMLElement
+    expect(bare).toHaveTextContent('还没装 brain-kit：先在最上面写对 brain-kit 的位置，才能装')
+    expect(bare).not.toHaveTextContent('在「导入仓库」里检查它')
+    expect(within(bare).queryByRole('button', { name: /去检查|去装/ })).toBeNull()
+    unmount()
+    const old = fx.status()
+    old.brainkit = { ...old.brainkit, ok: false, error: 'brain-kit 太旧（没有 sign.SpoolSigner）：要 72b278e 或更新的版本' }
+    const { unmount: u2 } = render(<SettingsView {...props({ status: old })} />)
+    expect(screen.getByTestId('settings-no-brainkit')).toHaveTextContent('brain-kit 太旧了（位置是对的）')
+    expect(screen.getByTestId('settings-no-brainkit')).toHaveTextContent('做什么在它的目录里拉取最新的代码（点「复制」拿命令），再到设置里点「保存」重新读它')
+    expect(within(screen.getByTestId('settings-no-brainkit')).getByTestId('cmd-line')).toHaveTextContent(`git -C ${old.brainkit.path} pull --ff-only`)
+    expect(screen.getByTestId('settings-no-brainkit')).not.toHaveTextContent('git clone')
+    u2()
+    const broken = fx.status()
+    broken.brainkit = { ...broken.brainkit, ok: false, error: "brain-kit 导入失败：ModuleNotFoundError: No module named 'x'" }
+    render(<SettingsView {...props({ status: broken })} />)
+    const b = screen.getByTestId('settings-no-brainkit')
+    expect(b).toHaveTextContent('brain-kit 读不进来')
+    expect(b.querySelector('details pre')).toHaveTextContent('ModuleNotFoundError')       // the Python error only under 细节
+    expect(b.querySelector('details')).not.toHaveAttribute('open')
+  })
+
+  test('a repo says its state by the reason; without GitLab it says so instead of an empty tag', () => {
+    const s = fx.status()
+    s.repos = [
+      { ...s.repos[0], kit: { ...s.repos[0].kit!, gitlab_base: '', gitlab_project: '' } },
+      { ...s.repos[1], id: 'r2', error: '找不到这个目录' },
+    ]
+    installFixtureRoutes({})
+    render(<SettingsView {...props({ status: s })} />)
+    const r1 = document.querySelector('[data-repo="r1"]') as HTMLElement
+    expect(Array.from(r1.querySelectorAll('.st-kit .br-tag')).map((t) => t.textContent)).toContain('不用 GitLab')
+    const r2 = document.querySelector('[data-repo="r2"]') as HTMLElement
+    expect(within(r2).getByText('找不到目录')).toHaveClass('tone-bad')
+    expect(within(r2).getByRole('button', { name: '移出列表' }).closest('.st-repo-top')).toBeTruthy()  // on the name's line, at its end
   })
 })

@@ -26,10 +26,10 @@ SET_TIMEOUT_S = 15
 RULE = "只能用小写字母、数字和 . _ -（字母或数字开头，最多 64 个）"
 LABEL_GITLAB = "你的 GitLab 用户名"
 LABEL_NAME = "你的名字"
-WHY_GITLAB = "这个仓库用 GitLab：认领的分支 ai/<名字>/… 和交接都按这个名字认人，要和你在 GitLab 上的用户名一样"
-WHY_OLD = "这个 brain-kit 要一个名字，认领和分支 ai/<名字>/… 用：这个仓库不用 GitLab，用登录名就行"
+WHY_GITLAB = "这个仓库用 GitLab：认领和交接都按这个名字认人，要和你在 GitLab 上的用户名一样"
+WHY_OLD = "要一个名字，认领需求时用：这个仓库不用 GitLab，用登录名就行"
 WHY_LOGIN = "这台机器的登录名不能当名字用：写一个"
-WHY_LOCAL = "这个仓库不用 GitLab：名字只给认领和分支 ai/<名字>/… 用"
+WHY_LOCAL = "这个仓库不用 GitLab：名字只在认领需求时用"
 
 
 def user_re() -> "re.Pattern[str]":
@@ -79,7 +79,7 @@ def of(top: str, gitlab_base: str, *, token: bool) -> dict[str, Any]:
     who = env or conf
     if who and valid(who.lower()):
         out.update(name=who.lower(), source="env" if env else "git",
-                   text="%s（%s）" % (who.lower(), "环境变量 BRAIN_USER" if env else "git config brain.user"))
+                   text="%s（%s）" % (who.lower(), "环境变量 BRAIN_USER 里写的" if env else "你在这个仓库的名字"))
         return out
     if env:     # git config does not win over it: nothing to fix here
         out.update(source="env", error="环境变量 BRAIN_USER（%s）不能用：%s。改掉它" % (env[:64], RULE))
@@ -89,7 +89,7 @@ def of(top: str, gitlab_base: str, *, token: bool) -> dict[str, Any]:
         out.update(name=login, source="login", text="%s（这台机器的登录名：这个仓库不用 GitLab）" % login)
         return out
     if who:
-        out["error"] = "git config brain.user 现在是「%s」：%s" % (who[:64], RULE)
+        out["error"] = "你在这个仓库的名字「%s」不能用：%s" % (who[:64], RULE)
     why = WHY_GITLAB if base else WHY_LOCAL if who else WHY_LOGIN if falls_back() else WHY_OLD
     out.update(ask=True, suggest=login, label=LABEL_GITLAB if base else LABEL_NAME, why=why)
     return out

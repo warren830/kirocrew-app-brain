@@ -65,10 +65,13 @@ def started(svc, coro_fn):
     return run(go())
 
 
-async def install(svc, path, kit=None, branch=None):
+async def install(svc, path, kit=None, branch=None, mode="branch"):
+    """安装 on a new branch (the way these tests follow; in place is the recommended one, test_inplace.py's)."""
     body = {"path": str(path), "kit": dict(kit or KIT)}
     if branch:
         body["branch"] = branch
+    if mode:
+        body["mode"] = mode
     job = (await svc.import_install(body))["job"]
     steps = [s["id"] for s in job["steps"]]      # a new branch (a repo with a remote), else in place
     assert job["state"] == "running" and steps in ([s for s, _ in installer.INSTALL_STEPS],
@@ -121,8 +124,9 @@ def test_an_installed_repo_is_one_click_inspect_then_add(tmp_path, home):
     assert [c[k]["level"] for k in ("path", "git", "branch", "default", "clean", "kit", "lean", "brain", "agents", "listed")] \
         == ["OK"] * 10, got["checks"]
     assert c["branch"]["why"] == "在 main 上" and c["default"]["why"].startswith("main")
-    assert c["kit"]["why"] == "装了，已提交（.brain/kit.json）" and c["listed"]["why"] == "还不在列表里"
-    assert c["origin"]["level"] == "WARN" and "git remote add origin" in c["origin"]["todo"]
+    assert c["kit"]["why"] == "装了，已提交" and c["listed"]["why"] == "还不在列表里"
+    # a repo done only on this machine: no origin is no warning (UI问题清单 #5)
+    assert c["origin"]["level"] == "OK" and c["origin"]["why"].startswith("没有 origin：这个仓库只在本机做")
     assert got["kit"]["state"] == "checkout" and got["kit"]["values"]["req_prefix"] == "PAY"
     assert any(r["text"].startswith("KiroCrew 引擎") for r in got["crew"]["rows"])   # crewcheck's rows for it
     assert added["ok"] and added["id"] == "r1" and added["status"]["repos"][0]["ok"] is True
@@ -162,10 +166,12 @@ def test_a_plain_dirty_repo_each_check_says_why_and_the_form_is_prefilled(tmp_pa
     assert c["origin"]["level"] == "OK" and "GitLab https://gitlab.example.com，项目 grp/pay" in c["origin"]["why"]
     assert got["origin"] == {"url": "git@gitlab.example.com:grp/pay.git", "base": "https://gitlab.example.com",
                              "project": "grp/pay"}
-    assert c["clean"]["level"] == "WARN" and "有 2 个改动没提交" in c["clean"]["why"] and "不会动" in c["clean"]["todo"]
-    assert c["kit"]["level"] == "FAIL" and "没装" in c["kit"]["why"] and "直接装在当前分支" in c["kit"]["todo"]
-    assert got["install"]["recommend"] == "branch"            # a remote: the new branch for an MR is recommended
-    assert [c[k]["level"] for k in ("lean", "brain", "agents")] == ["FAIL"] * 3
+    # SETUP-2: true for the way that is picked by default (in place): only the install's own files are committed
+    assert c["clean"]["level"] == "WARN" and "有 2 个改动没提交" in c["clean"]["why"] and "原样留着" in c["clean"]["todo"]
+    # SETUP-7: not installed yet is where an import starts: one row (Lean, the Brain, AGENTS.md come with it), no ✗
+    assert c["kit"]["why"] == "还没装（会一起装上 AI-DLC Lean、Brain 文件、AGENTS.md）" and c["kit"]["todo"] == "下一步：在下面装上"
+    assert not any(k in c for k in ("lean", "brain", "agents")) and "FAIL" not in {x["level"] for x in got["checks"]}
+    assert got["install"]["recommend"] == "inplace"           # a requirement can be opened today (after 推送)
     assert got["form"] == {"req_prefix": "PAY", "tracker": "none", "jira_base": "", "gitlab_base": "https://gitlab.example.com",
                            "gitlab_project": "grp/pay", "default_branch": "main", "team": ""}
     assert got["current_branch"] == "main" and got["default_branch"] == "main"
@@ -321,7 +327,8 @@ def test_install_goes_on_a_new_branch_in_its_own_worktree_and_never_touches_the_
         sh("git", "-C", repo, "rev-parse", "origin/main").stdout.strip()
     assert sh("git", "-C", wt, "status", "--porcelain").stdout == ""          # everything brain install wrote is committed
     assert sh("git", "-C", bare, "branch", "--list", "brain/install").stdout == ""   # nothing pushed
-    assert got["next"] == "pending" and got["kit"]["state"] == "branch"
+    # listed once its commit went in (SETUP-18); the install branch still waits to go in
+    assert got["next"] == "listed" and got["listed"] == "r1" and got["kit"]["state"] == "branch"
     p = got["pending"]
     assert p["text"] == "装在 brain/install 分支上，还没推送：合进 main 以后生效" and p["branch"] == "brain/install" and not p["pushed"]
     assert p["remote_url"] == str(bare.resolve()) and p["target"] == "main" and p["gitlab_project"] == "grp/pay"
@@ -349,7 +356,7 @@ def test_install_refuses_what_it_should_and_leaves_nothing_behind(tmp_path, home
         out = {"prefix": await refused({"path": str(plain), "kit": dict(KIT, req_prefix="pay-1")}),
                "half_gitlab": await refused({"path": str(plain), "kit": dict(KIT, gitlab_project="")}),
                "jira": await refused({"path": str(plain), "kit": dict(KIT, tracker="jira")}),
-               "branch": await refused({"path": str(plain), "kit": KIT, "branch": "bad..name"}),
+               "branch": await refused({"path": str(plain), "kit": KIT, "branch": "bad..name", "mode": "branch"}),
                "no_kit": await refused({"path": str(plain)})}
         out["installed"] = await install(svc, repo)
         out["no_default"] = await install(svc, plain, dict(KIT, default_branch="develop"))
@@ -438,14 +445,15 @@ def test_add_installed_and_pending_repos_then_merge_and_pull(tmp_path, home):
     assert got["refused"].code == "not_installed" and "还没装 brain-kit" in str(got["refused"])
     assert got["ready"]["status"]["repos"][0]["ok"] is True
     r2 = got["pending"]["status"]["repos"][1]
-    assert got["pending"]["id"] == "r2" and "装在 brain/install 分支上，还没推送：合进 main 以后生效" in got["pending"]["text"]
+    # the install listed it by itself (SETUP-18): 加入列表 afterwards only says so
+    assert got["pending"]["id"] == "r2" and got["pending"]["text"] == "已经在列表里了（r2）"
     assert r2["path"] == str(repo.resolve()) and r2["ok"] is False and r2["error"] == "" and r2["kit"] is None
     assert r2["pending"]["state"] == "branch" and r2["pending"]["text"] == "装在 brain/install 分支上，还没推送：合进 main 以后生效"
     assert "推送并开 MR" in r2["pending"]["next"]
     assert got["overview"]["errors"] == []                                      # pending is no error
     assert got["changed"] is True and got["pulled_seen"] is True
     m = got["merged"]["repos"][1]
-    assert m["pending"]["state"] == "merged" and "已经合进 origin/main" in m["pending"]["text"] and "git pull" in m["pending"]["next"]
+    assert m["pending"]["state"] == "merged" and "已经合进 origin/main" in m["pending"]["text"] and "「拉取」" in m["pending"]["next"]
     assert got["pulled"]["repos"][1]["ok"] is True and got["pulled"]["repos"][1]["pending"] is None
 
 
