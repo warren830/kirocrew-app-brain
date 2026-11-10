@@ -6,7 +6,7 @@
 import type { Actor, Question, ReqBoard, WaitDo, Waits, WaitWho } from '../types'
 import { isOpenQuestion } from '../ui'
 import { ACT } from '../vocab'
-import { leanOf } from './format'
+import { leanOf, waitsOnMe } from './format'
 
 export interface Step {
   id: string
@@ -133,4 +133,10 @@ export function nextOf(b: ReqBoard): Next {
     }
   }
   return { who: w.who, mine, since, steps, text: w.text, mr }
+}
+
+/** How many things wait, the one count the page says (这条路走到哪了, the graph's name): on the person looking, what 你要做的
+ * 一步 lists (a hand-over to label is one, though no actor asks); else, and in a replay, the actors that wait. */
+export function waitCount(b: ReqBoard, replaying = false): number {
+  return waitsOnMe(b) && !replaying ? nextOf(b).steps.length : b.actors.filter((a) => a.status === 'awaiting_approval').length
 }

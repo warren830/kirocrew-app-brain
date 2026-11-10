@@ -76,11 +76,18 @@ const W = world as unknown as {
   overviews: Record<'eval' | 'noeval', Record<string, Overview>>; todo: Record<'ok' | 'crewfail' | 'team', Todo>
   /** team mode's 交付总览 (the team runner's machine): each requirement once, a handed-over one as the runner's */
   overviews_team?: Record<'eval' | 'noeval', Record<string, Overview>>
-  /** KiroCrew's row when brain-dev.json is not there at all (problems.agent_missing) */
+  /** KiroCrew's row when brain-dev.json is not there at all (problems.agent_missing), and why a session is not opened
+   * then (crewcheck.not_ready: the button that row has) */
   crew_missing?: CheckRow
+  crew_not_ready?: string
+  /** 你是谁 on a GitLab repo of this machine, which has a GitLab token (identity.of: GitLab's name, nothing asked) */
+  me_token?: NonNullable<ImportInspect['me']>
   stages: Record<string, RequirementDetail['lean']['stages']>; brains: Record<string, BrainView>
   /** brainview.preview of a reflectable run, by repo/key, when the world recorded it */
   reflects?: Record<string, ReflectPreview>
+  /** 先检查's stop lines: brain-kit's own (its dry run: the picks 机密 / 不确定 / 绝密, the partner guide marked 机密,
+   * gate 3) and the page's words for each, by "<pick>|<line>" (intake.gate_text) */
+  intake_gates?: { raw: Record<'confidential' | 'unsure' | 'secret' | 'partner' | 'business', string>; said: Record<string, string> }
 }
 let repos: RepoInfo[] = flags.has('norepos') ? [] : clone(W.status.repos)
 
@@ -322,6 +329,8 @@ setApiRoutes({
   [`POST ${API}/refresh`]: (body) => ({ ok: true, text: `预览：没有真的跑 git fetch（${(body as { repo: string }).repo}）` }),
   [`POST ${API}/requirements/*`]: (body, path) => {
     if (path.endsWith('/session')) {
+      // as service._open_local: no brain-dev session while KiroCrew's brain-dev row fails
+      if (flags.has('crewfail') && !crewFixed) throw new StubApiError(409, { error: W.crew_not_ready ?? '', code: 'agent_not_ready' })
       const { key } = reqOf(path.replace(/\/session$/, ''))
       const slot = (body as OpenSessionBody | undefined)?.review ? `brain-${key}-review-${Math.random().toString(16).slice(2, 6)}` : `brain-${key}-7f3a`
       return { ok: true, slot, url: `/chat?sid=${slot}` }
@@ -366,20 +375,14 @@ setApiRoutes({
       c.files = (c.files ?? []).filter((f) => f.id !== 'D03')
       c.sources -= 1
     }
+    // brain-kit's lines as its dry run says them (gate 2 names a marked file, else the pick), each in the page's words
+    const gate = W.intake_gates!
     const raw: string[] = []
-    const plain: string[] = []
-    if (given === 'secret') {
-      raw.push('门 2：材料是绝密（你选的是 secret），不收，只留哈希')
-      plain.push('第 2 关：绝密材料不收（你选的是「绝密」）：只交脱敏摘要')
-    } else if (partner || given === 'confidential') {
-      const what = partner ? 'D03 合作方接口说明.pdf=confidential' : `你选的是 ${b.classification}`
-      raw.push(`门 2：材料按机密处理（${what}），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。`)
-      plain.push(`第 2 关：这个仓库不收机密材料（${partner ? 'D03 合作方接口说明.pdf 标着机密' : `你选的是「${b.classification === 'unsure' ? '不确定' : '机密'}」`}）。请产品写一份脱敏摘要再交，或者把这份写进「不收这些文件」`)
-    }
-    if (!b.business) {
-      raw.push("门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉")
-      plain.push('第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」')
-    }
+    if (given === 'secret') raw.push(gate.raw.secret)
+    else if (partner) raw.push(gate.raw.partner)
+    else if (b.classification === 'confidential' || b.classification === 'unsure') raw.push(gate.raw[b.classification])
+    if (!b.business) raw.push(gate.raw.business)
+    const plain = raw.map((l) => gate.said[`${b.classification}|${l}`] ?? l)
     if (b.business === 'mask') {
       // brain-kit masks them (its line: 商业敏感（已打码）), and backend/core/intake.py file_items says so
       c.findings = c.findings.map((l) => l.replace('商业敏感（原样保留）', '商业敏感（已打码）'))
@@ -392,6 +395,7 @@ setApiRoutes({
     const b = body as StartBody
     const r = keyed(fx.start(), b)
     if (!b.open_session) return { ...r, slot: null, url: null }
+    if (flags.has('crewfail') && !crewFixed) return { ...r, slot: null, url: null, session_error: W.crew_not_ready ?? '' }
     return r
   },
   [`POST ${API}/crew/fix`]: (body) => {
@@ -466,7 +470,17 @@ function importRoutes() {
   const pendingPaths = new Set<string>()
   const readyPaths = new Set<string>()      // installed in place, or merged / pulled: brain-kit is in the checkout
   const jobs = new Map<string, { job: ImportJob<unknown>; at: number; path: string }>()
+  const cloned = new Set<string>()         // made by 克隆 here: nothing uncommitted in it
   const at = (p: string) => <T,>(x: T): T => JSON.parse(JSON.stringify(x).split(FIXTURE_PATH).join(p)) as T
+  // a check of another folder than the fixtures' refund: importer.form_defaults' key prefix from the folder's name
+  // (and its GitLab project, as if cloned from shop/<folder>)
+  const FIXTURE_NAME = FIXTURE_PATH.split('/').pop() as string
+  const inFolder = (p: string) => <T,>(x: T): T => {
+    const name = p.split('/').pop() ?? ''
+    const letters = name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)
+    const prefix = /^[A-Z][A-Z0-9]{0,9}$/.test(letters) ? letters : 'REQ'
+    return JSON.parse(JSON.stringify(at(p)(x)).split(`shop/${FIXTURE_NAME}`).join(`shop/${name}`).split(FIXTURE_NAME.toUpperCase()).join(prefix)) as T
+  }
   const READY_KIT: KitForm = { tracker: 'none', req_prefix: 'READY', jira_base: '', default_branch: 'main', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/ready', team: '' }
   const kitAt = (path: string) => installedKit.get(path) ?? READY_KIT
   // the install branch as importer.pending reads it: pushed with its MR open once 推送并开 MR went through
@@ -479,31 +493,49 @@ function importRoutes() {
       text: mr ? `装在 ${p.branch} 分支上，MR 开着：合进 ${tgt} 以后生效` : `装在 ${p.branch} 分支上，推上去了：合进 ${tgt} 以后生效`,
       next: mr ? '在 GitLab 上合并 MR（团队的做法），合并以后点「拉取」' : '在 GitLab 上开 MR、合并；只有你一个人用的话，也可以在本机合并' }
   }
+  // importer.inspect's 你是谁: identity.of with this machine's GitLab token (a GitLab repo: GitLab's name, nothing
+  // asked), else the name saved here, else the listed repo's own
+  const whoHere = (path: string, c: ImportInspect): ImportInspect => {
+    const listed = repos.find((r) => r.path === path)
+    const base = (listed?.kit ?? c.form)?.gitlab_base ?? ''
+    const name = named.get(path)
+    const me = W.status.me.token && base && W.me_token ? { ...W.me_token, gitlab: base }
+      : name && c.me ? { ...c.me, name, source: 'git' as const, text: `${name}（你在这个仓库的名字）`, ask: false, label: '', why: '', suggest: '' }
+        : listed?.me ?? null
+    if (!me || me.ask) return c
+    return { ...c, me, checks: c.checks.map((x) => (x.id === 'me' ? { ...x, level: 'OK' as const, why: me.text, todo: '' } : x)) }
+  }
   const inspect = (path: string): ImportInspect => {
     const listed = repos.find((r) => r.path === path)
     // crewcheck.checks of this machine, and of the repo once it has brain-kit
     const crew = { rows: crewRows().filter((r) => !r.repo || r.repo === path), fix: { agent: flags.has('crewfail') && !crewFixed, engine: false } }
     if (pendingPaths.has(path)) {
-      const c = at(path)(fx.importInspectPending())
+      const c = whoHere(path, inFolder(path)(fx.importInspectPending()))
       const pending = pendingAt(path)
       // importer.inspect's brain-kit row says the install branch's own state, and its next step
       const checks = c.checks.map((x) => (x.id === 'kit' ? { ...x, why: `${pending.text}（AI-DLC Lean、Brain 文件、AGENTS.md 都在分支上）`, todo: pending.next } : x))
       return { ...c, crew, checks, pending, ...(listed ? { next: 'listed' as const, listed: listed.id } : {}) }
     }
-    const c = { ...at(path)(fx.importInspect()), crew }
-    const name = named.get(path)
-    if (name && c.me) {
-      c.me = { ...c.me, name, source: 'git', text: `${name}（你在这个仓库的名字）`, ask: false, label: '', why: '', suggest: '' }
-      c.checks = c.checks.map((x) => (x.id === 'me' ? { ...x, level: 'OK' as const, why: c.me!.text, todo: '' } : x))
+    const c = whoHere(path, { ...inFolder(path)(fx.importInspect()), crew })
+    // a fresh clone has nothing uncommitted (importer.inspect's 工作区 row)
+    if (cloned.has(path)) {
+      const clean = fx.importInspectPending().checks.find((x) => x.id === 'clean')!
+      c.checks = c.checks.map((x) => (x.id === 'clean' ? clean : x))
     }
-    if (flags.has('nokit') && !(path.endsWith('/ready') || listed || readyPaths.has(path))) {
+    if (listed && !listed.kit) {
+      // listed, brain-kit not installed: the install card (kit none → install), the list row says it is listed
+      c.listed = listed.id
+      c.checks = c.checks.map((x) => (x.id === 'listed' ? { ...x, why: '已经在列表里' } : x))
+    }
+    const installed = path.endsWith('/ready') || !!listed?.kit || readyPaths.has(path)
+    if (flags.has('nokit') && !installed) {
       // importer.inspect without brain-kit loaded: it cannot install
       c.next = 'fix'
       c.install = null
       c.checks = c.checks.map((x) => (x.id === 'kit' ? { ...x, level: 'FAIL' as const, why: '还没装 brain-kit，app 现在也没装载 brain-kit，装不了', todo: '先在设置里写对 brain-kit 的位置' } : x))
       return c
     }
-    if (path.endsWith('/ready') || listed || readyPaths.has(path)) {
+    if (installed) {
       c.next = listed ? 'listed' : 'add'
       c.listed = listed?.id ?? null
       const k = listed?.kit ?? kitAt(path)
@@ -540,6 +572,7 @@ function importRoutes() {
       const b = body as { url: string; parent: string; name: string }
       const name = b.name || b.url.replace(/\/+$/, '').split(/[/:]/).pop()?.replace(/\.git$/, '') || 'repo'
       const path = `${b.parent.replace(/\/+$/, '')}/${name}`
+      cloned.add(path)
       return start(at(path)(fx.importCloneJob()), path)
     },
     [`POST ${API}/import/install`]: (body: unknown) => {

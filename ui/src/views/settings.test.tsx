@@ -298,7 +298,7 @@ describe('设置', () => {
     const { unmount } = render(<SettingsView {...props({ status: missing })} />)
     const card = screen.getByTestId('settings-no-brainkit')
     expect(card).toHaveTextContent('找不到 brain-kit')
-    expect(card).toHaveTextContent('做什么在设置的「brain-kit 在哪」写上它的目录，点「保存」')
+    expect(card).toHaveTextContent('做什么在下面的「brain-kit 在哪」写上它的目录，点「保存」')
     expect(within(card).getByTestId('cmd-line')).toHaveTextContent('git clone https://github.com/warren830/brain-kit.git ~/brain-kit复制')
     const input = await within(card).findByLabelText('brain-kit 在哪')
     await waitFor(() => expect(input).toHaveFocus())
@@ -320,7 +320,7 @@ describe('设置', () => {
     old.brainkit = { ...old.brainkit, ok: false, error: 'brain-kit 太旧（没有 sign.SpoolSigner）：要 72b278e 或更新的版本' }
     const { unmount: u2 } = render(<SettingsView {...props({ status: old })} />)
     expect(screen.getByTestId('settings-no-brainkit')).toHaveTextContent('brain-kit 太旧了（位置是对的）')
-    expect(screen.getByTestId('settings-no-brainkit')).toHaveTextContent('做什么在它的目录里拉取最新的代码（点「复制」拿命令），再到设置里点「保存」重新读它')
+    expect(screen.getByTestId('settings-no-brainkit')).toHaveTextContent('做什么在它的目录里拉取最新的代码（点「复制」拿命令），再点下面的「保存」重新读它')
     expect(within(screen.getByTestId('settings-no-brainkit')).getByTestId('cmd-line')).toHaveTextContent(`git -C ${old.brainkit.path} pull --ff-only`)
     expect(screen.getByTestId('settings-no-brainkit')).not.toHaveTextContent('git clone')
     u2()

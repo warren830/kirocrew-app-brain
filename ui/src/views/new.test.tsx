@@ -157,8 +157,8 @@ describe('开需求', () => {
   })
 
   test('a check a gate stops says what to do on this page: the gate goes red, the field it names is marked, 开工 stays off', async () => {
-    const blocking = '第 2 关：这个仓库不收机密材料（D03 合作方接口说明.pdf 标着机密）。请产品写一份脱敏摘要再交，或者把这份写进「不收这些文件」'
-    const raw = '门 2：材料按机密处理（D03 合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。'
+    const blocking = '第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」'
+    const raw = '门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。'
     const { user } = setup({
       [`POST ${API}/intake/check`]: (): IntakeCheck => ({ ...fx.intakeCheck(), ok: false, classification: 'confidential', blocking: [blocking], blocking_raw: [raw] }),
     })
@@ -175,6 +175,22 @@ describe('开需求', () => {
     expect(screen.getByTestId('gate-2')).toHaveAttribute('data-state', 'bad')
     expect(screen.getByTestId('gate-1')).toHaveAttribute('data-state', 'ok')
     expect(flowStates()).toEqual(['done', 'bad', undefined, undefined, undefined])
+  })
+
+  test('gate 2 refusing the person\'s own pick points at the pick, not at 不收这些文件: no file is the cause', async () => {
+    const blocking = '第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要'
+    const raw = '门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。'
+    const { user } = setup({
+      [`POST ${API}/intake/check`]: (): IntakeCheck => ({ ...fx.intakeCheck(), ok: false, classification: 'confidential', blocking: [blocking], blocking_raw: [raw] }),
+    })
+    await fillBasics(user)
+    await fillGates(user)
+    await user.click(checkBtn())
+    const stops = await screen.findByTestId('blocking')
+    expect(stops).toHaveTextContent(blocking)
+    expect(stops).not.toHaveTextContent('不收这些文件')
+    expect(screen.getByLabelText(EXCLUDE).closest('.br-field')).not.toHaveAttribute('data-marked')
+    expect(screen.getByTestId('gate-2')).toHaveAttribute('data-state', 'bad')
   })
 
   test('gate 2 says up front that this repo takes no confidential material; picking it stops at once', async () => {

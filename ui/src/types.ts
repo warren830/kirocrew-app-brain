@@ -1152,7 +1152,9 @@ export interface ReflectPreview {
   gaps: { title: string; kind: string; what: string }[]
   notes: string[]
   warnings: string[]
-  problems: string[]
+  /** what blocks --apply, each a FAIL row in the app's words (a brain lint line as the Brain 检查 card says it, with
+   * its 做什么); brain-kit's lines are in raw */
+  problems: CheckRow[]
   /** at least one op that is more than sources added: --apply would open a branch */
   substantive: boolean
   error: string
@@ -1454,7 +1456,9 @@ export interface ReqBoard {
   /** something is at work right now (a session busy, the runner running): the board glows */
   live: boolean
   /** the owner (the sample's orchestrator slot) */
-  person: { status: ActorStatus; doing: string; owner: string | null; me: boolean }
+  /** *me*: the one reading is the owner; *you*: the board calls the owner 你 (they are, or nobody known reads it on their
+   * machine): the page says 你 and offers 开工 only then (an older backend did not say) */
+  person: { status: ActorStatus; doing: string; owner: string | null; me: boolean; you?: boolean }
   actors: Actor[]
   /** the way's edges (from, to) */
   edges: [string, string][]

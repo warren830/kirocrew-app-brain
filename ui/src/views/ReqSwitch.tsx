@@ -13,7 +13,7 @@ const SEP = '\u0001'
 const idOf = (repo: string, key: string) => `${repo}${SEP}${key}`
 
 export function optionText(r: Requirement): string {
-  return `${r.key} ${r.title}${r.state_label ? ` · ${r.state_label}` : ''}${r.waits.who === 'you' ? ' · 等你' : ''}`
+  return `${r.key}${r.title && r.title !== r.key ? ` ${r.title}` : ''}${r.state_label ? ` · ${r.state_label}` : ''}${r.waits.who === 'you' ? ' · 等你' : ''}`
 }
 
 /** The one shown that its repo does not have (closed, or a key from elsewhere): 「PAY-1（shop-pay 里没有）」. */

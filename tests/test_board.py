@@ -449,7 +449,7 @@ def test_someone_elses_requirement_names_them_and_a_question_for_the_product_is_
     b = snapshot(f, row, me="alice", mr=mr, local_only=False, now=hand + 3 * H)
     text = json.dumps(b, ensure_ascii=False)
     assert "carol 批准了需求" in [e["text"] for e in b["events"]] and "你批准了" not in text
-    assert b["person"]["status"] != "awaiting_approval" and b["person"]["me"] is False
+    assert b["person"]["status"] != "awaiting_approval" and b["person"]["me"] is False and b["person"]["you"] is False
     step = b["accept"]["step"]
     assert step["who"] == "产品" and step["text"].startswith("在 MR 上回答 D-2（A / B）")
     assert step["mr_url"] == mr["url"] and step["line"] is None and step["session_url"] is None
@@ -458,6 +458,7 @@ def test_someone_elses_requirement_names_them_and_a_question_for_the_product_is_
     for me in ("alice", None):
         b = snapshot(f, dict(row, where="runner", repo="runner"), me=me, mr=mr, local_only=False, now=hand + 3 * H)
         assert "carol 批准了需求" in [e["text"] for e in b["events"]], (me, [e["text"] for e in b["events"]])
+        assert b["person"]["you"] is False
 
 
 def test_a_claim_not_started_says_since_when_and_to_start_it():
@@ -466,8 +467,14 @@ def test_a_claim_not_started_says_since_when_and_to_start_it():
     local = actor(b, "local")
     assert local["status"] == "waiting" and local["since"] == T and local["facts"] == []
     assert b["accept"]["step"]["text"] == "认领了，还没开工：在开需求里开工 DEMO-3"
+    assert b["person"]["you"] is True
     b = snapshot(facts([], run=False, owner="carol"), row_of("claimed", "people", "已认领，还没开工"), me="alice")
     assert b["accept"]["step"]["text"] == "carol 认领的，等 carol 开工"
+    # BOARD-11: the board calls carol by her name, so the page offers alice no 开工 and says no 你; nobody known reading
+    # it on this machine is taken for its person, as every line of the board says
+    assert b["person"]["you"] is False
+    b = snapshot(facts([], run=False, owner="carol"), row_of("claimed", "you", "已认领，还没开工"), me=None)
+    assert b["person"]["you"] is True and b["accept"]["step"]["text"].startswith("认领了，还没开工")
 
 
 def test_each_commit_on_the_conveyor_carries_the_files_it_changed(tmp_path):
@@ -551,6 +558,12 @@ def test_a_push_without_its_label_waits_on_the_person_not_on_the_runner():
     assert runners == [], runners
     assert spent(b, ("wait",), now) >= 7 * H + 46 * M
     assert actor(b, "handover")["history"][-1]["who"] == "you"
+    # the check wall (and 需求详情's 检查, which shows it) says the label is missing, as the bridge's node does: nothing
+    # is being checked, the person labels it
+    cell = next(c for c in b["checks"]["cells"] if c["group"] == "handover" and c["id"] == "bridge")
+    assert (cell["label"], cell["name"], cell["status"], cell["actor"]) == ("标签", "补上交接标签", "wait", "handover"), cell
+    assert cell["detail"] == actor(b, "bridge")["doing"] == "MR 上没有交接标签：桥不会接"
+    assert "在核对" not in json.dumps(b["checks"], ensure_ascii=False)
 
 
 def test_a_question_the_runner_asks_on_the_mr_waits_on_whom_park_json_asks_as_the_row_says():
@@ -634,3 +647,47 @@ def test_a_write_back_branch_says_when_it_was_merged_into_the_default_branch(tmp
     assert got["brain/DEMO-3-reflect-1"][1] == got["brain/DEMO-3-reflect-1"][0]
     assert got["brain/DEMO-3-reflect-2"][1] == 1893456000.0
     assert got["brain/DEMO-3-reflect-3"][1] is None
+
+
+def test_the_runners_page_of_a_hand_over_it_cannot_read_yet_tells_one_story():
+    """runner/PAY-9: the team runner has it in its ledger, so the bridge took it; the signer signs its contract and the
+    runner has no working directory for it yet. The hand-over is behind it on every part of the board: no 等开工, no
+    桥 at work while 签名 waits for the bridge, no approvals 还剩 that were the person's before the hand-over."""
+    f = dict(facts([], run=False), claim=None, owner=None)
+    row = dict(row_of("handed_over", "bridge", "签名服务在签接手合同", do="none"), where="runner", repo="runner",
+               updated_at=T, mr={"iid": 53, "url": "https://gitlab.example.com/p/-/merge_requests/53", "state": None},
+               run_ids=["RUN-DEMO-3-1"])
+    b = snapshot(f, row, me="alice", local_only=False, now=T + M)
+    assert (actor(b, "handover")["status"], actor(b, "bridge")["status"]) == ("merged", "done")
+    assert (actor(b, "signer")["status"], actor(b, "signer")["doing"]) == ("running", "在签接手合同")
+    assert actor(b, "runner")["status"] == "waiting"
+    for k in ("local", "req", "design"):
+        assert (actor(b, k)["status"], actor(b, k)["doing"]) == ("done", board.RUNNER_BLIND), k
+    text = json.dumps(b["actors"], ensure_ascii=False)
+    assert "等开工" not in text and "等桥核对" not in text
+    cells = {c["id"]: c for c in b["checks"]["cells"]}
+    assert cells["bridge"]["status"] == "pass" and cells["signer"]["detail"] == "在签"
+    assert "gate-REQUIREMENTS" not in cells and "需求审批" not in b["checks"]["todo"]
+    assert "签接手合同" in b["checks"]["todo"] and "发布审批" in b["checks"]["todo"]
+    # signed: the runner prepares its working directory
+    row = dict(row, waits=dict(row["waits"], who="runner", text="运行机在准备工作区"))
+    b = snapshot(f, row, me="alice", local_only=False, now=T + M)
+    assert actor(b, "signer")["status"] == "merged"
+    assert (actor(b, "runner")["status"], actor(b, "runner")["doing"]) == ("queued", "运行机在准备工作区")
+
+
+def test_a_run_is_said_as_the_runner_page_says_it_the_id_only_on_hover():
+    """ovrest: the feed said 「签名服务签了接手合同（RUN-PAY-4-1）」 and the runner's lane had a 「RUN-PAY-4-1」 chip; the
+    运行机 page says 「第 1 次运行」."""
+    hand = T + 30 * M
+    f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "ychchen"})
+    t = {"actions": {"handovers": [{"kind": "bridge accepted", "at": iso(hand + M), "mr_iid": 41},
+                                   {"kind": "voucher", "at": iso(hand + 2 * M), "run_id": "RUN-DEMO-3-1"}]}}
+    row = dict(row_of("running", "runner", "运行机在跑"), run_ids=["RUN-DEMO-3-1"])
+    b = snapshot(f, row, t=t, local_only=False, now=hand + H)
+    signed = next(e for e in b["events"] if e["kind"] == "signed")
+    assert (signed["text"], signed["src"]) == ("签名服务签了接手合同（第 1 次运行）", "运行号 RUN-DEMO-3-1")
+    assert "第 1 次运行" in actor(b, "runner")["facts"]
+    shown = json.dumps([b["events"], [a["facts"] for a in b["actors"]], [a["marks"] for a in b["actors"]]], ensure_ascii=False)
+    assert "RUN-DEMO-3-1" not in shown.replace('"运行号 RUN-DEMO-3-1"', "")
+    assert board.run_words(["RUN-PAY-4-1", "RUN-PAY-4-2"]) == "第 1、2 次运行"

@@ -125,8 +125,8 @@ export const BOARD_EXTRA_CSS = `
 .br-board .kt-track-span.is-wait.is-other.is-live { background: var(--kt-info); box-shadow: none; }
 .br-board .kt-track-span.is-wait.is-other.is-live::after { display: none; }
 
-/* the graph keeps its text readable: an app too narrow for it scrolls the graph sideways (layout.ts graphWidth); the
-   hidden part's edge fades and says so */
+/* the graph keeps its text readable: an app too narrow for its six columns gets one column per phase (layout.ts
+   graphShape); narrower still, it scrolls the graph sideways and the hidden part's edge fades and says so */
 .br-graph-view { position: relative; }
 /* its smallest words are 12 px too, so at that scale nothing on the graph is under 10 px (BOARD-31) */
 .br-board .kt-graph-svg :is(.kt-orch-sub, .kt-rail-n, .kt-phase-stages, .kt-roster-title, .kt-roster-item text) { font-size: 12px; }

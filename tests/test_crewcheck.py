@@ -243,6 +243,25 @@ def test_agent_ok_needs_the_checks_to_have_found_leans_hooks():
                         {"level": "FAIL", "text": "仓库 pay：.kiro/brain/lean-hook.py is not committed"}])
 
 
+def test_a_session_refused_names_the_button_settings_shows_for_brain_dev(tmp_path, home):
+    """NEW-4: why brain-dev cannot be opened is said by the row 设置's KiroCrew shows, so the button it names is the
+    one there: brain-dev.json missing → 装上 brain-dev; hooks missing → 补上 Lean 的拦截; the file unreadable or
+    brain-kit not loaded → what to do, no button."""
+    cc, P = mod("crewcheck"), mod("problems")
+    make_service(tmp_path, [make_project(tmp_path)]).reload_sync()  # brain-kit loaded, no background tasks
+    agent = home / ".kiro" / "agents" / "brain-dev.json"
+    said = cc.not_ready(cc.checks([])["rows"])
+    assert not agent.exists() and said == "KiroCrew 里还没有 brain-dev。在「设置」的 KiroCrew 里点「装上 brain-dev」：" \
+        "装上 brain-kit 带的那一份；没有它，Lean 的拦截在 KiroCrew 里不会跑", said
+    agent.parent.mkdir(parents=True, exist_ok=True)
+    agent.write_text(json.dumps({"name": "brain-dev", "hooks": {}}))
+    assert "在「设置」的 KiroCrew 里点「补上 Lean 的拦截」" in cc.not_ready(cc.checks([])["rows"])
+    agent.write_text("{ not json")
+    said = cc.not_ready(cc.checks([])["rows"])
+    assert said.startswith("brain-dev 的设置读不懂") and "点「" not in said and "自己修好它" in said, said
+    assert cc.not_ready([P.brainkit_missing()]) == "brain-kit 没装载。在「设置」里写对 brain-kit 的位置"
+
+
 def test_a_repo_whose_lean_counts_the_run_records_as_code_fails(tmp_path, home):
     """brain-kit 72b278e / 48b6b97: Lean must leave runs/** out of its code fingerprint (aidlc-docs/lean.json
     fingerprint_exclude), or a park.json or MR.md written after `lean release` voids the RELEASE approval; `brain
@@ -277,6 +296,34 @@ def test_a_checkout_missing_its_brain_files_or_agents_md_offers_the_kit_fix(tmp_
     rows = [r for r in cc.checks([str(repo)])["rows"] if r["repo"] == str(repo)]
     assert [(r["text"], r["fix"]) for r in rows] == [("缺 Brain 文件：TECH.md", "kit"), ("仓库根目录没有 AGENTS.md", "kit")]
     assert all("点「重装 kit 文件」" in r["todo"] for r in rows)
+
+
+def test_leans_files_gone_from_the_disk_but_still_in_git_offer_the_kit_fix_the_check_row_names(tmp_path, home):
+    """导入仓库's 检查 row says 「AI-DLC Lean 没装 · 点下面 KiroCrew 里的「重装 kit 文件」」 when Lean is not on the disk,
+    git's index still having it (runner_kit_problems reads git and finds nothing): the KiroCrew block then has that
+    very button for the repo. Not in git either: one Lean row, brain-kit's own."""
+    from test_import import checks
+    repo = make_project(tmp_path)
+    install_brain_dev(home)
+    cc = loaded(tmp_path)
+    (repo / ".kiro" / "aidlc-lean" / "aidlc_lean.py").unlink()
+    rows = [r for r in cc.checks([str(repo)])["rows"] if r["repo"] == str(repo)]
+    assert [(r["text"], r["fix"]) for r in rows] == [("没装 AI-DLC Lean", "kit")] and "点「重装 kit 文件」" in rows[0]["todo"]
+    svc = make_service(tmp_path, [])
+
+    async def go():
+        await svc.start()
+        try:
+            return await svc.import_inspect({"path": str(repo)})
+        finally:
+            await svc.stop()
+
+    got = run(go())
+    assert checks(got)["lean"]["level"] == "FAIL" and "「重装 kit 文件」" in checks(got)["lean"]["todo"]
+    assert any(r["fix"] == "kit" and r["repo"] == str(repo) for r in got["crew"]["rows"])
+    sh("git", "-C", str(repo), "rm", "-q", "--cached", ".kiro/aidlc-lean/aidlc_lean.py")
+    rows = [r for r in loaded(tmp_path).checks([str(repo)])["rows"] if r["repo"] == str(repo)]
+    assert [r["text"] for r in rows] == ["AI-DLC Lean 没提交到 git"], rows
 
 
 def test_the_engine_fix_says_why_it_did_not_change_in_words(tmp_path, monkeypatch):

@@ -64,7 +64,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
   },
   "actors": [
     {
@@ -465,7 +466,7 @@
         {
           "at": 1793639480.0,
           "kind": "signed",
-          "title": "签名服务签了接手合同（RUN-PAY-2-1）"
+          "title": "签名服务签了接手合同（第 1 次运行）"
         },
         {
           "at": 1793650501.0,
@@ -692,7 +693,7 @@
       "facts": [
         "提交 6 次",
         "停下问人 4 次",
-        "RUN-PAY-2-1"
+        "第 1 次运行"
       ],
       "credits": 14.4,
       "session": {
@@ -1115,9 +1116,9 @@
       "kind": "signed",
       "from": "bridge",
       "to": "signer",
-      "text": "签名服务签了接手合同（RUN-PAY-2-1）",
+      "text": "签名服务签了接手合同（第 1 次运行）",
       "detail": false,
-      "src": null
+      "src": "运行号 RUN-PAY-2-1"
     },
     {
       "seq": 23,

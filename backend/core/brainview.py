@@ -84,20 +84,42 @@ REFLECT_SAYS: list[tuple[re.Pattern[str], Any]] = [(re.compile(rx), say) for rx,
     (r"^\S+ is not valid JSON: .*$", "这次运行的记录坏了，读不出来"),
     (r"^\S+ has no valid intent$", "这次运行的记录不完整"),
 ]]
-_CJK = re.compile(r"[\u4e00-\u9fff]")
+UNTRANSLATED = "brain-kit 说了一句这里还没翻译的话：原话在「细节」里"
+
+
+def reflect_row(line: str, level: str = "FAIL", *, brain_dir: str = "brain", prefix: str = "") -> dict[str, Any]:
+    """One line brain reflect said, as a CheckRow in Chinese: its own sentences (REFLECT_SAYS); a brain lint sentence
+    (the dry run lints the Brain with the proposals written: ``TECH.md:20: source '见群聊' is not a reference (…)``, or
+    a proposal's text: ``proposal at line 27: looks like a secret``) the way the Brain 检查 card says it, with its 做什么;
+    a Chinese sentence as it is; anything else (English quoting a Chinese word too) the note that the original is in
+    细节. The originals are the preview's ``raw``."""
+    s = " ".join(str(line).split())
+    for rx, say in REFLECT_SAYS:
+        m = rx.match(s)
+        if m:
+            g = m.groupdict()
+            at = _at(g) if g.get("w") else ""
+            return problems.mk(level, say(m, at) if callable(say) else
+                               say.format(at=at, **{k: v for k, v in g.items() if v is not None}))
+    m = re.match(_AT + r"(?P<msg>.+)$", s)
+    if m:
+        where, msg = _at(m.groupdict()), m["msg"]
+    else:
+        _, at, msg = problems.lint_parts(s)
+        where = problems.where_text(at, brain_dir) if at else ""
+    said = problems.lint_says(msg, prefix) if where else None
+    if said:
+        return problems.mk(level, "%s：%s" % (where, said[0]), said[1])
+    return problems.mk(level, s if problems.chinese(s) else UNTRANSLATED)
+
+
+def _at(g: dict[str, Any]) -> str:
+    return "第 %s 行的%s" % (g["n"], "提议" if g["w"] == "proposal" else "缺口")
 
 
 def reflect_says(line: str) -> str:
-    """One line brain reflect said, in Chinese: a known sentence translated, Chinese as it is, any other English as a
-    note that the original is in 细节."""
-    line = str(line).strip()
-    for rx, say in REFLECT_SAYS:
-        m = rx.match(line)
-        if m:
-            g = m.groupdict()
-            at = ("第 %s 行的%s" % (g["n"], "提议" if g["w"] == "proposal" else "缺口")) if g.get("w") else ""
-            return say(m, at) if callable(say) else say.format(at=at, **{k: v for k, v in g.items() if v is not None})
-    return line if _CJK.search(line) else "brain-kit 说了一句这里还没翻译的话：原话在「细节」里"
+    """reflect_row's sentence alone (a note, a warning, the error)."""
+    return reflect_row(line)["text"]
 
 
 def _brain(repo: Repo) -> tuple[Any, str]:
@@ -247,7 +269,9 @@ def preview(repo: Repo, facts: dict[str, Any], vouchers_dir: str | None) -> dict
         what = "之前已登记 %s" % (r["existing"] or {}).get("key") if r.get("existing") else "写入时登记成新需求"
         out["gaps"].append({"title": str(getattr(g, "title", ""))[:200], "kind": str(getattr(g, "kind", "")), "what": what})
     said = [str(n) for n in notes], [str(w) for w in lost], [str(p) for p in probs]
-    out["notes"], out["warnings"], out["problems"] = ([reflect_says(x) for x in xs] for xs in said)
+    out["notes"], out["warnings"] = [reflect_says(x) for x in said[0]], [reflect_says(x) for x in said[1]]
+    out["problems"] = [reflect_row(x, brain_dir=str(mcfg.get("brain_dir") or "brain"),
+                                   prefix=str(repo.cfg.get("req_prefix") or "")) for x in said[2]]
     out["raw"] = [x for xs in said for x in xs]
     out["substantive"] = bool(ops) and R.substantive(ops)
     return out

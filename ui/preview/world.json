@@ -37,10 +37,10 @@
     },
     "pending": null,
     "me": {
-     "name": "alice",
-     "source": "git",
+     "name": null,
+     "source": "token",
      "gitlab": "https://gitlab.example.com",
-     "text": "alice（你在这个仓库的名字）",
+     "text": "GitLab 令牌认你：用你在 GitLab 上的用户名",
      "ask": false,
      "label": "",
      "why": "",
@@ -76,13 +76,13 @@
     },
     "me": {
      "name": null,
-     "source": "none",
+     "source": "token",
      "gitlab": "https://gitlab.example.com",
-     "text": "",
-     "ask": true,
-     "label": "你的 GitLab 用户名",
-     "why": "这个仓库用 GitLab：认领和交接都按这个名字认人，要和你在 GitLab 上的用户名一样",
-     "suggest": "alice",
+     "text": "GitLab 令牌认你：用你在 GitLab 上的用户名",
+     "ask": false,
+     "label": "",
+     "why": "",
+     "suggest": "",
      "error": ""
     },
     "remote": true
@@ -151,7 +151,7 @@
   "me": {
    "user": "alice",
    "token": true,
-   "how": "GitLab 令牌（有）；alice（你在这个仓库的名字）"
+   "how": "GitLab 令牌（有）；alice（这台机器的登录名：这个仓库不用 GitLab）"
   },
   "team": {
    "enabled": false,
@@ -21731,7 +21731,14 @@
    "notes": [],
    "warnings": [],
    "problems": [
-    "TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
+    {
+     "level": "FAIL",
+     "text": "brain/TECH.md 第 20 行：来源「见群聊」不是引用",
+     "todo": "来源写成查得到的引用：需求文档的段落、材料、决定号、凭证号、运行号或条目号",
+     "fix": null,
+     "repo": null,
+     "raw": ""
+    }
    ],
    "substantive": true,
    "error": "",
@@ -21760,7 +21767,14 @@
    "notes": [],
    "warnings": [],
    "problems": [
-    "TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
+    {
+     "level": "FAIL",
+     "text": "brain/TECH.md 第 20 行：来源「见群聊」不是引用",
+     "todo": "来源写成查得到的引用：需求文档的段落、材料、决定号、凭证号、运行号或条目号",
+     "fix": null,
+     "repo": null,
+     "raw": ""
+    }
    ],
    "substantive": true,
    "error": "",
@@ -21902,6 +21916,18 @@
   "repo": null,
   "raw": "没有 ~/.kiro/agents/brain-dev.json"
  },
+ "crew_not_ready": "KiroCrew 里还没有 brain-dev。在「设置」的 KiroCrew 里点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的拦截在 KiroCrew 里不会跑",
+ "me_token": {
+  "name": null,
+  "source": "token",
+  "gitlab": "https://gitlab.example.com",
+  "text": "GitLab 令牌认你：用你在 GitLab 上的用户名",
+  "ask": false,
+  "label": "",
+  "why": "",
+  "suggest": "",
+  "error": ""
+ },
  "boards": {
   "r1/PAY-2": {
    "at": 1794146400,
@@ -21969,7 +21995,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -22370,7 +22397,7 @@
       {
        "at": 1793639480.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-2-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1793650501.0,
@@ -22597,7 +22624,7 @@
      "facts": [
       "提交 6 次",
       "停下问人 4 次",
-      "RUN-PAY-2-1"
+      "第 1 次运行"
      ],
      "credits": 14.4,
      "session": {
@@ -23020,9 +23047,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-2-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-2-1"
     },
     {
      "seq": 23,
@@ -23925,7 +23952,8 @@
     "status": "awaiting_approval",
     "doing": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -25327,7 +25355,8 @@
     "status": "waiting",
     "doing": "等产品在 MR 上回答 D-2（设计）",
     "owner": "carol",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -25657,7 +25686,7 @@
       {
        "at": 1794123380.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-4-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -25739,7 +25768,7 @@
      "facts": [
       "提交 1 次",
       "停下问人 2 次",
-      "RUN-PAY-4-1"
+      "第 1 次运行"
      ],
      "credits": 6.1,
      "session": {
@@ -26028,9 +26057,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-4-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-4-1"
     },
     {
      "seq": 20,
@@ -26480,7 +26509,8 @@
     "status": "waiting",
     "doing": "等产品在 MR 上验收 D-3（approve / reject）",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -26810,7 +26840,7 @@
       {
        "at": 1793910680.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-5-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -26932,7 +26962,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-PAY-5-1"
+      "第 1 次运行"
      ],
      "credits": 24.2,
      "session": {
@@ -27278,9 +27308,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-5-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-5-1"
     },
     {
      "seq": 20,
@@ -27937,7 +27967,8 @@
     "status": "awaiting_approval",
     "doing": "接手被拒：标签是 bob 打的，不是负责人 alice",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -28952,7 +28983,8 @@
     "status": "waiting",
     "doing": "等 carol 开工",
     "owner": "carol",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -29346,7 +29378,8 @@
     "status": "awaiting_approval",
     "doing": "已认领，还没开工",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -29746,7 +29779,8 @@
     "status": "awaiting_approval",
     "doing": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -30530,12 +30564,12 @@
      {
       "id": "bridge",
       "group": "handover",
-      "label": "桥",
-      "name": "桥核对交接",
+      "label": "标签",
+      "name": "补上交接标签",
       "status": "wait",
       "at": null,
-      "detail": "在核对",
-      "actor": "bridge"
+      "detail": "MR 上没有交接标签：桥不会接",
+      "actor": "handover"
      },
      {
       "id": "signer",
@@ -30580,7 +30614,7 @@
       "count": 1
      }
     ],
-    "checks": "检查 3/4 过 · 等人：桥核对交接 · 还剩 发布审批、签接手合同",
+    "checks": "检查 3/4 过 · 等人：补上交接标签 · 还剩 发布审批、签接手合同",
     "done": null
    },
    "brain": {
@@ -30698,7 +30732,8 @@
     "status": "awaiting_approval",
     "doing": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -31690,7 +31725,8 @@
     "status": "waiting",
     "doing": "等小需求合进来：已合并 1/3（1 个待认领，1 个在做）",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -32756,7 +32792,8 @@
     "status": "waiting",
     "doing": "已合进大需求 PAY-11 的分支：等它评审、发布",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -33471,7 +33508,8 @@
     "status": "waiting",
     "doing": "bob 在自己的机器上做",
     "owner": "bob",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -34044,7 +34082,8 @@
     "status": "waiting",
     "doing": "待认领：谁做都可以认领（开工要等 PAY-13（web，bob 在做）合进大需求）",
     "owner": null,
-    "me": false
+    "me": false,
+    "you": true
    },
    "actors": [
     {
@@ -34433,7 +34472,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -34774,7 +34814,7 @@
       {
        "at": 1788269780.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-1-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1788283921.0,
@@ -34933,7 +34973,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-ORD-1-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -35291,9 +35331,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-1-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-1-1"
     },
     {
      "seq": 20,
@@ -35931,7 +35971,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "dave",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -36272,7 +36313,7 @@
       {
        "at": 1788870980.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-2-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1788887041.0,
@@ -36436,7 +36477,7 @@
      "facts": [
       "提交 5 次",
       "停下问人 2 次",
-      "RUN-ORD-2-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -36831,9 +36872,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-2-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-2-1"
     },
     {
      "seq": 20,
@@ -37530,7 +37571,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -37921,7 +37963,7 @@
       {
        "at": 1789647680.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-3-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1789662421.0,
@@ -38085,7 +38127,7 @@
      "facts": [
       "提交 5 次",
       "停下问人 2 次",
-      "RUN-ORD-3-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -38473,9 +38515,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-3-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-3-1"
     },
     {
      "seq": 23,
@@ -39172,7 +39214,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "dave",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -39513,7 +39556,7 @@
       {
        "at": 1790246180.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-4-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1790260321.0,
@@ -39672,7 +39715,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-ORD-4-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -40044,9 +40087,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-4-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-4-1"
     },
     {
      "seq": 20,
@@ -40692,7 +40735,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -41690,7 +41734,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "dave",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -42081,7 +42126,7 @@
       {
        "at": 1791552080.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-6-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1791568141.0,
@@ -42245,7 +42290,7 @@
      "facts": [
       "提交 5 次",
       "停下问人 2 次",
-      "RUN-ORD-6-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -42664,9 +42709,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-6-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-6-1"
     },
     {
      "seq": 23,
@@ -43381,7 +43426,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -43722,7 +43768,7 @@
       {
        "at": 1792236980.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-7-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1792251121.0,
@@ -43881,7 +43927,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-ORD-7-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -44239,9 +44285,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-7-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-7-1"
     },
     {
      "seq": 20,
@@ -44892,7 +44938,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "dave",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -45238,7 +45285,7 @@
       {
        "at": 1793097380.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-8-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1793108041.0,
@@ -45460,7 +45507,7 @@
      "facts": [
       "提交 5 次",
       "停下问人 4 次",
-      "RUN-ORD-8-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -45832,9 +45879,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-8-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-8-1"
     },
     {
      "seq": 20,
@@ -46578,7 +46625,8 @@
     "status": "merged",
     "doing": "已合并，有 1 条新知识等 erin 回写 Brain",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -46969,7 +47017,7 @@
       {
        "at": 1793888480.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-9-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1793902621.0,
@@ -47128,7 +47176,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-ORD-9-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -47518,9 +47566,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-9-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-9-1"
     },
     {
      "seq": 23,
@@ -48193,7 +48241,8 @@
     "status": "running",
     "doing": "运行机在跑",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -48516,7 +48565,7 @@
       {
        "at": 1794125720.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-10-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -48574,7 +48623,7 @@
      ],
      "facts": [
       "提交 3 次",
-      "RUN-ORD-10-1"
+      "第 1 次运行"
      ],
      "credits": 7.4,
      "session": {
@@ -48863,9 +48912,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-10-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-10-1"
     },
     {
      "seq": 20,
@@ -49277,7 +49326,8 @@
     "status": "running",
     "doing": "AI 在做「应用设计」",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -49912,7 +49962,8 @@
     "status": "running",
     "doing": "签名服务在签接手合同",
     "owner": null,
-    "me": false
+    "me": false,
+    "you": true
    },
    "actors": [
     {
@@ -49920,8 +49971,8 @@
      "title": "本机会话",
      "sub": "brain-dev · AI-DLC Lean",
      "icon": "laptop",
-     "status": "waiting",
-     "doing": "等开工",
+     "status": "done",
+     "doing": "交接前的事：运行机还没建工作区，读不到它的记录",
      "since": null,
      "history": [],
      "spans": [],
@@ -49936,8 +49987,8 @@
      "title": "需求审批",
      "sub": "Lean 请人批需求",
      "icon": "req",
-     "status": "waiting",
-     "doing": "等 Lean 走到需求审批",
+     "status": "done",
+     "doing": "交接前的事：运行机还没建工作区，读不到它的记录",
      "since": null,
      "history": [],
      "spans": [],
@@ -49952,8 +50003,8 @@
      "title": "设计审批",
      "sub": "设计 · 代码生成计划",
      "icon": "design",
-     "status": "waiting",
-     "doing": "等需求批准以后的设计",
+     "status": "done",
+     "doing": "交接前的事：运行机还没建工作区，读不到它的记录",
      "since": null,
      "history": [],
      "spans": [],
@@ -49968,14 +50019,14 @@
      "title": "交接",
      "sub": "本机做完交给运行机",
      "icon": "handover",
-     "status": "queued",
-     "doing": "等桥核对交接",
-     "since": 1794146400.0,
+     "status": "merged",
+     "doing": "桥接手了",
+     "since": 1794146340.0,
      "history": [
       {
-       "at": 1794146400.0,
-       "status": "queued",
-       "doing": "等桥核对交接",
+       "at": 1794146340.0,
+       "status": "merged",
+       "doing": "桥接手了",
        "who": null
       }
      ],
@@ -49993,24 +50044,18 @@
      "title": "桥",
      "sub": "核对交接 · 转问题",
      "icon": "bridge",
-     "status": "running",
-     "doing": "签名服务在签接手合同",
-     "since": 1794146400.0,
+     "status": "done",
+     "doing": "核对过了：交给签名服务签合同",
+     "since": 1794146340.0,
      "history": [
       {
-       "at": 1794146400.0,
-       "status": "running",
-       "doing": "签名服务在签接手合同",
+       "at": 1794146340.0,
+       "status": "done",
+       "doing": "核对过了：交给签名服务签合同",
        "who": null
       }
      ],
-     "spans": [
-      {
-       "a": 1794146400.0,
-       "b": null,
-       "kind": "work"
-      }
-     ],
+     "spans": [],
      "marks": [],
      "facts": [],
      "credits": null,
@@ -50022,11 +50067,24 @@
      "title": "签名",
      "sub": "接手合同 · 回答凭证",
      "icon": "signer",
-     "status": "waiting",
-     "doing": "等桥核对完签接手合同",
-     "since": null,
-     "history": [],
-     "spans": [],
+     "status": "running",
+     "doing": "在签接手合同",
+     "since": 1794146340.0,
+     "history": [
+      {
+       "at": 1794146340.0,
+       "status": "running",
+       "doing": "在签接手合同",
+       "who": null
+      }
+     ],
+     "spans": [
+      {
+       "a": 1794146340.0,
+       "b": null,
+       "kind": "work"
+      }
+     ],
      "marks": [],
      "facts": [],
      "credits": null,
@@ -50045,7 +50103,7 @@
      "spans": [],
      "marks": [],
      "facts": [
-      "RUN-PAY-9-1"
+      "第 1 次运行"
      ],
      "credits": null,
      "session": null,
@@ -50148,16 +50206,6 @@
    "checks": {
     "cells": [
      {
-      "id": "gate-REQUIREMENTS",
-      "group": "gate",
-      "label": "需求",
-      "name": "需求审批",
-      "status": "skip",
-      "at": null,
-      "detail": "还没到这一步",
-      "actor": "req"
-     },
-     {
       "id": "gate-RELEASE",
       "group": "gate",
       "label": "发布",
@@ -50182,9 +50230,9 @@
       "group": "handover",
       "label": "桥",
       "name": "桥核对交接",
-      "status": "skip",
-      "at": null,
-      "detail": "还没交接",
+      "status": "pass",
+      "at": 1794146340.0,
+      "detail": "接手了",
       "actor": "bridge"
      },
      {
@@ -50194,19 +50242,19 @@
       "name": "签名服务签接手合同",
       "status": "skip",
       "at": null,
-      "detail": "还没签",
+      "detail": "在签",
       "actor": "signer"
      }
     ],
-    "passed": 0,
+    "passed": 1,
     "failed": 0,
-    "total": 0,
+    "total": 1,
     "todo": [
-     "需求审批",
      "发布审批",
-     "自动检查"
+     "自动检查",
+     "签接手合同"
     ],
-    "at": null,
+    "at": 1794146340.0,
     "history": []
    },
    "accept": {
@@ -50219,7 +50267,7 @@
      "session_url": null
     },
     "by": [],
-    "checks": "还没有检查结果 · 还剩 需求审批、发布审批、自动检查",
+    "checks": "目前 1 项都过 · 还剩 发布审批、自动检查、签接手合同",
     "done": null
    },
    "brain": {
@@ -50238,7 +50286,7 @@
     "source": null,
     "path": null,
     "ref": null,
-    "error": "还没开工：开工以后才有变更说明"
+    "error": "运行机还没开始做：它做完提交以后才有变更说明"
    },
    "sessions": [],
    "credits": {
@@ -50320,7 +50368,8 @@
     "status": "waiting",
     "doing": "等产品在 MR 上回答 D-2（设计）",
     "owner": "carol",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -50650,7 +50699,7 @@
       {
        "at": 1794123380.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-4-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -50732,7 +50781,7 @@
      "facts": [
       "提交 1 次",
       "停下问人 2 次",
-      "RUN-PAY-4-1"
+      "第 1 次运行"
      ],
      "credits": 6.1,
      "session": {
@@ -51021,9 +51070,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-4-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-4-1"
     },
     {
      "seq": 20,
@@ -51460,7 +51509,8 @@
     "status": "waiting",
     "doing": "等产品在 MR 上验收 D-3（approve / reject）",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -51790,7 +51840,7 @@
       {
        "at": 1793910680.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-5-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -51912,7 +51962,7 @@
      "facts": [
       "提交 4 次",
       "停下问人 2 次",
-      "RUN-PAY-5-1"
+      "第 1 次运行"
      ],
      "credits": 24.2,
      "session": {
@@ -52258,9 +52308,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-5-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-5-1"
     },
     {
      "seq": 20,
@@ -52913,7 +52963,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -53310,7 +53361,7 @@
       {
        "at": 1793639480.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-PAY-2-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       },
       {
        "at": 1793650501.0,
@@ -53537,7 +53588,7 @@
      "facts": [
       "提交 6 次",
       "停下问人 4 次",
-      "RUN-PAY-2-1"
+      "第 1 次运行"
      ],
      "credits": 14.4,
      "session": {
@@ -53960,9 +54011,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-PAY-2-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-PAY-2-1"
     },
     {
      "seq": 23,
@@ -54890,7 +54941,8 @@
     "status": "waiting",
     "doing": "D-1 的回答签名服务不签：看运行机页的拒签原因",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -55220,7 +55272,7 @@
       {
        "at": 1794125720.0,
        "kind": "signed",
-       "title": "签名服务签了接手合同（RUN-ORD-10-1）"
+       "title": "签名服务签了接手合同（第 1 次运行）"
       }
      ],
      "facts": [
@@ -55301,7 +55353,7 @@
      "facts": [
       "提交 3 次",
       "停下问人 1 次",
-      "RUN-ORD-10-1"
+      "第 1 次运行"
      ],
      "credits": 7.4,
      "session": {
@@ -55590,9 +55642,9 @@
      "kind": "signed",
      "from": "bridge",
      "to": "signer",
-     "text": "签名服务签了接手合同（RUN-ORD-10-1）",
+     "text": "签名服务签了接手合同（第 1 次运行）",
      "detail": false,
-     "src": null
+     "src": "运行号 RUN-ORD-10-1"
     },
     {
      "seq": 20,
@@ -56816,7 +56868,7 @@
     "source": null,
     "path": null,
     "ref": null,
-    "error": "还没开工：开工以后才有变更说明"
+    "error": "运行机还没开始做：它做完提交以后才有变更说明"
    }
   },
   "runner/PAY-4": {
@@ -62586,6 +62638,47 @@
    "reflect": [],
    "error": "",
    "raw": ""
+  }
+ },
+ "intake_gates": {
+  "raw": {
+   "confidential": "门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。",
+   "unsure": "门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。",
+   "secret": "门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。",
+   "partner": "门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。",
+   "business": "门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉"
+  },
+  "said": {
+   "|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」",
+   "|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」",
+   "public|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "public|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "public|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "public|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」",
+   "public|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」",
+   "internal|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "internal|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "internal|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "internal|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」",
+   "internal|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」",
+   "confidential|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "confidential|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "confidential|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "confidential|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密、你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "confidential|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」",
+   "secret|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "secret|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "secret|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "secret|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密）：先请产品写一份脱敏摘要，交摘要；不想交这份，就把它写进「不收这些文件」",
+   "secret|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」",
+   "unsure|门 2：材料按机密处理（你选的是 confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要",
+   "unsure|门 2：材料按机密处理（你选的是 unsure），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "unsure|门 2：材料按绝密处理（你选的是 secret）：绝密材料不收，不写材料包。": "第 2 关：绝密材料不收（你选的是「绝密」）：先请产品写一份脱敏摘要，交摘要",
+   "unsure|门 2：材料按机密处理（合作方接口说明.pdf=confidential），而 intake.allow_confidential 是 false（决策 02 未放行）。请产品写一份脱敏摘要再交，或用 --exclude 去掉这份。": "第 2 关：这个仓库不收机密材料（合作方接口说明.pdf 标着机密、你选的是「不确定」）：先请产品写一份脱敏摘要，交摘要",
+   "unsure|门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉": "第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」"
   }
  }
 }
