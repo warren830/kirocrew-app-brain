@@ -7,7 +7,7 @@ import { API, installFixtureRoutes } from '../test/routes'
 import { parseView, searchOf } from '../nav'
 import type { CheckRow, CrewChecks, IntakeCheck, RepoMe, Status } from '../types'
 import { NAME_RULE } from '../ui'
-import { GATE4, GATE5, HERO_LOCAL, HERO_TEXT, NO_CONFIDENTIAL, NewView, REVIEW_HINT, STARTED_NEXT, slugFrom } from './NewReq'
+import { CHECK_HINT, CREW_OK, GATE4, GATE5, HERO_LOCAL, HERO_TEXT, NO_CONFIDENTIAL, NO_SECRET, NewView, REVIEW_HINT, STARTED_NEXT, slugFrom } from './NewReq'
 
 /** KiroCrew with nothing that stops a session (the fixtures' status has a ✗ row: the tests of it bring their own). */
 function calmCrew(): CrewChecks {
@@ -38,7 +38,7 @@ const EXCLUDE = '不收这些文件（按文件名，可以用 *，一行一个�
 const startBtn = () => screen.getByRole('button', { name: '开工' })
 const gateStates = () => [1, 2, 3, 4, 5].map((n) => screen.getByTestId(`gate-${n}`).dataset.state)
 const flowStates = () => within(screen.getByRole('list', { name: '开需求的步骤' })).getAllByRole('listitem').map((li) => li.dataset.state)
-const checkBtn = () => screen.getByRole('button', { name: '先检查（不写入）' })
+const checkBtn = () => screen.getByRole('button', { name: '先检查' })
 
 async function fillBasics(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() => expect(screen.getByLabelText('需求号')).toHaveValue('PAY-8'))
@@ -69,7 +69,8 @@ describe('开需求', () => {
     const d01 = files.querySelector('[data-file="D01"]') as HTMLElement
     expect(d01).toHaveTextContent('结算周报需求.docx')
     expect(within(d01).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['电话 2 处：已打码', '金额 4 处：原样保留'])
-    expect(files.querySelector('[data-file="D04"]')).toHaveTextContent('没收：图片里的字读不出来，这份不收')
+    // why a file was not taken is its own line under a 没收 chip (no 「没收：…不收」 chain)
+    expect(files.querySelector('[data-file="D04"] .nr-file-no')).toHaveTextContent(/^没收图片里的字读不出来：/)
     expect(files).not.toHaveTextContent('phone×2')                                      // no code labels, no Markdown
     expect(files).not.toHaveTextContent('**')
     const pkg = screen.getByTestId('check-summary')
@@ -136,9 +137,9 @@ describe('开需求', () => {
     await user.click(checkBtn())
     const review = await screen.findByTestId('review')
     expect(within(review).getByText('请你确认')).toBeInTheDocument()
-    const [item] = fx.intakeCheck().review
-    expect(within(review).getByText(item)).toHaveTextContent('D01 结算周报需求.docx：请你确认 1 处')
-    expect(review).toHaveTextContent('「对接人：张三李四」')
+    expect(within(review).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['结算周报需求.docx：「对接人：张三李四」'])
+    expect(review).not.toHaveTextContent('D01')                                            // the file by its name, as its card says it
+    expect(review.textContent?.split('可能是人名或密码').length).toBe(2)                  // the why once: REVIEW_HINT
     expect(review).toHaveTextContent(REVIEW_HINT)
     expect(startBtn()).toBeEnabled()
     expect(screen.getByTestId('gate-4')).toHaveAttribute('data-state', 'warn') // the gate shows it, in the warn tone
@@ -146,7 +147,7 @@ describe('开需求', () => {
   })
 
   test('a check without review findings shows no 请你确认', async () => {
-    const { user } = setup({ [`POST ${API}/intake/check`]: (): IntakeCheck => ({ ...fx.intakeCheck(), review: [] }) })
+    const { user } = setup({ [`POST ${API}/intake/check`]: (): IntakeCheck => ({ ...fx.intakeCheck(), review: [], files: fx.intakeCheck().files?.map((f) => ({ ...f, review: '' })) }) })
     await fillBasics(user)
     await fillGates(user)
     await user.click(checkBtn())
@@ -187,7 +188,11 @@ describe('开需求', () => {
     await user.click(screen.getByLabelText('我是作者，或已取得作者同意'))
     await user.click(pick('confidential'))
     expect(gate).toHaveAttribute('data-state', 'bad')
-    expect(screen.getByTestId('start-why')).toHaveTextContent(NO_CONFIDENTIAL)
+    expect(screen.getByTestId('start-why')).toHaveTextContent('这个仓库不收机密材料（你选的是「机密」）：先请产品写一份脱敏摘要，交摘要。')
+    await user.click(pick('unsure'))
+    expect(screen.getByTestId('start-why')).toHaveTextContent('这个仓库不收机密材料（你选的是「不确定」）')
+    await user.click(pick('secret'))
+    expect(screen.getByTestId('start-why')).toHaveTextContent(NO_SECRET)
     await user.click(within(gate).getByLabelText('内部'))
     expect(gate).toHaveAttribute('data-state', 'ok')
   })
@@ -200,6 +205,13 @@ describe('开需求', () => {
     const pick = (v: string) => screen.getByTestId('gate-2').querySelector(`input[value="${v}"]`) as HTMLInputElement
     expect(pick('confidential').closest('label')).not.toHaveTextContent('不收')
     expect(pick('secret').closest('label')).toHaveTextContent('不收')                  // brain-kit never takes it
+    await user.click(screen.getByLabelText('我是作者，或已取得作者同意'))
+    await user.click(pick('secret'))
+    expect(screen.getByTestId('gate-2')).toHaveAttribute('data-state', 'bad')
+    expect(screen.getByTestId('start-why')).toHaveTextContent(NO_SECRET)              // what this repo refuses: 绝密 only
+    expect(screen.getByTestId('start-why')).not.toHaveTextContent('机密、绝密')
+    await user.click(pick('confidential'))
+    expect(screen.getByTestId('gate-2')).toHaveAttribute('data-state', 'ok')
   })
 
   test('a check that fails (a hard stop or a request error) says so and keeps 开工 off', async () => {
@@ -217,7 +229,7 @@ describe('开需求', () => {
     await waitFor(() => expect(screen.getByLabelText('需求号')).toHaveValue('PAY-8'))
     expect(screen.getByTestId('no-docs')).toHaveTextContent('没有文档：五关')
     expect(screen.queryByTestId('gate-1')).toBeNull()
-    expect(screen.queryByRole('button', { name: '先检查（不写入）' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '先检查' })).toBeNull()
     expect(startBtn()).toBeDisabled()
     await user.type(screen.getByLabelText('标题'), '商户结算周报')
     await user.clear(screen.getByLabelText(SLUG))
@@ -297,7 +309,7 @@ describe('开需求', () => {
     const { user } = setup({ [`GET ${API}/intake/next*`]: () => ({ ...fx.intakeNext(), push: { branch: 'main', remote_url: 'git@gitlab.example.com:shop/shop-pay.git' } }) })
     await fillBasics(user)
     expect(startBtn()).toBeDisabled()
-    expect(screen.getByTestId('start-why')).toHaveTextContent('先推送 main：开工从 origin 上的 main 建分支')
+    expect(screen.getByTestId('start-why')).toHaveTextContent('先推送 main：开工从远端的 main 建分支')
     const box = screen.getByTestId('new-push')
     await user.click(within(box).getByRole('button', { name: '推送 main' }))
     expect(within(box).getByTestId('push-team')).toHaveTextContent('这会直接改团队的 main，没有 MR 评审')
@@ -332,7 +344,7 @@ describe('开需求', () => {
     expect(card).not.toHaveTextContent('KiroCrew 引擎：kas') // OK rows are not listed here
     await user.click(within(card).getByRole('button', { name: '补上 Lean 的 hook' }))
     await waitFor(() => expect(apiCalls.find((c) => c.path === `${API}/crew/fix`)?.body).toEqual({ what: 'agent' }))
-    expect(await screen.findByText('KiroCrew 的检查都过了。')).toBeInTheDocument()
+    expect(await screen.findByText(CREW_OK)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'KiroCrew 的检查' })).toBeNull()
     expect(props.reloadStatus).toHaveBeenCalled()
   })
@@ -381,6 +393,47 @@ describe('开需求', () => {
     expect(go).toHaveBeenLastCalledWith({ kind: 'import', path: waiting.repos[0].path })
     await user.click(within(card).getByRole('button', { name: /导入别的仓库/ }))
     expect(go).toHaveBeenLastCalledWith({ kind: 'import' })
+  })
+
+  test('without brain-kit no repo can be used: one card, one way forward (去填位置, as the banner), no per-repo 去导入仓库检查', async () => {
+    const user = userEvent.setup()
+    installFixtureRoutes({})
+    const s = fx.status()
+    s.brainkit = { ...s.brainkit, ok: false, version: null, error: '这里没有 brain-kit（找不到 /Users/alice/brain-kit/brainkit/__init__.py）' }
+    s.repos = s.repos.map((r) => ({ ...r, ok: false, error: 'brain-kit 没装载', kit: null, me: null }))
+    const go = vi.fn()
+    render(<NewView entry={{}} status={s} go={go} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} />)
+    const card = screen.getByTestId('no-usable-repo')
+    expect(card).toHaveTextContent('开不了需求：app 读不了 brain-kit')
+    for (const r of s.repos) expect(card).toHaveTextContent(r.name)
+    expect(screen.getByTestId('no-kit-todo')).toHaveTextContent('做什么先在设置里写对 brain-kit 的位置')
+    expect(within(card).queryByRole('button', { name: '去导入仓库检查' })).toBeNull()
+    expect(within(card).getAllByRole('button')).toHaveLength(1)
+    await user.click(within(card).getByRole('button', { name: '去填位置' }))
+    expect(go).toHaveBeenCalledWith({ kind: 'settings' })
+  })
+
+  test('a KiroCrew fix that leaves only another repo’s rows: the card goes and says so (that repo’s rows stay in 设置)', async () => {
+    const status = fx.status()
+    const fail: CheckRow = { level: 'FAIL', text: '没有 ~/.kiro/agents/brain-dev.json', todo: '点「装上 brain-dev」：装上 brain-kit 带的那一份', fix: 'agent', repo: null, raw: '' }
+    const other: CheckRow = { level: 'WARN', text: '.kiro/brain/lean-hook.py 是旧版', todo: '点「重装 kit 文件」', fix: 'kit', repo: '/Users/alice/workplace/shop-tools', raw: '' }
+    status.crew = { ...status.crew, rows: [fail, other] }
+    const { user } = setup({
+      [`GET ${API}/crew`]: () => ({ ...fx.crew(), rows: [fail, other] }),
+      [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了：~/.kiro/agents/brain-dev.json', rows: [{ ...fail, level: 'OK', text: 'brain-dev.json 的 Lean hook 都在', todo: '', fix: null }, other] }),
+    }, status)
+    const card = await screen.findByRole('region', { name: 'KiroCrew 的检查' })
+    expect(card).not.toHaveTextContent('lean-hook.py')                                  // shop-tools' row: not this requirement's
+    await user.click(within(card).getByRole('button', { name: '装上 brain-dev' }))
+    expect(await screen.findByText(CREW_OK)).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'KiroCrew 的检查' })).toBeNull()
+  })
+
+  test('先检查 says what it does not do: nothing is claimed, no document taken in', async () => {
+    const { user } = setup()
+    await fillBasics(user)
+    await user.type(screen.getByLabelText('文档（一行一个路径）'), '/Users/alice/Downloads/a.docx')
+    expect(checkBtn().parentElement).toHaveTextContent(CHECK_HINT)
   })
 
   test('a repo without a remote: the hero and the steps say nothing of the runner, its step is 这次不需要', async () => {

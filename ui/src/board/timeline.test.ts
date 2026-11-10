@@ -260,3 +260,26 @@ describe('replayAt', () => {
     }
   })
 })
+
+describe('replayAt: what was there then', () => {
+  it('a session is there once it was opened, never before 开工; what it cost is known at the end; the MR comes with the hand-over', () => {
+    const b = fx.board()
+    const claim = b.events.find((e) => e.kind === 'claim')!.at
+    expect(b.sessions[0].opened_at).toBeLessThanOrEqual(claim) // the record says so; a claim has no session
+    expect(replayAt(b, claim + 1).actors.find((a) => a.key === 'local')!.session).toBeNull()
+    const opened = b.events.find((e) => e.kind === 'session')!.at
+    const before = replayAt(b, opened - 1)
+    expect(before.actors.find((a) => a.key === 'local')!.session).toBeNull()
+    expect(before.sessions).toEqual([])
+    expect(before.credits.total).toBeNull()
+    expect(before.row.credits).toBeNull()
+    const after = replayAt(b, opened + 60)
+    expect(after.actors.find((a) => a.key === 'local')!.session).toEqual(b.actors.find((a) => a.key === 'local')!.session)
+    expect(after.sessions).toHaveLength(1)
+    expect(after.credits.total).toBeNull()
+    const m = fx.boardMerged()
+    const hand = m.events.find((e) => e.kind === 'handover')!.at
+    expect(replayAt(m, hand - 1).row.mr).toBeNull()
+    expect(replayAt(m, hand + 1).row.mr).toEqual(m.row.mr)
+  })
+})

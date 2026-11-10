@@ -64,6 +64,9 @@ describe('需求详情', () => {
     for (const t of ['PAY-3', '退款单导出 CSV', '本地开发中', 'alice 的需求 · 在这台机器上做', 'ai/alice/PAY-3-refund-export']) expect(head).toHaveTextContent(t)
     const facts = head.querySelector('dl.br-detail-facts') as HTMLElement
     expect(facts).toHaveTextContent('工作目录/Users/alice/workplace/brain-app/PAY-3-refund-export')
+    // the branch, like a path, breaks only after a 「/」: each part whole (DETAIL-24)
+    const branch = within(facts).getByTitle('ai/alice/PAY-3-refund-export')
+    expect([...branch.querySelectorAll(':scope > span > span')].map((x) => x.textContent)).toEqual(['ai', '/alice', '/PAY-3-refund-export'])
     expect(facts).toHaveTextContent('Lean 记录aidlc-docs/261107-refund-export/')
     expect(facts).toHaveTextContent('MR还没有：交接时开')
     expect(facts).toHaveTextContent('来自产品需求')
@@ -122,7 +125,8 @@ describe('需求详情', () => {
     expect(within(bar).getByTestId('review-say').tagName).toBe('DETAILS')
     fireEvent.click(within(bar).getByRole('button', { name: '复制那一句' }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(said))
-    expect(within(bar).getByRole('button', { name: '打开会话' })).toBeInTheDocument()
+    // never the session that wrote the code, under any name (REST-18)
+    expect(within(bar).queryByRole('button', { name: /^(打开会话|去回话)$/ })).toBeNull()
     fireEvent.click(within(bar).getByRole('button', { name: '开审查会话' }))
     await waitFor(() => expect(navigations).toEqual(['/chat?sid=brain-PAY-3-rev1']))
     expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/requirements/r1/PAY-3/session`, body: { trust: true, kickoff: true, review: true } })
@@ -146,17 +150,18 @@ describe('需求详情', () => {
     renderDetail()
     const bar = await screen.findByRole('region', { name: '此刻' })
     expect(bar).toHaveTextContent('交接以后，批准在 MR 上回答：回答 D-3（approve / reject）')
-    expect(within(bar).getByRole('link', { name: /去 MR 上回答 D-3/ })).toHaveAttribute('href', MR)
+    expect(within(bar).getByRole('link', { name: /去 MR 上验收 D-3/ })).toHaveAttribute('href', MR)
     const q = within(screen.getByRole('region', { name: '问题和回答' })).getByTestId('question')
-    expect(q).toHaveTextContent('这是 Lean 的发布审批请求：在 MR 上回答 D-3（approve / reject），桥会把回答带回运行机。')
+    expect(q).toHaveTextContent('这是 Lean 的发布审批请求：在 MR 上验收 D-3（approve / reject），桥会把回答带回运行机。')
     expect(q).not.toHaveTextContent('在会话里')
-    expect(within(q).getByRole('link', { name: /去 MR 上回答/ })).toHaveAttribute('href', MR)
+    expect(within(q).getByRole('link', { name: /去 MR 上验收/ })).toHaveAttribute('href', MR)
     const lean = screen.getByRole('region', { name: 'Lean 进度' })
     expect(lean).toHaveTextContent('交接以后，审批在 MR 上回答')
     expect(lean).not.toHaveTextContent('由你在会话里自己打')
     const release = await pendingApproval()
     expect(release).toHaveTextContent('发布审批在 MR 上等回答')
-    expect(release).toHaveTextContent('在 MR 上回答 D-3（approve / reject），这里不能回答。')
+    expect(release).toHaveTextContent('在 MR 上验收 D-3（approve / reject），这里不能回答。')
+    expect(within(release).getByRole('link', { name: /去 MR 上验收/ })).toHaveAttribute('href', MR)
     expect(within(release).queryByTestId('type-line')).toBeNull()
   })
 
@@ -171,9 +176,31 @@ describe('需求详情', () => {
     const bar = await screen.findByRole('region', { name: '此刻' })
     expect(bar).toHaveTextContent('等产品')
     expect(bar).toHaveTextContent('等产品在 MR 上回答 D-2，你不用做什么')
-    const link = within(bar).getByRole('link', { name: /在 MR 上看 D-2/ })
+    const link = within(bar).getByRole('link', { name: /看 MR/ })
     expect(link).not.toHaveClass('is-primary')
     expect(bar).not.toHaveTextContent('去 MR 上回答')
+    // one judgment: the question card below says the same, and only looks (DETAIL-10)
+    const q = within(screen.getByRole('region', { name: '问题和回答' })).getByTestId('question')
+    expect(q).toHaveTextContent('等产品在 MR 上回答')
+    expect(within(q).getByRole('link', { name: '看 MR' })).toHaveAttribute('href', MR)
+    expect(screen.getByTestId('br-detail')).not.toHaveTextContent('去 MR 上回答')
+  })
+
+  test('an approval someone else answers on the MR: the Lean card names them too and only looks (DETAIL-10)', async () => {
+    withDetail((d) => {
+      handedOver(d)
+      d.row.waits = { who: 'product', text: '等产品在 MR 上验收 D-3（approve / reject）', line: null, raw: '', do: 'accept', since: AT - 7200, where: 'mr' }
+    })
+    renderDetail()
+    const bar = await screen.findByRole('region', { name: '此刻' })
+    expect(bar).toHaveTextContent('等产品在 MR 上验收 D-3，你不用做什么；验收以后运行机接着做。')
+    const release = await pendingApproval()
+    expect(release).toHaveTextContent('等产品在 MR 上验收 D-3（approve / reject），你不用做什么。')
+    expect(within(release).getByRole('link', { name: '看 MR' })).toHaveAttribute('href', MR)
+    const q = within(screen.getByRole('region', { name: '问题和回答' })).getByTestId('question')
+    expect(q).toHaveTextContent('这是 Lean 的发布审批请求：等产品在 MR 上验收 D-3')
+    expect(within(q).getByRole('link', { name: '看 MR' })).toBeInTheDocument()
+    expect(screen.getByTestId('br-detail')).not.toHaveTextContent(/去 MR 上(回答|验收)/)
   })
 
   test('merged with new knowledge to write back: 此刻 has 回写 Brain, which opens the Brain view’s write-back of it', async () => {
@@ -576,6 +603,20 @@ describe('需求详情', () => {
     expect(go).toHaveBeenLastCalledWith({ kind: 'brain', repo: 'r1', reflect: 'PAY-3' })
   })
 
+  test('用到的 Brain: once the write-back branch is on the default branch (the reflect step merged) it says 已合进 Brain', async () => {
+    const m = fx.boardMerged()
+    const r = m.actors.find((a) => a.key === 'reflect')!
+    Object.assign(r, { status: 'merged', doing: '回写分支 brain/PAY-2-reflect-1 已合并' })
+    withDetail((x) => {
+      x.row.state = 'merged'
+      x.brain.proposals = 2
+    }, { [`GET ${API}/board/*`]: () => structuredClone(m) })
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '用到的 Brain' })
+    await waitFor(() => expect(within(card).getByTestId('brain-proposals')).toHaveTextContent('提议 2 条新知识：已合进 Brain（回写分支 brain/PAY-2-reflect-1）'))
+    expect(card).not.toHaveTextContent('等合并')
+  })
+
   test('the sessions list opens a session; with a live session there is no 开会话', async () => {
     renderDetail()
     const sessions = await screen.findByRole('region', { name: '会话' })
@@ -704,15 +745,20 @@ describe('需求详情', () => {
     expect(screen.queryByText(/看板读不到/)).toBeNull()
   })
 
-  test('Lean’s progress, one way: 做完 · 跳过 · 下一步 (the backend’s counts, else counted from the stages); the next stage cell says 下一步', async () => {
+  test('Lean’s progress, one way: 做完 · 跳过 · 在做 / 下一步 (the backend’s counts, else counted from the stages); the next stage cell says 下一步', async () => {
     withDetail((d) => {
       delete d.row.lean.done_n
       delete d.row.lean.skipped_n
       delete d.row.lean.next
     })
     renderDetail()
-    expect(await screen.findByTestId('lean-progress')).toHaveTextContent('Lean 做完 4 · 跳过 4 · 下一步：代码生成')
-    expect(screen.getByRole('region', { name: 'Lean 进度' })).toHaveTextContent('做完 4 · 跳过 4 · 下一步：代码生成')
+    // code generation is started: 在做, not 下一步
+    expect(await screen.findByTestId('lean-progress')).toHaveTextContent('Lean 做完 4 · 跳过 4 · 在做：代码生成')
+    expect(screen.getByRole('region', { name: 'Lean 进度' })).toHaveTextContent('做完 4 · 跳过 4 · 在做：代码生成')
+    cleanup()
+    installFixtureRoutes()   // the backend's counts and stage_state
+    renderDetail()
+    expect(await screen.findByTestId('lean-progress')).toHaveTextContent('Lean 做完 4 · 跳过 4 · 在做：代码生成')
     withDetail((d) => {
       d.lean.stages = d.lean.stages.map((s) => ({ ...s, state: s.n === 11 ? 'todo' : s.n % 2 ? 'skipped' : 'done' }))
       d.row.lean = { ...d.row.lean, done_n: 5, skipped_n: 5, next: { id: 'release', label: '发布', n: 11 } }
@@ -805,9 +851,39 @@ describe('需求详情', () => {
     expect(card).toHaveTextContent(`${fmtCredits(fx.detail().credits.total)}credits`)
     expect(card).toHaveTextContent('1 个会话')
     expect(card).not.toHaveTextContent('token')
-    const chip = within(within(card).getByLabelText('会话')).getByRole('button')
+    const chip = within(within(card).getByLabelText('会话的用量')).getByRole('button')
     expect(chip.title).toBe('PAY-3 退款单导出 CSV · 等批准 · 12.4 credits')
     expect(card).toHaveTextContent('等人')
+  })
+
+  test('看每个会话的用量 ↓ and the session icons scroll to the 会话 card, not to the icons themselves', async () => {
+    const seen: Element[] = []
+    const spy = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (this: Element) { seen.push(this) })
+    try {
+      renderDetail()
+      const card = await screen.findByRole('article', { name: '成本' })
+      fireEvent.click(within(card).getByRole('button', { name: '看每个会话的用量 ↓' }))
+      fireEvent.click(within(within(card).getByLabelText('会话的用量')).getByRole('button'))
+      expect(seen).toEqual([screen.getByRole('region', { name: '会话' }), screen.getByRole('region', { name: '会话' })])
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  test('credits with no session listed: both cards say none is open now, never 还没开过会话; a session not reported yet is not 「— credits」', async () => {
+    withDetail((d) => { d.sessions = [] })
+    renderDetail()
+    const cost = await screen.findByRole('article', { name: '成本' })
+    expect(cost).toHaveTextContent(`${fmtCredits(fx.detail().credits.total)}credits`)
+    expect(cost).toHaveTextContent('现在没有开着的会话')
+    expect(screen.getByTestId('br-detail')).not.toHaveTextContent('还没开过会话')
+    expect(screen.getByRole('region', { name: '会话' })).toHaveTextContent('现在没有开着的会话；上面的合计是记下的用量。')
+    cleanup()
+    withDetail((d) => { d.credits.total = null })
+    renderDetail()
+    const head = (await screen.findByRole('region', { name: '会话' })).querySelector('.cto-chart-head') as HTMLElement
+    expect(head).toHaveTextContent('这个 app 开的 · 用量还没报')
+    expect(head).not.toHaveTextContent('—')
   })
 
   test('成本 without a session: 「还没有」 and 还没开过会话, never 「— credits」', async () => {
@@ -887,6 +963,26 @@ describe('需求详情', () => {
     expect(tl).toHaveTextContent('做什么：')
     expect(within(tl).getByText('细节').closest('details')).toHaveTextContent('git log failed')
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  test('时间线 the backend could not read says why in its own words, and what to do; no 细节 to pass on when there is no original', async () => {
+    withDetail((d) => { d.timeline.error = 'brain-kit 读不出这个需求的完整记录：下面只有 Lean 自己记下的事' })
+    renderDetail()
+    const note = await screen.findByTestId('timeline-error')
+    expect(note).toHaveTextContent(/^brain-kit 读不出这个需求的完整记录：下面只有 Lean 自己记下的事做什么：等一会儿它会自己再读；一直这样的话，到设置里看 brain-kit 能不能用。$/)
+    expect(note).not.toHaveTextContent('原话')
+    expect(within(note).queryByText('细节')).toBeNull()
+  })
+
+  test('时间线: an answer brain-kit recorded without its words says only that it was answered, and by whom in words', async () => {
+    withDetail((d) => {
+      d.timeline.items.push({ at: '2026-11-08T21:00:00+08:00', kind: 'human', label: '回答 ：', detail: null, who: 'P-7C1D', src: null })
+    })
+    renderDetail()
+    const tl = await screen.findByRole('region', { name: '时间线' })
+    const item = within(tl).getAllByTestId('tl-item').find((i) => i.title.includes('化名 P-7C1D'))!
+    expect(item).toHaveTextContent(/^21:00人回答 · 一位组员$/)
+    expect(tl).not.toHaveTextContent(/回答 ?：/)
   })
 
   test('需求看板 ↗ and the time card’s parts go to this requirement’s board; no 回放 before it is merged', async () => {

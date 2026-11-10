@@ -3,7 +3,8 @@
  * 需求详情 and 需求看板 (the requirement in hand: the last one opened), 开需求, Brain, 待办 (with its count), 运行机 (team
  * mode only) — and at the right 导入仓库 (how a repo gets into the app) and 设置. It stays where it is when the view
  * changes. Without a requirement in hand, 需求详情 and 需求看板 open the one that waits on you (else the newest one); with one
- * in hand both tabs carry its key, so a person sees which one they open. 运行机 opened on a machine that is not a team
+ * in hand both tabs carry its key, so a person sees which one they open; one its repo does not have (*gone*) opens in
+ * neither, and the other tab says so instead of opening it. 运行机 opened on a machine that is not a team
  * runner is still a tab there (selected, greyed): the page says why it is empty.
  */
 import { VIEW_NAME, type ViewKind } from './nav'
@@ -21,11 +22,13 @@ const TABS: [Tab, string, string][] = ([
   ['team', '团队运行机：交接、运行、签名'],
 ] as [Tab, string][]).map(([k, hint]) => [k, VIEW_NAME[k], hint])
 
-export function AppBar({ view, onView, item, picking, todo, team }: {
+export function AppBar({ view, onView, item, gone = false, picking, todo, team }: {
   view: ViewKind
   onView: (v: ViewKind) => void
   /** the requirement in hand (KEY), what 需求详情 and 需求看板 open */
   item?: string
+  /** its repo does not have it (the view in hand got 404) */
+  gone?: boolean
   /** 需求详情 / 需求看板 clicked with nothing in hand: the app is picking one */
   picking?: boolean
   /** status.counts.todo */
@@ -40,12 +43,13 @@ export function AppBar({ view, onView, item, picking, todo, team }: {
         {TABS.filter(([k]) => k !== 'team' || team || view === 'team').map(([k, name, hint]) => {
           const held = k === 'item' || k === 'board'
           const off = k === 'team' && !team
+          const none = held && !!item && gone && view !== k
           return (
             <button type="button" role="tab" key={k} aria-selected={view === k} disabled={held && !item && !!picking}
-              className={off ? 'is-off' : undefined}
-              title={off ? '这台机器不是团队运行机' : held ? (item ? `${hint}（${item}）` : `${hint}（打开等你的那个需求，没有就打开最近的）`) : hint}
+              aria-disabled={none || undefined} className={off || none ? 'is-off' : undefined}
+              title={off ? '这台机器不是团队运行机' : none ? `没有 ${item} 这个需求：${name}打不开` : held ? (item ? `${hint}（${item}）` : `${hint}（打开等你的那个需求，没有就打开最近的）`) : hint}
               aria-label={k === 'todo' && todo > 0 ? `待办 ${todo}` : held && item ? `${name} ${item}` : undefined}
-              onClick={() => view !== k && onView(k)}>
+              onClick={() => view !== k && !none && onView(k)}>
               {name}
               {held && item && <span className="br-bar-key">{item}</span>}
               {k === 'todo' && todo > 0 && <span className="br-count" aria-hidden="true">{todo}</span>}

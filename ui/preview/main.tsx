@@ -29,7 +29,7 @@ import { API, fixtureRoutes } from '../src/test/routes'
 import { StubApiError, setApiRoutes, setNavigateHook } from '../src/test/stubs/app-sdk'
 import { simulated } from './simulate'
 import type {
-  BrainView, CheckRow, CrewFixBody, ImportInspect, ImportJob, IntakeBody, IntakeNext, KitForm, OpenSessionBody, Overview, ReflectApplyBody, ReflectApplyResult, ReflectPreview, RepoInfo, ReqBoard, RequirementDetail, Settings, StartBody, Status, TeamView, Todo,
+  BrainView, CheckRow, CrewFixBody, ImportInspect, ImportJob, InstallResult, IntakeBody, IntakeNext, KitForm, OpenSessionBody, Overview, ReflectApplyBody, ReflectApplyResult, ReflectPreview, RepoInfo, ReqBoard, RequirementDetail, Settings, StartBody, Status, TeamView, Todo,
 } from '../src/types'
 
 const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'norepos', 'light'] as const
@@ -73,12 +73,15 @@ const W = world as unknown as {
   status: Status; overview: Overview; boards: Record<string, ReqBoard>; details: Record<string, RequirementDetail>
   overviews: Record<'eval' | 'noeval', Record<string, Overview>>; todo: Record<'ok' | 'crewfail' | 'team', Todo>
   stages: Record<string, RequirementDetail['lean']['stages']>; brains: Record<string, BrainView>
+  /** brainview.preview of a reflectable run, by repo/key, when the world recorded it */
+  reflects?: Record<string, ReflectPreview>
 }
 let repos: RepoInfo[] = flags.has('norepos') ? [] : clone(W.status.repos)
 
 /** KiroCrew's rows as the backend reads them: brain-dev.json's row says what is there, a repo's rows are the listed
  * repos'; 「KiroCrew 有 FAIL」 is brain-dev.json missing (backend/core/problems.py's words for it). */
 function crewRows(): CheckRow[] {
+  if (flags.has('nokit')) return [{ level: 'FAIL', text: 'brain-kit 没装载', todo: '在「设置」里写对 brain-kit 的位置', fix: null, repo: null, raw: '' }]
   const listed = new Set(repos.map((r) => r.path))
   const rows = clone(W.status.crew.rows).filter((r) => !r.repo || listed.has(r.repo))
   if (!flags.has('crewfail') || crewFixed) return rows
@@ -227,20 +230,31 @@ function brain(path: string): BrainView {
     usage: { useful: [0, 0], repeat_rate: [0, 0], archived: 0, purged: 0, runs: [], never_cited: [], repeats_any: [], unmerged: [] }, reflect: [] }
 }
 
-/** POST /brain/reflect/preview: the requirement's own run. PAY-5 has new knowledge (the fixture, said as the backend says
- * brain-kit's lines); PAY-2 was written back already, so brain-kit skips its proposals. */
-function reflectPreview(key: string): ReflectPreview {
-  const intent = W.boards[`r1/${key}`]?.row.intent ?? key.toLowerCase()
+/** POST /brain/reflect/preview: the requirement's own run, planned against that repo's Brain in the world: the
+ * backend's own answer when the world recorded it; else PAY-5 has new knowledge (the fixture, said as the backend says
+ * brain-kit's lines), a run whose entries are in the Brain already (T-ORD-2-1 is ORD-2's) was written back, so
+ * brain-kit skips those proposals, and any other proposes nothing the world knows of. A merged run is read on main,
+ * one in its worktree there. */
+function reflectPreview(repo: string, key: string): ReflectPreview {
+  const brain = W.brains[repo]
+  if (!brain || !listedRepos().some((r) => r.id === repo && r.ok)) throw new StubApiError(404, { error: '没有这个仓库', code: 'no_repo' })
+  const recorded = W.reflects?.[`${repo}/${key}`]
+  if (recorded) return clone(recorded)
+  const row = W.boards[`${repo}/${key}`]?.row
+  const source = `${row?.state === 'merged' ? 'main:' : ''}aidlc-docs/${row?.intent ?? key.toLowerCase()}/decisions.md`
   const f = fx.reflect()
-  if (key === 'PAY-5') {
-    return { ...f, key, gaps: f.gaps.map((g) => ({ ...g, kind: 'knowledge' })),
+  if (repo === 'r1' && key === 'PAY-5') {
+    return { ...f, repo, key, gaps: f.gaps.map((g) => ({ ...g, kind: 'knowledge' })),
       notes: ['第 31 行的提议和 T-PAY-2-1 的文字一样：只给 T-PAY-2-1 补来源'],
       warnings: ['D-3 被否了（凭证 V-7c1e9a20），可是没有一条纠正或「又出现」的提议提到它'],
       raw: ['proposal at line 31: same text as T-PAY-2-1: recorded as same (sources added)', 'D-3 (V-7c1e9a20) was rejected, but no correction or repeats proposal cites it'] }
   }
-  return { ...f, key, source: `aidlc-docs/${intent}/decisions.md`, ops: [], gaps: [], warnings: [], problems: [], substantive: false,
-    notes: ['第 18 行的提议 Brain 里已经有了（P-PAY-2-1），跳过', '第 27 行的提议 Brain 里已经有了（T-PAY-2-1），跳过'],
-    raw: ['proposal at line 18: already in the Brain as P-PAY-2-1, skipped', 'proposal at line 27: already in the Brain as T-PAY-2-1, skipped'] }
+  const own = new RegExp(`^[A-Z]-${key}-\\d+$`)
+  const written = brain.files.flatMap((x) => x.sections.flatMap((sec) => sec.entries.map((e) => e.id))).filter((id) => own.test(id))
+  const lines = written.map((id, i) => [18 + 9 * i, id] as const)
+  return { ...f, repo, key, source, ops: [], gaps: [], warnings: [], problems: [], substantive: false,
+    notes: lines.map(([n, id]) => `第 ${n} 行的提议 Brain 里已经有了（${id}），跳过`),
+    raw: lines.map(([n, id]) => `proposal at line ${n}: already in the Brain as ${id}, skipped`) }
 }
 
 /** GET /team: the ledger's run counts from its own runs table (the backend reads both from one table); a refusal says
@@ -255,16 +269,32 @@ function team(): TeamView {
   return t
 }
 
-/** GET /intake/next?repo=: the next free key of that repo (its prefix, after its highest one). */
+/** GET /intake/next?repo=: the next free key of that repo (its prefix, after its highest one: the world's requirements
+ * of that checkout, none for one imported here), whether gate 2 takes confidential material (no kit here allows it),
+ * and the default branch an in-place install left unpushed. */
 function intakeNext(path: string): IntakeNext {
   const repo = new URL(path, location.origin).searchParams.get('repo') ?? ''
   const r = repos.find((x) => x.id === repo)
   const prefix = r?.kit?.req_prefix ?? ''
-  if (!prefix) return { repo, key: null, tracker: 'none', prefix: '', error: '这个仓库还没装 brain-kit' }
-  const n = Math.max(0, ...W.overview.rows.filter((x) => x.repo === repo).map((x) => Number(x.key.split('-').pop()) || 0))
-  return { repo, key: `${prefix}-${n + 1}`, tracker: r?.kit?.tracker ?? 'none', prefix, error: '' }
+  if (!r || !prefix) return { repo, key: null, tracker: 'none', prefix: '', error: '这个仓库还没装 brain-kit', allow_confidential: false, push: null }
+  const world = W.status.repos.find((x) => x.path === r.path)?.id
+  const n = Math.max(0, ...W.overview.rows.filter((x) => x.repo === world).map((x) => Number(x.key.split('-').pop()) || 0))
+  return { repo, key: `${prefix}-${n + 1}`, tracker: r.kit?.tracker ?? 'none', prefix, error: '', allow_confidential: false, push: unpushed.get(r.path) ?? null }
 }
 
+/** What 导入仓库 did to a path in the preview, read by the routes that answer about it afterwards. */
+const installedKit = new Map<string, KitForm>()                                   // the kit an install wrote
+const unpushed = new Map<string, { branch: string; remote_url: string }>()        // in place, the default branch not pushed
+const published = new Map<string, string | null>()                               // the install branch pushed: its MR
+const named = new Map<string, string>()                                           // 你是谁 saved (git config brain.user)
+
+
+/** A check's or a start's answer for the key and 英文短名 the form sent (the key: the next free one when it sent none),
+ * as the backend answers: the fixtures were made for PAY-8 merchant-weekly. */
+function keyed<T>(x: T, b: IntakeBody): T {
+  const key = b.key || intakeNext(`${API}/intake/next?repo=${encodeURIComponent(b.repo)}`).key || 'PAY-8'
+  return JSON.parse(JSON.stringify(x).split('PAY-8').join(key).split('merchant-weekly').join(b.slug || 'merchant-weekly')) as T
+}
 
 const routes = fixtureRoutes()
 setApiRoutes({
@@ -297,7 +327,7 @@ setApiRoutes({
   },
   [`POST ${API}/intake/check`]: (body) => {
     const b = body as IntakeBody
-    const c = fx.intakeCheck()
+    const c = keyed(fx.intakeCheck(), b)
     if (!b.consent) return { ...c, ok: false, findings: [], files: [], blocking: [], blocking_raw: [], refused: [], error: '第 1 关：勾上「我是作者，或已取得作者同意」' }
     // as brain-kit's rules go with this repo's kit.json (intake.allow_confidential false, the default): the partner
     // guide (D03) is marked Confidential, so it stops the check unless it is left out; so does a confidential pick
@@ -322,12 +352,17 @@ setApiRoutes({
       raw.push("门 3：找到商业敏感内容 {'amount': 4, 'company': 3}，请选 --business keep（原样）或 --business mask（换占位符）；不想交的文件请从输入里去掉")
       plain.push('第 3 关：找到金额 4 处、公司名 3 处：在第 3 关选「原样保留」或「换成占位符」；不想交的文件写进「不收这些文件」')
     }
+    if (b.business === 'mask') {
+      // brain-kit masks them (its line: 商业敏感（已打码）), and backend/core/intake.py file_items says so
+      c.findings = c.findings.map((l) => l.replace('商业敏感（原样保留）', '商业敏感（已打码）'))
+      c.files = (c.files ?? []).map((f) => ({ ...f, items: f.items.map((t) => t.replace(/^((?:金额|公司名) \d+ 处)：原样保留$/, '$1：已换成占位符')) }))
+    }
     c.classification = given === 'secret' ? 'secret' : partner ? 'confidential' : given || 'internal'
     return { ...c, ok: raw.length === 0, blocking: plain, blocking_raw: raw }
   },
   [`POST ${API}/intake/start`]: (body) => {
     const b = body as StartBody
-    const r = fx.start()
+    const r = keyed(fx.start(), b)
     if (!b.open_session) return { ...r, slot: null, url: null }
     return r
   },
@@ -335,15 +370,19 @@ setApiRoutes({
     crewFixed = true
     return { ok: true, text: `预览：${(body as CrewFixBody).what === 'agent' ? '装好了 ~/.kiro/agents/brain-dev.json' : '引擎换成了 kas'}（没有真的改）`, rows: status().crew.rows }
   },
-  [`POST ${API}/brain/reflect/preview`]: (body) => shift(reflectPreview((body as { key: string }).key)),
+  [`POST ${API}/brain/reflect/preview`]: (body) => {
+    const b = body as { repo: string; key: string }
+    return shift(reflectPreview(b.repo, b.key))
+  },
   [`POST ${API}/brain/reflect/apply`]: (body): ReflectApplyResult => {
     const b = body as ReflectApplyBody
+    const r = repos.find((x) => x.id === b.repo)
     const br = `brain/${b.key}-reflect-1`
-    const wt = `/Users/alice/.brain/worktrees/shop-pay/brain-${b.key}-reflect-1`
-    const mr = 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/58'
+    const wt = `/Users/alice/.brain/worktrees/${r?.name ?? b.repo}/brain-${b.key}-reflect-1`
+    const mr = `${r?.kit?.gitlab_base || 'https://gitlab.example.com'}/${r?.kit?.gitlab_project || `shop/${r?.name ?? b.repo}`}/-/merge_requests/58`
     return {
       ok: true, branch: br, worktree: wt, mr_url: b.push ? mr : null, pushed: b.push,
-      output: `预览：没有真的写。\n  new T-PAY-5-2\n${b.push ? `已推送并开 MR：${mr}` : `已提交到本地分支 ${br}（${wt}）。看过以后推送：git -C ${wt} push -u origin ${br}`}`,
+      output: `预览：没有真的写。\n  new T-${b.key}-1\n${b.push ? `已推送并开 MR：${mr}` : `已提交到本地分支 ${br}（${wt}）。看过以后推送：git -C ${wt} push -u origin ${br}`}`,
     }
   },
   [`POST ${API}/team/loop`]: () => ({ ok: true, summary: { poll: 3, prepared: 0, dispatch: 1, watch: 2, collect: 1, reconcile: 0 }, error: '' }),
@@ -356,21 +395,47 @@ function importRoutes() {
   const readyPaths = new Set<string>()      // installed in place, or merged / pulled: brain-kit is in the checkout
   const jobs = new Map<string, { job: ImportJob<unknown>; at: number; path: string }>()
   const at = (p: string) => <T,>(x: T): T => JSON.parse(JSON.stringify(x).split(FIXTURE_PATH).join(p)) as T
+  const READY_KIT: KitForm = { tracker: 'none', req_prefix: 'READY', jira_base: '', default_branch: 'main', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/ready', team: '' }
+  const kitAt = (path: string) => installedKit.get(path) ?? READY_KIT
+  // the install branch as importer.pending reads it: pushed with its MR open once 推送并开 MR went through
+  const pendingAt = (path: string) => {
+    const p = at(path)(fx.importInspectPending()).pending!
+    if (!published.has(path)) return p
+    const mr = published.get(path) ?? null
+    const tgt = p.target || '默认分支'
+    return { ...p, pushed: true, mr_url: mr, word: mr ? 'MR 等合并' : '等开 MR',
+      text: mr ? `装在 ${p.branch} 分支上，MR 开着：合进 ${tgt} 以后生效` : `装在 ${p.branch} 分支上，推上去了：合进 ${tgt} 以后生效`,
+      next: mr ? '在 GitLab 上合并 MR（团队的做法），合并以后点「拉取」' : '在 GitLab 上开 MR、合并；只有你一个人用的话，也可以在本机合并' }
+  }
   const inspect = (path: string): ImportInspect => {
     const listed = repos.find((r) => r.path === path)
-    if (pendingPaths.has(path)) return { ...at(path)(fx.importInspectPending()), ...(listed ? { next: 'listed' as const, listed: listed.id } : {}) }
-    const c = at(path)(fx.importInspect())
+    // crewcheck.checks of this machine, and of the repo once it has brain-kit
+    const crew = { rows: crewRows().filter((r) => !r.repo || r.repo === path), fix: { agent: flags.has('crewfail') && !crewFixed, engine: false } }
+    if (pendingPaths.has(path)) {
+      const c = at(path)(fx.importInspectPending())
+      const pending = pendingAt(path)
+      // importer.inspect's brain-kit row says the install branch's own state, and its next step
+      const checks = c.checks.map((x) => (x.id === 'kit' ? { ...x, why: `${pending.text}（AI-DLC Lean、Brain 文件、AGENTS.md 都在分支上）`, todo: pending.next } : x))
+      return { ...c, crew, checks, pending, ...(listed ? { next: 'listed' as const, listed: listed.id } : {}) }
+    }
+    const c = { ...at(path)(fx.importInspect()), crew }
+    const name = named.get(path)
+    if (name && c.me) {
+      c.me = { ...c.me, name, source: 'git', text: `${name}（你在这个仓库的名字）`, ask: false, label: '', why: '', suggest: '' }
+      c.checks = c.checks.map((x) => (x.id === 'me' ? { ...x, level: 'OK' as const, why: c.me!.text, todo: '' } : x))
+    }
     if (flags.has('nokit') && !(path.endsWith('/ready') || listed || readyPaths.has(path))) {
       // importer.inspect without brain-kit loaded: it cannot install
       c.next = 'fix'
       c.install = null
-      c.checks = c.checks.map((x) => (x.id === 'kit' ? { ...x, level: 'FAIL' as const, why: '没装（没有 .brain/kit.json），app 现在也没装载 brain-kit，装不了', todo: '先在设置里写对 brain-kit 的位置' } : x))
+      c.checks = c.checks.map((x) => (x.id === 'kit' ? { ...x, level: 'FAIL' as const, why: '还没装 brain-kit，app 现在也没装载 brain-kit，装不了', todo: '先在设置里写对 brain-kit 的位置' } : x))
       return c
     }
     if (path.endsWith('/ready') || listed || readyPaths.has(path)) {
       c.next = listed ? 'listed' : 'add'
       c.listed = listed?.id ?? null
-      c.kit = { state: 'checkout', values: { tracker: 'none', req_prefix: 'READY', default_branch: 'main', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/ready' } }
+      const k = listed?.kit ?? kitAt(path)
+      c.kit = { state: 'checkout', values: { tracker: k.tracker, req_prefix: k.req_prefix, default_branch: k.default_branch, gitlab_base: k.gitlab_base, gitlab_project: k.gitlab_project } }
       c.checks = c.checks.map((x) => (['kit', 'lean', 'brain', 'agents'].includes(x.id) ? { ...x, level: 'OK' as const, why: '装了', todo: '' } : x))
     }
     return c
@@ -391,7 +456,9 @@ function importRoutes() {
       j.ended_at = null
       j.steps = j.steps.map((s, i) => (i < done ? s : { ...s, state: i === done ? 'running' : 'todo', detail: '' }))
     } else if (j.kind === 'install') {
-      ((j.result as { mode?: string } | null)?.mode === 'inplace' ? readyPaths : pendingPaths).add(got.path)
+      const r = j.result as InstallResult | null
+      ;(r?.mode === 'inplace' ? readyPaths : pendingPaths).add(got.path)
+      if (r?.mode === 'inplace' && r.remote_url && !unpushed.has(got.path)) unpushed.set(got.path, { branch: r.branch, remote_url: r.remote_url })
     }
     return j
   }
@@ -413,6 +480,7 @@ function importRoutes() {
           ...(k.gitlab_project ? [`GitLab ${k.gitlab_project}（${k.gitlab_base}）`] : []), ...(k.team ? [`团队 ${k.team}`] : [])].join(' · ')
         job.result = { ...job.result, kit: k }
         job.steps = job.steps.map((x) => (x.id === 'kit' ? { ...x, detail: line } : x))
+        installedKit.set(b.path, k)
       }
       return start(job, b.path)
     },
@@ -441,23 +509,28 @@ function importRoutes() {
       const r = fx.importPull()
       return { ...r, text: `预览：没有真的拉取。${r.text}` }
     },
-    [`POST ${API}/import/push`]: () => {
+    [`POST ${API}/import/push`]: (body: unknown) => {
+      unpushed.delete((body as { path: string }).path)
       const r = fx.importPush()
       return { ...r, text: `预览：没有真的推送。${r.text}` }
     },
     [`GET ${API}/import/jobs/*`]: (_b: unknown, path: string) => progress(path.split('/').pop() ?? ''),
     [`POST ${API}/import/commit`]: () => ({ ok: true, sha: 'e'.repeat(40), blocked: false, text: '提交了 eeeeeeee（作者 alice）', output: '' }),
     [`POST ${API}/import/publish`]: (body: unknown) => {
-      const r = at((body as { path: string }).path)(fx.importPublish())
+      const path = (body as { path: string }).path
+      const r = at(path)(fx.importPublish())
       r.text = `预览：没有真的推送。${r.text}`
+      published.set(path, r.mr?.url ?? null)
+      repos = repos.map((x) => (x.path === path && x.pending ? { ...x, pending: pendingAt(path) } : x))
       return r
     },
     [`POST ${API}/import/add`]: (body: unknown) => {
       const path = (body as { path: string }).path
       const id = `r${repos.length + 1}`
-      const pending = pendingPaths.has(path) ? at(path)(fx.importInspectPending()).pending : null
+      const pending = pendingPaths.has(path) ? pendingAt(path) : null
+      const k = kitAt(path)
       repos = [...repos, { id, path, name: path.split('/').pop() ?? path, ok: !pending, error: '', pending,
-        kit: pending ? null : { tracker: 'none', req_prefix: 'READY', default_branch: 'main', gitlab_base: 'https://gitlab.example.com', gitlab_project: 'shop/ready' },
+        kit: pending ? null : { tracker: k.tracker, req_prefix: k.req_prefix, default_branch: k.default_branch, gitlab_base: k.gitlab_base, gitlab_project: k.gitlab_project },
         me: pending ? null : at(path)(fx.importInspect()).me }]
       return { ok: true, id, text: `预览：加入了（${id}）${pending ? `：${pending.text}` : ''}`, status: status() }
     },
@@ -465,7 +538,8 @@ function importRoutes() {
       const b = body as { path: string; name: string }
       const name = String(b.name || '').trim().toLowerCase()
       if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) throw new StubApiError(400, { error: '名字只能用小写字母、数字和 . _ -（字母或数字开头，最多 64 个）', code: 'invalid_name' })
-      const me = { name, source: 'git' as const, gitlab: '', text: `${name}（git config brain.user）`, ask: false, label: '', why: '', suggest: '', error: '' }
+      const me = { name, source: 'git' as const, gitlab: '', text: `${name}（你在这个仓库的名字）`, ask: false, label: '', why: '', suggest: '', error: '' }
+      named.set(b.path, name)
       repos = repos.map((r) => (r.path === b.path && r.me ? { ...r, me: { ...me, gitlab: r.me.gitlab } } : r))
       return { ok: true, text: `你在这个仓库的名字设成了 ${name}`, raw: `git config brain.user ${name}`, me, status: status() }
     },

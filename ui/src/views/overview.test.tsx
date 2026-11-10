@@ -20,7 +20,8 @@ const reqRows = (table: HTMLElement) => table.querySelectorAll('tr[data-key]')
 const keysOf = (table: HTMLElement) => Array.from(reqRows(table)).map((r) => r.getAttribute('data-key'))
 const cardOf = (flow: HTMLElement, key: string) => flow.querySelector(`[data-testid="flow-card"][data-key="${key}"]`) as HTMLElement
 
-/** the review's real case: a repo with no remote, two sessions idle waiting on the person, three claims not started */
+/** the review's real case: a repo with no remote, two sessions idle waiting on the person for Lean's review in a new
+ * session, three claims not started */
 function localWorld(): { ov: Overview; status: Status } {
   const ov = fx.overview()
   const status = fx.status()
@@ -28,13 +29,14 @@ function localWorld(): { ov: Overview; status: Status } {
   const base = ov.rows[0]
   const lean = { stage: 'release', stage_label: '发布', stage_n: 11, stage_state: 'todo' as const, done: 10, total: 11, done_n: 4, skipped_n: 6, next: { id: 'release', label: '发布', n: 11 } }
   const reply = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'ychchen', state: 'local', state_label: '本地开发中', lean, stage: '做完 4 · 跳过 6 · 下一步：发布', overlap: [], open_questions: [], mr: null, local_only: true,
-    waits: { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: ov.at - 11 * 3600 - 120, where: 'session' } })
+    waits: { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: ov.at - 11 * 3600 - 120, where: 'session', review: true },
+    session_url: `/chat?sid=brain-${key}-dev`, worktree: `/Users/ychchen/workplace/demo/${key}` })
   const claim = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'ychchen', state: 'claimed', state_label: '已认领', summary: null, credits: null, updated_at: null, overlap: [], open_questions: [], mr: null, local_only: true,
     lean: { stage: null, stage_label: null, stage_n: null, stage_state: null, done: 0, total: 11, done_n: 0, skipped_n: 0, next: null }, stage: null,
     waits: { who: 'you', text: '已认领，还没开工', line: null, raw: '', do: 'start', since: ov.at - 3 * 3600, where: 'app' } })
   ov.rows = [reply('DEMO-1', '计算器减法'), claim('DEMO-2', 'AGENTS.md 缺仓库简介'), reply('DEMO-3', '计算器乘法'), claim('DEMO-4', 'add 的测试'), claim('DEMO-5', '仓库说明')]
   ov.overlaps = [{ keys: ['DEMO-1', 'DEMO-3'], paths: ['calc.py'] }]
-  ov.cto = { ...ov.cto, sentence: '这个仓库只在本机做，不交给运行机。人介入了 2 次（本机做的也算），2 次落在判断点上。有 credits 的 2 个需求，平均每个 43.4 credits。', unattended: [0, 0], runs: [{ key: 'DEMO-1', repo: 'r1', how: 'local', beyond: [], at_points: 1, outside: 0, credits: 49.8, merged_at: null }, { key: 'DEMO-3', repo: 'r1', how: 'local', beyond: [], at_points: 1, outside: 0, credits: 37, merged_at: null }],
+  ov.cto = { ...ov.cto, sentence: '这个仓库只在本机做，不交给运行机。人介入了 2 次（本机做的也算），2 次落在判断点上。有 credits 的 2 个需求，平均每个 43.4 credits。', unattended: [0, 0], runs: [{ key: 'DEMO-1', repo: 'r1', how: 'pending', beyond: [], at_points: 1, outside: 0, credits: 49.8, merged_at: null }, { key: 'DEMO-3', repo: 'r1', how: 'pending', beyond: [], at_points: 1, outside: 0, credits: 37, merged_at: null }],
     weekly: ov.cto.weekly.map((w) => ({ ...w, unattended: 0, people: 0, local: 0, pending: 0 })) }
   ov.counts = { claimed: 3, local: 2 }
   return { ov, status }
@@ -95,6 +97,45 @@ describe('交付总览', () => {
     expect(screen.getByRole('article', { name: '无人值守' })).not.toHaveTextContent('0/0')
   })
 
+  test('brain-kit’s notes and a skipped run in words with 做什么, its own words under 细节 (the backend’s note_rows, skipped raw)', async () => {
+    const ov = fx.overview()
+    const raw = '--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）'
+    ov.eval = { ...ov.eval, notes: ['花费只有一个总数'], skipped: [{ key: 'PAY-1', why: '它的开工记录读不了', ...{ raw: 'runs/PAY-1/run.json: Expecting value: line 3' } }],
+      ...{ note_rows: [{ text: '花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个', todo: '在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来', raw }] } }
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props()} />)
+    const note = await screen.findByTestId('eval-notes')
+    expect(note).toHaveTextContent('brain-kit 说：花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个')
+    expect(note).toHaveTextContent('做什么：在这个 app 里开会话做需求，花费就按需求分开记')
+    expect((within(note).getByText('细节').closest('details') as HTMLDetailsElement).open).toBe(false)
+    expect(within(note).getByText(raw)).toBeInTheDocument()
+    const skipped = screen.getByTestId('eval-skipped')
+    expect(skipped).toHaveTextContent('读不了，不算进数字：它的开工记录读不了')
+    expect(within(skipped).getByText('细节').closest('details')).toHaveTextContent('Expecting value')
+  })
+
+  test('/status not read (the login expired): the top says how many requirements, not 「0 个仓库」', async () => {
+    installFixtureRoutes()
+    render(<OverviewView entry={{}} {...props({ status: null })} />)
+    await screen.findByTestId('ov-hero')
+    expect(document.querySelector('.cto-org')).toHaveTextContent(/^6 个需求$/)
+  })
+
+  test('while brain-kit works the eval out (the backend’s computing flag), the page says 正在算, not 还没有', async () => {
+    const ov = fx.overview()
+    ov.cto = { ...ov.cto, available: false, unattended: null, stepped_in: null }
+    ov.eval = { ...ov.eval, available: false, error: '正在算交付评估…', raw: '', metrics: [], queue: [], skipped: [], notes: [], ...{ computing: true } }
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props()} />)
+    const hero = await screen.findByTestId('ov-hero')
+    expect(hero).toHaveTextContent('brain-kit 正在算评估的数字，算好就出来：下面先看 credits 和合并')
+    expect(screen.getByTestId('ov-unattended')).toHaveTextContent(/^正在算$/)
+    expect(screen.getByTestId('ov-people')).toHaveTextContent(/^正在算$/)
+    expect(screen.getByRole('article', { name: '人介入' })).toHaveTextContent('brain-kit 正在算评估，算好就出来')
+    expect(screen.getByTestId('eval-computing')).toHaveTextContent('正在算')
+    expect(screen.getByTestId('eval-batch')).not.toHaveTextContent('还没有评估模块')
+  })
+
   test('a repo with no remote: said once at the top, 无人值守 and the runner fold to 这次不需要, no 从远端取最新', async () => {
     const { ov, status } = localWorld()
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
@@ -103,11 +144,12 @@ describe('交付总览', () => {
     expect(hero.textContent!.split('只在本机做')).toHaveLength(2) // the backend's sentence says it; the page does not say it again
     expect(screen.getByTestId('ov-local-tag')).toHaveTextContent('只在本机')
     expect(screen.getByTestId('ov-unattended')).toHaveTextContent('这次不需要')
-    expect(screen.getByRole('article', { name: '无人值守' })).toHaveTextContent('只在本机2')
+    // not 「还没评 2」 under it: in a repo done only here nothing is judged for 无人值守, now or later
+    expect(screen.getByRole('article', { name: '无人值守' })).not.toHaveTextContent('还没评')
     expect(screen.queryByRole('button', { name: /从远端取最新/ })).toBeNull()
     const flow = screen.getByTestId('flow')
     expect(flow.querySelector('[data-lane="runner"]')).toBeNull()
-    expect(within(flow).getByTestId('flow-runner-off')).toHaveTextContent('这次不需要：这个仓库只在本机做')
+    expect(within(flow).getByTestId('flow-runner-off')).toHaveTextContent('这次不需要：这个仓库只在本机做，不交给运行机')
     expect(within(flow).getByTestId('flow-stats')).not.toHaveTextContent('运行机')
     expect(flow).not.toHaveTextContent('交给运行机以后就不在本机做了')
     // 每周合并 with nothing merged: one line, no chart
@@ -117,35 +159,66 @@ describe('交付总览', () => {
     expect(screen.getByTestId('overlaps')).toHaveTextContent('都是 ychchen 的：先合一个，再做另一个，免得冲突')
   })
 
-  test('轮到你: an idle session is the person’s turn, not 「AI 在本机做」; a claim is 等开工; each has its step and how long it has waited', async () => {
+  test('全部 over two repos done only here: the runner band says both, not 这个仓库', async () => {
+    const { ov, status } = localWorld()
+    status.repos = [status.repos[0], { ...status.repos[0], id: 'r2', name: 'oms-brain', path: '/w/oms-brain' }]
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props({ status })} />)
+    const flow = await screen.findByTestId('flow')
+    expect(within(flow).getByTestId('flow-runner-off')).toHaveTextContent('这次不需要：这 2 个仓库都只在本机做，不交给运行机')
+    expect(flow).not.toHaveTextContent('这个仓库')
+  })
+
+  test('轮到你: an idle session is the person’s turn, not 「AI 在本机做」; Lean’s review is 等审查, a claim 等开工; each has its step and how long it has waited', async () => {
     const user = userEvent.setup()
     const { ov, status } = localWorld()
-    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov,
+      [`POST ${API}/requirements/*`]: () => ({ ok: true, slot: 'brain-DEMO-1-review', url: '/chat?sid=brain-DEMO-1-review' }) })
     const p = props({ status })
     render(<OverviewView entry={{}} {...p} />)
     const flow = await screen.findByTestId('flow')
-    expect(within(flow).getByTestId('flow-stats')).toHaveTextContent('进行中 5 个·轮到你 5（等回话 2 · 等开工 3）·等别人 0·AI 在本机做 0')
+    expect(within(flow).getByTestId('flow-stats')).toHaveTextContent('进行中 5 个·轮到你 5（等审查 2 · 等开工 3）·等别人 0·AI 在本机做 0')
     for (const k of ['DEMO-1', 'DEMO-3', 'DEMO-2', 'DEMO-4', 'DEMO-5']) expect((cardOf(flow, k).closest('[data-lane]') as HTMLElement).dataset.lane).toBe('you')
     expect(cardOf(flow, 'DEMO-3')).toHaveTextContent('已等 11 小时')
     expect(cardOf(flow, 'DEMO-5')).toBeInTheDocument() // three in a cell, none hidden behind 「+1 个」
     // the first screen: what waits on the person, the longest wait first, each with its one step
     const yours = screen.getByTestId('your-turn')
-    expect(yours).toHaveTextContent('5 个需求 · 等回话 2 · 等开工 3')
+    expect(yours).toHaveTextContent('5 个需求 · 等审查 2 · 等开工 3')
+    expect(yours).not.toHaveTextContent(/去回话|打开会话|等回话/)
     expect(Array.from(yours.querySelectorAll('li')).map((li) => li.dataset.key)).toEqual(['DEMO-1', 'DEMO-3', 'DEMO-2', 'DEMO-4', 'DEMO-5'])
     const demo2 = yours.querySelector('li[data-key="DEMO-2"]') as HTMLElement
     expect(demo2).toHaveTextContent('已认领，还没开工已等 3 小时')
     await user.click(within(demo2).getByRole('button', { name: '去开工 ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'new', repo: 'r1', key: 'DEMO-2', title: 'AGENTS.md 缺仓库简介' })
-    await user.click(within(cardOf(flow, 'DEMO-1')).getByRole('button', { name: '去回话 ↗' }))
-    expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'DEMO-1', from: 'overview' })
-    expect(p.go).toHaveBeenCalledTimes(2) // the step does not open the card's board as well
+    // the review is a new session's (the one that wrote the code may not review it): 开审查会话 opens it right here
+    expect(within(cardOf(flow, 'DEMO-1')).queryByRole('button', { name: /去回话|打开会话/ })).toBeNull()
+    await user.click(within(cardOf(flow, 'DEMO-1')).getByRole('button', { name: '开审查会话' }))
+    await waitFor(() => expect(navigations).toEqual(['/chat?sid=brain-DEMO-1-review']))
+    expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/requirements/r1/DEMO-1/session`, body: { trust: true, kickoff: true, review: true } })
+    expect(p.go).toHaveBeenCalledTimes(1) // the step does not open the card's board as well
     // the ledger says the same: Lean the one way, and the step
     const table = screen.getByTestId('req-table')
     expect(within(rowOf(table, 'DEMO-3')).getByTestId('lean-cell')).toHaveTextContent('做完 4 · 跳过 6 · 下一步：发布')
     expect(within(rowOf(table, 'DEMO-3')).getByTestId('lean-cell')).not.toHaveTextContent('11/11')
     expect(within(rowOf(table, 'DEMO-2')).getByTestId('lean-cell')).toHaveTextContent(/^还没开工$/)
-    expect(rowOf(table, 'DEMO-3')).toHaveTextContent('只在本机')
+    expect(rowOf(table, 'DEMO-3')).toHaveTextContent('只在本机（还没合并）人介入 1 次')
+    expect(rowOf(table, 'DEMO-3')).not.toHaveTextContent('还没评')
     expect(rowOf(table, 'DEMO-3')).not.toHaveTextContent('本机做完')
+    expect(within(rowOf(table, 'DEMO-3')).getByRole('button', { name: '开审查会话' })).toBeInTheDocument()
+    expect(within(yours.querySelector('li[data-key="DEMO-3"]') as HTMLElement).getByRole('button', { name: '开审查会话' })).toBeInTheDocument()
+  })
+
+  test('an idle session that is not a review: 去回话 opens that session, as 待办 does', async () => {
+    const { ov, status } = localWorld()
+    ov.rows = ov.rows.map((r) => (r.key === 'DEMO-1' ? { ...r, waits: { ...r.waits, review: false, text: '代码生成做完了，下一步是构建测试：在会话里让它接着做' } } : r))
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    const p = props({ status })
+    render(<OverviewView entry={{}} {...p} />)
+    const yours = await screen.findByTestId('your-turn')
+    expect(yours).toHaveTextContent('5 个需求 · 等回话 1 · 等审查 1 · 等开工 3')
+    await userEvent.setup().click(within(yours.querySelector('li[data-key="DEMO-1"]') as HTMLElement).getByRole('button', { name: '去回话 ↗' }))
+    expect(navigations).toEqual(['/chat?sid=brain-DEMO-1-dev'])
+    expect(p.go).not.toHaveBeenCalled()
   })
 
   test('需求流动: every open card sits in the column colOf and the lane laneOf (waits.who) say; merged ones in 已合并', async () => {
@@ -303,6 +376,19 @@ describe('交付总览', () => {
     expect(screen.getByTestId('repo-error')).toHaveTextContent('shop-web：还没装 brain-kit')
   })
 
+  test('a repo whose scan threw: its English error folded under 细节, the banner in words with 做什么', async () => {
+    const ov = fx.overview()
+    ov.errors = [{ repo: 'r1', error: "KeyError: 'runs' while reading runs/PAY-3/run.json" }]
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props()} />)
+    const banner = await screen.findByTestId('repo-error')
+    expect(banner).toHaveTextContent('shop-pay：这次没读出来')
+    expect(banner).toHaveTextContent('做什么：看看这个仓库的目录还在不在、能不能读，再去导入仓库检查它')
+    const raw = within(banner).getByText('细节').closest('details') as HTMLDetailsElement
+    expect(raw.open).toBe(false)
+    expect(raw).toHaveTextContent("KeyError: 'runs'")
+  })
+
   test('a summary shows no Markdown and no internal ids: `code` as code, the ids on hover, 规模 in Chinese, no 「现在：」', () => {
     const s = plainSummary('给 `calc.py` 加乘法 `multiply(a, b)`，返回 `a * b`（D01#S002 · 097f2e9e）（规模 small）。现在：Lean 在「构建测试」做完，在本地开发（还没交接）。')
     expect(s.parts).toEqual([
@@ -325,7 +411,7 @@ describe('交付总览', () => {
     expect(cell('PAY-6')).toHaveTextContent(/^还没开工$/)
   })
 
-  test('a row opens its 需求看板; 详情 opens its 需求详情; the overlap card names both, their owners and what they share', async () => {
+  test('a row opens its 需求看板; 需求详情 opens its 需求详情; the overlap card names both, their owners and what they share', async () => {
     const user = userEvent.setup()
     installFixtureRoutes()
     const p = props()
@@ -333,7 +419,7 @@ describe('交付总览', () => {
     const table = await screen.findByTestId('req-table')
     await user.click(within(rowOf(table, 'PAY-4')).getByText('对账单按商户拆分'))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-4', from: 'overview' })
-    await user.click(within(rowOf(table, 'PAY-4')).getByRole('button', { name: '详情' }))
+    await user.click(within(rowOf(table, 'PAY-4')).getByRole('button', { name: '需求详情' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-4', from: 'overview' })
     expect(p.go).toHaveBeenCalledTimes(2) // the button does not open the board as well
     const overlaps = screen.getByTestId('overlaps')
@@ -382,6 +468,21 @@ describe('交付总览', () => {
     await waitFor(() => expect(apiCalls.some((c) => c.path === `${API}/overview?repo=r1`)).toBe(true))
   })
 
+  test('opened at one repo (a reload on repo=r1), every pill still has its counts: the others from 全部, read once', async () => {
+    const status = fx.status()
+    status.repos = [status.repos[0], { ...status.repos[0], id: 'r3', name: 'shop-order', path: '/w/shop-order' }]
+    const all = fx.overview()
+    all.rows = [...all.rows, { ...all.rows[0], repo: 'r3', key: 'ORD-10', waits: { ...all.rows[0].waits, who: 'runner', do: 'none' } }]
+    const r1 = fx.overview()
+    installFixtureRoutes({ [`GET ${API}/overview*`]: (_b, path) => (path.includes('repo=all') ? all : r1) })
+    render(<OverviewView entry={{ repo: 'r1' }} {...props({ status })} />)
+    const pills = await screen.findByRole('navigation', { name: '仓库' })
+    await waitFor(() => expect(within(pills).getByRole('button', { name: /^shop-order/ })).toHaveTextContent('shop-order进行中 1'))
+    expect(within(pills).getByRole('button', { name: /^全部/ })).toHaveTextContent('全部进行中 6 · 轮到你 2')
+    expect(within(pills).getByRole('button', { name: /^shop-pay/ })).toHaveTextContent('shop-pay进行中 5 · 轮到你 2')
+    expect(apiCalls.filter((c) => c.path === `${API}/overview?repo=all`)).toHaveLength(1)
+  })
+
   test('opened with a state in the URL, only those rows show; a filter with no rows says so', async () => {
     const user = userEvent.setup()
     installFixtureRoutes()
@@ -415,6 +516,7 @@ describe('交付总览', () => {
     render(<OverviewView entry={{}} {...props()} />)
     await screen.findByTestId('req-table')
     const before = apiCalls.filter((c) => c.path.startsWith(`${API}/overview`)).length
+    expect(screen.getByRole('button', { name: '从远端取最新' }).title).not.toMatch(/git|fetch/)
     await user.click(screen.getByRole('button', { name: '从远端取最新' }))
     expect(await screen.findByTestId('refresh-result')).toHaveTextContent(/^已经从远端取到最新。$/)
     expect(apiCalls.filter((c) => c.method === 'POST')).toEqual([{ method: 'POST', path: `${API}/refresh`, body: { repo: 'r1' } }])
@@ -456,7 +558,9 @@ describe('交付总览', () => {
     const batch = await screen.findByTestId('eval-batch')
     expect(batch).toHaveTextContent('这一批：远端的 main 分支上已经有记录的需求 · 不跟着交付清单的筛选变')
     expect(batch.querySelector('[data-metric="autonomy"]')).toHaveTextContent(/^自主度2\/3交接以后没人插手、交付也正确的$/)
-    expect(batch.querySelector('[data-metric="autonomy"]')).toHaveAttribute('title', fx.overview().eval.metrics[0].rule)
+    // each whole rule on hover, in the app's words: no Lean approval kinds, no brain-kit field names
+    expect(batch.querySelector('[data-metric="autonomy"]')).toHaveAttribute('title', '交接以后，除了必经的审批（需求、设计、计划、发布审批和验收），没有人做过任何事，而且交付正确')
+    for (const m of batch.querySelectorAll('[data-metric]')) expect(m.getAttribute('title')).not.toMatch(/[A-Z]{3,}|park|correction|run\b/)
     expect(batch.querySelector('[data-metric="staleness"]')).toHaveTextContent(/^过时与冲突2/)
     expect(batch.querySelector('[data-metric="repeat_rate"]')).toHaveTextContent(/^重复纠正率还没有/)
     expect(batch.querySelector('[data-metric="credits_per_success"]')).toHaveTextContent(/^每个正确交付的 credits还没有/)
@@ -510,6 +614,8 @@ describe('交付总览', () => {
     const card = await screen.findByTestId('funnel-card')
     expect(card).toHaveTextContent('15个决定')
     expect(card).toHaveTextContent('人定了 4 个 · 数字来自 brain-kit 的评估 · 没合并的需求也算')
+    // beside 人介入 5 次, 人定了 4 个 says it counts something else
+    expect(within(card).getByTestId('funnel-vs-people')).toHaveTextContent('人定的 4 个是决定表里的条数；「人介入 5 次」数的是人做的动作（批准、驳回、回答），所以两个数不一样')
     expect(Array.from(card.querySelectorAll('[data-row]')).map((r) => r.getAttribute('data-row'))).toEqual(['person', 'check', 'brain', 'unclassified', 'unknown'])
     expect(card.querySelector('[data-row="person"]')).toHaveTextContent(/^人4$/)
     expect(within(card).getByRole('img', { name: /^决定：人 4，检查定的 5，照 Brain 3，AI 自己定的 0，/ })).toBeInTheDocument()

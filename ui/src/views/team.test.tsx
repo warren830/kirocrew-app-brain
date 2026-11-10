@@ -23,7 +23,10 @@ describe('运行机', () => {
     installFixtureRoutes()
     render(<TeamPage {...props()} />)
     const runs = await screen.findByRole('region', { name: '运行' })
-    expect(runs).toHaveTextContent('RUN-PAY-4-1')
+    // a run in words, its id on hover
+    expect(runs).toHaveTextContent('第 1 次运行')
+    expect(runs).not.toHaveTextContent('RUN-PAY-4-1')
+    expect(within(runs).getAllByTitle('RUN-PAY-4-1')).toHaveLength(1)
     expect(within(runs).getByRole('link', { name: /!41/ })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/41')
     const ledger = screen.getByRole('region', { name: '账本' })
     expect(ledger.querySelector('[data-ledger="handoffs"]')).toHaveTextContent('已接手 4')
@@ -45,7 +48,7 @@ describe('运行机', () => {
     installFixtureRoutes({ [`GET ${API}/team`]: () => tv })
     render(<TeamPage {...props()} />)
     const runs = await screen.findByRole('region', { name: '运行' })
-    const chip = (runId: string) => within(within(runs).getByText(runId).closest('tr') as HTMLElement).getByText(/./, { selector: '.br-chip' })
+    const chip = (runId: string) => within(within(runs).getByTitle(runId).closest('tr') as HTMLElement).getByText(/./, { selector: '.br-chip' })
     expect(chip('RUN-PAY-9-1')).toHaveTextContent('parked_somewhere')
     expect(chip('RUN-PAY-9-1')).toHaveClass('tone-idle')
     expect(chip('RUN-PAY-4-1')).toHaveTextContent('已派给会话')
@@ -77,14 +80,16 @@ describe('运行机', () => {
     const item = (r: string) => ho.querySelector(`[data-result="${r}"]`) as HTMLElement
     expect(item('waiting')).toHaveTextContent('正在别处签名')
     expect(item('waiting')).toHaveTextContent('下一轮再看')
-    expect(item('waiting')).toHaveTextContent('9c1d2e3f4a5b')
+    // the hand-over's commit on hover, not as text
+    expect(item('waiting')).not.toHaveTextContent('9c1d2e3f4a5b')
+    expect(item('waiting')).toHaveAttribute('title', '交接的提交 9c1d2e3f4a5b')
     expect(within(item('waiting')).getByRole('link', { name: /shop\/shop-pay!48/ })).toHaveAttribute('href', 'https://gitlab.example.com/shop/shop-pay/-/merge_requests/48')
     expect(item('unlabelled')).toHaveTextContent('标签刚被拿掉')
     expect(item('unlabelled')).toHaveTextContent('重新交接、再打一次标签时会这样')
     expect(item('error')).toHaveTextContent('这一轮没查成')
     expect(item('error')).toHaveTextContent(fx.team().handovers.find((h) => h.result === 'error')!.error) // its error instead of the hint
     expect(item('error')).not.toHaveTextContent('下一轮再试')
-    // on the conveyor: dashed (looked at again next round); the belt ends at the runner, outside the part that scrolls
+    // on the conveyor: dashed (looked at again next round); the belt ends at the runner, outside the part that wraps
     expect(item('waiting')).toHaveClass('kt-belt-chip', 'is-pending')
     expect(within(item('waiting')).getByText('正在别处签名')).toHaveClass('kt-pill', 'tone-hand')
     expect(ho.querySelector('.kt-belt-end.is-head')).toHaveTextContent('运行机')
@@ -99,6 +104,20 @@ describe('运行机', () => {
     expect(await screen.findByRole('region', { name: '交接' })).toHaveTextContent('上一轮没有打着交接标签的 MR')
   })
 
+  test('brain-kit’s English (the bridge not set up, an MR it could not check) is said in words, the original folded', async () => {
+    const tv = fx.team()
+    tv.status = { ...tv.status, ok: false, error: "FileNotFoundError: [Errno 2] No such file or directory: 'bridge.json'" }
+    tv.handovers = tv.handovers.map((h) => (h.result === 'error' ? { ...h, error: 'GitLab 502: Bad Gateway' } : h))
+    installFixtureRoutes({ [`GET ${API}/team`]: () => tv })
+    render(<TeamPage {...props()} />)
+    const err = await screen.findByTestId('team-error')
+    expect(err).toHaveTextContent('桥没准备好做什么看设置里团队模式填的配置文件')
+    expect((within(err).getByText('细节').closest('details') as HTMLDetailsElement).open).toBe(false)
+    const chip = screen.getByRole('region', { name: '交接' }).querySelector('[data-result="error"]') as HTMLElement
+    expect(chip).toHaveTextContent('没查成：原话在细节里')
+    expect(within(chip).getByText('GitLab 502: Bad Gateway').closest('details')).not.toHaveAttribute('open')
+  })
+
   test('the vouchers the signer did not answer last round are listed (asked for again next round); none, no heading', async () => {
     installFixtureRoutes()
     const { unmount } = render(<TeamPage {...props()} />)
@@ -107,7 +126,8 @@ describe('运行机', () => {
     const item = within(within(signer).getByTestId('signer-waiting')).getByRole('listitem')
     expect(item).toHaveTextContent('回答 D-2')
     expect(within(item).getByText('回答的凭证')).toHaveClass('br-tag')
-    expect(item).toHaveTextContent('RUN-PAY-4-1')
+    expect(item).toHaveTextContent('PAY-4 的第 1 次运行')
+    expect(item).not.toHaveTextContent('RUN-PAY-4-1')
     expect(item).toHaveTextContent(fmtIso('2026-11-08T21:40:00+08:00'))
     unmount()
     const tv = fx.team()
