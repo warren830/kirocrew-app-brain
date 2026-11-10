@@ -11,7 +11,7 @@ import type { ViewProps } from '../views/props'
 import { BoardPage } from './BoardPage'
 import { tickLabel } from './Lanes'
 import { GW, SCALE, graphWidth } from './layout'
-import { CELL_GROUPS, actorMeta, fmtCredits, fmtWhen } from './format'
+import { CELL_GROUPS, actorMeta, fmtCredits, fmtSpan, fmtWhen } from './format'
 
 const PAY3: BoardEntry = { repo: 'r1', key: 'PAY-3' }
 const PAY2: BoardEntry = { repo: 'r1', key: 'PAY-2' }
@@ -250,6 +250,31 @@ describe('需求看板', () => {
     fireEvent.click(within(local).getByRole('button', { name: '打开会话 ›' }))
     expect(navigations).toEqual([b.actors[0].session!.url])
     expect(screen.queryByTestId('kt-lanes-out')).toBeNull()
+  })
+
+  test('the lanes’ time starts at 开工, the moment 需求详情 says it started; the claim before it is 认领, not 开工', async () => {
+    installFixtureRoutes()
+    renderBoard()
+    await loaded()
+    const b = fx.board()
+    const claim = b.events.find((e) => e.kind === 'claim')!
+    const start = b.events.find((e) => e.kind === 'start')!
+    expect(start.at).toBeGreaterThan(claim.at)
+    expect(screen.getByTestId('kt-axis-title')).toHaveTextContent(`时间线（从 ${fmtWhen(start.at)} 开工起）`)
+    const span = region('各环节的泳道').querySelector('.kt-track-span') as HTMLElement
+    const a = b.actors.flatMap((x) => x.spans).sort((p, q) => p.a - q.a).find((x) => x.a >= start.at)!
+    expect(span.getAttribute('title')).toContain('（开工后 ')
+    expect(span.getAttribute('title')).not.toContain(`（开工后 ${fmtSpan(a.a - claim.at)}）`)
+    cleanup()
+    // a board with no 开工 recorded (the run's record not read) starts at the claim and says so
+    const c = fx.board()
+    c.events = c.events.filter((e) => e.kind !== 'start')
+    c.started_at = claim.at
+    installFixtureRoutes(boardRoute(() => structuredClone(c)))
+    renderBoard()
+    await loaded()
+    expect(screen.getByTestId('kt-axis-title')).toHaveTextContent(`时间线（从 ${fmtWhen(claim.at)} 认领起）`)
+    expect(region('各环节的泳道').querySelector('.kt-track-span')?.getAttribute('title')).toContain('（认领后 ')
   })
 
   test('an actor not on this requirement’s way has no lane: one line says what is not needed', async () => {

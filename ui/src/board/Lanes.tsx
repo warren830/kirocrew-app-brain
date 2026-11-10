@@ -83,6 +83,9 @@ export const TAIL_PCT = 16
 
 export interface Axis {
   t0: number
+  /** what happened at t0, in the words 需求详情 uses for it: 开工 (the run's start), else 认領 (the claim); '' when
+   * neither is recorded */
+  from: '开工' | '认领' | ''
   /** the last activity (the end of the even part) */
   last: number
   /** the axis' end: the merge, else now */
@@ -102,8 +105,18 @@ export function lastActivity(b: ReqBoard): number | null {
   return ts.length ? Math.max(...ts) : null
 }
 
+/** The axis starts where 需求详情's cycle does, at 开工 (the run's start event); before it nothing works or waits on a
+ * lane (the claim is the event before it). A board with no 开工 recorded starts at its first event, said as what that
+ * was. */
+export function axisStart(b: Pick<ReqBoard, 'events' | 'started_at' | 'at'>): { t0: number; from: Axis['from'] } {
+  const start = b.events.find((e) => e.kind === 'start')
+  if (start) return { t0: start.at, from: '开工' }
+  const t0 = b.started_at ?? b.events[0]?.at ?? b.at
+  return { t0, from: b.events.some((e) => e.kind === 'claim' && e.at === t0) ? '认领' : '' }
+}
+
 export function axisOf(b: ReqBoard, now: number): Axis {
-  const t0 = b.started_at ?? b.at
+  const { t0, from } = axisStart(b)
   const end = Math.max(t0 + 60, b.ended_at ?? now)
   const last = Math.min(end, Math.max(t0 + 60, lastActivity(b) ?? end))
   const quiet = end - last
@@ -114,7 +127,7 @@ export function axisOf(b: ReqBoard, now: number): Axis {
     if (t <= top) return Math.max(0, ((t - t0) / (top - t0)) * even)
     return Math.min(100, even + ((t - last) / (end - last)) * TAIL_PCT)
   }
-  return { t0, last, end, tail, pct }
+  return { t0, from, last, end, tail, pct }
 }
 
 function LanesAxis({ board, ax }: { board: ReqBoard; ax: Axis }) {
@@ -123,7 +136,7 @@ function LanesAxis({ board, ax }: { board: ReqBoard; ax: Axis }) {
   const waiting = board.actors.some((a) => a.status === 'awaiting_approval')
   return (
     <div className="kt-lane kt-lane-axis" aria-hidden="true">
-      <div className="kt-axis-title">时间线（从 {fmtWhen(ax.t0)} 开工起）</div>
+      <div className="kt-axis-title" data-testid="kt-axis-title">时间线（从 {fmtWhen(ax.t0)} {ax.from}起）</div>
       <div className="kt-axis">
         {ticks.map((t, i) => {
           const left = ax.pct(ax.t0 + t)
@@ -166,7 +179,7 @@ function LaneTrack({ a, board, ax }: { a: Actor; board: ReqBoard; ax: Axis }) {
       {a.spans.map((s, i) => (
         <span key={i} className={`kt-track-span is-${s.kind}${s.b === null && going(s.kind) ? ' is-live' : ''}${s.kind === 'wait' && spanWho(a, board, s) !== 'you' ? ' is-other' : ''}`}
           style={{ left: `${ax.pct(s.a)}%`, width: `${Math.max(0.6, ax.pct(s.b ?? now) - ax.pct(s.a))}%` }}
-          title={`${word(s)}：${fmtWhen(s.a)} 起，${s.b === null ? `到现在（${fmtSpan(now - s.a)}）` : `用了 ${fmtSpan(s.b - s.a)}`}（开工后 ${fmtSpan(s.a - ax.t0)}）`} />
+          title={`${word(s)}：${fmtWhen(s.a)} 起，${s.b === null ? `到现在（${fmtSpan(now - s.a)}）` : `用了 ${fmtSpan(s.b - s.a)}`}${ax.from ? `（${ax.from}后 ${fmtSpan(s.a - ax.t0)}）` : ''}`} />
       ))}
       {a.marks.map((m, i) => (
         <span key={`m${i}`} className={`kt-track-mark is-${m.kind}`} style={{ left: `${ax.pct(m.at)}%` }} title={`${fmtWhen(m.at)} · ${m.title}`} />
