@@ -191,8 +191,9 @@ export default function BrainApp({ pollMs }: { pollMs?: number } = {}) {
     body = <OverviewView key={n} entry={entry} {...props} />
   }
   const s = status.data
-  // 开需求, 设置 and 待办 show KiroCrew's rows themselves, with the same fix buttons: no banner over them there.
-  const failing = s && v.kind !== 'new' && v.kind !== 'settings' && v.kind !== 'todo' ? s.crew.rows.filter((r) => r.level === 'FAIL') : []
+  // 开需求, 设置 and 待办 show KiroCrew's rows themselves, with the same fix buttons: no banner over them there. Without
+  // brain-kit KiroCrew's only row is that one cause, which the brain-kit banner already says: one banner for it.
+  const failing = s && s.brainkit.ok && v.kind !== 'new' && v.kind !== 'settings' && v.kind !== 'todo' ? s.crew.rows.filter((r) => r.level === 'FAIL') : []
   const off = status.error ? httpProblem(status.status) : null
   const kit = s && !s.brainkit.ok && v.kind !== 'settings' ? brainkitProblem(s.brainkit.error, s.brainkit.path) : null
   return (

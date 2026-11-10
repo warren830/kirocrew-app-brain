@@ -202,12 +202,44 @@ describe('the app: one bar over the views', () => {
     expect(bar().getByRole('tab', { name: '交付总览' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  test('banner on every view but 设置: brain-kit not found → where to get it and 去填位置; KiroCrew FAIL rows with their fix button, but not on 开需求, 设置 and 待办, which list them', async () => {
+  test('no brain-kit: one banner for it on every view but 设置 (where to get it, 去填位置); 设置 says it at its top, and its KiroCrew row points at that card', async () => {
+    const user = userEvent.setup()
+    const s = fx.status()
+    s.brainkit.ok = false
+    s.brainkit.error = '这里没有 brain-kit（找不到 /Users/alice/src/brain-kit/brainkit/__init__.py）'
+    // what crewcheck answers without brain-kit: that one row (problems.brainkit_missing)
+    s.crew.rows = [{ level: 'FAIL', text: 'brain-kit 没装载', todo: '在「设置」里写对 brain-kit 的位置', fix: null, repo: null, raw: '' }]
+    installFixtureRoutes({ [`GET ${API}/status`]: () => s, [`GET ${API}/crew`]: () => ({ ...fx.crew(), rows: s.crew.rows }) })
+    render(<BrainApp pollMs={60_000} />)
+    const nokit = await screen.findByTestId('br-no-brainkit')
+    expect(nokit).toHaveTextContent('找不到 brain-kit做什么在设置的「brain-kit 在哪」写上它的目录，点「保存」；这台机器上还没有的话，先在终端里克隆一份（点「复制」拿命令），再写它的位置')
+    expect(within(nokit).getByTestId('cmd-line')).toHaveTextContent('git clone https://github.com/warren830/brain-kit.git ~/brain-kit复制')
+    expect(within(nokit).getByText('细节').closest('details')).not.toHaveAttribute('open')
+    expect(within(nokit).getByText(s.brainkit.error)).toBeInTheDocument()
+    expect(screen.getAllByRole('alert').filter((e) => e.closest('[data-testid=br-banners]'))).toHaveLength(1)
+    expect(screen.queryByTestId('br-crew-fail')).toBeNull()                  // one cause, one banner
+    await user.click(within(nokit).getByRole('button', { name: '去填位置' }))
+    expect(parseView(window.location.search)).toEqual({ kind: 'settings' })
+    // 设置 asks for brain-kit's place at its top: no banner over it, and nothing there says to go to 「设置」
+    const card = await screen.findByTestId('settings-no-brainkit')
+    expect(card).toHaveTextContent('做什么在下面的「brain-kit 在哪」写上它的目录，点「保存」')
+    expect(screen.queryByTestId('br-no-brainkit')).toBeNull()
+    const crew = screen.getByRole('region', { name: 'KiroCrew' })
+    expect(crew).toHaveTextContent('brain-kit 没装载做什么照最上面「找不到 brain-kit」那张卡做')
+    expect(screen.getByTestId('br-app')).not.toHaveTextContent('在「设置」里')
+    expect(screen.getByTestId('br-app')).not.toHaveTextContent('在设置的')
+    for (const open of [() => user.click(bar().getByRole('tab', { name: 'Brain' })), () => user.click(bar().getByRole('button', { name: '导入仓库' })),
+      () => user.click(bar().getByRole('tab', { name: '交付总览' }))]) {
+      await open()
+      expect(await screen.findByTestId('br-no-brainkit')).toBeInTheDocument()
+      expect(screen.queryByTestId('br-crew-fail')).toBeNull()
+    }
+  }, 20_000)
+
+  test('KiroCrew FAIL rows: a banner with their fix button on every view but 开需求, 设置 and 待办, which list them', async () => {
     const user = userEvent.setup()
     const s = fx.status()
     s.app.team = true
-    s.brainkit.ok = false
-    s.brainkit.error = '这里没有 brain-kit（找不到 /Users/alice/src/brain-kit/brainkit/__init__.py）'
     s.crew.rows = [{ level: 'FAIL', text: '找不到 brain-dev agent：~/.kiro/agents/brain-dev.json 不存在' }, { level: 'OK', text: 'KiroCrew 在跑' }]
     installFixtureRoutes({
       [`GET ${API}/status`]: () => s,
@@ -215,26 +247,17 @@ describe('the app: one bar over the views', () => {
       [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了', rows: [] }),
     })
     render(<BrainApp pollMs={60_000} />)
-    const nokit = await screen.findByTestId('br-no-brainkit')
-    expect(nokit).toHaveTextContent('找不到 brain-kit做什么在设置的「brain-kit 在哪」写上它的目录，点「保存」；这台机器上还没有的话，先在终端里克隆一份（点「复制」拿命令），再写它的位置')
-    expect(within(nokit).getByTestId('cmd-line')).toHaveTextContent('git clone https://github.com/warren830/brain-kit.git ~/brain-kit复制')
-    expect(within(nokit).getByText('细节').closest('details')).not.toHaveAttribute('open')
-    expect(within(nokit).getByText(s.brainkit.error)).toBeInTheDocument()
-    const crew = screen.getByTestId('br-crew-fail')
+    const crew = await screen.findByTestId('br-crew-fail')
     expect(crew).toHaveTextContent('KiroCrew 这边有 1 件要先处理')
     expect(crew).toHaveTextContent('找不到 brain-dev agent')
     expect(crew).not.toHaveTextContent('KiroCrew 在跑') // only the failing rows
     await user.click(within(crew).getByRole('button', { name: FIX }))
     expect(await within(crew).findByText('装好了')).toBeInTheDocument()
     expect(apiCalls.some((c) => c.method === 'POST' && c.path === `${API}/crew/fix`)).toBe(true)
-    await user.click(within(nokit).getByRole('button', { name: '去填位置' }))
-    expect(parseView(window.location.search)).toEqual({ kind: 'settings' })
-    // 设置 asks for brain-kit's place at its top, with the same words: no banner over it saying them again
-    expect(await screen.findByTestId('settings-no-brainkit')).toHaveTextContent('找不到 brain-kit')
-    expect(screen.queryByTestId('br-no-brainkit')).toBeNull()
+    await user.click(bar().getByRole('button', { name: '设置' }))
     // 设置 and 开需求 list KiroCrew's rows themselves, with the fix: no banner over them
+    const card = await screen.findByRole('region', { name: 'KiroCrew' })
     expect(screen.queryByTestId('br-crew-fail')).toBeNull()
-    const card = screen.getByRole('region', { name: 'KiroCrew' })
     expect(card).toHaveTextContent('找不到 brain-dev agent')
     expect(within(card).getByRole('button', { name: FIX })).toBeInTheDocument()
     await user.click(bar().getByRole('tab', { name: '开需求' }))
@@ -242,7 +265,6 @@ describe('the app: one bar over the views', () => {
     expect(checks).toHaveTextContent('找不到 brain-dev agent')
     expect(within(checks).getByRole('button', { name: FIX })).toBeInTheDocument()
     expect(screen.queryByTestId('br-crew-fail')).toBeNull()
-    expect(within(screen.getByTestId('br-no-brainkit')).getByRole('button', { name: '去填位置' })).toBeInTheDocument()
     // 待办 lists them in its KiroCrew group, once
     await user.click(bar().getByRole('tab', { name: TODO_TAB }))
     expect(within(await screen.findByRole('region', { name: 'KiroCrew 的问题' })).getByRole('button', { name: FIX })).toBeInTheDocument()
@@ -260,7 +282,6 @@ describe('the app: one bar over the views', () => {
       await open()
       expect(parseView(window.location.search).kind).toBe(kind)
       expect(screen.getByTestId('br-crew-fail')).toHaveTextContent('找不到 brain-dev agent')
-      expect(screen.getByTestId('br-no-brainkit')).toBeInTheDocument()
     }
   }, 20_000)
 
