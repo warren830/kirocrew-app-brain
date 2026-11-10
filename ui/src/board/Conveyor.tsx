@@ -12,11 +12,15 @@ import { RoleIcon } from './RoleIcon'
 import { ExtLink } from '../ui'
 import { ACT } from '../vocab'
 
-/** An empty belt, said by why it is empty: no commit yet; a run whose working copy is on the runner, not here (its
- * commits are on the MR); a requirement brain-kit could not read the record of (the page's note says what to do). */
-function beltEmpty(b: Pick<ReqBoard, 'source' | 'row'>): string {
+/** An empty belt, said by why it is empty: no commit yet; a hand-over the runner has not started on (what it waits
+ * for, as the board says it); a run whose working copy is on the runner, not here (its commits are on the MR); a
+ * requirement brain-kit could not read the record of (the page's note says what to do). */
+function beltEmpty(b: Pick<ReqBoard, 'source' | 'row' | 'actors'>): string {
   if (b.source === 'trace') return '运行分支上还没有提交'
-  if (b.row.where === 'runner' && !b.row.worktree) return '运行机的工作目录不在这台机器上，这里读不到它的提交'
+  if (b.row.where === 'runner' && !b.row.worktree) {
+    const runner = b.actors.find((a) => a.key === 'runner')?.status
+    return runner === 'waiting' || runner === 'queued' ? `运行机还没开始做，还没有它的提交：${b.row.waits.text}` : '运行机的工作目录不在这台机器上，这里读不到它的提交'
+  }
   return '这里读不到运行分支的提交：brain-kit 没读出这个需求的记录'
 }
 

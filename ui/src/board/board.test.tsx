@@ -1133,12 +1133,26 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     const b = fx.board()
     Object.assign(b, { source: 'app', belt: [] })
     Object.assign(b.row, { where: 'runner', worktree: null, mr: { iid: 9, url: 'https://gitlab.example.com/x/-/merge_requests/9', state: 'opened' } })
+    b.actors = b.actors.map((a) => (a.key === 'runner' ? { ...a, status: 'running' as const } : a))
     installFixtureRoutes(boardRoute(() => structuredClone(b)))
     renderBoard()
     await loaded()
     const belt = screen.getByTestId('kt-conveyor')
     expect(belt).toHaveTextContent('运行机的工作目录不在这台机器上，这里读不到它的提交')
     expect(within(belt).getByRole('link', { name: '看 MR' })).toHaveAttribute('href', b.row.mr!.url)
+  })
+
+  test('a hand-over the runner has not started on: the conveyor says so with what it waits for, as the board says it, not that its directory is elsewhere', async () => {
+    const b = fx.board()
+    Object.assign(b, { source: 'app', belt: [] })
+    Object.assign(b.row, { where: 'runner', worktree: null, waits: { ...b.row.waits, who: 'nobody', text: '签名服务在签接手合同' } })
+    b.actors = b.actors.map((a) => (a.key === 'runner' ? { ...a, status: 'waiting' as const } : a))
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    await loaded()
+    const belt = screen.getByTestId('kt-conveyor')
+    expect(belt).toHaveTextContent('运行机还没开始做，还没有它的提交：签名服务在签接手合同')
+    expect(belt).not.toHaveTextContent('不在这台机器上')
   })
 
   test('a repo done only here: the graph numbers and names its phases as its introduction does (2 检查 · 发布, 3 回写), no 验收', async () => {
