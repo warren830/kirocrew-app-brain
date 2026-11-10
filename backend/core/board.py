@@ -301,7 +301,9 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
                 add(at, "reject", "person", gates[0], "%s退回了%s" % (approver(kind, at, s), name), gates=list(gates),
                     lean=kind, who=approver(kind, at, s))
             else:
-                add(at, "refused", gates[0], gates[0], "批准的那一行没被接受（%s）" % name, gates=list(gates), lean=kind)
+                why = lean_view.refused_why(d.get("check"))
+                add(at, "refused", gates[0], gates[0], "%s（%s）%s" % (lean_view.REFUSED, name, "：%s" % why if why else ""),
+                    gates=list(gates), lean=kind)
         elif ev == "BLOCKED":
             what = "写 %s" % _clip(d.get("path"), 50) if d.get("path") else "一次%s" % lean_view.BLOCK_TOOL.get(str(d.get("tool") or ""), "工具调用")
             add(at, "blocked", s, s, "Lean 拦下了%s：%s" % (what, lean_view.block_rule(d.get("gate"))),

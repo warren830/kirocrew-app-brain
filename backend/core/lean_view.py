@@ -39,7 +39,7 @@ STAGE_STATE = {"STAGE_STARTED": "started", "STAGE_COMPLETED": "done", "STAGE_SKI
 LEAN_NOTES = (
     (re.compile(r"^verify PASS: (\d+) checks? on code fingerprint [0-9a-f]*$"), lambda m: "%s 项自动检查都过了" % m.group(1)),
     (re.compile(r"^RELEASE approved \(sha [0-9a-f]*\)$"), lambda m: "发布审批通过了"),
-    (re.compile(r"^not requested \(lean new without --ideation\)$"), lambda m: "这次没要构想这一段"),
+    (re.compile(r"^not requested \(lean new without --ideation\)$"), lambda m: "这次没要构思这一段"),
 )
 
 
@@ -55,11 +55,18 @@ def say_note(note: Any) -> str | None:
 PASSED_OVER = "Lean 没记这一步，直接往后做了"
 APPROVAL_EVENTS = ("APPROVAL_REQUESTED", "APPROVED", "REJECTED", "APPROVAL_REFUSED")
 KIND_LABEL = {"REQUIREMENTS": "需求", "DESIGN": "设计", "INCEPTION": "需求和设计", "PLAN": "代码生成计划",
-              "RELEASE": "发布"}
+              "RELEASE": "发布", "IDEATION": "构思"}
+# an approval line Lean did not take (APPROVAL_REFUSED), as the board says it, and why (aidlc_lean.py record_approval's
+# checks), in words
+REFUSED = "批准的那一行没被接受"
+REFUSED_CHECK = {"target": "没有等它批准的请求", "hash": "那一行的编号和请求对不上（文件改过了，或者没带编号）",
+                 "release": "发布还没准备好", "ideation": "要先做完构思的交接", "approvers": "批的人不在批准人名单里",
+                 "team": "要别的团队的人批"}
 # Lean's BLOCKED gates (aidlc_lean.py block()) and tools, in words
 BLOCK_GATE = {"records": "记录文件只能由 Lean 自己写", "protected": "受保护的文件", "danger": "危险命令", "intent": "还没选需求",
               "contract": "别的团队的文件：要先开变更请求", "verify": "还没过自动检查", "requirements": "需求还没批",
-              "design": "设计还没批", "inception": "需求和设计还没批", "ideation": "构思还没批", "released": "已经发布了"}
+              "design": "设计还没批", "inception": "需求和设计还没批", "ideation": "构思还没批", "released": "已经发布了",
+              "plan": "代码生成计划还没批"}
 BLOCK_TOOL = {"fs_write": "写文件", "write": "写文件", "execute_bash": "跑命令", "shell": "跑命令", "bash": "跑命令"}
 BLOCKED = "Lean 拦下了一个不该做的改动"
 CHECKBOX_RE = re.compile(rb"(?m)^([ \t]*[-*] )\[[xX ]\]")
@@ -72,6 +79,16 @@ Lister = Callable[[str], list]              # repo-relative prefix -> repo-relat
 def block_rule(gate: Any) -> str:
     """Which of Lean's rules a BLOCKED record broke, in words."""
     return BLOCK_GATE.get(str(gate or ""), "它的规则不让")
+
+
+def block_what(path: Any, tool: Any) -> str | None:
+    """What a BLOCKED record stopped: the file it would have written, else the kind of tool call, in words."""
+    return str(path)[:120] if path else BLOCK_TOOL.get(str(tool or ""), "工具调用") if tool else None
+
+
+def refused_why(check: Any) -> str | None:
+    """Why Lean did not take an approval line (APPROVAL_REFUSED's check), in words; None when it is not one it knows."""
+    return REFUSED_CHECK.get(str(check or ""))
 
 
 def epoch(ts: Any) -> float | None:
@@ -338,14 +355,14 @@ def stage_events(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
                         "who": None, "src": src})
         elif ev in APPROVAL_EVENTS:
             kind = str(d.get("kind") or "")
-            verb = {"APPROVAL_REQUESTED": "请求批准", "APPROVED": "批准", "REJECTED": "驳回",
-                    "APPROVAL_REFUSED": "审批口令没被接受"}[ev]
-            out.append({"at": at, "kind": "approval", "label": verb + KIND_LABEL.get(kind, kind),
-                        "detail": ("sha %s" % str(d.get("sha256"))[:8]) if d.get("sha256") else (d.get("check") or None),
-                        "who": None, "src": src})
+            name = KIND_LABEL.get(kind, kind)
+            label = "%s（%s）" % (REFUSED, name) if ev == "APPROVAL_REFUSED" else \
+                {"APPROVAL_REQUESTED": "请求批准", "APPROVED": "批准", "REJECTED": "退回"}[ev] + name
+            out.append({"at": at, "kind": "approval", "label": label,
+                        "detail": refused_why(d.get("check")) if ev == "APPROVAL_REFUSED" else None, "who": None, "src": src})
         elif ev == "BLOCKED":
             out.append({"at": at, "kind": "blocked", "label": "%s：%s" % (BLOCKED, block_rule(d.get("gate"))),
-                        "detail": str(d.get("path") or d.get("tool") or "")[:120] or None, "who": None, "src": src})
+                        "detail": block_what(d.get("path"), d.get("tool")), "who": None, "src": src})
         elif ev == "VERIFY":
             out.append({"at": at, "kind": "verify", "label": "自动检查%s" % ("通过" if d.get("ok") else "没过"),
                         "detail": None, "who": None, "src": src})

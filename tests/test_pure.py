@@ -317,7 +317,7 @@ def test_commit_dates_and_how_a_run_was_merged_in_the_timeline():
     items = {i["detail"].split(" ")[0]: i for i in detail.trace_timeline(t) if i["kind"] in ("commit", "merge")}
     assert items["1" * 12]["detail"] == "1" * 12
     assert items["2" * 12]["detail"] == "%s · 提交于 2026-11-09 02:30Z" % ("2" * 12) and items["2" * 12]["label"] == "运行机提交"
-    assert items["3" * 12]["detail"] == "%s （squash 合并（分支还在））" % ("3" * 12)
+    assert items["3" * 12]["detail"] == "%s （压缩成一个提交合并（分支还在））" % ("3" * 12)
     t["outcome"]["merged_at"]["how"] = "a new way"
     assert any(i["detail"] == "%s （a new way）" % ("3" * 12) for i in detail.trace_timeline(t))
 
@@ -555,3 +555,44 @@ def test_lean_s_own_stage_lines_are_said_in_words_and_the_agent_s_stay():
     assert notes == {"reverse-engineering": agent, "build-and-test": "1 项自动检查都过了", "release": "发布审批通过了"}
     assert [i["detail"] for i in lean_view.stage_events(evs)] == [agent, "1 项自动检查都过了", "发布审批通过了"]
     assert lean_view.say_note("verify PASS: 3 checks on code fingerprint 0123abcd") == "3 项自动检查都过了"
+
+
+def test_the_timeline_says_who_did_what_and_why_without_record_codes(tmp_path):
+    """REST-29 on 需求详情's timeline, in the board's words: an answer without its D-n or choice is not 「回答 ：」;
+    approve / reject in words; a refused approval line says why (Lean's check), not the check's code; a tool call by
+    its kind; the bridge's refusal, a Lean request asked on the MR and a squash merge's note in words; no brain-kit
+    module named when brain-kit cannot read the run."""
+    detail, lv = mod("detail"), mod("lean_view")
+    t = {"humans": [{"at": "2026-11-09T01:00:00Z", "kind": "answer", "what": "clarify", "who": "P-7C1D"},
+                    {"at": "2026-11-09T01:01:00Z", "kind": "answer", "what": "acceptance", "decision": "D-2",
+                     "choice": "approve", "voucher_id": "V-0123456789"},
+                    {"at": "2026-11-09T01:02:00Z", "kind": "approval_refused", "what": "REQUIREMENTS", "check": "hash"},
+                    {"at": "2026-11-09T01:03:00Z", "kind": "rejection", "what": "DESIGN"},
+                    {"at": "2026-11-09T01:04:00Z", "kind": "platform_restart"}],
+         "actions": {"blocked": [{"at": "2026-11-09T00:10:00Z", "gate": "plan", "tool": "execute_bash"}],
+                     "questions": [{"at": "2026-11-09T00:20:00Z", "kind": "design", "status": "waiting",
+                                    "lean_request": "DESIGN " + "a" * 8}],
+                     "handovers": [{"at": "2026-11-09T02:00:00Z", "kind": "bridge rejected", "reason": "MR comes from a fork"}]},
+         "decisions": [{"source": "bridge", "id": "D-3", "state": "answered", "at": "2026-11-09T03:00:00Z", "choice": "reject"}],
+         "outcome": {"merged_at": {"value": "2026-11-09T04:00:00Z", "commit": "c" * 40, "how": "squash merge (the branch is still here)",
+                                   "note": "the squash commit carries exactly the branch's changes"}}}
+    said = [(i["label"], i["detail"]) for i in detail.trace_timeline(t)]
+    assert said == [("Lean 拦下了一个不该做的改动：代码生成计划还没批", "跑命令"), ("停下问人：设计", "要批准设计"),
+                    ("回答了澄清问题", None), ("回答 D-2：通过", "凭证 V-0123456789"),
+                    ("批准的那一行没被接受（需求）", "那一行的编号和请求对不上（文件改过了，或者没带编号）"), ("退回设计", None),
+                    ("在 KiroCrew 上手动操作了一次", None), ("桥拒绝接手", "MR 是从复制出去的仓库开的"), ("D-3 回答了", "退回"),
+                    ("合并进默认分支", "%s （压缩成一个提交合并（分支还在）） 压缩出来的提交正好是分支的全部改动" % ("c" * 12))]
+    ledger = [{"event": e, "data": dict(d, kind="REQUIREMENTS", sha256="b" * 64), "ts": "2026-11-09T00:0%dZ" % i}
+              for i, (e, d) in enumerate((("APPROVAL_REQUESTED", {}), ("APPROVAL_REFUSED", {"check": "approvers"}),
+                                          ("REJECTED", {})))]
+    assert [(i["label"], i["detail"]) for i in lv.stage_events(ledger)] == [
+        ("请求批准需求", None), ("批准的那一行没被接受（需求）", "批的人不在批准人名单里"), ("退回需求", None)]
+    mods = bk._state["mods"]
+    saved = mods.pop("trace", None)
+    try:
+        err = detail.timeline(str(tmp_path), {}, "PAY-1", ref=None, events=[])["error"]
+    finally:
+        if saved is not None:
+            mods["trace"] = saved
+    assert err.endswith("在设置里换新一点的 brain-kit") and not re.search(r"[A-Za-z]{4,}", re.sub(r"brain-kit|Lean", "", err))
+    assert detail.NO_TOKENS == "KiroCrew 只报 credits，没有别的用量数"
