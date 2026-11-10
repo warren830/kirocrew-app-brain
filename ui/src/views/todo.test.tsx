@@ -77,6 +77,24 @@ describe('待办', () => {
     expect(screen.getByTestId('todo-count')).toHaveTextContent('2件')
   })
 
+  test('a Lean approval says which document to read before the line to type (the backend’s path), a path broken only after 「/」', async () => {
+    const items = fx.todo().items.filter((i) => i.kind === 'lean_approval')
+      .map((i) => ({ ...i, path: 'aidlc-docs/construction/plans/refund-api-code-generation-plan.md' }))
+    installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items }) })
+    renderTodo()
+    const card = within(await screen.findByRole('region', { name: 'Lean 审批' })).getByTestId('todo-item')
+    const read = within(card).getByTestId('todo-read')
+    expect(read).toHaveTextContent('要读的：aidlc-docs/construction/plans/refund-api-code-generation-plan.md')
+    expect(read.compareDocumentPosition(within(card).getByText('approve PLAN 5d1e7a90')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(Array.from(read.querySelectorAll('.td-seg')).map((x) => x.textContent)).toEqual(['aidlc-docs/', 'construction/', 'plans/', 'refund-api-code-generation-plan.md'])
+  })
+
+  test('without the path (an older backend) the approval card has no 要读的', async () => {
+    renderTodo()
+    const card = within(await screen.findByRole('region', { name: 'Lean 审批' })).getByTestId('todo-item')
+    expect(within(card).queryByTestId('todo-read')).toBeNull()
+  })
+
   test('Lean’s review is 等审查, opened in a new session (开审查会话), never the session that wrote the code', async () => {
     const items = fx.todo().items.filter((i) => i.kind === 'reply')
     installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items }),

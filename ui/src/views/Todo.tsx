@@ -21,7 +21,7 @@
  * A key opens 需求详情, 需求看板 opens the board. Polls GET /todo every 10 s; the tab's count and the sidebar badge come
  * from /status (the app shell), read again when they disagree with this list.
  */
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@kirocrew/app-sdk'
 import { paths, usePoll } from '../api'
 import { fmtWaited } from '../format'
@@ -158,6 +158,24 @@ export function TodoView(props: ViewProps) {
   )
 }
 
+/** The document a Lean approval covers (the backend's TodoItem.path; INCEPTION's two joined by 「 + 」), null when the
+ * backend does not send it. */
+const readOf = (it: TodoItem): string | null => (it as TodoItem & { path?: string | null }).path || null
+
+/** 要读的：the document to read before typing the line, a path broken only after a 「/」. */
+function ToRead({ path }: { path: string }) {
+  return (
+    <p className="td-do td-read" data-testid="todo-read">
+      <b>要读的：</b>
+      {path.split(' + ').map((p, i) => (
+        <span key={p}>{i > 0 && '、'}<code className="br-mono">{p.split('/').map((seg, j, all) => (
+          <Fragment key={j}><span className="td-seg">{seg}{j < all.length - 1 && '/'}</span>{j < all.length - 1 && <wbr />}</Fragment>
+        ))}</code></span>
+      ))}
+    </p>
+  )
+}
+
 /** What a refused hand-over asks the person to say to the AI in their session (they type it themselves). */
 const redoLine = (why: string) => `交接被拒了：${why.replace(/^(接手被拒|交接被拒)[：:]\s*/, '')}。请按这个原因改好，再交接一次。`
 
@@ -184,6 +202,7 @@ function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; 
         {it.since !== null && <span className="br-dim br-small" title="从它这样等着你的那一刻算起">已等 {fmtWaited(now - it.since)}</span>}
       </div>
       {it.text && <p className="td-text">{it.text}</p>}
+      {it.kind === 'lean_approval' && readOf(it) && <ToRead path={readOf(it)!} />}
       {group.key === 'stuck' && <p className="td-do"><b>做什么</b>找这个需求的负责人，在 MR 上决定重开还是关掉它。</p>}
       {/* a Lean approval's text is its waits.text, which says the person types the line (deliveries.lean_wait_text) */}
       {line && (it.kind === 'lean_approval' || it.kind === 'reply' || it.kind === 'handoff_rejected') && <TypeLine line={line} sessionUrl={session} said={it.kind === 'lean_approval'} />}
@@ -255,6 +274,8 @@ const TD_CSS = `
 .td-text { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text); }
 .td-do { margin: 0; font-size: .93em; color: var(--text); }
 .td-do b { color: var(--muted); font-weight: 650; margin-right: .5em; }
+.td-read b { margin-right: 0; }
+.td-read .td-seg { white-space: nowrap; }
 .td-acts { display: flex; align-items: center; gap: .5em; flex-wrap: wrap; }
 .td-acts a.br-btn { text-decoration: none; }
 .td-acts .kt-btn { padding: 4px 10px; font-size: .84em; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; }
