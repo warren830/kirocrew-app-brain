@@ -429,7 +429,7 @@
         "kind": "commit",
         "label": "提交（只改记录）",
         "detail": "e7e3cc104242",
-        "who": "G-3F2A1C",
+        "who": "owner",
         "src": null
       },
       {
@@ -437,7 +437,7 @@
         "kind": "human",
         "label": "批准需求",
         "detail": null,
-        "who": "P-1A2B",
+        "who": "owner",
         "src": null
       },
       {
@@ -469,7 +469,7 @@
         "kind": "human",
         "label": "批准设计",
         "detail": null,
-        "who": "P-1A2B",
+        "who": "owner",
         "src": null
       },
       {
@@ -541,7 +541,7 @@
         "kind": "human",
         "label": "批准代码生成计划",
         "detail": null,
-        "who": "P-1A2B",
+        "who": "owner",
         "src": null
       },
       {
@@ -549,7 +549,7 @@
         "kind": "commit",
         "label": "提交",
         "detail": "93b2dea57790",
-        "who": "G-3F2A1C",
+        "who": "owner",
         "src": null
       },
       {
@@ -557,7 +557,7 @@
         "kind": "commit",
         "label": "提交",
         "detail": "193239b77a5f",
-        "who": "G-3F2A1C",
+        "who": "owner",
         "src": null
       },
       {
@@ -581,7 +581,7 @@
         "kind": "commit",
         "label": "提交（只改记录）",
         "detail": "61ddbc3019ed",
-        "who": "G-3F2A1C",
+        "who": "owner",
         "src": null
       },
       {

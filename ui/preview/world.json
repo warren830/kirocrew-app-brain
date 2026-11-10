@@ -48917,7 +48917,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "e7e3cc104242",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -48925,7 +48925,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -48957,7 +48957,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -49029,7 +49029,7 @@
       "kind": "human",
       "label": "批准代码生成计划",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -49037,7 +49037,7 @@
       "kind": "commit",
       "label": "提交",
       "detail": "93b2dea57790",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -49045,7 +49045,7 @@
       "kind": "commit",
       "label": "提交",
       "detail": "193239b77a5f",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -49069,7 +49069,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "61ddbc3019ed",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -49302,7 +49302,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1793654640
      },
      {
@@ -49409,7 +49409,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "b1c99d394a9e",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -49417,7 +49417,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -49449,7 +49449,7 @@
       "kind": "human",
       "label": "退回设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -49457,7 +49457,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "622f3943f97a",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -49465,7 +49465,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -49489,7 +49489,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "9d9baab498b8",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -49497,7 +49497,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "a9617a94c6a9",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -49505,7 +49505,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "a9617a94c6a9",
-      "who": "alice",
+      "who": "owner",
       "src": null
      },
      {
@@ -49632,7 +49632,7 @@
       "at": "2026-11-02T21:24:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -50036,7 +50036,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "cd94b9089aa7",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -50044,7 +50044,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -50076,7 +50076,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -50100,7 +50100,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "27eb89850ce1",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -50108,7 +50108,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "d138dc559626",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -50116,7 +50116,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "d138dc559626",
-      "who": "carol",
+      "who": "owner",
       "src": null
      },
      {
@@ -50379,7 +50379,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1793920020
      },
      {
@@ -50491,7 +50491,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "ea8d691a52c5",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -50499,7 +50499,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -50531,7 +50531,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -50555,7 +50555,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "0a6eb67168ae",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -50563,7 +50563,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "9e03de54601e",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -50571,7 +50571,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "9e03de54601e",
-      "who": "alice",
+      "who": "owner",
       "src": null
      },
      {
@@ -50642,7 +50642,7 @@
       "at": "2026-11-05T23:07:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -50893,7 +50893,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "2 项自动检查都过了",
+      "note": "自动检查通过（2 项）",
       "at": 1794128100
      },
      {
@@ -50960,7 +50960,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "11c60e3bab2e",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -50968,7 +50968,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -51000,7 +51000,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -51024,7 +51024,7 @@
       "kind": "commit",
       "label": "提交",
       "detail": "8ae59141865d",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -51047,7 +51047,7 @@
       "at": "2026-11-08T08:55:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "2 项自动检查都过了",
+      "detail": "自动检查通过（2 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -51056,7 +51056,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "26e73e03f048",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -51064,7 +51064,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "26e73e03f048",
-      "who": "alice",
+      "who": "owner",
       "src": null
      },
      {
@@ -51761,7 +51761,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "dd0c835bf311",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -51769,7 +51769,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -51801,7 +51801,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -51825,7 +51825,7 @@
       "kind": "commit",
       "label": "提交",
       "detail": "a76d026be44a",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -51857,7 +51857,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "220c77b1d8d2",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -51865,7 +51865,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "220c77b1d8d2",
-      "who": "alice",
+      "who": "owner",
       "src": null
      }
     ],
@@ -52134,7 +52134,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "40be8d3aca13",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -52142,7 +52142,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -52174,7 +52174,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -52222,7 +52222,7 @@
       "kind": "commit",
       "label": "提交",
       "detail": "6d61499e6d27",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -52465,7 +52465,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1788279120
      },
      {
@@ -52526,7 +52526,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "e6be1d4b5931",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -52534,7 +52534,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -52566,7 +52566,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -52590,7 +52590,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "f630153642df",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -52598,7 +52598,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "d8f346a38446",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -52606,7 +52606,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "d8f346a38446",
-      "who": "erin",
+      "who": "owner",
       "src": null
      },
      {
@@ -52677,7 +52677,7 @@
       "at": "2026-09-01T16:12:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -52930,7 +52930,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1788882240
      },
      {
@@ -52991,7 +52991,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "47163eefc20f",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -52999,7 +52999,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -53031,7 +53031,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -53055,7 +53055,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "82ac87d6cdbe",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -53063,7 +53063,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "b33a597d5a35",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -53071,7 +53071,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "b33a597d5a35",
-      "who": "dave",
+      "who": "owner",
       "src": null
      },
      {
@@ -53158,7 +53158,7 @@
       "at": "2026-09-08T15:44:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -53411,7 +53411,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1789657620
      },
      {
@@ -53472,7 +53472,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "ed1d9d6f4067",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -53480,7 +53480,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -53512,7 +53512,7 @@
       "kind": "human",
       "label": "退回设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -53520,7 +53520,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "95f99a759b62",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -53528,7 +53528,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -53552,7 +53552,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "02faf1c0078c",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -53560,7 +53560,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "5566657e6ef0",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -53568,7 +53568,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "5566657e6ef0",
-      "who": "erin",
+      "who": "owner",
       "src": null
      },
      {
@@ -53624,7 +53624,7 @@
       "kind": "commit",
       "label": "提交",
       "detail": "c13fc0b4001a",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -53647,7 +53647,7 @@
       "at": "2026-09-17T15:07:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -53903,7 +53903,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1790255520
      },
      {
@@ -53964,7 +53964,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "484ed9b6d549",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -53972,7 +53972,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -54004,7 +54004,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -54028,7 +54028,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "0cf99cc62d01",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -54036,7 +54036,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "bcb137787c98",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -54044,7 +54044,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "bcb137787c98",
-      "who": "dave",
+      "who": "owner",
       "src": null
      },
      {
@@ -54115,7 +54115,7 @@
       "at": "2026-09-24T13:12:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -54424,7 +54424,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "588d6bfcf6cd",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -54432,7 +54432,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -54464,7 +54464,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -54488,7 +54488,7 @@
       "kind": "commit",
       "label": "提交",
       "detail": "b73a9ba1a602",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -54520,7 +54520,7 @@
       "kind": "human",
       "label": "批准发布",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -54739,7 +54739,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1791563340
      },
      {
@@ -54800,7 +54800,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "1abcbf15fd42",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -54808,7 +54808,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -54840,7 +54840,7 @@
       "kind": "human",
       "label": "退回设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -54848,7 +54848,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "ccfe5cccaa7e",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -54856,7 +54856,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -54880,7 +54880,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "ae9767b36f15",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -54888,7 +54888,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "77e3887617fd",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -54896,7 +54896,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "77e3887617fd",
-      "who": "dave",
+      "who": "owner",
       "src": null
      },
      {
@@ -54983,7 +54983,7 @@
       "at": "2026-10-09T16:29:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -55236,7 +55236,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1792246320
      },
      {
@@ -55297,7 +55297,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "16976f6adea3",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -55305,7 +55305,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -55337,7 +55337,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -55361,7 +55361,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "22ece4e6d334",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -55369,7 +55369,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "6773c017ce17",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -55377,7 +55377,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "6773c017ce17",
-      "who": "erin",
+      "who": "owner",
       "src": null
      },
      {
@@ -55448,7 +55448,7 @@
       "at": "2026-10-17T14:12:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -55704,7 +55704,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1793110260
      },
      {
@@ -55765,7 +55765,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "b29db1be744d",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -55773,7 +55773,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -55805,7 +55805,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -55829,7 +55829,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "29d99ae69064",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -55837,7 +55837,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "262e4350ace7",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -55845,7 +55845,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "262e4350ace7",
-      "who": "dave",
+      "who": "owner",
       "src": null
      },
      {
@@ -55956,7 +55956,7 @@
       "at": "2026-10-27T14:11:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -56211,7 +56211,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1793897820
      },
      {
@@ -56272,7 +56272,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "7ec953cb1ef8",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -56280,7 +56280,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -56312,7 +56312,7 @@
       "kind": "human",
       "label": "退回设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -56320,7 +56320,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "e5b41900a203",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -56328,7 +56328,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -56352,7 +56352,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "f52943f1fae7",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -56360,7 +56360,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "d661cef8386f",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -56368,7 +56368,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "d661cef8386f",
-      "who": "erin",
+      "who": "owner",
       "src": null
      },
      {
@@ -56439,7 +56439,7 @@
       "at": "2026-11-05T16:57:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -56752,7 +56752,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "71151237f772",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -56760,7 +56760,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -56792,7 +56792,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -56816,7 +56816,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "6e67c1b51e31",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -56824,7 +56824,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "eee4adf06506",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -56832,7 +56832,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "eee4adf06506",
-      "who": "erin",
+      "who": "owner",
       "src": null
      },
      {
@@ -57123,7 +57123,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -57147,7 +57147,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "9797d8c7ef9a",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      }
     ],
@@ -57661,7 +57661,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "cd94b9089aa7",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -57669,7 +57669,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -57701,7 +57701,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -57725,7 +57725,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "27eb89850ce1",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -57733,7 +57733,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "d138dc559626",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -57741,7 +57741,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "d138dc559626",
-      "who": "carol",
+      "who": "owner",
       "src": null
      },
      {
@@ -58012,7 +58012,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1793920020
      },
      {
@@ -58124,7 +58124,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "ea8d691a52c5",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -58132,7 +58132,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -58164,7 +58164,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -58188,7 +58188,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "0a6eb67168ae",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -58196,7 +58196,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "9e03de54601e",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -58204,7 +58204,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "9e03de54601e",
-      "who": "alice",
+      "who": "owner",
       "src": null
      },
      {
@@ -58275,7 +58275,7 @@
       "at": "2026-11-05T23:07:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -58516,7 +58516,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "3 项自动检查都过了",
+      "note": "自动检查通过（3 项）",
       "at": 1793654640
      },
      {
@@ -58662,7 +58662,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "b1c99d394a9e",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -58670,7 +58670,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -58702,7 +58702,7 @@
       "kind": "human",
       "label": "退回设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -58710,7 +58710,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "622f3943f97a",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -58718,7 +58718,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -58742,7 +58742,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "9d9baab498b8",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -58750,7 +58750,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "a9617a94c6a9",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -58758,7 +58758,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "a9617a94c6a9",
-      "who": "alice",
+      "who": "owner",
       "src": null
      },
      {
@@ -58885,7 +58885,7 @@
       "at": "2026-11-02T21:24:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "3 项自动检查都过了",
+      "detail": "自动检查通过（3 项）",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -59228,7 +59228,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "71151237f772",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -59236,7 +59236,7 @@
       "kind": "human",
       "label": "批准需求",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -59268,7 +59268,7 @@
       "kind": "human",
       "label": "批准设计",
       "detail": null,
-      "who": "P-1A2B",
+      "who": "owner",
       "src": null
      },
      {
@@ -59292,7 +59292,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "6e67c1b51e31",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -59300,7 +59300,7 @@
       "kind": "commit",
       "label": "提交（只改记录）",
       "detail": "eee4adf06506",
-      "who": "G-3F2A1C",
+      "who": "owner",
       "src": null
      },
      {
@@ -59308,7 +59308,7 @@
       "kind": "handover",
       "label": "交接",
       "detail": "eee4adf06506",
-      "who": "erin",
+      "who": "owner",
       "src": null
      },
      {
@@ -59503,7 +59503,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1793654640
    },
    {
@@ -59852,7 +59852,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1793920020
    },
    {
@@ -59958,7 +59958,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "2 项自动检查都过了",
+    "note": "自动检查通过（2 项）",
     "at": 1794128100
    },
    {
@@ -60493,7 +60493,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1788279120
    },
    {
@@ -60599,7 +60599,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1788882240
    },
    {
@@ -60705,7 +60705,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1789657620
    },
    {
@@ -60811,7 +60811,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1790255520
    },
    {
@@ -61023,7 +61023,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1791563340
    },
    {
@@ -61129,7 +61129,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1792246320
    },
    {
@@ -61235,7 +61235,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1793110260
    },
    {
@@ -61341,7 +61341,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1793897820
    },
    {
@@ -61761,7 +61761,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1793920020
    },
    {
@@ -61867,7 +61867,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "3 项自动检查都过了",
+    "note": "自动检查通过（3 项）",
     "at": 1793654640
    },
    {

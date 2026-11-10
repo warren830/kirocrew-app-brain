@@ -37,7 +37,8 @@ STAGE_STATE = {"STAGE_STARTED": "started", "STAGE_COMPLETED": "done", "STAGE_SKI
 # the notes Lean writes itself (aidlc_lean.py: verify's build-and-test completion, the RELEASE approval's, `lean new`'s
 # Ideation skip), said in words; a note the agent wrote is its own and stays as written
 LEAN_NOTES = (
-    (re.compile(r"^verify PASS: (\d+) checks? on code fingerprint [0-9a-f]*$"), lambda m: "%s 项自动检查都过了" % m.group(1)),
+    # as 需求看板 says a verify round (board.py: 「自动检查通过（1 项）」), never 「1 项…都过了」 (BOARD-29)
+    (re.compile(r"^verify PASS: (\d+) checks? on code fingerprint [0-9a-f]*$"), lambda m: "自动检查通过（%s 项）" % m.group(1)),
     (re.compile(r"^RELEASE approved \(sha [0-9a-f]*\)$"), lambda m: "发布审批通过了"),
     (re.compile(r"^not requested \(lean new without --ideation\)$"), lambda m: "这次没要构思这一段"),
 )

@@ -580,9 +580,9 @@ def test_lean_s_own_stage_lines_are_said_in_words_and_the_agent_s_stay():
                                   {"stage": "build-and-test", "note": "verify PASS: 1 check on code fingerprint 66bad1cf"},
                                   {"stage": "release", "note": "RELEASE approved (sha 0c9a7e21)"}], 1)]
     notes = {s["id"]: s["note"] for s in lean_view.stages(evs) if s["state"] == "done"}
-    assert notes == {"reverse-engineering": agent, "build-and-test": "1 项自动检查都过了", "release": "发布审批通过了"}
-    assert [i["detail"] for i in lean_view.stage_events(evs)] == [agent, "1 项自动检查都过了", "发布审批通过了"]
-    assert lean_view.say_note("verify PASS: 3 checks on code fingerprint 0123abcd") == "3 项自动检查都过了"
+    assert notes == {"reverse-engineering": agent, "build-and-test": "自动检查通过（1 项）", "release": "发布审批通过了"}
+    assert [i["detail"] for i in lean_view.stage_events(evs)] == [agent, "自动检查通过（1 项）", "发布审批通过了"]
+    assert lean_view.say_note("verify PASS: 3 checks on code fingerprint 0123abcd") == "自动检查通过（3 项）"
 
 
 def test_the_timeline_says_who_did_what_and_why_without_record_codes(tmp_path):
