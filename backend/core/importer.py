@@ -56,7 +56,7 @@ MAX_OUT = 20000
 WORK_DIRS = ("workplace", "workplaces", "workspace", "workspaces")
 LEAN_SCRIPT = ".kiro/aidlc-lean/aidlc_lean.py"
 LEAN_CONFIG = "aidlc-docs/lean.json"
-BRAIN_FILES = ("PRODUCT.md", "TECH.md", "IMPROVEMENT.md", "PROJECT.md")
+BRAIN_FILES = crewcheck.BRAIN_FILES
 
 CTRL_RE = re.compile(r"[\x00-\x1f\x7f\u2028\u2029]")
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
@@ -964,7 +964,7 @@ def inspect(raw: Any, *, listed: list[str], records: Records, token: bool = Fals
             checks.append(row("links", "FAIL", "符号链接", "仓库里 %s 是符号链接：安装会顺着它写到别处" %
                               "、".join(links), "先把它换成普通的目录或文件，提交，再检查"))
     if has_kit:     # what brain install put in the checkout (before an install, or on its branch: the kit row says it)
-        todo = "重装 brain-kit 会补上：在「设置」的 KiroCrew 里点「%s」" % problems.FIX_BUTTON["kit"]
+        todo = "点下面 KiroCrew 里的「%s」：会补上（设置里也有这个按钮）" % problems.FIX_BUTTON["kit"]
         lean_ok = os.path.isfile(os.path.join(top, LEAN_SCRIPT)) and os.path.isfile(os.path.join(top, LEAN_CONFIG))
         checks.append(row("lean", "OK", "AI-DLC Lean", "装了（%s）" % LEAN_SCRIPT) if lean_ok else
                       row("lean", "FAIL", "AI-DLC Lean", "没装", todo))

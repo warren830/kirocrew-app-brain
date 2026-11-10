@@ -262,3 +262,17 @@ def test_a_repo_whose_lean_counts_the_run_records_as_code_fails(tmp_path, home):
     assert row[0]["fix"] == "kit" and "runs/**" in row[0]["todo"] and "交接会被拒" in row[0]["todo"]
     assert "指纹" in row[0]["raw"] and "runs/**" in row[0]["raw"]        # brain-kit's own words, kept for the page
     assert got["fix"] == {"agent": False, "engine": False} and cc.agent_ok(got["rows"])
+
+
+def test_a_checkout_missing_its_brain_files_or_agents_md_offers_the_kit_fix(tmp_path, home):
+    """importer's 检查 says to click 重装 kit 文件 when only AGENTS.md or Brain files are missing: the KiroCrew checks
+    (设置, and the import page's KiroCrew block) offer that very button for the repo."""
+    repo = make_project(tmp_path)
+    install_brain_dev(home)
+    cc = loaded(tmp_path)
+    assert not [r for r in cc.checks([str(repo)])["rows"] if r["repo"]]
+    (repo / "AGENTS.md").unlink()
+    (repo / "brain" / "TECH.md").unlink()
+    rows = [r for r in cc.checks([str(repo)])["rows"] if r["repo"] == str(repo)]
+    assert [(r["text"], r["fix"]) for r in rows] == [("缺 Brain 文件：TECH.md", "kit"), ("仓库根目录没有 AGENTS.md", "kit")]
+    assert all("点「重装 kit 文件」" in r["todo"] for r in rows)

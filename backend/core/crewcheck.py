@@ -150,6 +150,8 @@ def checks(repo_paths: list[str], team_paths: Any = None) -> dict[str, Any]:
             probs = []
         for p in probs:
             rows.append(P.row("FAIL", p, repo=rp, team=is_team))
+        for p in kit_files_missing(rp):
+            rows.append(P.row("FAIL", p, repo=rp, team=is_team))
         why = _records_counted(rp)
         if why:
             rows.append(P.row("FAIL", why, repo=rp, team=is_team))
@@ -158,6 +160,22 @@ def checks(repo_paths: list[str], team_paths: Any = None) -> dict[str, Any]:
     if be not in (None, "kas", ""):
         fix["engine"] = True
     return {"rows": rows, "fix": fix, "checked_at": time.time()}
+
+
+BRAIN_FILES = ("PRODUCT.md", "TECH.md", "IMPROVEMENT.md", "PROJECT.md")   # brain install's Brain (kit.json brain_files)
+
+
+def kit_files_missing(rp: str) -> list[str]:
+    """The kit files `brain install` puts in a checkout that are not in this one (the Brain files, AGENTS.md), in
+    `brain doctor`'s words, so their rows offer 重装 kit 文件 as its rows do."""
+    try:
+        cfg = bk.m("config").load(rp)
+    except Exception:  # noqa: BLE001 - no readable kit.json: the repo's own row says so
+        return []
+    bdir = str(cfg.get("brain_dir") or "brain")
+    names = [n for n in cfg.get("brain_files") or BRAIN_FILES if not os.path.isfile(os.path.join(rp, bdir, n))]
+    out = ["Brain files in %s/: missing %s" % (bdir, ", ".join(names))] if names else []
+    return out + ([] if os.path.isfile(os.path.join(rp, "AGENTS.md")) else ["AGENTS.md at repo root"])
 
 
 def _unreadable_row(why: str) -> dict[str, Any]:
