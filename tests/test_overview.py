@@ -178,11 +178,11 @@ def test_team_mode_lists_each_requirement_once_the_runners_facts_winning(tmp_pat
     svc = make_service(tmp_path, [repo])
     deliveries = __import__("appkit").mod("deliveries")
 
-    def runner_row(key, state, text):
+    def runner_row(key, state, text, project="shop/pay"):
         row = deliveries.base_row("runner", {"key": key, "where": "runner"})
         row.update(where="runner", state=state, state_label=deliveries.STATE_LABEL[state],
                    waits=deliveries.waits("product" if state == "parked" else "nobody", "none", text))
-        return row, {"key": key, "project": "shop/pay", "decisions_text": None}, []
+        return row, {"key": key, "project": project, "decisions_text": None}, []
 
     async def go():
         await svc.start()
@@ -191,7 +191,8 @@ def test_team_mode_lists_each_requirement_once_the_runners_facts_winning(tmp_pat
             svc._team_rows = lambda snap: [runner_row("PAY-1", "parked", "等产品在 MR 上回答 D-1"),
                                            runner_row("PAY-2", "merged", "MR 已合并，运行结束"),
                                            runner_row("PAY-3", "running", "运行机在跑"),
-                                           runner_row("PAY-9", "running", "运行机在跑")]
+                                           runner_row("PAY-9", "running", "运行机在跑"),
+                                           runner_row("WEB-1", "running", "运行机在跑", project="shop/web")]
             return await svc.overview("all"), await svc.overview("r1"), await svc.overview("runner"), await svc.todo()
         finally:
             svc.team = None
@@ -200,10 +201,16 @@ def test_team_mode_lists_each_requirement_once_the_runners_facts_winning(tmp_pat
     every, r1, runner, todo = run(go())
     ids = sorted((r["repo"], r["key"]) for r in every["rows"])
     # PAY-1 handed over: the runner's; PAY-2 merged by both: r1's; PAY-3 never handed over here: r1's; PAY-9 the runner's
-    assert ids == [("r1", "PAY-2"), ("r1", "PAY-3"), ("runner", "PAY-1"), ("runner", "PAY-9")], ids
-    assert sorted(r["key"] for r in r1["rows"]) == ["PAY-2", "PAY-3"]
-    assert sorted(r["key"] for r in runner["rows"]) == ["PAY-1", "PAY-9"]
-    assert sum(every["counts"].values()) == len(every["rows"]) == len(r1["rows"]) + len(runner["rows"])
+    assert ids == [("r1", "PAY-2"), ("r1", "PAY-3"), ("runner", "PAY-1"), ("runner", "PAY-9"), ("runner", "WEB-1")], ids
+    # r1's view has what the runner does for r1's project (shop/pay), each row saying its repo; a project this machine
+    # does not list (shop/web) is in 全部 and the runner's view only
+    assert sorted((r["repo"], r["key"]) for r in r1["rows"]) == [("r1", "PAY-2"), ("r1", "PAY-3"), ("runner", "PAY-1"),
+                                                                 ("runner", "PAY-9")]
+    assert {r["key"]: r["home"] for r in every["rows"]} == {"PAY-1": "r1", "PAY-2": None, "PAY-3": None, "PAY-9": "r1",
+                                                            "WEB-1": None}
+    assert next(r for r in r1["rows"] if r["key"] == "PAY-1")["state"] == "parked"
+    assert sorted(r["key"] for r in runner["rows"]) == ["PAY-1", "PAY-9", "WEB-1"]
+    assert sum(every["counts"].values()) == len(every["rows"]) == len(r1["rows"]) + 1
     assert next(r for r in every["rows"] if r["key"] == "PAY-1")["state"] == "parked"
     assert not any(i["key"] == "PAY-1" and i["repo"] == "r1" for i in todo["items"]), todo["items"]
 
@@ -251,3 +258,4 @@ def test_a_repo_that_cannot_be_read_is_said_in_words_with_the_original_under_det
     (e,) = view["errors"]
     assert e["error"] == "读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对"
     assert e["raw"].startswith("[Errno 13] Permission denied")
+    assert (e["name"], e["path"]) == (repo.name, str(repo.resolve()))

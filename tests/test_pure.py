@@ -76,6 +76,7 @@ def test_the_bridges_mr_comments_are_read_back(decisions):
     only = mrinfo.parse_notes(notes[:1])
     assert only["rejected_reason"] == "标签是 bob 打的，不是负责人 alice"          # the bridge's reason in short Chinese ...
     assert only["rejected_raw"] == "label 'ai-handoff' was added by bob, not by the branch owner alice"   # ... and as it wrote it
+    assert only["rejected_todo"] == "让 alice 自己交接（交接时会打标签）"                 # ... and what to do: the rule's own
     fake = mrinfo.parse_notes([note(1, ask(decisions, "D-9", clarify, ["mallory"], "clarify"), "mallory")],
                               bridge_user="brain-bridge")
     assert fake["questions"] == []  # with the bridge's account known, nobody else's comment reads as a question
@@ -125,7 +126,7 @@ def test_team_states_from_the_ledger():
     deliveries.team_classify(r, {"state": "signing", "run_id": "RUN-PAY-1-1"}, [], None)
     assert "签接手合同" in r["waits"]["text"] and "RUN-" not in r["waits"]["text"]
     # who answers a question on the runner: park.json's ask, as a person's row of it says (the owner by name)
-    for ask, who, text in (("product", "product", "等产品在 MR 上回答 D-2（设计）"), ("owner", "people", "等carol在 MR 上回答 D-2（设计）"),
+    for ask, who, text in (("product", "product", "等产品在 MR 上回答 D-2（设计）"), ("owner", "people", "等 carol 在 MR 上回答 D-2（设计）"),
                            ("security", "people", "等人在 MR 上回答 D-2（设计）")):
         r = dict(row(), owner="carol")
         deliveries.team_classify(r, {"state": "dispatched"}, [{"id": "D-2", "state": "open", "kind": "design"}],
@@ -407,10 +408,19 @@ def test_evaluate_notes_say_which_runs_wait_for_their_merge():
     assert view["note_rows"][0]["raw"].startswith("--credits 只有一条记录")
     # REST-29: the review queue's reasons and the skipped run in words
     assert view["queue"][0]["reasons"] == [
-        "自动检查没过 3 次（2 次就要人看一眼）", "不知道运行机收没收到这次派单：去 KiroCrew 看一下它的会话",
+        "自动检查没过 3 次（2 次就要人看一眼）", "不知道运行机收没收到这次派单",
         "30 小时没有进展（最后一次 %s，≥24 小时算停住）：运行机没接着做（它的问题还在等：去 KiroCrew 看一下它的会话）" % time.strftime(
             "%m-%d %H:%M", time.localtime(1794099600)),
         "桥上的问题没走通：D-2 作废", "判断点之外有人介入 2 次（交接后推代码）", "验收被退回 1 次"]
+    # OVERVIEW-20: a run to look at again says what to do too, each rule's once (real DEMO-1/3: 29 小时没有进展)
+    todo = view["queue"][0]["todo"]
+    assert todo.startswith(deliveries.QUEUE_TODO["verify_fail_rounds"] + "；" + deliveries.QUEUE_TODO["state_unknown"])
+    assert deliveries.QUEUE_TODO["stuck"] in todo and todo.count(deliveries.QUEUE_TODO["stuck"]) == 1
+    assert not re.search(r"[A-Za-z_]{5,}", view["queue"][0]["todo"].replace("KiroCrew", "").replace("Brain", ""))
+    assert set(deliveries.QUEUE_TODO) >= {"stuck", "closed_unmerged", "runner_failed", "state_unknown", "merge_not_here",
+                                         "question_problem", "not_readable", "acceptance_rejected", "reverted_or_hotfixed",
+                                         "verify_fail_rounds", "repeat_corrections", "stale_citations",
+                                         "outside_judgment", "cost_outlier"}     # brain-kit evaluate.py's rules
     assert view["skipped"] == [{"key": "PAY-1", "why": "它的开工记录读不了", "raw": "runs/PAY-1/run.json is not valid JSON"}]
 
 
@@ -516,6 +526,26 @@ def test_todo_lists_what_waits_for_you_the_way_the_rows_say_it():
     assert [(i["kind"], i["key"], i["text"]) for i in got["items"]] == [("reply", "PAY-1", "下一步是发布"),
                                                                       ("start", "PAY-2", "已认领，还没开工")]
     assert got["items"][0]["session"] == sess and got["items"][0]["since"] == 9.0 and got["items"][1]["since"] == 5.0
+
+
+def test_a_refused_hand_over_in_todo_says_the_reasons_own_todo_and_keeps_the_bridges_words():
+    """REST-12: a 接手被拒 card says each reason's own 做什么 (problems.REASON_RULES), not only a generic line, and the
+    bridge's words (with the 做法) are on the item for its 细节, as the board has them."""
+    todo = mod("todo")
+    raws = ["label 'ai-handoff' was added by bob, not by the branch owner alice", "brain_commit 0123456789ab does not exist"]
+    why, raw = mod("problems").reasons_text(raws)
+    mr = {"state": "opened", "labels": ["ai-handoff-rejected"], "questions": [], "rejected_reason": why, "rejected_raw": raw,
+          "rejected_todo": mod("problems").reasons_todo(raws), "rejected_at": "2026-11-09T02:00:00Z"}
+    f = {"key": "PAY-7", "owner": "alice", "claim": {"owner": "alice", "title": "t"}, "approvals": [], "park": None,
+         "run": {"intent": "i", "branch": "ai/alice/PAY-7-x", "handoff": {"local_head": "a" * 40}}, "stages": []}
+    row = deliveries.base_row("r1", f)
+    deliveries.classify(row, f, cfg={"rejected_label": "ai-handoff-rejected"}, me="alice", now=1794186500.0, mr=mr, slot=None)
+    assert row["state"] == "rejected" and row["waits"]["todo"] == "让 alice 自己交接（交接时会打标签）；让这个分支跟上默认分支的最新版，再交接一次"
+    (item,) = todo.build([{"row": row, "facts": f, "own": True, "has_session": False, "can_post": False, "mr": mr,
+                           "session": None}], team=False, crew_rows=[])["items"]
+    assert item["kind"] == "handoff_rejected" and item["todo"] == row["waits"]["todo"]
+    assert item["raw"].startswith("label 'ai-handoff' was added by bob") and "做法：git rebase <默认分支>" in item["raw"]
+    assert not re.search(r"label|brain_commit|rebase|ai-handoff|git ", item["text"] + item["todo"]), item
 
 
 def test_team_todo_says_a_runner_question_as_the_detail_does_its_kind_in_words():
@@ -624,3 +654,12 @@ def test_the_timeline_says_who_did_what_and_why_without_record_codes(tmp_path):
             mods["trace"] = saved
     assert err.endswith("在设置里换新一点的 brain-kit") and not re.search(r"[A-Za-z]{4,}", re.sub(r"brain-kit|Lean", "", err))
     assert detail.NO_TOKENS == "KiroCrew 只报 credits，没有别的用量数"
+
+
+def test_a_name_in_a_sentence_has_a_space_on_each_side():
+    """「读的是demo 的 main 分支」 (OVERVIEW real data): a Latin name meets Chinese with a space, as the app writes it."""
+    assert deliveries.spaced("等", "alice", "批准", "代码生成计划") == "等 alice 批准代码生成计划"
+    assert deliveries.spaced("等", "你", "批准") == "等你批准"
+    assert deliveries.approve_text({"kind": "PLAN", "unit": "refund-api"}, "alice").startswith("等 alice 批准 refund-api 的")
+    assert deliveries.mr_ask("people", "设计", "D-2", approval=False, owner="carol") == "等 carol 在 MR 上回答 D-2（设计）"
+    assert deliveries.branch_words([("demo", "main"), ("oms-brain", "master")]) == "demo 的 main 分支、oms-brain 的 master 分支"

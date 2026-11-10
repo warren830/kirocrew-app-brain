@@ -455,7 +455,8 @@ class Service:
 
     def _team_split(self, mine: list[tuple[str, dict[str, Any], dict[str, Any]]], snap: dict[str, Any]
                     ) -> tuple[list[tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]], set[tuple[str, str]]]:
-        """Team mode, one row per requirement: the runner's requirements listed as its own (_team_rows'), and the
+        """Team mode, one row per requirement: the runner's requirements listed as its own (_team_rows'), each with
+        the listed repo of its GitLab project (row ``home``, None when this machine does not list it), and the
         (repo id, key) of this machine's rows (*mine*: repo id, facts, row) they stand for (deliveries.runner_takes)."""
         team = self._team_rows(snap)
         rid_of: dict[str, str] = {}
@@ -468,6 +469,7 @@ class Service:
             rid = rid_of.get(str(t[1].get("project") or ""))
             f, row = by.get((rid, t[0]["key"]), (None, None)) if rid else (None, None)
             if deliveries.runner_takes(f, row, t[0]):
+                t[0]["home"] = rid
                 keep.append(t)
                 if f is not None:
                     taken.add((rid, t[0]["key"]))
@@ -497,7 +499,8 @@ class Service:
                 facts = repo.scan()
             except Exception as exc:  # noqa: BLE001 - git's or brain-kit's own words go under 细节
                 if which in ("all", rid):
-                    errors.append({"repo": rid, "error": "读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对",
+                    errors.append({"repo": rid, "name": repo.name, "path": repo.path,
+                                   "error": "读不了这个仓库里的需求：在「导入仓库」里检查它，那里会说哪里不对",
                                    "raw": str(exc)[:2000]})
                 continue
             mine += [(rid, f, self._row(repo, f, snap)) for f in facts]
@@ -518,10 +521,11 @@ class Service:
         for rid, (path, err) in self.repo_errors.items():
             if which in ("all", rid):   # the app's own words say what to do; anything else is under 细节
                 said = re.search(r"[\u4e00-\u9fff]", err)
-                errors.append({"repo": rid, "error": err if said else "读不了这个仓库：在「导入仓库」里检查它，那里会说哪里不对",
+                errors.append({"repo": rid, "name": os.path.basename(path), "path": path,   # /status's name for it
+                               "error": err if said else "读不了这个仓库：在「导入仓库」里检查它，那里会说哪里不对",
                                "raw": path if said else "%s：%s" % (path, err)})
-        if which in ("all", "runner"):
-            for row, f, decs in runner:
+        for row, f, decs in runner:   # a repo's view has what the runner does for it, as 全部 and the runner's do
+            if which in ("all", "runner", row["home"]):
                 rows.append(row)
                 all_decisions += [dict(d, key=row["key"]) for d in detail.decisions(f.get("decisions_text"), "decisions.md", [])]
                 for d in decs:
@@ -1097,7 +1101,8 @@ class Service:
     def _team_status(self) -> dict[str, Any]:
         if self.team is None:
             on = bool(self.settings["team"].get("enabled"))
-            return {"enabled": on, "ok": False, "error": "brain-kit 没装载" if on else "",
+            why = problems.team_start("brain-kit 没装载" if on else "")
+            return {"enabled": on, "ok": False, "error": why["text"], "error_todo": why["todo"], "error_raw": why["raw"],
                     "last_loop_at": None, "loop_error": "", "same_user": False, "signer": {"pending": 0, "refused": 0}}
         return self.team.status()
 
@@ -1496,7 +1501,8 @@ class Service:
 
     async def team_loop(self) -> dict[str, Any]:
         if self.team is None or self.team.host is None:
-            raise AppError((self.team.error if self.team else "") or "运行机模式没打开", "team_off", 409)
+            raise AppError((problems.team_start(self.team.error)["text"] if self.team else "") or "运行机模式没打开",
+                           "team_off", 409)
         try:
             summary = await self._in_team(self.team.loop_once)
         except Exception as exc:  # noqa: BLE001

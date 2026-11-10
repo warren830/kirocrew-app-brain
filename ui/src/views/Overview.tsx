@@ -19,8 +19,8 @@ import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, useAction, usePoll } from '../api'
 import { RoleIcon } from '../board/RoleIcon'
 import { HOW, HOW_LABEL, HOW_VAR, MiniCredits, MiniPeople, MiniUnattended, MiniWho, WHO_VAR, WeeklyChart, fmt, slash } from '../cto/charts'
-import { COL_NAME, Flow, LANE_NAME, StepButton, colOf, laneOf, stepOf, waitedText, type Col, type Lane } from '../cto/Flow'
-import { ago, fmtCredits } from '../format'
+import { COL_NAME, Flow, LANE_NAME, StepButton, colOf, homeOf, laneOf, stepOf, waitedText, type Col, type Lane } from '../cto/Flow'
+import { ago, fmtCredits, spaced } from '../format'
 import type { OverviewEntry, View } from '../nav'
 import type { CtoNumbers, CtoRun, EvalMetric, EvalView, Funnel, Overview, RefreshResult, ReqState, RepoInfo, Requirement } from '../types'
 import { STATE_LABEL } from '../types'
@@ -126,6 +126,7 @@ export const OV_CSS = `
   .br-ov .cto-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .br-ov .br-ledger { font-size: 13px; }
   .br-ov .br-ledger th, .br-ov .br-ledger td { padding: 8px 6px; }
+  .br-ov .br-ledger .br-acts { flex-direction: column; align-items: stretch; }
 }
 @container brov (max-width: 900px) {
   .br-ov .br-kanban { grid-template-columns: minmax(0, 1fr) !important; }
@@ -140,14 +141,17 @@ type LedgerPick = { id: string; label: string; keep: (r: Requirement, run: CtoRu
 type RepoCount = { open: number; you: number }
 
 const isOpen = (r: Requirement) => r.state !== 'merged' && r.state !== 'closed'
+/** the runner's rows of projects this machine does not list: no repo pill holds them, so one more pill does */
+const ELSEWHERE: LedgerPick = { id: 'elsewhere', label: '没导入的项目', keep: (r) => homeOf(r) === 'runner' }
 const idOf = (r: { repo: string; key: string }) => `${r.repo}/${r.key}`
 
 /** A repo pill's counts: its requirements in progress, and those that wait on you (a merge to write back into the
- * Brain too, as 轮到你 lists them); 'all' among *ids*: every row. */
+ * Brain too, as 轮到你 lists them), a row on the runner under its repo (homeOf; 'runner': a project not listed here);
+ * 'all' among *ids*: every row. */
 function repoCounts(rows: Requirement[], ids: string[]): Record<string, RepoCount> {
   const counts: Record<string, RepoCount> = Object.fromEntries(ids.map((id) => [id, { open: 0, you: 0 }]))
   for (const r of rows) {
-    for (const id of ids.includes('all') ? [r.repo, 'all'] : [r.repo]) {
+    for (const id of ids.includes('all') ? [homeOf(r), 'all'] : [homeOf(r)]) {
       const c = (counts[id] ??= { open: 0, you: 0 })
       if (isOpen(r)) c.open += 1
       if (r.waits.who === 'you' && r.state !== 'closed') c.you += 1
@@ -220,9 +224,15 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
     if (r) go({ kind: 'item', repo: r, key, from: 'overview', decision: id })
   }
   const repoName = (id: string) => repos.find((x) => x.id === id)?.name
+  const elsewhere = pillCounts.runner
   const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
+  // opened at a repo the app cannot read (an old link: brain-kit not installed there, not listed any more): its way in
+  // is 导入仓库 (or its brain-kit on the way: PendingRepo's banner), not 开需求
+  const picked = repo !== 'all' ? repos.find((r) => r.id === repo) : undefined
+  const unreadable = !!status && repo !== 'all' && !noKit && (!picked || !picked.ok)
+  const readable = scope.filter((r) => r.ok)
   // nothing here can be handed over: no origin to push to, or no GitLab for the bridge (the backend's local_only rule)
-  const localOnly = scope.length > 0 && scope.every((r) => r.remote === false || !(r.kit?.gitlab_base && r.kit?.gitlab_project))
+  const localOnly = readable.length > 0 && readable.every((r) => r.remote === false || !(r.kit?.gitlab_base && r.kit?.gitlab_project))
   const manyRepos = repo === 'all' && repos.length > 1
   const team = !!status && (status.app.team || status.team.enabled)
   const newReq = () => go({ kind: 'new', ...(repo !== 'all' ? { repo } : {}) })
@@ -247,25 +257,27 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
       <header className="cto-top">
         {localOnly && <span className="cto-tag" data-testid="ov-local-tag" title="没有远端：需求只在这台机器上做，不交给运行机">只在本机</span>}
         {team && <span className="cto-tag is-real" title="交给运行机的需求由团队的运行机接手">团队模式</span>}
-        <span className="cto-org">{noKit ? `${repos.length} 个仓库 · 现在一个都读不了`
+        <span className="cto-org">{noKit ? `${repos.length} 个仓库 · 现在一个都读不了` : unreadable ? (picked ? `${picked.name} 还读不了` : '这个仓库不在列表里')
           : [status ? `${scope.length} 个仓库` : '', data ? `${data.rows.length} 个需求` : '…'].filter(Boolean).join(' · ')}</span>
         <span className="cto-grow" />
-        <RefreshButton repos={scope.filter((r) => r.remote !== false)} onDone={ov.reload} />
+        <RefreshButton repos={readable.filter((r) => r.remote !== false)} onDone={ov.reload} />
       </header>
       {repos.filter((r) => r.pending && (repo === 'all' || r.id === repo)).map((r) => (
         <PendingRepo key={r.id} repo={r} banner onOpen={() => go({ kind: 'import', path: r.path })} onDone={reloadStatus} />
       ))}
       <LoadState loading={ov.loading} error={ov.error} has={!!data} />
-      {!noKit && data?.errors.map((e) => {
+      {!noKit && data?.errors.filter((e) => !(unreadable && e.repo === repo)).map((e) => {
         const r = repos.find((x) => x.id === e.repo)
-        // the backend's words when it said them; an error it passed on as it came (a scan that threw) is folded
+        // the backend's words when it said them; an error it passed on as it came (a scan that threw) is folded. Its
+        // name and path are the backend's too, for when /status could not be read
         const plain = /[\u3400-\u9fff]/.test(e.error)
+        const path = r?.path ?? e.path
         return (
           <div key={e.repo} className="br-banner" role="status" data-testid="repo-error">
             <div className="br-row">
-              <span><b className="br-strong">{r?.name ?? e.repo}：</b>{plain ? e.error : '这次没读出来'}</span>
+              <span><b className="br-strong">{r?.name ?? e.name ?? '这个仓库'}：</b>{plain ? e.error : '这次没读出来'}</span>
               {!plain && <span className="br-dim">做什么：看看这个仓库的目录还在不在、能不能读，再去导入仓库检查它</span>}
-              {r && <button type="button" className="br-btn is-small" onClick={() => go({ kind: 'import', path: r.path })}>去导入仓库</button>}
+              {path && <button type="button" className="br-btn is-small" onClick={() => go({ kind: 'import', path })}>去导入仓库</button>}
               {(plain ? e.raw : e.error) && <details className="br-raw"><summary>细节</summary><pre>{plain ? e.raw : e.error}</pre></details>}
             </div>
           </div>
@@ -277,7 +289,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
           <h2>{c.sentence}</h2>
           <p>
             {c.available
-              ? `数字来自 brain-kit 的评估（读的是${c.ref || '默认分支'}）和这个 app 开的会话`
+              ? `数字来自 brain-kit 的评估（${spaced('读的是', c.ref || '默认分支')}）和这个 app 开的会话`
               : computing ? 'brain-kit 正在算评估的数字，算好就出来：下面先看 credits 和合并' : 'brain-kit 的评估还没给出数字：下面先看 credits 和合并'}
             {' · '}口径见末尾
             {!c.available && status?.brainkit.modules.evaluate === false && (
@@ -300,13 +312,23 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
               </button>
             )
           })}
+          {elsewhere && elsewhere.open + elsewhere.you > 0 && (
+            <button type="button" aria-pressed={pick?.id === ELSEWHERE.id} data-testid="pill-elsewhere" title="运行机在做的、这台机器没导入的项目：点一下在全部的交付清单里看它们"
+              onClick={() => { if (repo !== 'all') pickRepo('all'); filterTo(ELSEWHERE) }}>
+              <b>{ELSEWHERE.label}</b>
+              <span>进行中 {elsewhere.open}{elsewhere.you > 0 && <span className="is-you"> · 轮到你 {elsewhere.you}</span>}</span>
+            </button>
+          )}
         </nav>
       )}
 
       {empty && noKit && (
         <section className="cto-card" data-testid="ov-nokit"><p className="cto-was">brain-kit 读不到，这里的需求和数字要等它能读了才有：照最上面那条提示修。</p></section>
       )}
-      {empty && !noKit && (
+      {data && unreadable && !picked?.pending && (
+        <Unreadable repo={picked} error={data.errors.find((e) => e.repo === repo)} onImport={(path) => go({ kind: 'import', ...(path ? { path } : {}) })} onAll={() => pickRepo('all')} />
+      )}
+      {empty && !noKit && !unreadable && (
         <EmptyHero title="还没有需求" text={[`${where}还没有需求。认领一个需求，交它的文档过五关，开工：它会在这里一路走到合并——在哪一步、等谁、花了多少。`]}
           punch="人只在判断点上出手：批准、回答、验收。"
           flow={localOnly
@@ -373,7 +395,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
                     </td></tr>
                   )}
                   {rows.slice(0, limit).map((r) => (
-                    <Row key={idOf(r)} r={r} at={data.at} run={runsBy.get(idOf(r))} ev={data.eval} repoName={manyRepos ? repoName(r.repo) : undefined}
+                    <Row key={idOf(r)} r={r} at={data.at} run={runsBy.get(idOf(r))} ev={data.eval} repoName={manyRepos ? repoName(homeOf(r)) : undefined}
                       onOpen={() => toBoard(r)} onItem={() => toItem(r)} onReplay={() => toBoard(r, true)} onGo={go} />
                   ))}
                 </tbody>
@@ -400,6 +422,25 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
         </details>
       )}
     </main>
+  )
+}
+
+/** The page opened at a repo the app cannot read: why, in the backend's words when it said them (else /status's), with
+ * the way in, 导入仓库 for that path; one not listed any more says so. Its own words (a scan that threw) under 细节. */
+function Unreadable({ repo, error, onImport, onAll }: {
+  repo?: RepoInfo; error?: Overview['errors'][number]; onImport: (path?: string) => void; onAll: () => void
+}) {
+  const said = error?.error || repo?.error || ''
+  const plain = /[\u3400-\u9fff]/.test(said)
+  const raw = plain ? error?.raw : said
+  return (
+    <EmptyHero testid="ov-unreadable" title={repo ? `${repo.name} 还读不了` : '这个仓库不在列表里'}
+      text={[repo ? (plain ? said : '这次没读出来：看看这个仓库的目录还在不在、能不能读，再去导入仓库检查它') : '这个链接里的仓库已经不在这台机器的仓库列表里了：要看它就去导入仓库把它加回来。']}
+      punch="能读了，它的需求、数字和交付清单就都在这里。">
+      <button type="button" className="br-btn is-primary is-big" onClick={() => onImport(repo?.path)}><RoleIcon role="import" size={17} />去导入仓库</button>
+      <button type="button" className="br-btn" onClick={onAll}>看全部</button>
+      {raw && <details className="br-raw"><summary>细节</summary><pre>{raw}</pre></details>}
+    </EmptyHero>
   )
 }
 
@@ -448,7 +489,7 @@ function YourTurn({ rows, at, repoName, onGo, onOpen, onAll }: {
         {rows.slice(0, SHOWN).map((r) => {
           const step = stepOf(r)
           const waited = waitedText(r, at)
-          const name = repoName(r.repo)
+          const name = repoName(homeOf(r))
           return (
             <li key={idOf(r)} data-key={r.key}>
               {step && <StepButton step={step} onGo={onGo} />}
@@ -775,7 +816,7 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
     <section className="cto-card br-eval" aria-label="brain-kit 的评估" data-testid="eval-batch">
       <div className="cto-chart-head">
         <h3>brain-kit 的评估</h3>
-        <span className="cto-dim">{ev.available ? `这一批：${ev.ref || '默认分支'}上已经有记录的需求 · 不跟着交付清单的筛选变` : ''}</span>
+        <span className="cto-dim">{ev.available ? `这一批：${spaced(ev.ref || '默认分支', '上已经有记录的需求')} · 不跟着交付清单的筛选变` : ''}</span>
       </div>
       {!ev.available ? (
         <div className="br-note" style={{ marginTop: 6 }}>
@@ -808,6 +849,7 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
                   <span className="kt-pill tone-warn">要复看</span>
                   <button type="button" className="br-link br-key" onClick={() => onBoard(q.key)}>{q.key} ↗</button>
                   <span>{q.reasons.join('；')}</span>
+                  {q.todo && <span className="cto-was">做什么：{q.todo}</span>}
                 </li>
               ))}
               {ev.skipped.map((x) => (

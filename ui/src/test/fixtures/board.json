@@ -33,6 +33,7 @@
       "line": "approve PLAN 5d1e7a90",
       "raw": "",
       "do": "approve",
+      "todo": "",
       "since": 1794146040.0,
       "where": "session",
       "review": false
@@ -53,7 +54,8 @@
       "src/export/csv.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-3-7f3a"
+    "session_url": "/chat?sid=brain-PAY-3-7f3a",
+    "home": null
   },
   "branch": "ai/alice/PAY-3-refund-export",
   "base": "main",

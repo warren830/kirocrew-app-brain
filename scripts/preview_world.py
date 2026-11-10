@@ -669,9 +669,14 @@ def main() -> None:
     status = json.loads((FIX / "status.json").read_text(encoding="utf-8"))
     status["crew"]["rows"] = crew_rows()
     status["crew"]["fix"] = {"agent": True, "engine": False}
+    for r_ in ov["rows"] + [det["row"]]:
+        r_.setdefault("home", None)                                     # deliveries.base_row: a runner row's only
     rows = {r["key"]: r for r in ov["rows"]}
-    for q in ov["eval"]["queue"]:
-        q["reasons"] = [deliveries.eval_reason(x) for x in q["reasons"]]
+    for q in ov["eval"]["queue"]:      # deliveries.evaluate: each reason in words, what to do by brain-kit's rule
+        rules = [next((r for t, r in (("验收被", "acceptance_rejected"), ("判断点之外", "outside_judgment"),
+                                       ("小时没有进展", "stuck")) if t in x), "") for x in q["reasons"]]
+        q["reasons"] = [deliveries.eval_reason({"rule": r, "text": x}) for r, x in zip(rules, q["reasons"])]
+        q["todo"] = "；".join(dict.fromkeys(deliveries.QUEUE_TODO.get(r, deliveries.QUEUE_TODO[""]) for r in rules))
     # brainkit.evaluate's notes and its skipped run, as deliveries.evaluate says them
     ov["eval"]["note_rows"] = deliveries.eval_notes(COST_NOTE, ["PAY-2"], [])
     ov["eval"]["notes"] = [x["text"] for x in ov["eval"]["note_rows"]]
@@ -683,8 +688,9 @@ def main() -> None:
     for e in ov["errors"] + [r_ for r_ in status["repos"] if r_.get("error")]:
         if "还没装 brain-kit" in e["error"]:
             e["error"] = NO_KIT
-    for e in ov["errors"]:      # service._overview_sync: what the app said, and its path (or the exception) for 细节
+    for e in ov["errors"]:      # service._overview_sync: what the app said, its name and path, the path for 细节
         e["raw"] = e.get("raw") or "/Users/alice/workplace/shop-web"
+        e.update(path=e["raw"], name=os.path.basename(e["raw"]))
     for d_ in det["decisions"]:     # detail.decisions: the in-session questions each records the answer of
         d_["asked"] = detail.asked_in(d_["text"], d_["why"])
     # each row's 变更说明 first line (service._row: mrdesc_view.plain_line of it): the requirement's own
@@ -857,13 +863,15 @@ def main() -> None:
     p7.stage(t + 81 * M, "build-and-test", "done", note="verify PASS: 2 checks on code fingerprint %s" % sha("PAY-7", "fp")[:8])
     p7.handoff(t + 85 * M)
     reqs["r1"].append(p7)
-    why, raw = problems.reasons_text(["label 'ai-handoff' was added by bob, not by the branch owner alice"])
+    p7_why = ["label 'ai-handoff' was added by bob, not by the branch owner alice"]
+    why, raw = problems.reasons_text(p7_why)
     p7_refused = p7.hand_at + 25 * M        # the bridge's next round after the hand-over
     p7.rejected(p7_refused, why)
     p7_sess = dict(det["sessions"][0], slot="brain-PAY-7-2b9f", url="/chat?sid=brain-PAY-7-2b9f", title="PAY-7 退款原因下拉框",
                    credits=18.2, turns=27, busy=False, awaiting=False, last_activity=T0 - 5 * H)
     row = classified(p7, rows["PAY-7"], slot=p7_sess, mr={"state": "opened", "labels": ["ai-handoff-rejected"], "questions": [],
                                                           "rejected_reason": why, "rejected_raw": raw,
+                                                          "rejected_todo": problems.reasons_todo(p7_why),
                                                           "rejected_at": iso(p7_refused)})
     board_later(p7, row, decisions=decisions(p7, [("requirements", "原因列表在后台维护，页面只读", "运营要自己加原因", None, "agent", [])]),
                                   mr_desc=mrdesc(p7, first["PAY-7"]), credits=18.2,
@@ -1042,7 +1050,7 @@ def main() -> None:
         ids = [x for x in ("r1", "r3", "r4") if repo in ("all", x)]
         o = copy.deepcopy(ov)
         o["rows"] = [r_ for r_ in all_rows if r_["repo"] in ids and not (team and (r_["repo"], r_["key"]) in taken)] + (
-            copy.deepcopy(runner_rows) if team and repo in ("all", "runner") else [])
+            [copy.deepcopy(r_) for r_ in runner_rows if repo in ("all", "runner", r_["home"])] if team else [])
         o["overlaps"] = [x for x in ov["overlaps"] if any(r_["key"] == x["keys"][0] for r_ in o["rows"])]
         o["counts"] = deliveries.counts(o["rows"])
         o["errors"] = [e for e in ov["errors"] if repo in ("all", e["repo"])]
@@ -1132,6 +1140,7 @@ def main() -> None:
         mine = next((r_ for r_ in all_rows if (r_["repo"], r_["key"]) == (rid, key)), None)
         own = next((x for x in reqs.get(rid, []) if x.key == key), None)
         if deliveries.runner_takes(own.facts() if own and mine else None, mine, row_t):
+            row_t["home"] = rid
             team_entries.append({"row": row_t, "decisions": decs, "mr_url": url})
             runner_rows.append(row_t)
             if mine is not None:

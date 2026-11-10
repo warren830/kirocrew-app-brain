@@ -34,6 +34,7 @@
         "line": "approve PLAN 5d1e7a90",
         "raw": "",
         "do": "approve",
+        "todo": "",
         "since": 1794146040.0,
         "where": "session",
         "review": false
@@ -54,7 +55,8 @@
         "src/export/csv.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+      "session_url": "/chat?sid=brain-PAY-3-7f3a",
+      "home": null
     },
     {
       "repo": "r1",
@@ -89,6 +91,7 @@
         "line": null,
         "raw": "",
         "do": "answer",
+        "todo": "",
         "since": 1794135600.0,
         "where": "mr",
         "review": false
@@ -117,7 +120,8 @@
         "src/statement/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
     },
     {
       "repo": "r1",
@@ -152,6 +156,7 @@
         "line": null,
         "raw": "",
         "do": "accept",
+        "todo": "",
         "since": 1794056400.0,
         "where": "mr",
         "review": false
@@ -177,7 +182,8 @@
         "src/callback/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
     },
     {
       "repo": "r1",
@@ -212,6 +218,7 @@
         "line": null,
         "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
         "do": "redo_handoff",
+        "todo": "让 alice 自己交接（交接时会打标签）",
         "since": 1794129840.0,
         "where": "session",
         "review": false
@@ -233,7 +240,8 @@
         "web/refund/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+      "session_url": "/chat?sid=brain-PAY-7-2b9f",
+      "home": null
     },
     {
       "repo": "r1",
@@ -268,6 +276,7 @@
         "line": null,
         "raw": "",
         "do": "start",
+        "todo": "",
         "since": 1793973600.0,
         "where": "app",
         "review": false
@@ -283,7 +292,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "home": null
     },
     {
       "repo": "r1",
@@ -314,6 +324,7 @@
         "line": null,
         "raw": "",
         "do": "watch",
+        "todo": "",
         "since": 1793661540.0,
         "where": null,
         "review": false
@@ -337,7 +348,8 @@
         "src/refund/id.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+      "session_url": "/chat?sid=brain-PAY-2-1c4e",
+      "home": null
     }
   ],
   "overlaps": [
@@ -469,7 +481,8 @@
         "reasons": [
           "验收被退回 1 次",
           "判断点之外有人介入 2 次（交接后推代码）"
-        ]
+        ],
+        "todo": "打开需求看板看产品为什么退回；学到的在合并以后回写 Brain，下次就不会再犯；看看为什么要在判断点之外插手：能写进 Brain 或检查里的，下次就不用人插手"
       }
     ],
     "skipped": [
@@ -513,7 +526,9 @@
     {
       "repo": "r2",
       "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
-      "raw": "/Users/alice/workplace/shop-web"
+      "raw": "/Users/alice/workplace/shop-web",
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web"
     }
   ],
   "cto": {

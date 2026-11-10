@@ -53,11 +53,26 @@ def park_is_acceptance(park: dict[str, Any]) -> bool:
     return park.get("kind") == "acceptance" or lr.startswith("RELEASE ")
 
 
+HAN_RE, LATIN_RE = re.compile(r"[\u3400-\u9fff]"), re.compile(r"[A-Za-z0-9]")
+
+
+def spaced(*parts: str) -> str:
+    """Pieces of one sentence joined the way the app spaces Chinese: a space where a Han character meets a Latin
+    letter or digit (「等 carol 在 MR 上回答」), none next to punctuation or a space (「等你批准」)."""
+    out = ""
+    for p in parts:
+        if out and p and ((HAN_RE.match(out[-1]) and LATIN_RE.match(p[0])) or (LATIN_RE.match(out[-1]) and HAN_RE.match(p[0]))):
+            out += " "
+        out += p
+    return out
+
+
 def waits(who: str, do: str, text: str, *, where: str | None = None, since: float | None = None,
-          line: str | None = None, raw: str = "", review: bool = False) -> dict[str, Any]:
+          line: str | None = None, raw: str = "", review: bool = False, todo: str = "") -> dict[str, Any]:
     """A row's ``waits`` (ui/src/types.ts Waits): who, the step (WaitDo), where it is taken, since when; *review*: the
-    reply is the review in a new session (开审查会话), not a turn in the one that wrote the code."""
-    return {"who": who, "text": text, "line": line, "raw": raw, "do": do,
+    reply is the review in a new session (开审查会话), not a turn in the one that wrote the code; *todo*: what to do,
+    in words, when the step alone does not say it (a refused hand-over: each reason's own 做什么)."""
+    return {"who": who, "text": text, "line": line, "raw": raw, "do": do, "todo": todo,
             "since": float(since) if isinstance(since, (int, float)) and not isinstance(since, bool) else None,
             "where": where, "review": bool(review)}
 
@@ -72,6 +87,7 @@ def base_row(repo_id: str, f: dict[str, Any], *, local_only: bool = False) -> di
     lean = lean_view.summary(f.get("stages") or lean_view.stages([]))
     return {
         "repo": repo_id, "key": f["key"], "title": title or f["key"], "owner": f.get("owner"),
+        "home": None,        # a runner row: the listed repo (r1 …) of its GitLab project, filled in by the service
         "source": str(claim.get("source") or "product"), "state": "claimed", "state_label": STATE_LABEL["claimed"],
         "where": f.get("where") or "claim", "branch": f.get("branch"), "intent": run.get("intent"),
         "lean": lean, "stage": lean_view.stage_text(lean), "waits": waits("nobody", "none", ""),
@@ -148,7 +164,7 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
         if park_waiting(park):
             kind = str(park.get("kind") or "other")
             here = mine and slot is not None and kind == "clarify" and not park.get("lean_request")
-            return put("parked", you, "answer", "AI 停下等%s回答（%s）" % (them, KIND_LABEL.get(kind, "问题")),
+            return put("parked", you, "answer", spaced("AI 停下等", them, "回答（%s）" % KIND_LABEL.get(kind, "问题")),
                        where="app" if here else "session", since=f.get("park_at"))
         if not mine:
             return put("local", "people", "none", "%s 在自己的机器上做" % owner, since=f.get("tip_at"))
@@ -180,6 +196,7 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
         return put("rejected", you, "redo_handoff",
                    "接手被拒：" + (str((mr or {}).get("rejected_reason") or "看 MR 上的说明")[:200]), where="session",
                    raw=str((mr or {}).get("rejected_raw") or "")[:2000],   # the bridge's own words (problems.reason)
+                   todo=str((mr or {}).get("rejected_todo") or ""),
                    since=lean_view.epoch((mr or {}).get("rejected_at")) or f.get("tip_at"))
     open_q = [q for q in (mr or {}).get("questions") or [] if q.get("state") == "open"]
     if park_waiting(park) or open_q:
@@ -207,7 +224,7 @@ def approve_text(a: dict[str, Any], them: str = "你") -> str:
     """A pending Lean approval of a run on this machine, said as what waits: 「等你批准代码生成计划：读完再在会话里自己打那一行」."""
     what = lean_view.KIND_LABEL.get(a["kind"], a["kind"])
     what = " %s 的%s" % (a["unit"], what) if a.get("unit") else what
-    return "等%s批准%s：读完再在会话里自己打那一行" % (them, what)
+    return spaced("等", them, "批准", what, "：读完再在会话里自己打那一行")
 
 
 def mr_ask(who: str, what: str, did: Any, *, approval: bool, owner: str | None = None) -> str:
@@ -216,8 +233,8 @@ def mr_ask(who: str, what: str, did: Any, *, approval: bool, owner: str | None =
     hand-over)."""
     name = owner if who == "people" and owner else ASK_NAME.get(who, "人")
     verb = "验收" if what == "验收" else "回答"
-    return "等%s在 MR 上%s%s（%s）" % (name, verb, " " + str(did) if did else "",
-                                   "approve / reject" if approval else what)
+    return spaced("等", name, "在 MR 上%s%s（%s）" % (verb, " " + str(did) if did else "",
+                                                 "approve / reject" if approval else what))
 
 
 def not_labelled(f: dict[str, Any], mr: dict[str, Any] | None, cfg: dict[str, Any]) -> bool:
@@ -442,8 +459,10 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
     queue = []
     for q in data.get("review_queue") or []:
         if isinstance(q, dict) and q.get("key"):
-            queue.append({"key": str(q["key"]), "intent": q.get("intent"),
-                          "reasons": [eval_reason(r)[:200] for r in q.get("reasons") or []][:10]})
+            rs = [r if isinstance(r, dict) else {"text": r} for r in q.get("reasons") or []][:10]
+            queue.append({"key": str(q["key"]), "intent": q.get("intent"), "reasons": [eval_reason(r)[:200] for r in rs],
+                          "todo": "；".join(dict.fromkeys(QUEUE_TODO.get(str(r.get("rule") or ""), QUEUE_TODO[""])
+                                                         for r in rs))})
     skipped = [{"key": str(x.get("key") or ""), "why": skip_why(x), "raw": str(x.get("why") or "")[:300]}
                for x in data.get("skipped") or [] if isinstance(x, dict)][:50]
     d = data.get("delivery") if isinstance(data.get("delivery"), dict) else {}
@@ -517,6 +536,26 @@ STUCK_ON = (("run 没接着做（park.json 还在等：去 KiroCrew 看 slot）"
             ("桥不知道送到没有（看桥的日志和 KiroCrew 的 slot）", "桥不知道回答送到没有（看桥的日志和 KiroCrew 里它的会话）"))
 
 
+# what to do about a run on brain-kit's review queue (evaluate.review_reasons / open_reasons), by its rule
+QUEUE_TODO = {
+    "stuck": "打开它的需求看板，看它停在哪一步、在等谁，请那个人接着做；不做了就关掉它",
+    "closed_unmerged": "确认它是不做了；还要做的话，在开需求里重新认领",
+    "runner_failed": "请运行机负责人看一下运行机的记录，修好再交接一次",
+    "state_unknown": "去 KiroCrew 看一下它的会话：没收到就再交接一次",
+    "merge_not_here": "点上面的「从远端取最新」",
+    "question_problem": "打开它的需求详情，看是哪个问题，在 MR 上重新回答，或者请运行机负责人看一下",
+    "not_readable": "点上面的「从远端取最新」再看；还读不到就请运行机负责人看一下",
+    "acceptance_rejected": "打开需求看板看产品为什么退回；学到的在合并以后回写 Brain，下次就不会再犯",
+    "reverted_or_hotfixed": "看看合并以后为什么要回滚或修补，学到的回写 Brain",
+    "verify_fail_rounds": "看看自动检查为什么老是没过：是检查的问题就修检查，不是就把原因写进 Brain",
+    "repeat_corrections": "同一个纠正又来了：把它回写进 Brain，下次 AI 就照着做",
+    "stale_citations": "在 Brain 里看看那一条是不是该换成新的",
+    "outside_judgment": "看看为什么要在判断点之外插手：能写进 Brain 或检查里的，下次就不用人插手",
+    "cost_outlier": "回放一遍看钱花在哪：会话绕了远路，或者需求太大，下次拆小一点",
+    "": "打开它的需求看板看一遍",
+}
+
+
 def eval_reason(r: Any) -> str:
     """One reason brain-kit's review queue gives for a run, in words."""
     if not isinstance(r, dict):
@@ -525,12 +564,12 @@ def eval_reason(r: Any) -> str:
     if rule == "verify_fail_rounds":
         m = re.match(r"verify 失败 (\d+) 次（≥(\d+)）", text)
         return "自动检查没过 %s 次（%s 次就要人看一眼）" % m.groups() if m else "自动检查没过好几次"
-    if rule == "state_unknown":
-        return "不知道运行机收没收到这次派单：去 KiroCrew 看一下它的会话"
+    if rule == "state_unknown":     # what to do is the queue item's todo (QUEUE_TODO), not said twice
+        return "不知道运行机收没收到这次派单"
     if rule == "runner_failed":
         return "运行机没能开始做它（工作区没建成）"
     if rule == "merge_not_here":
-        return "桥说 MR 合并了，这台机器的默认分支上还没有：从远端取最新"
+        return "桥说 MR 合并了，这台机器的默认分支上还没有"
     if rule == "question_problem":
         text = re.sub(r"（[a-z_]+）", "", text)
     if rule == "stuck":   # its last activity as a moment, not an ISO time

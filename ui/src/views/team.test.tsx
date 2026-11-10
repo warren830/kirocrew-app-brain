@@ -111,11 +111,27 @@ describe('运行机', () => {
     installFixtureRoutes({ [`GET ${API}/team`]: () => tv })
     render(<TeamPage {...props()} />)
     const err = await screen.findByTestId('team-error')
-    expect(err).toHaveTextContent('桥没准备好做什么看设置里团队模式填的配置文件')
+    expect(err).toHaveTextContent('桥没准备好做什么看设置里团队模式填的两个配置文件')
     expect((within(err).getByText('细节').closest('details') as HTMLDetailsElement).open).toBe(false)
     const chip = screen.getByRole('region', { name: '交接' }).querySelector('[data-result="error"]') as HTMLElement
     expect(chip).toHaveTextContent('没查成：原话在细节里')
     expect(within(chip).getByText('GitLab 502: Bad Gateway').closest('details')).not.toHaveAttribute('open')
+  })
+
+  test('a bridge that did not start: what is wrong and what to do in words; the file names and keys only under 细节', async () => {
+    const tv = fx.team()
+    const raw = 'bridge.json 不能写 signing_key：私钥只给签名服务（signer/），桥用 "signer": {"type": "spool", …} 请签名服务签'
+    tv.status = { ...tv.status, ok: false, error: '桥的配置文件里写了私钥', error_todo: '把私钥从桥的配置文件里删掉：私钥只给签名服务，桥只把要签的东西交给签名服务', error_raw: raw }
+    installFixtureRoutes({ [`GET ${API}/team`]: () => tv })
+    render(<TeamPage {...props()} />)
+    const err = await screen.findByTestId('team-error')
+    expect(err).toHaveTextContent('桥的配置文件里写了私钥做什么把私钥从桥的配置文件里删掉')
+    const fold = within(err).getByText('细节').closest('details') as HTMLDetailsElement
+    expect(fold.open).toBe(false)
+    expect(within(fold).getByText(raw)).toBeInTheDocument()
+    // nothing of the file names or keys outside the fold
+    const face = Array.from(err.childNodes).filter((n) => n !== fold).map((n) => n.textContent).join('')
+    expect(face).not.toMatch(/bridge\.json|signing_key|signer|spool/)
   })
 
   test('the vouchers the signer did not answer last round are listed (asked for again next round); none, no heading', async () => {
@@ -184,6 +200,12 @@ describe('运行机', () => {
     expect(within(hero).getByText(/这台机器没开团队模式/)).toBeInTheDocument()
     for (const word of ['bridge.json', 'runnerd', 'brain-run']) expect(hero).not.toHaveTextContent(word)
     expect(within(hero).getAllByRole('listitem')).toHaveLength(5)
+    // each step's words break only where a phrase ends (1050: 「MR 上回 / 答、验收」 broke inside a word): kept whole,
+    // the last step's title is the two things done there, where in its line
+    const last = within(hero).getAllByRole('listitem')[4]
+    expect(last.querySelector('b')).toHaveTextContent(/^5回答、验收$/)
+    expect(last.querySelector('small')?.textContent).toBe('在 MR 上，以\u00a0GitLab\u00a0身份')
+    expect(document.querySelector('style')?.textContent).toContain('.tm-root .br-flow > li { word-break: keep-all;')
     await userEvent.setup().click(within(hero).getByRole('button', { name: '去设置' }))
     expect(p.go).toHaveBeenCalledWith({ kind: 'settings' })
     expect(apiCalls.filter((c) => c.path === `${API}/team`)).toHaveLength(0)
