@@ -769,7 +769,7 @@ function ReflectCard({ repo, branch, items, pick, onPick, onItem, onApplied, pos
               <span>MR 合并进 {branch} 以后，这里的条目就更新了。</span>
             </p>
           )}
-          {r.ok && !r.mr_url && r.pushed && <p>推上去了，但没开成 MR（这台机器没有 GitLab 的 token）：在 GitLab 上用这个分支开一个 MR，合并以后这里就更新了。</p>}
+          {r.ok && !r.mr_url && r.pushed && <p>推上去了，但没开成 MR（这台机器没有 GitLab 的令牌）：在 GitLab 上用这个分支开一个 MR，合并以后这里就更新了。</p>}
           {r.ok && !r.pushed && <p>只写在本机，还没推。要给团队看：把这个分支推上去再开 MR（怎么推在「细节」里）；合并进 {branch} 以后这里就更新了。</p>}
           {r.worktree && <p className="br-note" data-testid="reflect-worktree">工作区：<span className="br-mono">{r.worktree}</span></p>}
           {r.output && (

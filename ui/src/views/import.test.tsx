@@ -199,7 +199,7 @@ describe('导入仓库', () => {
     const { user } = setup({ [`POST ${API}/import/inspect`]: () => pend, [`POST ${API}/import/publish`]: () => p })
     await inspectPath(user)
     await user.click(await screen.findByRole('button', { name: '推送并开 MR' }))
-    expect(screen.getByTestId('publish-confirm')).toHaveTextContent('这台机器上没有 GitLab token：只推送，MR 用给出的命令或链接自己开。')
+    expect(screen.getByTestId('publish-confirm')).toHaveTextContent('这台机器上没有 GitLab 令牌：只推送，MR 用给出的命令或链接自己开。')
     await user.click(screen.getByRole('button', { name: '确定推送' }))
     const out = await screen.findByTestId('publish-result')
     expect(within(out).getByRole('link', { name: /在 GitLab 上开 MR/ })).toHaveAttribute('href', p.new_mr_url as string)

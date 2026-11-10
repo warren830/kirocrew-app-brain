@@ -238,7 +238,7 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
           </div>
         )}
         <div className="st-mods">
-          <span className={`br-chip tone-${s.me.token ? 'ok' : 'warn'}`}><i aria-hidden="true">{s.me.token ? '✓' : '!'}</i>GitLab token {yes(s.me.token)}</span>
+          <span className={`br-chip tone-${s.me.token ? 'ok' : 'warn'}`}><i aria-hidden="true">{s.me.token ? '✓' : '!'}</i>GitLab 令牌 {yes(s.me.token)}</span>
         </div>
         {s.me.how && <div className="br-kpi-note st-how">{s.me.how}</div>}
       </section>
