@@ -22,7 +22,7 @@
       "skipped_n": 6,
       "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
       "who": "nobody",
       "text": "已合并，在观察合并后的 14 天（到 11-17）",

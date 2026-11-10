@@ -175,15 +175,16 @@ def test_the_lean_stage_of_a_row():
     assert at([]) == (None, None, 0, 0, "reverse-engineering", None)
     # a stage Lean went past without a word (here a greenfield intent's reverse engineering) is skipped, said once
     assert at([ev("STAGE_STARTED", "requirements")]) == ("requirements", "started", 0, 1, "requirements",
-                                                         "做完 0 · 跳过 1 · 下一步：需求分析")
+                                                         "做完 0 · 跳过 1 · 在做：需求分析")
     done = [ev("STAGE_COMPLETED", s) for s in ("reverse-engineering", "requirements")] + \
         [ev("STAGE_SKIPPED", s) for s in ("user-stories", "application-design", "units")] + \
         [ev("STAGE_SKIPPED", s, "app") for s in ("functional-design", "nfr-design", "infrastructure-design")] + \
         [ev("STAGE_COMPLETED", "code-generation", "app"), ev("STAGE_COMPLETED", "build-and-test")]
     assert at(done) == ("release", "todo", 4, 6, "release", "做完 4 · 跳过 6 · 下一步：发布")
+    # a stage already started is 在做, never 下一步 (the 会话记录 said 「下一步：发布」 next to 「在做：发布」)
     assert at(done + [ev("STAGE_STARTED", "release")]) == ("release", "started", 4, 6, "release",
-                                                           "做完 4 · 跳过 6 · 下一步：发布")
-    assert at(done + [ev("STAGE_COMPLETED", "release")]) == ("release", "done", 5, 6, None, "做完 5 · 跳过 6 · 全部做完")
+                                                           "做完 4 · 跳过 6 · 在做：发布")
+    assert at(done + [ev("STAGE_COMPLETED", "release")]) == ("release", "done", 5, 6, None, "全部做完（跳过 6）")
     # a merged run that never recorded its unit's design stages: the cells and the count say the same (skipped)
     unsaid = [e for e in done if e["data"]["stage"] not in ("functional-design", "nfr-design", "infrastructure-design")]
     rows = lv.stages(unsaid + [ev("STAGE_COMPLETED", "release")])

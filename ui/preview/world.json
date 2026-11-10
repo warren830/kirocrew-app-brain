@@ -197,7 +197,7 @@
       "n": 9
      }
     },
-    "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+    "stage": "做完 4 · 跳过 4 · 在做：代码生成",
     "waits": {
      "who": "you",
      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -252,7 +252,7 @@
       "n": 6
      }
     },
-    "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+    "stage": "做完 2 · 跳过 3 · 在做：功能设计",
     "waits": {
      "who": "product",
      "text": "等产品在 MR 上回答 D-2（设计）",
@@ -315,7 +315,7 @@
       "n": 11
      }
     },
-    "stage": "做完 4 · 跳过 6 · 下一步：发布",
+    "stage": "做完 4 · 跳过 6 · 在做：发布",
     "waits": {
      "who": "product",
      "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -477,7 +477,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -689,7 +689,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -741,7 +741,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -793,7 +793,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -845,7 +845,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -897,7 +897,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -947,7 +947,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -999,7 +999,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -1051,7 +1051,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并，在观察合并后的 14 天（到 11-11）",
@@ -1103,7 +1103,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "people",
      "text": "已合并，有 1 条新知识等 erin 回写 Brain",
@@ -1159,7 +1159,7 @@
       "n": 9
      }
     },
-    "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+    "stage": "做完 2 · 跳过 6 · 在做：代码生成",
     "waits": {
      "who": "runner",
      "text": "运行机在跑",
@@ -1215,7 +1215,7 @@
       "n": 4
      }
     },
-    "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+    "stage": "做完 1 · 跳过 2 · 在做：应用设计",
     "waits": {
      "who": "agent",
      "text": "AI 在做「应用设计」",
@@ -1709,7 +1709,7 @@
         "n": 9
        }
       },
-      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "stage": "做完 4 · 跳过 4 · 在做：代码生成",
       "waits": {
        "who": "you",
        "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -1764,7 +1764,7 @@
         "n": 6
        }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上回答 D-2（设计）",
@@ -1827,7 +1827,7 @@
         "n": 11
        }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -1989,7 +1989,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -2201,7 +2201,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -2253,7 +2253,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -2305,7 +2305,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -2357,7 +2357,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -2409,7 +2409,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -2459,7 +2459,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -2511,7 +2511,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -2563,7 +2563,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-11）",
@@ -2615,7 +2615,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "people",
        "text": "已合并，有 1 条新知识等 erin 回写 Brain",
@@ -2671,7 +2671,7 @@
         "n": 9
        }
       },
-      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "stage": "做完 2 · 跳过 6 · 在做：代码生成",
       "waits": {
        "who": "runner",
        "text": "运行机在跑",
@@ -2727,7 +2727,7 @@
         "n": 4
        }
       },
-      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "stage": "做完 1 · 跳过 2 · 在做：应用设计",
       "waits": {
        "who": "agent",
        "text": "AI 在做「应用设计」",
@@ -3219,7 +3219,7 @@
         "n": 9
        }
       },
-      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "stage": "做完 4 · 跳过 4 · 在做：代码生成",
       "waits": {
        "who": "you",
        "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -3274,7 +3274,7 @@
         "n": 6
        }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上回答 D-2（设计）",
@@ -3337,7 +3337,7 @@
         "n": 11
        }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -3499,7 +3499,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -4266,7 +4266,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -4318,7 +4318,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -4370,7 +4370,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -4422,7 +4422,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -4474,7 +4474,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -4524,7 +4524,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -4576,7 +4576,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -4628,7 +4628,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-11）",
@@ -4680,7 +4680,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "people",
        "text": "已合并，有 1 条新知识等 erin 回写 Brain",
@@ -4736,7 +4736,7 @@
         "n": 9
        }
       },
-      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "stage": "做完 2 · 跳过 6 · 在做：代码生成",
       "waits": {
        "who": "runner",
        "text": "运行机在跑",
@@ -5151,7 +5151,7 @@
         "n": 4
        }
       },
-      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "stage": "做完 1 · 跳过 2 · 在做：应用设计",
       "waits": {
        "who": "agent",
        "text": "AI 在做「应用设计」",
@@ -5484,7 +5484,7 @@
         "n": 6
        }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上回答 D-2（设计）",
@@ -5542,7 +5542,7 @@
         "n": 11
        }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -5600,7 +5600,7 @@
         "n": 9
        }
       },
-      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "stage": "做完 2 · 跳过 6 · 在做：代码生成",
       "waits": {
        "who": "people",
        "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
@@ -5892,7 +5892,7 @@
         "n": 9
        }
       },
-      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "stage": "做完 4 · 跳过 4 · 在做：代码生成",
       "waits": {
        "who": "you",
        "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -5947,7 +5947,7 @@
         "n": 6
        }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上回答 D-2（设计）",
@@ -6010,7 +6010,7 @@
         "n": 11
        }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -6172,7 +6172,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -6384,7 +6384,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -6436,7 +6436,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -6488,7 +6488,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -6540,7 +6540,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -6592,7 +6592,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -6642,7 +6642,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -6694,7 +6694,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -6746,7 +6746,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-11）",
@@ -6798,7 +6798,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "people",
        "text": "已合并，有 1 条新知识等 erin 回写 Brain",
@@ -6854,7 +6854,7 @@
         "n": 9
        }
       },
-      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "stage": "做完 2 · 跳过 6 · 在做：代码生成",
       "waits": {
        "who": "runner",
        "text": "运行机在跑",
@@ -6910,7 +6910,7 @@
         "n": 4
        }
       },
-      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "stage": "做完 1 · 跳过 2 · 在做：应用设计",
       "waits": {
        "who": "agent",
        "text": "AI 在做「应用设计」",
@@ -7153,7 +7153,7 @@
         "n": 9
        }
       },
-      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "stage": "做完 4 · 跳过 4 · 在做：代码生成",
       "waits": {
        "who": "you",
        "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -7208,7 +7208,7 @@
         "n": 6
        }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上回答 D-2（设计）",
@@ -7271,7 +7271,7 @@
         "n": 11
        }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -7433,7 +7433,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -8004,7 +8004,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -8056,7 +8056,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -8108,7 +8108,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -8160,7 +8160,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -8212,7 +8212,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -8262,7 +8262,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -8314,7 +8314,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -8366,7 +8366,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-11）",
@@ -8418,7 +8418,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "people",
        "text": "已合并，有 1 条新知识等 erin 回写 Brain",
@@ -8474,7 +8474,7 @@
         "n": 9
        }
       },
-      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "stage": "做完 2 · 跳过 6 · 在做：代码生成",
       "waits": {
        "who": "runner",
        "text": "运行机在跑",
@@ -8699,7 +8699,7 @@
         "n": 4
        }
       },
-      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "stage": "做完 1 · 跳过 2 · 在做：应用设计",
       "waits": {
        "who": "agent",
        "text": "AI 在做「应用设计」",
@@ -8976,7 +8976,7 @@
         "n": 6
        }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上回答 D-2（设计）",
@@ -9034,7 +9034,7 @@
         "n": 11
        }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -9092,7 +9092,7 @@
         "n": 9
        }
       },
-      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "stage": "做完 2 · 跳过 6 · 在做：代码生成",
       "waits": {
        "who": "people",
        "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
@@ -9321,7 +9321,7 @@
         "n": 9
        }
       },
-      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "stage": "做完 4 · 跳过 4 · 在做：代码生成",
       "waits": {
        "who": "you",
        "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -9478,7 +9478,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -9690,7 +9690,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -9742,7 +9742,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -9794,7 +9794,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -9846,7 +9846,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -9898,7 +9898,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -9948,7 +9948,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -10000,7 +10000,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -10052,7 +10052,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-11）",
@@ -10104,7 +10104,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "people",
        "text": "已合并，有 1 条新知识等 erin 回写 Brain",
@@ -10160,7 +10160,7 @@
         "n": 4
        }
       },
-      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "stage": "做完 1 · 跳过 2 · 在做：应用设计",
       "waits": {
        "who": "agent",
        "text": "AI 在做「应用设计」",
@@ -10268,7 +10268,7 @@
         "n": 6
        }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上回答 D-2（设计）",
@@ -10326,7 +10326,7 @@
         "n": 11
        }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -10384,7 +10384,7 @@
         "n": 9
        }
       },
-      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "stage": "做完 2 · 跳过 6 · 在做：代码生成",
       "waits": {
        "who": "people",
        "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
@@ -10880,7 +10880,7 @@
         "n": 9
        }
       },
-      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "stage": "做完 4 · 跳过 4 · 在做：代码生成",
       "waits": {
        "who": "you",
        "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -11037,7 +11037,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -11795,7 +11795,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -11847,7 +11847,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -11899,7 +11899,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -11951,7 +11951,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -12003,7 +12003,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -12053,7 +12053,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -12105,7 +12105,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -12157,7 +12157,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-11）",
@@ -12209,7 +12209,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "people",
        "text": "已合并，有 1 条新知识等 erin 回写 Brain",
@@ -12624,7 +12624,7 @@
         "n": 4
        }
       },
-      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "stage": "做完 1 · 跳过 2 · 在做：应用设计",
       "waits": {
        "who": "agent",
        "text": "AI 在做「应用设计」",
@@ -12957,7 +12957,7 @@
         "n": 6
        }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上回答 D-2（设计）",
@@ -13015,7 +13015,7 @@
         "n": 11
        }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -13073,7 +13073,7 @@
         "n": 9
        }
       },
-      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "stage": "做完 2 · 跳过 6 · 在做：代码生成",
       "waits": {
        "who": "people",
        "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
@@ -13365,7 +13365,7 @@
         "n": 9
        }
       },
-      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "stage": "做完 4 · 跳过 4 · 在做：代码生成",
       "waits": {
        "who": "you",
        "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -13522,7 +13522,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -13734,7 +13734,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -13786,7 +13786,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -13838,7 +13838,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -13890,7 +13890,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -13942,7 +13942,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -13992,7 +13992,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -14044,7 +14044,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -14096,7 +14096,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-11）",
@@ -14148,7 +14148,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "people",
        "text": "已合并，有 1 条新知识等 erin 回写 Brain",
@@ -14204,7 +14204,7 @@
         "n": 4
        }
       },
-      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "stage": "做完 1 · 跳过 2 · 在做：应用设计",
       "waits": {
        "who": "agent",
        "text": "AI 在做「应用设计」",
@@ -14312,7 +14312,7 @@
         "n": 6
        }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上回答 D-2（设计）",
@@ -14370,7 +14370,7 @@
         "n": 11
        }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -14428,7 +14428,7 @@
         "n": 9
        }
       },
-      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "stage": "做完 2 · 跳过 6 · 在做：代码生成",
       "waits": {
        "who": "people",
        "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
@@ -14675,7 +14675,7 @@
         "n": 9
        }
       },
-      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "stage": "做完 4 · 跳过 4 · 在做：代码生成",
       "waits": {
        "who": "you",
        "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -14832,7 +14832,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -15403,7 +15403,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -15455,7 +15455,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -15507,7 +15507,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -15559,7 +15559,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -15611,7 +15611,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -15661,7 +15661,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -15713,7 +15713,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并",
@@ -15765,7 +15765,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "nobody",
        "text": "已合并，在观察合并后的 14 天（到 11-11）",
@@ -15817,7 +15817,7 @@
        "skipped_n": 6,
        "next": null
       },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "stage": "全部做完（跳过 6）",
       "waits": {
        "who": "people",
        "text": "已合并，有 1 条新知识等 erin 回写 Brain",
@@ -16042,7 +16042,7 @@
         "n": 4
        }
       },
-      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "stage": "做完 1 · 跳过 2 · 在做：应用设计",
       "waits": {
        "who": "agent",
        "text": "AI 在做「应用设计」",
@@ -16319,7 +16319,7 @@
         "n": 6
        }
       },
-      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "stage": "做完 2 · 跳过 3 · 在做：功能设计",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上回答 D-2（设计）",
@@ -16377,7 +16377,7 @@
         "n": 11
        }
       },
-      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "stage": "做完 4 · 跳过 6 · 在做：发布",
       "waits": {
        "who": "product",
        "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -16435,7 +16435,7 @@
         "n": 9
        }
       },
-      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "stage": "做完 2 · 跳过 6 · 在做：代码生成",
       "waits": {
        "who": "people",
        "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
@@ -17369,7 +17369,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并，在观察合并后的 14 天（到 11-17）",
@@ -19326,7 +19326,7 @@
       "n": 9
      }
     },
-    "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+    "stage": "做完 4 · 跳过 4 · 在做：代码生成",
     "waits": {
      "who": "you",
      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -20718,7 +20718,7 @@
       "n": 6
      }
     },
-    "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+    "stage": "做完 2 · 跳过 3 · 在做：功能设计",
     "waits": {
      "who": "product",
      "text": "等产品在 MR 上回答 D-2（设计）",
@@ -21872,7 +21872,7 @@
       "n": 11
      }
     },
-    "stage": "做完 4 · 跳过 6 · 下一步：发布",
+    "stage": "做完 4 · 跳过 6 · 在做：发布",
     "waits": {
      "who": "product",
      "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -27000,7 +27000,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -28496,7 +28496,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -30093,7 +30093,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -31733,7 +31733,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -33253,7 +33253,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -34247,7 +34247,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -35936,7 +35936,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并",
@@ -37445,7 +37445,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "已合并，在观察合并后的 14 天（到 11-11）",
@@ -39129,7 +39129,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "people",
      "text": "已合并，有 1 条新知识等 erin 回写 Brain",
@@ -40742,7 +40742,7 @@
       "n": 9
      }
     },
-    "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+    "stage": "做完 2 · 跳过 6 · 在做：代码生成",
     "waits": {
      "who": "runner",
      "text": "运行机在跑",
@@ -41828,7 +41828,7 @@
       "n": 4
      }
     },
-    "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+    "stage": "做完 1 · 跳过 2 · 在做：应用设计",
     "waits": {
      "who": "agent",
      "text": "AI 在做「应用设计」",
@@ -42861,7 +42861,7 @@
       "n": 6
      }
     },
-    "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+    "stage": "做完 2 · 跳过 3 · 在做：功能设计",
     "waits": {
      "who": "product",
      "text": "等产品在 MR 上回答 D-2（设计）",
@@ -43999,7 +43999,7 @@
       "n": 11
      }
     },
-    "stage": "做完 4 · 跳过 6 · 下一步：发布",
+    "stage": "做完 4 · 跳过 6 · 在做：发布",
     "waits": {
      "who": "product",
      "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -45452,7 +45452,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "MR 已合并，运行结束",
@@ -47427,7 +47427,7 @@
       "n": 9
      }
     },
-    "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+    "stage": "做完 2 · 跳过 6 · 在做：代码生成",
     "waits": {
      "who": "people",
      "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
@@ -48574,7 +48574,7 @@
       "n": 9
      }
     },
-    "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+    "stage": "做完 4 · 跳过 4 · 在做：代码生成",
     "waits": {
      "who": "you",
      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
@@ -49415,7 +49415,7 @@
       "n": 6
      }
     },
-    "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+    "stage": "做完 2 · 跳过 3 · 在做：功能设计",
     "waits": {
      "who": "product",
      "text": "等产品在 MR 上回答 D-2（设计）",
@@ -49868,7 +49868,7 @@
       "n": 11
      }
     },
-    "stage": "做完 4 · 跳过 6 · 下一步：发布",
+    "stage": "做完 4 · 跳过 6 · 在做：发布",
     "waits": {
      "who": "product",
      "text": "等产品在 MR 上验收 D-3（approve / reject）",
@@ -50374,7 +50374,7 @@
      "skipped_n": 6,
      "next": null
     },
-    "stage": "做完 5 · 跳过 6 · 全部做完",
+    "stage": "全部做完（跳过 6）",
     "waits": {
      "who": "nobody",
      "text": "MR 已合并，运行结束",
@@ -51013,7 +51013,7 @@
       "n": 9
      }
     },
-    "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+    "stage": "做完 2 · 跳过 6 · 在做：代码生成",
     "waits": {
      "who": "people",
      "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
