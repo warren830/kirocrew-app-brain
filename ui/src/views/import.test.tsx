@@ -140,7 +140,7 @@ describe('导入仓库', () => {
     expect(within(out).getByText('改了 14 个文件').closest('details')).not.toHaveAttribute('open')  // folded
     const doctor = fx.importJob().result!.doctor.rows
     expect(within(out).getByTestId('doctor')).toHaveTextContent('自检')
-    expect(within(out).getByTestId('doctor')).not.toHaveTextContent('没有 ~/.kiro/agents/brain-dev.json')  // the KiroCrew block's, once
+    expect(within(out).getByTestId('doctor')).not.toHaveTextContent('KiroCrew 里还没有 brain-dev')  // the KiroCrew block's, once
     expect(within(out).getByText(`${doctor.length} 项都正常`)).toBeInTheDocument()
     expect(within(out).getByTestId('commit-ok')).toHaveTextContent('提交了 eb43199f（作者 Alice Example <alice@example.com>）')
     expect(props.reloadStatus).toHaveBeenCalled()

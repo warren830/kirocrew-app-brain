@@ -304,7 +304,7 @@ describe('开需求', () => {
   })
 
   test('KiroCrew cannot open the session (a ✗): 开工 is off and names the fix button; without a session it may start', async () => {
-    const bad: CheckRow = { level: 'FAIL', text: '没有 ~/.kiro/agents/brain-dev.json', todo: '点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的 hook 在 KiroCrew 里不会跑', fix: 'agent', repo: null, raw: '' }
+    const bad: CheckRow = { level: 'FAIL', text: 'KiroCrew 里还没有 brain-dev', todo: '点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的拦截在 KiroCrew 里不会跑', fix: 'agent', repo: null, raw: '没有 ~/.kiro/agents/brain-dev.json' }
     const crew = { ...fx.crew(), rows: [bad] }
     const status = calmStatus()
     status.crew = { ...status.crew, rows: [bad] }
@@ -324,7 +324,7 @@ describe('开需求', () => {
     const slow = new Promise<void>((r) => { answer = r })
     const { user, props } = setup({
       [`GET ${API}/crew`]: async () => { await slow; return fx.crew() },
-      [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了：~/.kiro/agents/brain-dev.json', rows: fx.crew().rows.map((r) => ({ ...r, level: 'OK' })) }),
+      [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '给 brain-dev 的设置补上了 Lean 的拦截：调用工具前。别的都没动；改之前的那份留作备份：brain-dev.json.bak-20261110-091500。新开的会话才会用上。', rows: fx.crew().rows.map((r) => ({ ...r, level: 'OK' })) }),
     }, fx.status())
     const card = screen.getByRole('region', { name: 'KiroCrew 的检查' })            // before /crew answered: no jump later
     for (const r of fx.status().crew.rows.filter((x) => x.level !== 'OK')) expect(card).toHaveTextContent(r.text)

@@ -179,7 +179,7 @@ describe('设置', () => {
 
   test('the status: brain-kit and its modules, each repo, who I am (a token is only 有/没有), KiroCrew’s checks with a fix', async () => {
     const user = userEvent.setup()
-    installFixtureRoutes({ [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了 ~/.kiro/agents/brain-dev.json', rows: fx.crew().rows.slice(0, 2) }) })
+    installFixtureRoutes({ [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '给 brain-dev 的设置补上了 Lean 的拦截：调用工具前。别的都没动；改之前的那份留作备份：brain-dev.json.bak-20261110-091500。新开的会话才会用上。', rows: fx.crew().rows.slice(0, 2) }) })
     const p = props()
     render(<SettingsView {...p} />)
     const kit = screen.getByRole('region', { name: 'brain-kit' })
@@ -208,7 +208,7 @@ describe('设置', () => {
     expect(within(crew).getByRole('img', { name: '1 正常，1 注意，1 有问题' })).toBeInTheDocument()
     expect(crew).toHaveClass('is-bad')
     await user.click(within(crew).getByRole('button', { name: '补上 Lean 的 hook' }))
-    expect(await within(crew).findByText('装好了 ~/.kiro/agents/brain-dev.json')).toBeInTheDocument()
+    expect(await within(crew).findByText('给 brain-dev 的设置补上了 Lean 的拦截：调用工具前。别的都没动；改之前的那份留作备份：brain-dev.json.bak-20261110-091500。新开的会话才会用上。')).toBeInTheDocument()
     expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/crew/fix`, body: { what: 'agent' } })
     expect(p.reloadStatus).toHaveBeenCalled()
   })
