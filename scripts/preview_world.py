@@ -110,6 +110,7 @@ class Req:
         self.after14: dict | None = None
         self.app: list[dict] = []
         self.proposals = 0
+        self.worktree: str | None = None    # its checkout on this machine, if it has one
 
     # Lean's ledger
     def _lean(self, at: float, event: str, **data) -> None:
@@ -218,8 +219,10 @@ class Req:
                 run["handoff"] = {"requested_at": iso(self.hand_at), "by": self.owner, "local_head": sha(self.key, "lh")}
         return {"key": self.key, "claim": {"owner": self.owner, "title": self.title, "created_at": iso(self.claim_at or self.start_at or T0),
                                            "source": "product"},
-                "where": "main" if self.merged_at else "worktree" if self.hand_at is None else "branch", "branch": self.branch if run else None,
-                "owner": self.owner, "worktree": None, "run": run, "park": park, "merged": bool(self.merged_at),
+                # repo._key_facts: merged, else read in its checkout here when this machine has one, else on its branch
+                "where": "main" if self.merged_at else "worktree" if self.worktree or self.hand_at is None else "branch",
+                "branch": self.branch if run else None,
+                "owner": self.owner, "worktree": None if self.merged_at else self.worktree, "run": run, "park": park, "merged": bool(self.merged_at),
                 "merged_at": self.merged_at, "tip_at": self.merged_at or (_epoch(self.commits[-1]["at"]) if self.commits else None),
                 "park_at": _epoch(self.park[-1]["at"]) if self.park else None, "review": None,
                 "decisions_text": "```brain-proposal\n```\n" * self.proposals, "events": self.events, "approvals": approvals,
@@ -531,10 +534,13 @@ def classified(r: Req, row: dict, *, park: dict | None = None, mr: dict | None =
                local_only: bool = False, reflected: bool = False, at_handover: bool = False) -> dict:
     """*row* with what the backend works out of *r*'s records (service._row: deliveries.base_row and classify): its
     state, Lean progress and what it waits on. The rest of *row* (title, summary, credits, the MR link) stays."""
+    r.worktree = row.get("worktree")     # the row's checkout on this machine is the requirement's
     f = r.facts(park)
     got = deliveries.base_row(r.repo, f, local_only=local_only)
     deliveries.classify(got, f, mr=mr, slot=slot, cfg=CFG, me=ME, reflected=reflected, now=T0, at_handover=at_handover)
-    row.update({k: got[k] for k in ("state", "state_label", "lean", "stage", "waits", "local_only")})
+    row.update({k: got[k] for k in ("state", "state_label", "lean", "stage", "waits", "local_only", "where", "worktree")})
+    # the head says where it is, the facts list its checkout: never 「这台机器没检出」 above a 工作目录 on this machine
+    assert not (row["where"] == "branch" and row["worktree"]), r.key
     row["session_url"] = slot["url"] if slot else None
     row["summary"] = mrdesc_view.plain_line(row.get("summary"))     # what service._row shows of the 变更说明
     return row
