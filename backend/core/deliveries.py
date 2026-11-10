@@ -53,6 +53,20 @@ def park_is_acceptance(park: dict[str, Any]) -> bool:
     return park.get("kind") == "acceptance" or lr.startswith("RELEASE ")
 
 
+HAN_RE, LATIN_RE = re.compile(r"[\u3400-\u9fff]"), re.compile(r"[A-Za-z0-9]")
+
+
+def spaced(*parts: str) -> str:
+    """Pieces of one sentence joined the way the app spaces Chinese: a space where a Han character meets a Latin
+    letter or digit (「等 carol 在 MR 上回答」), none next to punctuation or a space (「等你批准」)."""
+    out = ""
+    for p in parts:
+        if out and p and ((HAN_RE.match(out[-1]) and LATIN_RE.match(p[0])) or (LATIN_RE.match(out[-1]) and HAN_RE.match(p[0]))):
+            out += " "
+        out += p
+    return out
+
+
 def waits(who: str, do: str, text: str, *, where: str | None = None, since: float | None = None,
           line: str | None = None, raw: str = "", review: bool = False) -> dict[str, Any]:
     """A row's ``waits`` (ui/src/types.ts Waits): who, the step (WaitDo), where it is taken, since when; *review*: the
@@ -149,7 +163,7 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
         if park_waiting(park):
             kind = str(park.get("kind") or "other")
             here = mine and slot is not None and kind == "clarify" and not park.get("lean_request")
-            return put("parked", you, "answer", "AI 停下等%s回答（%s）" % (them, KIND_LABEL.get(kind, "问题")),
+            return put("parked", you, "answer", spaced("AI 停下等", them, "回答（%s）" % KIND_LABEL.get(kind, "问题")),
                        where="app" if here else "session", since=f.get("park_at"))
         if not mine:
             return put("local", "people", "none", "%s 在自己的机器上做" % owner, since=f.get("tip_at"))
@@ -208,7 +222,7 @@ def approve_text(a: dict[str, Any], them: str = "你") -> str:
     """A pending Lean approval of a run on this machine, said as what waits: 「等你批准代码生成计划：读完再在会话里自己打那一行」."""
     what = lean_view.KIND_LABEL.get(a["kind"], a["kind"])
     what = " %s 的%s" % (a["unit"], what) if a.get("unit") else what
-    return "等%s批准%s：读完再在会话里自己打那一行" % (them, what)
+    return spaced("等", them, "批准", what, "：读完再在会话里自己打那一行")
 
 
 def mr_ask(who: str, what: str, did: Any, *, approval: bool, owner: str | None = None) -> str:
@@ -217,8 +231,8 @@ def mr_ask(who: str, what: str, did: Any, *, approval: bool, owner: str | None =
     hand-over)."""
     name = owner if who == "people" and owner else ASK_NAME.get(who, "人")
     verb = "验收" if what == "验收" else "回答"
-    return "等%s在 MR 上%s%s（%s）" % (name, verb, " " + str(did) if did else "",
-                                   "approve / reject" if approval else what)
+    return spaced("等", name, "在 MR 上%s%s（%s）" % (verb, " " + str(did) if did else "",
+                                                 "approve / reject" if approval else what))
 
 
 def not_labelled(f: dict[str, Any], mr: dict[str, Any] | None, cfg: dict[str, Any]) -> bool:

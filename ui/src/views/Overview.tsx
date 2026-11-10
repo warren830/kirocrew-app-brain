@@ -20,7 +20,7 @@ import { POLL_MS, paths, useAction, usePoll } from '../api'
 import { RoleIcon } from '../board/RoleIcon'
 import { HOW, HOW_LABEL, HOW_VAR, MiniCredits, MiniPeople, MiniUnattended, MiniWho, WHO_VAR, WeeklyChart, fmt, slash } from '../cto/charts'
 import { COL_NAME, Flow, LANE_NAME, StepButton, colOf, homeOf, laneOf, stepOf, waitedText, type Col, type Lane } from '../cto/Flow'
-import { ago, fmtCredits } from '../format'
+import { ago, fmtCredits, spaced } from '../format'
 import type { OverviewEntry, View } from '../nav'
 import type { CtoNumbers, CtoRun, EvalMetric, EvalView, Funnel, Overview, RefreshResult, ReqState, RepoInfo, Requirement } from '../types'
 import { STATE_LABEL } from '../types'
@@ -287,7 +287,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
           <h2>{c.sentence}</h2>
           <p>
             {c.available
-              ? `数字来自 brain-kit 的评估（读的是${c.ref || '默认分支'}）和这个 app 开的会话`
+              ? `数字来自 brain-kit 的评估（${spaced('读的是', c.ref || '默认分支')}）和这个 app 开的会话`
               : computing ? 'brain-kit 正在算评估的数字，算好就出来：下面先看 credits 和合并' : 'brain-kit 的评估还没给出数字：下面先看 credits 和合并'}
             {' · '}口径见末尾
             {!c.available && status?.brainkit.modules.evaluate === false && (
@@ -814,7 +814,7 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
     <section className="cto-card br-eval" aria-label="brain-kit 的评估" data-testid="eval-batch">
       <div className="cto-chart-head">
         <h3>brain-kit 的评估</h3>
-        <span className="cto-dim">{ev.available ? `这一批：${ev.ref || '默认分支'}上已经有记录的需求 · 不跟着交付清单的筛选变` : ''}</span>
+        <span className="cto-dim">{ev.available ? `这一批：${spaced(ev.ref || '默认分支', '上已经有记录的需求')} · 不跟着交付清单的筛选变` : ''}</span>
       </div>
       {!ev.available ? (
         <div className="br-note" style={{ marginTop: 6 }}>

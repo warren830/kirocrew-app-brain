@@ -73,6 +73,17 @@ describe('交付总览', () => {
     expect(screen.queryByText('实测 · brain-kit')).toBeNull()
   })
 
+  test('the branch read is joined with a space before a Latin repo name (real data: 读的是 demo 的 main 分支)', async () => {
+    const ov = fx.overview()
+    const ref = 'demo 的 main 分支、oms-brain 的 master 分支'
+    ov.cto = { ...ov.cto, ref }
+    ov.eval = { ...ov.eval, ref }
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props()} />)
+    expect(await screen.findByTestId('ov-hero')).toHaveTextContent(`数字来自 brain-kit 的评估（读的是 ${ref}）`)
+    expect(screen.getByTestId('eval-batch')).toHaveTextContent(`这一批：${ref}上已经有记录的需求`)
+  })
+
   test('a number with nothing to count yet says 还没有 and when it will have one, and draws no chart', async () => {
     const ov = fx.overview()
     ov.cto = { ...ov.cto, available: false, unattended: null, stepped_in: null, credits: { per_req: null, total: null, reqs: 0 } }

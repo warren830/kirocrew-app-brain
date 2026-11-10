@@ -88,3 +88,14 @@ export function fmtWaited(sec: number): string {
   if (h < 48) return `${h} 小时`
   return `${Math.floor(h / 24)} 天`
 }
+
+const HAN = /[㐀-鿿]/
+const LATIN = /[A-Za-z0-9]/
+/** Pieces of one sentence joined the way the app spaces Chinese (backend/core/deliveries.py spaced): a space where a
+ * Han character meets a Latin letter or digit (「读的是 demo 的 main 分支」), none next to punctuation or a space. */
+export function spaced(...parts: string[]): string {
+  return parts.reduce((out, p) => {
+    const a = out.slice(-1), b = p.slice(0, 1)
+    return out + ((HAN.test(a) && LATIN.test(b)) || (LATIN.test(a) && HAN.test(b)) ? ' ' : '') + p
+  }, '')
+}

@@ -125,7 +125,7 @@ def test_team_states_from_the_ledger():
     deliveries.team_classify(r, {"state": "signing", "run_id": "RUN-PAY-1-1"}, [], None)
     assert "签接手合同" in r["waits"]["text"] and "RUN-" not in r["waits"]["text"]
     # who answers a question on the runner: park.json's ask, as a person's row of it says (the owner by name)
-    for ask, who, text in (("product", "product", "等产品在 MR 上回答 D-2（设计）"), ("owner", "people", "等carol在 MR 上回答 D-2（设计）"),
+    for ask, who, text in (("product", "product", "等产品在 MR 上回答 D-2（设计）"), ("owner", "people", "等 carol 在 MR 上回答 D-2（设计）"),
                            ("security", "people", "等人在 MR 上回答 D-2（设计）")):
         r = dict(row(), owner="carol")
         deliveries.team_classify(r, {"state": "dispatched"}, [{"id": "D-2", "state": "open", "kind": "design"}],
@@ -597,3 +597,12 @@ def test_the_timeline_says_who_did_what_and_why_without_record_codes(tmp_path):
             mods["trace"] = saved
     assert err.endswith("在设置里换新一点的 brain-kit") and not re.search(r"[A-Za-z]{4,}", re.sub(r"brain-kit|Lean", "", err))
     assert detail.NO_TOKENS == "KiroCrew 只报 credits，没有别的用量数"
+
+
+def test_a_name_in_a_sentence_has_a_space_on_each_side():
+    """「读的是demo 的 main 分支」 (OVERVIEW real data): a Latin name meets Chinese with a space, as the app writes it."""
+    assert deliveries.spaced("等", "alice", "批准", "代码生成计划") == "等 alice 批准代码生成计划"
+    assert deliveries.spaced("等", "你", "批准") == "等你批准"
+    assert deliveries.approve_text({"kind": "PLAN", "unit": "refund-api"}, "alice").startswith("等 alice 批准 refund-api 的")
+    assert deliveries.mr_ask("people", "设计", "D-2", approval=False, owner="carol") == "等 carol 在 MR 上回答 D-2（设计）"
+    assert deliveries.branch_words([("demo", "main"), ("oms-brain", "master")]) == "demo 的 main 分支、oms-brain 的 master 分支"

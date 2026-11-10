@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ago, fmtAgo, fmtCredits, fmtIso, fmtRate, fmtSpan, isoDay, lines, splitPaths } from './format'
+import { ago, fmtAgo, fmtCredits, fmtIso, fmtRate, fmtSpan, isoDay, lines, spaced, splitPaths } from './format'
 import { errorRaw, errorStatus, errorText, httpProblem } from './api'
 
 describe('format', () => {
@@ -14,6 +14,15 @@ describe('format', () => {
     expect(fmtAgo(3 * 86400)).toBe('3 天前')
     expect(ago(1000, 1360)).toBe('6 分钟前')
     expect(ago(null)).toBe('—')
+  })
+
+  it('joins a sentence with a space where Chinese meets a Latin name, and nowhere else', () => {
+    expect(spaced('读的是', 'demo 的 main 分支、oms-brain 的 master 分支')).toBe('读的是 demo 的 main 分支、oms-brain 的 master 分支')
+    expect(spaced('读的是', '远端的 main 分支')).toBe('读的是远端的 main 分支')
+    expect(spaced('main 分支', '上')).toBe('main 分支上')
+    expect(spaced('等', 'carol', '在 MR 上回答')).toBe('等 carol 在 MR 上回答')
+    expect(spaced('等', 'carol', '：')).toBe('等 carol：')
+    expect(spaced('main', '（远端）')).toBe('main（远端）')
   })
 
   it('formats credits and rates', () => {
