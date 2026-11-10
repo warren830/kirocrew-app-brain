@@ -1016,7 +1016,11 @@ function QuestionsCard({ x, repo, reqKey, onAnswered, waiter }: { x: Requirement
   const inSession = `会话里直接问的（${qs.join('、')}），回答记在决定 ${ds.join('、')} 里。`
   return (
     <section className="cto-card" aria-label="问题和回答">
-      <div className="cto-chart-head"><h3>问题和回答</h3><span className="cto-dim">{x.questions.length} 个 · 能在这里回答的才有回答框</span></div>
+      <div className="cto-chart-head">
+        <h3>问题和回答</h3>
+        {/* the count is every question asked, those asked straight in the session too (DETAIL-16) */}
+        <span className="cto-dim">{x.questions.length + qs.length} 个 · 能在这里回答的才有回答框</span>
+      </div>
       {x.questions.length === 0 ? (
         <p className="br-empty">
           {qs.length ? `问题都是${inSession}这里只列停下来等回答的和 MR 上的问题。` : '没有停下来问过人。'}

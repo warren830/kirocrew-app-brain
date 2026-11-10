@@ -514,7 +514,9 @@ describe('需求详情', () => {
     })
     renderDetail()
     const card = await screen.findByRole('region', { name: '问题和回答' })
-    expect(card).toHaveTextContent('0 个')
+    // the count says the two asked in the session, never 「0 个」 above the sentence that they were asked (DETAIL-16)
+    expect(card).toHaveTextContent('问题和回答2 个 · 能在这里回答的才有回答框')
+    expect(card).not.toHaveTextContent('0 个')
     expect(card).toHaveTextContent('问题都是会话里直接问的（Q1、Q2），回答记在决定 D-1、D-2 里。')
     expect(card).not.toHaveTextContent('没有停下来问过人')
   })
@@ -524,6 +526,7 @@ describe('需求详情', () => {
     renderDetail()
     const card = await screen.findByRole('region', { name: '问题和回答' })
     expect(within(card).getAllByTestId('question')).toHaveLength(fx.detail().questions.length)
+    expect(card).toHaveTextContent(`问题和回答${fx.detail().questions.length + 1} 个`)
     expect(card).toHaveTextContent('另有会话里直接问的（Q1），回答记在决定 D-3 里。')
   })
 
