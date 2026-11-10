@@ -147,7 +147,7 @@ def checks(repo_paths: list[str], team_paths: Any = None) -> dict[str, Any]:
             probs = []
         for p in probs:
             rows.append(P.row("FAIL", p, repo=rp, team=is_team))
-        for p in kit_files_missing(rp):
+        for p in kit_files_missing(rp, told=probs):
             rows.append(P.row("FAIL", p, repo=rp, team=is_team))
         why = _records_counted(rp)
         if why:
@@ -160,18 +160,23 @@ def checks(repo_paths: list[str], team_paths: Any = None) -> dict[str, Any]:
 
 
 BRAIN_FILES = ("PRODUCT.md", "TECH.md", "IMPROVEMENT.md", "PROJECT.md")   # brain install's Brain (kit.json brain_files)
+LEAN_SCRIPT = ".kiro/aidlc-lean/aidlc_lean.py"                               # cli.runner_kit_problems names it
 
 
-def kit_files_missing(rp: str) -> list[str]:
-    """The kit files `brain install` puts in a checkout that are not in this one (the Brain files, AGENTS.md), in
-    `brain doctor`'s words, so their rows offer 重装 kit 文件 as its rows do."""
+def kit_files_missing(rp: str, told: list[str] = ()) -> list[str]:
+    """The kit files `brain install` puts in a checkout that are not in this one (AI-DLC Lean, the Brain files,
+    AGENTS.md), in `brain doctor`'s words, so their rows offer 重装 kit 文件 as its rows do, also for a file gone from
+    the disk that git still has (runner_kit_problems reads git). *told*: runner_kit_problems' lines, which already say
+    when Lean is not in git."""
     try:
         cfg = bk.m("config").load(rp)
     except Exception:  # noqa: BLE001 - no readable kit.json: the repo's own row says so
         return []
+    lean = bk.m("lean").installed(rp) or any(x.startswith(LEAN_SCRIPT + " ") for x in told)
     bdir = str(cfg.get("brain_dir") or "brain")
     names = [n for n in cfg.get("brain_files") or BRAIN_FILES if not os.path.isfile(os.path.join(rp, bdir, n))]
-    out = ["Brain files in %s/: missing %s" % (bdir, ", ".join(names))] if names else []
+    out = ([] if lean else ["AI-DLC Lean not installed"]) + (
+        ["Brain files in %s/: missing %s" % (bdir, ", ".join(names))] if names else [])
     return out + ([] if os.path.isfile(os.path.join(rp, "AGENTS.md")) else ["AGENTS.md at repo root"])
 
 
