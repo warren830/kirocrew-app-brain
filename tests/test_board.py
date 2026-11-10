@@ -403,8 +403,8 @@ def test_the_replay_knows_whose_turn_each_wait_was():
     b = snapshot(facts(evs, handoff={"requested_at": iso(hand), "by": "ychchen"}),
                  row_of("acceptance", "product", "等产品在 MR 上验收 D-3（approve / reject）", do="accept"),
                  local_only=False, now=T + 2 * H)
-    waits = [(h["status"], h["who"]) for h in actor(b, "release")["history"] if h["status"] == "awaiting_approval"]
-    assert waits and all(who == "product" for _, who in waits)
+    waits = [(h["doing"], h["who"]) for h in actor(b, "release")["history"] if h["status"] == "awaiting_approval"]
+    assert waits and all(who == "product" for _, who in waits) and waits[0][0] == "等产品在 MR 上批准发布"
     assert [h["who"] for h in actor(b, "req")["history"] if h["status"] == "awaiting_approval"] == ["you"]
     assert (actor(b, "release")["title"], actor(b, "release")["sub"]) == ("发布验收", "发布审批 · 验收")
 
