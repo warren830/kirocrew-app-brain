@@ -1003,21 +1003,21 @@ function DecisionsCard({ decisions, stages, repo, owner, me, go, onAt, picked }:
 
 function QuestionsCard({ x, repo, reqKey, onAnswered, waiter }: { x: RequirementDetail; repo: string; reqKey: string; onAnswered: () => void; waiter: string | null }) {
   // questions asked straight in the session (「Q1 选 A」 in decisions.md) are not park.json's or the MR's
-  const asked = x.decisions.flatMap((d) => [...d.text.matchAll(/\bQ(\d+)\b/g)].map((m) => ({ q: `Q${m[1]}`, d: d.id })))
+  const asked = x.decisions.flatMap((d) => (d.asked ?? []).map((q) => ({ q, d: d.id })))
   const qs = [...new Set(asked.map((a) => a.q))]
   const ds = [...new Set(asked.map((a) => a.d))]
+  const inSession = `会话里直接问的（${qs.join('、')}），回答记在决定 ${ds.join('、')} 里。`
   return (
     <section className="cto-card" aria-label="问题和回答">
       <div className="cto-chart-head"><h3>问题和回答</h3><span className="cto-dim">{x.questions.length} 个 · 能在这里回答的才有回答框</span></div>
       {x.questions.length === 0 ? (
         <p className="br-empty">
-          {qs.length
-            ? `问题都是在会话里直接问的（${qs.join('、')}），回答记在决定 ${ds.join('、')} 里。这里只列停下来等回答的和 MR 上的问题。`
-            : '没有停下来问过人。'}
+          {qs.length ? `问题都是${inSession}这里只列停下来等回答的和 MR 上的问题。` : '没有停下来问过人。'}
         </p>
       ) : (
         <div className="br-stack">
           {x.questions.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={repo} reqKey={reqKey} onAnswered={onAnswered} waiter={waiter} />)}
+          {qs.length > 0 && <p className="cto-dim" style={{ margin: 0 }}>另有{inSession}</p>}
         </div>
       )}
     </section>

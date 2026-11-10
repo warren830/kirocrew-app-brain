@@ -480,17 +480,34 @@ describe('需求详情', () => {
     expect(within(clarify).queryByRole('list', { name: '选项' })).toBeNull()   // its options are the form's
   })
 
-  test('no questions here, but the decisions say Q1, Q2 were answered: it says they were asked in the session', async () => {
+  test('no questions here, but the decisions record the answers to Q1, Q2 (in their why): it says they were asked in the session', async () => {
     withDetail((d) => {
       d.questions = []
-      d.decisions[0].text = '不是数字的输入照 Python（Q1 选 A）'
-      d.decisions[1].text = '零规则不特别处理（Q2 选 A）'
+      d.decisions[0].why = 'Q1 答"按推荐"'
+      d.decisions[0].asked = ['Q1']
+      d.decisions[1].why = 'Q2 答"按推荐"'
+      d.decisions[1].asked = ['Q2']
     })
     renderDetail()
     const card = await screen.findByRole('region', { name: '问题和回答' })
     expect(card).toHaveTextContent('0 个')
-    expect(card).toHaveTextContent('问题都是在会话里直接问的（Q1、Q2），回答记在决定 D-1、D-2 里。')
+    expect(card).toHaveTextContent('问题都是会话里直接问的（Q1、Q2），回答记在决定 D-1、D-2 里。')
     expect(card).not.toHaveTextContent('没有停下来问过人')
+  })
+
+  test('questions here and some asked in the session too: both are said', async () => {
+    withDetail((d) => { d.decisions[2].asked = ['Q1'] })
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '问题和回答' })
+    expect(within(card).getAllByTestId('question')).toHaveLength(fx.detail().questions.length)
+    expect(card).toHaveTextContent('另有会话里直接问的（Q1），回答记在决定 D-3 里。')
+  })
+
+  test('no question anywhere: it says nobody was asked', async () => {
+    withDetail((d) => { d.questions = []; d.decisions.forEach((x) => { x.asked = [] }) })
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '问题和回答' })
+    expect(card).toHaveTextContent('没有停下来问过人。')
   })
 
   test('决定: the stage by its name, who settled it in words (vouchers in the hover), every Brain cite opens the Brain view', async () => {
