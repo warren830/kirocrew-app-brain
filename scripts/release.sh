@@ -140,6 +140,17 @@ print("   bundled brain-kit loads: version %s, needs %s or newer, optional modul
       % (info["version"], bk.VERSION_NEEDED, json.dumps(info["modules"])))
 EOF
 "$PY3" -I -B "$SRC/scripts/release_secrets.py" "$REL" || die "secret check failed: nothing was committed"
+# Names that must not reach a public tree (internal hosts, tools, people): one per line in a file outside the repo,
+# so the list itself is not published.
+WORDS="${RELEASE_WORDS:-$HOME/.config/brain-release/words}"
+if [ -f "$WORDS" ]; then
+  if grep -rniF -f "$WORDS" "$REL" | sed "s|^$REL/|   |" | cut -c1-200 | grep .; then
+    die "the release tree holds names listed in $WORDS: nothing was committed"
+  fi
+  echo "== no name from $WORDS in the tree"
+else
+  echo "   (no $WORDS: the internal-name check did not run)"
+fi
 echo "== bind scan (each hit must be loopback or explained)"
 grep -rnE '0\.0\.0\.0|\[::\]|--host|listen\(' "$REL" | sed "s|^$REL/|   |" | cut -c1-200 || echo "   none"
 
@@ -174,7 +185,7 @@ git -C "$WT" archive HEAD | tar -x -C "$STAGE/committed"
 REV="$(git -C "$WT" rev-parse --short HEAD)"
 if [ "$PUSH" = 1 ]; then
   echo "== push $BRANCH to origin"
-  git -C "$ROOT" push --no-verify origin "$BRANCH"
+  git -C "$ROOT" push origin "$BRANCH"
   echo "== done: $BRANCH at $REV ($(git -C "$WT" ls-files | wc -l | tr -d ' ') files, $(du -sh "$STAGE/committed" | cut -f1)), pushed"
 else
   echo "== done: $BRANCH at $REV ($(git -C "$WT" ls-files | wc -l | tr -d ' ') files, $(du -sh "$STAGE/committed" | cut -f1)); not pushed: git push origin $BRANCH"
