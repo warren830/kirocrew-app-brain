@@ -374,7 +374,7 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
           <NotesCard x={x} />
           <SessionsCard sessions={x.sessions} total={x.credits.total} note={x.credits.note} replying={now.do === 'reply'} at={at} />
           <BrainUseCard x={x} board={board} repo={entry.repo} reqKey={entry.key} go={props.go} />
-          <TimelineCard x={x} showMissing={handedOver(x) && !localOnly} />
+          <TimelineCard x={x} showMissing={handedOver(x) && !localOnly} me={board?.person.me ?? false} />
         </div>
       </div>
     </>
@@ -1208,7 +1208,15 @@ function TraceError({ error }: { error: string }) {
   )
 }
 
-function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: boolean }) {
+/** Who did a timeline item, in words: the owner's own acts (brain-kit's who 「owner」) are 你 to the owner and their
+ * name to anyone else, as 需求看板 signs them; another person's pseudonym is 一位组员 (its name on hover). */
+function itemWho(who: string | null, owner: string | null, me: boolean): string | null {
+  if (!who) return null
+  if (who === 'owner' || who === owner) return me ? '你' : owner ?? '负责人'
+  return PSEUDONYM.test(who) ? '一位组员' : who
+}
+
+function TimelineCard({ x, showMissing, me }: { x: RequirementDetail; showMissing: boolean; me: boolean }) {
   const t = x.timeline
   const items = [...t.items].sort((a, b) => (isoSec(b.at) ?? 0) - (isoSec(a.at) ?? 0))
   const days = new Map<string, TimelineItem[]>()
@@ -1235,7 +1243,7 @@ function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: b
                 const k = KIND_META[it.kind] ?? { icon: 'commit', label: it.kind }
                 const s = itemText(it)
                 const long = !!s.detail && s.detail.length > 60
-                const who = it.who ? (PSEUDONYM.test(it.who) ? '一位组员' : it.who) : null
+                const who = itemWho(it.who, x.row.owner, me)
                 return (
                   <li key={i} data-testid="tl-item" data-kind={it.kind} title={[s.title, it.who && PSEUDONYM.test(it.who) ? `化名 ${it.who}` : null].filter(Boolean).join(' · ') || undefined}>
                     <time>{clock(it.at)}</time>

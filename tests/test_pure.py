@@ -323,6 +323,32 @@ def test_commit_dates_and_how_a_run_was_merged_in_the_timeline():
     assert any(i["detail"] == "%s （a new way）" % ("3" * 12) for i in detail.trace_timeline(t))
 
 
+def test_the_timeline_signs_the_owners_own_acts_as_the_owner():
+    """DETAIL-20: what was done on the owner's side before the hand-over (an approval line typed in their own session,
+    the run branch's commits) is the owner's, as 需求看板 says 「你批准了需求」: signed owner (the page says 你 to them),
+    and so is any later act of the same pseudonym; someone answering on the MR, or a push after the hand-over by another
+    pseudonym, stays as brain-kit names them."""
+    detail = mod("detail")
+    me, other = "G-A29056", "G-77B0C1"
+    t = {"owner": "alice",
+         "humans": [{"at": "2026-11-09T01:00:00Z", "kind": "approval", "what": "REQUIREMENTS", "who": me,
+                     "channel": "local", "after_handover": False},
+                    {"at": "2026-11-09T03:00:00Z", "kind": "answer", "what": "clarify", "who": "P-7C1D", "channel": "bridge",
+                     "after_handover": True},
+                    {"at": "2026-11-09T03:10:00Z", "kind": "push_after_handover", "what": "code", "who": other,
+                     "channel": "git", "after_handover": True},
+                    {"at": "2026-11-09T03:20:00Z", "kind": "push_after_handover", "what": "records", "who": me,
+                     "channel": "git", "after_handover": True}],
+         "actions": {"commits": [{"sha": "1" * 40, "at": "2026-11-09T02:00:00Z", "by": "person", "who": me, "after_handover": False},
+                                 {"sha": "2" * 40, "at": "2026-11-09T02:30:00Z", "by": "bot", "who": None, "after_handover": True}],
+                     "handovers": [{"at": "2026-11-09T02:10:00Z", "kind": "requested", "by": "alice", "commit": "1" * 40}]}}
+    who = [(i["label"], i["who"]) for i in detail.trace_timeline(t)]
+    assert who == [("批准需求", detail.OWNER), ("提交", detail.OWNER), ("交接", detail.OWNER), ("运行机提交", None),
+                   ("回答了澄清问题", "P-7C1D"), ("交接后有人推了代码", other), ("交接后有人改了记录", detail.OWNER)]
+    # an older brain-kit without the hand-over facts names nobody the owner
+    assert all(i["who"] != detail.OWNER for i in detail.trace_timeline({"humans": [{"kind": "approval", "who": me}]}))
+
+
 def test_the_timeline_says_what_happened_in_words_never_the_record_codes():
     """REST-29: no 「verify 通过」, 「park：clarify（waiting）」, 「Lean 拦下（inception）」, 「D-1 delivered」 or 「桥：bridge
     accepted」 on 需求详情's timeline; the board's words for the same records."""

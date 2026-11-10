@@ -140,13 +140,25 @@ class Req:
         self._lean(at, "APPROVAL_REQUESTED", kind=kind, sha256=h, **self._doc(kind, unit))
         return h
 
-    def approve(self, at: float, kind: str, h: str, who: str = "P-1A2B", unit: str | None = None) -> None:
+    @property
+    def me(self) -> str:
+        """The owner's pseudonym in brain-kit's record (trace.pseudonym of their git email)."""
+        return "G-" + sha("git", self.owner)[:6].upper()
+
+    def _human(self, at: float, kind: str, what: str, who: str | None) -> None:
+        """brainkit.trace's human act: one typed in the owner's own session is the Lean record's identity (channel
+        local, before any hand-over); one *who* answered on the MR came through the bridge."""
+        self.humans.append({"at": iso(at), "kind": kind, "what": what, "who": who or self.me, "judgment_point": True,
+                            "channel": "bridge" if who else "local",
+                            "after_handover": self.hand_at is not None and at > self.hand_at})
+
+    def approve(self, at: float, kind: str, h: str, who: str | None = None, unit: str | None = None) -> None:
         self._lean(at, "APPROVED", kind=kind, sha256=h, **self._doc(kind, unit))
-        self.humans.append({"at": iso(at), "kind": "approval", "what": kind, "who": who, "judgment_point": True})
+        self._human(at, "approval", kind, who)
 
     def reject(self, at: float, kind: str, h: str) -> None:
         self._lean(at, "REJECTED", kind=kind, sha256=h, **self._doc(kind, None))
-        self.humans.append({"at": iso(at), "kind": "rejection", "what": kind, "who": "P-1A2B", "judgment_point": True})
+        self._human(at, "rejection", kind, None)
 
     def turn(self, at: float, session: str = "s-1") -> None:
         """The person typed in the session (Lean's UserPromptSubmit hook): the session's first prompt is its task."""
@@ -162,7 +174,7 @@ class Req:
     # git and the hand-over
     def commit(self, at: float, by: str, subject: str, files: int = 3, after: bool | None = None, records: bool = False) -> str:
         s = sha(self.key, "commit", at, subject)
-        self.commits.append({"sha": s, "at": iso(at), "committed_at": iso(at), "by": by, "who": None if by == "bot" else "G-3F2A1C",
+        self.commits.append({"sha": s, "at": iso(at), "committed_at": iso(at), "by": by, "who": None if by == "bot" else self.me,
                              "files": files, "records_only": records, "merge": False,
                              "after_handover": (self.hand_at is not None and at > self.hand_at) if after is None else after,
                              "subject": subject})
@@ -189,8 +201,7 @@ class Req:
         self.decs.append({"id": did, "source": "bridge", "kind": kind, "asked_at": iso(asked), "at": iso(answered) if answered else None,
                           "choice": choice, "state": state, "who": who if choice else None, "voucher_id": None})
         if choice:
-            self.humans.append({"at": iso(answered), "kind": "approval" if kind == "acceptance" else "answer",
-                                "what": "acceptance" if kind == "acceptance" else kind, "who": who, "judgment_point": True})
+            self._human(answered, "approval" if kind == "acceptance" else "answer", "acceptance" if kind == "acceptance" else kind, who)
 
     def merge(self, at: float, how: str = "merge commit") -> None:
         self.merged_at, self.merge_how = at, how
@@ -239,7 +250,7 @@ class Req:
                 row.update(state=lean_view.STAGE_STATE[e["event"]], at=e["ts"], note=d.get("note") or d.get("reason"), src="aidlc-docs/audit/L-3F2A1C.jsonl")
         stages = sorted(seen.values(), key=lambda r: r["first_at"])
         verify = [{"at": e["ts"], "ok": e["data"]["ok"], "src": "aidlc-docs/audit/L-3F2A1C.jsonl"} for e in self.events if e["event"] == "VERIFY"]
-        return {"stages": stages, "humans": self.humans, "brain": brain, "missing": TRACE_MISSING,
+        return {"owner": self.owner, "stages": stages, "humans": self.humans, "brain": brain, "missing": TRACE_MISSING,
                 "actions": {"commits": self.commits, "handovers": self.hands, "questions": self.park, "blocked": [
                     {"at": e["ts"], "gate": e["data"]["gate"], "path": e["data"]["path"], "tool": "fs_write", "src": "aidlc-docs/audit/L-3F2A1C.jsonl"}
                     for e in self.events if e["event"] == "BLOCKED"]},

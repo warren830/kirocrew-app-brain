@@ -1042,6 +1042,22 @@ describe('需求详情', () => {
     expect(tl).not.toHaveTextContent(/回答 ?：/)
   })
 
+  test('时间线: the owner’s own acts are signed 你 to the owner and by name to anyone else, as 需求看板 says it (DETAIL-20)', async () => {
+    const own = { at: '2026-11-08T21:00:00+08:00', kind: 'human' as const, label: '批准需求', detail: null, who: 'owner', src: null }
+    withDetail((d) => { d.timeline.items.push(own) })
+    renderDetail()
+    const tl = await screen.findByRole('region', { name: '时间线' })
+    await waitFor(() => expect(within(tl).getAllByTestId('tl-item').find((i) => i.textContent?.includes('21:00'))).toHaveTextContent(/^21:00人批准需求 · 你$/))
+    expect(tl).not.toHaveTextContent('owner')
+    cleanup()
+    const b = fx.board()
+    b.person = { ...b.person, me: false }
+    withDetail((d) => { d.timeline.items.push(own) }, { [`GET ${API}/board/*`]: () => b })
+    renderDetail()
+    const tl2 = await screen.findByRole('region', { name: '时间线' })
+    await waitFor(() => expect(within(tl2).getAllByTestId('tl-item').find((i) => i.textContent?.includes('21:00'))).toHaveTextContent(/^21:00人批准需求 · alice$/))
+  })
+
   test('the runner’s run and a hand-over’s commit are said in words, the id and the sha only on hover', async () => {
     withDetail((d) => {
       d.sessions = [{ ...d.sessions[0], slot: 'brain-run-RUN-PAY-3-1', title: 'RUN-PAY-3-1', kind: 'runner', agent: 'brain-run', awaiting: false }]
