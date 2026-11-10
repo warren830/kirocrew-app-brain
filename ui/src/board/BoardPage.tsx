@@ -34,7 +34,7 @@ import { openHere, reviewNext } from './next'
 import { Intro, Kpis, TopBar } from './Header'
 import { ClockContext, useReducedMotion, type SnapshotClock } from './hooks'
 import { Lanes } from './Lanes'
-import { SLOTS, edgesOf, foldedPhases, graphWidth, layoutGraph } from './layout'
+import { SLOTS, edgesOf, foldedPhases, graphShape, layoutGraph } from './layout'
 import { ReplayBar, useReplay } from './Replay'
 import { RoleIcon } from './RoleIcon'
 import { useBoard } from './useBoard'
@@ -136,7 +136,7 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
   }, [live.board]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // the live board's shape: a replay moves through the same picture; the graph's width is the app's (its text keeps
-  // its size: layout.ts graphWidth)
+  // its size: layout.ts graphShape, one column per phase when six do not fit)
   const shape = live.board
   const structure = shape ? structureKey(shape) : ''
   const [graphW, setGraphW] = useState<number | null>(null)
@@ -158,7 +158,8 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
     if (!shape) return null
     const fold = foldedPhases(shape.actors)
     const keys = shape.actors.map((a) => a.key).filter((k) => !fold.includes(SLOTS[k]?.phase ?? ''))
-    return layoutGraph(keys, edgesOf(new Set(keys), shape.direct), rosterRows(shape), fold, graphWidth(graphW, fold))
+    const g = graphShape(graphW, fold)
+    return layoutGraph(keys, edgesOf(new Set(keys), shape.direct, g.compact), rosterRows(shape), fold, g.width, g.compact)
   }, [structure, graphW]) // eslint-disable-line react-hooks/exhaustive-deps
   const liveClock: SnapshotClock = useMemo(() => ({ at: live.board?.at ?? Date.now() / 1000, receivedAt: live.receivedAt || Date.now() }), [live.board?.at, live.receivedAt])
   const clock = rp.clock ?? liveClock

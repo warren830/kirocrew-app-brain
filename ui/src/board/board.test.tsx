@@ -10,7 +10,7 @@ import { TYPE_IT_YOURSELF } from '../ui'
 import type { ViewProps } from '../views/props'
 import { BoardPage } from './BoardPage'
 import { tickLabel } from './Lanes'
-import { GW, SCALE, graphWidth } from './layout'
+import { GW, NODE_H, NODE_W, SCALE, SLOTS, edgesOf, graphShape, graphWidth, layoutGraph } from './layout'
 import { CELL_GROUPS, actorMeta, fmtCredits, fmtSpan, fmtWhen } from './format'
 
 const PAY3: BoardEntry = { repo: 'r1', key: 'PAY-3' }
@@ -1211,17 +1211,42 @@ describe('需求看板 · 谁做的、等谁、看得清', () => {
     expect(screen.queryByRole('link', { name: '去 MR ↗' })).toBeNull()
   })
 
-  test('the graph is never drawn below its scale: a narrow app gets a narrower layout, then the graph scrolls (the text stays)', () => {
+  test('the graph is never drawn below its scale: a narrow app gets closer columns, then one column per phase; every phase in view (BOARD-31)', () => {
     expect(graphWidth(null)).toBe(GW)
     expect(graphWidth(1558)).toBe(GW)
-    // the full way cannot be narrower than its columns: it keeps the scale and scrolls
-    const full = graphWidth(1008)
-    expect(full).toBeLessThan(GW)
-    expect(Math.floor(full * SCALE)).toBeGreaterThan(1008)
-    // a repo done only here fits 1050 (1280 minus the KiroCrew sidebar) at the scale
-    const local = graphWidth(1008, ['runner'])
-    expect(Math.floor(local * SCALE)).toBeLessThanOrEqual(1008)
+    expect(graphShape(1558).compact).toBe(false)
     expect(SCALE * 12).toBeGreaterThanOrEqual(10)
+    // 1050 and 1280 wide (the graph card 1008 and 1240 px): six columns do not fit at the scale, one per phase does; a
+    // repo done only here (no runner columns) still fits its five at 1050, and one per phase when narrower
+    const keys = fx.board().actors.map((a) => a.key)
+    for (const [avail, fold, compact] of [[1008, [], true], [1240, [], true], [1008, ['runner'], false], [960, ['runner'], true]] as const) {
+      const g = graphShape(avail, fold)
+      expect(g.compact).toBe(compact)
+      expect(Math.floor(g.width * SCALE)).toBeLessThanOrEqual(avail)
+      const on = keys.filter((k) => !fold.includes(SLOTS[k].phase as never))
+      const lay = layoutGraph(on, edgesOf(new Set(on), false, g.compact), 2, fold, g.width, g.compact)
+      // every phase has its band inside the graph, in order, none over another
+      const bands = lay.phases.map((p) => [p.key, p.x1, p.x2] as const)
+      expect(bands.map((x) => x[0])).toEqual(['init', 'local', 'runner', 'check', 'land'])
+      for (let i = 1; i < bands.length; i++) expect(bands[i][1]).toBeGreaterThan(bands[i - 1][2])
+      expect(bands[bands.length - 1][2]).toBeLessThanOrEqual(lay.width)
+      // every node inside, none on another
+      const boxes = [...lay.nodes.values()]
+      expect(boxes).toHaveLength(on.length)
+      for (const n of boxes) expect(n.x + NODE_W / 2).toBeLessThanOrEqual(lay.width)
+      for (const p of boxes) for (const q of boxes) if (p !== q) expect(Math.abs(p.x - q.x) >= NODE_W || Math.abs(p.y - q.y) >= NODE_H).toBe(true)
+    }
+    // the way reads down each column: 本机会话 → 需求审批 → 设计审批, 交接 → 桥 → 签名 → 运行机
+    const lay = layoutGraph(keys, edgesOf(new Set(keys), false, true), 2, [], graphWidth(1008), true)
+    const at = (k: string) => lay.nodes.get(k)!
+    expect(new Set(['local', 'req', 'design'].map((k) => at(k).x)).size).toBe(1)
+    expect(at('local').y).toBeLessThan(at('req').y)
+    expect(at('req').y).toBeLessThan(at('design').y)
+    expect(['handover', 'bridge', 'signer', 'runner'].map((k) => at(k).y)).toEqual([...['handover', 'bridge', 'signer', 'runner'].map((k) => at(k).y)].sort((x, y) => x - y))
+    expect(lay.edges.map((e) => `${e.from}>${e.to}`)).toContain('req>design')
+    expect(lay.edges.map((e) => `${e.from}>${e.to}`)).not.toContain('local>design')
+    // narrower than even that: it keeps the scale and scrolls
+    expect(Math.floor(graphWidth(700) * SCALE)).toBeGreaterThan(700)
   })
 
   test('the introduction keeps every word whole: what a step does breaks only after a 、', async () => {
