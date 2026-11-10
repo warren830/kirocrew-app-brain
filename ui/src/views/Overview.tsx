@@ -67,6 +67,7 @@ export const OV_CSS = `
 .br-ov .br-yours .br-yt-title { color: var(--text-strong); font-weight: 600; }
 .br-ov .br-waited { color: var(--kt-approve); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
 .br-ov .br-linecopy { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.br-ov .br-linecopy code { white-space: nowrap; }
 .br-ov .br-linecopy code { padding: 1px 8px; border-radius: 6px; border: 1px dashed color-mix(in srgb, var(--kt-approve) 60%, var(--border)); color: var(--text-strong); font-weight: 700; user-select: all; }
 
 .br-ov .cto-lane { justify-content: flex-start; padding: 8px 10px; }
@@ -709,7 +710,9 @@ function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
         {run ? (
           <>
             <span className="br-how" title={run.beyond.length ? `判断点之外：${run.beyond.join('、')}` : undefined}><i style={{ background: HOW_VAR[run.how] }} />{HOW_LABEL[run.how]}</span>
-            {(run.at_points || run.outside) ? <div className="cto-was">人介入 {run.at_points}{run.outside ? ` + 判断点外 ${run.outside}` : ''} 次</div> : null}
+            {(run.at_points || run.outside) ? (
+              <div className="cto-was"><span className="br-nw">人介入 {run.at_points + run.outside} 次</span>{run.outside ? <span className="br-nw">（判断点外 {run.outside}）</span> : null}</div>
+            ) : null}
           </>
         ) : <span className="cto-was">—</span>}
       </td>

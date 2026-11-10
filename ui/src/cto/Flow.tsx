@@ -11,7 +11,7 @@ import { RoleIcon } from '../board/RoleIcon'
 import type { View } from '../nav'
 import type { Requirement, WaitWho } from '../types'
 import { ago, fmtCredits, fmtWaited } from '../format'
-import { ACT, DO_NAME, waitName, waitsOn } from '../vocab'
+import { ACT, DO_NAME, PHRASE_BREAK, waitName, waitsOn } from '../vocab'
 import { ReviewButton } from '../views/Question'
 
 export type Col = '需求' | '设计' | '构建' | '交给运行机' | '发布验收' | '已合并'
@@ -84,9 +84,16 @@ export function StepButton({ step, onGo, primary = true }: { step: Step; onGo: (
     return <span className="br-step br-review" onClick={stop} onKeyDown={stop}><ReviewButton repo={x.repo} reqKey={x.key} liveSlot={x.slot} worktree={x.worktree} /></span>
   }
   if (step.href) {
-    return <a className={cls} href={step.href} target="_blank" rel="noopener noreferrer" onClick={stop}>{step.label} ↗</a>
+    return <a className={cls} href={step.href} target="_blank" rel="noopener noreferrer" onClick={stop} aria-label={`${step.label} ↗`}><StepWords text={step.label} /></a>
   }
-  return <button type="button" className={cls} onClick={(e) => { stop(e); if (step.session) navigate(step.session); else if (step.view) onGo(step.view) }}>{step.label} ↗</button>
+  return <button type="button" className={cls} aria-label={`${step.label} ↗`} onClick={(e) => { stop(e); if (step.session) navigate(step.session); else if (step.view) onGo(step.view) }}><StepWords text={step.label} /></button>
+}
+
+/** A step's words and its ↗, broken on a narrow card only between their phrases (改好后 | 重新交接 ↗, where
+ * PHRASE_BREAK says), never inside one. */
+function StepWords({ text }: { text: string }) {
+  const at = PHRASE_BREAK[text] ?? 0
+  return <>{at > 0 && <span className="br-nw">{text.slice(0, at)}</span>}<span className="br-nw">{text.slice(at)} ↗</span></>
 }
 
 type Handlers = {
@@ -170,7 +177,7 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
           <div className={`cto-kb-h${localOnly && key === '交给运行机' ? ' is-off' : ''}`} key={key}>
             <button type="button" onClick={() => h.onCell(key)} title={`在下方交付清单里看「${name}」这一列`}>
               <div><b>{name}</b>{!(localOnly && key === '交给运行机') && <span className="cto-n">{count(key)}</span>}</div>
-              <div className="cto-st">{localOnly && key === '交给运行机' ? '这次不需要' : sub}</div>
+              <div className="cto-st">{localOnly && key === '交给运行机' ? '这次不需要' : sub.split(' · ').map((x, i) => <span key={x}>{i > 0 && ' · '}<span className="br-nw">{x}</span></span>)}</div>
             </button>
           </div>
         ))}

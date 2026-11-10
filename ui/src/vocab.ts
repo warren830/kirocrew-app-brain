@@ -87,6 +87,11 @@ export const REVIEW_WAIT = '等审查'
 export const doName = (w: Pick<Waits, 'do' | 'review'>): string => (w.review ? ACT.review : w.do ? DO_NAME[w.do] : '')
 export const waitName = (w: Pick<Waits, 'do' | 'review'>): string => (w.review ? REVIEW_WAIT : w.do ? WAIT_NAME[w.do] : '')
 
+/** where a step's long name may break on a narrow button (the characters before the break): 改好后 | 重新交接 */
+export const PHRASE_BREAK: Record<string, number> = {
+  [DO_NAME.redo_handoff]: 3, [DO_NAME.label_handoff]: 2, [DO_NAME.tool]: 3, [ACT.review]: 1,
+}
+
 /** where a requirement's facts were read (Requirement.where) → where it is, in words (需求详情's head) */
 export const WHERE_NAME: Record<string, string> = {
   worktree: '在这台机器上做', branch: '在运行分支上（这台机器没检出）', main: '已合并到默认分支', runner: '在运行机上', claim: '只有认领',
