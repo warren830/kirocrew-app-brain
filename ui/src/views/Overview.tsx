@@ -140,6 +140,20 @@ type RepoCount = { open: number; you: number }
 const isOpen = (r: Requirement) => r.state !== 'merged' && r.state !== 'closed'
 const idOf = (r: { repo: string; key: string }) => `${r.repo}/${r.key}`
 
+/** A repo pill's counts: its requirements in progress, and those that wait on you (a merge to write back into the
+ * Brain too, as 轮到你 lists them); 'all' among *ids*: every row. */
+function repoCounts(rows: Requirement[], ids: string[]): Record<string, RepoCount> {
+  const counts: Record<string, RepoCount> = Object.fromEntries(ids.map((id) => [id, { open: 0, you: 0 }]))
+  for (const r of rows) {
+    for (const id of ids.includes('all') ? [r.repo, 'all'] : [r.repo]) {
+      const c = (counts[id] ??= { open: 0, you: 0 })
+      if (isOpen(r)) c.open += 1
+      if (r.waits.who === 'you' && r.state !== 'closed') c.you += 1
+    }
+  }
+  return counts
+}
+
 export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs }: { entry: OverviewEntry } & ViewProps) {
   const [repo, setRepo] = useState(entry.repo ?? 'all')
   const [state, setState] = useState<ReqState | undefined>(entry.state)
@@ -160,17 +174,20 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
   )
   useEffect(() => {
     if (!data) return
-    const counts: Record<string, RepoCount> = Object.fromEntries((repo === 'all' ? ['all', ...repos.filter((x) => x.ok).map((x) => x.id)] : [repo]).map((id) => [id, { open: 0, you: 0 }]))
-    // 轮到你 is every requirement that waits on you (a merge to write back into the Brain too), as 轮到你 lists them
-    for (const r of data.rows) {
-      for (const id of repo === 'all' ? [r.repo, 'all'] : [r.repo]) {
-        const c = (counts[id] ??= { open: 0, you: 0 })
-        if (isOpen(r)) c.open += 1
-        if (r.waits.who === 'you' && r.state !== 'closed') c.you += 1
-      }
-    }
+    const counts = repoCounts(data.rows, repo === 'all' ? ['all', ...repos.filter((x) => x.ok).map((x) => x.id)] : [repo])
     setPillCounts((m) => (repo === 'all' ? counts : { ...m, ...counts }))
   }, [data, repo]) // eslint-disable-line react-hooks/exhaustive-deps
+  // opened at one repo (a link, a reload): the other pills' counts come from 全部, read once
+  const api = useAppApi()
+  const pillsRead = useRef(entry.repo === undefined || entry.repo === 'all')
+  const manyPills = repos.length > 1
+  useEffect(() => {
+    if (pillsRead.current || !manyPills) return
+    pillsRead.current = true
+    void api.get<Overview>(paths.overview('all')).then(
+      (o) => setPillCounts((m) => ({ ...repoCounts(o.rows, ['all', ...repos.filter((x) => x.ok).map((x) => x.id)]), ...m })),
+      () => { /* the pills keep their names; the repo shown has its counts from its own poll */ })
+  }, [manyPills]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const pickRepo = (r: string) => {
     setRepo(r)

@@ -404,6 +404,21 @@ describe('交付总览', () => {
     await waitFor(() => expect(apiCalls.some((c) => c.path === `${API}/overview?repo=r1`)).toBe(true))
   })
 
+  test('opened at one repo (a reload on repo=r1), every pill still has its counts: the others from 全部, read once', async () => {
+    const status = fx.status()
+    status.repos = [status.repos[0], { ...status.repos[0], id: 'r3', name: 'shop-order', path: '/w/shop-order' }]
+    const all = fx.overview()
+    all.rows = [...all.rows, { ...all.rows[0], repo: 'r3', key: 'ORD-10', waits: { ...all.rows[0].waits, who: 'runner', do: 'none' } }]
+    const r1 = fx.overview()
+    installFixtureRoutes({ [`GET ${API}/overview*`]: (_b, path) => (path.includes('repo=all') ? all : r1) })
+    render(<OverviewView entry={{ repo: 'r1' }} {...props({ status })} />)
+    const pills = await screen.findByRole('navigation', { name: '仓库' })
+    await waitFor(() => expect(within(pills).getByRole('button', { name: /^shop-order/ })).toHaveTextContent('shop-order进行中 1'))
+    expect(within(pills).getByRole('button', { name: /^全部/ })).toHaveTextContent('全部进行中 6 · 轮到你 2')
+    expect(within(pills).getByRole('button', { name: /^shop-pay/ })).toHaveTextContent('shop-pay进行中 5 · 轮到你 2')
+    expect(apiCalls.filter((c) => c.path === `${API}/overview?repo=all`)).toHaveLength(1)
+  })
+
   test('opened with a state in the URL, only those rows show; a filter with no rows says so', async () => {
     const user = userEvent.setup()
     installFixtureRoutes()
