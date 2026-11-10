@@ -520,7 +520,7 @@ STUCK_ON = (("run 没接着做（park.json 还在等：去 KiroCrew 看 slot）"
 def eval_reason(r: Any) -> str:
     """One reason brain-kit's review queue gives for a run, in words."""
     if not isinstance(r, dict):
-        return acts_in_words(str(r))
+        r = {"text": r}
     rule, text = str(r.get("rule") or ""), str(r.get("text") or "")
     if rule == "verify_fail_rounds":
         m = re.match(r"verify 失败 (\d+) 次（≥(\d+)）", text)
