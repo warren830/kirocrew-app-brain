@@ -472,7 +472,6 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted, added, ad
   const done = job?.state === 'done' && !!job.result?.commit.ok
   const here = choice?.current || c.current_branch || '当前分支'
   const picked = choice?.options.find((o) => o.mode === mode)
-  const remote = !!choice?.remote_url || !!c.origin
   const run = async () => {
     if (!c.path) return
     const r = await start.run({ path: c.path, branch: mode === 'branch' ? branch.trim() : '', mode, kit: { ...form, req_prefix: form.req_prefix.trim().toUpperCase() } })
@@ -560,22 +559,20 @@ function InstallCard({ c, job, state, readError, onStart, onCommitted, added, ad
               <span className="imp-preview-head">
                 <b>会写进这个仓库的 brain-kit 设置 <small className="br-mono">.brain/kit.json</small></b>
                 {!editing && (
-                  <button type="button" className="br-btn is-small" onClick={() => setEditing(true)}><Icon name="Pencil" size={13} />改设置</button>
+                  <>
+                    <button type="button" className="br-btn is-small" onClick={() => setEditing(true)}><Icon name="Pencil" size={13} />改设置</button>
+                    <small className="br-hint" data-testid="install-guess">按这个仓库{fromOrigin ? '的远端地址' : ''}猜的：对的话直接装；要改，点「改设置」。</small>
+                  </>
                 )}
               </span>
               <KitChips k={form} />
-              {!editing && <p className="br-hint" data-testid="install-guess">按这个仓库{fromOrigin ? '的远端地址' : ''}猜的：对的话直接装；要改，点「改设置」。</p>}
-              {mode === 'branch' ? (
+              {/* in place, where the commit goes is the picked way's own line above */}
+              {mode === 'branch' && (
                 <div className="imp-route" aria-label="新分支从哪来">
                   <code>{form.default_branch.trim() || 'main'}</code>
                   <span className="imp-arrow" aria-hidden="true">→</span>
                   <code className="is-new">{branch.trim() || '—'}</code>
                   <small>{c.origin ? '从远端的默认分支建新分支' : '新分支'}，单独的工作目录；合并以后才能开需求</small>
-                </div>
-              ) : (
-                <div className="imp-route" aria-label="提交在哪">
-                  <code className="is-new">{here}</code>
-                  <small>{remote ? '你现在的检出，提交在这里；推送以后就能开需求' : '你现在的检出，提交在这里，马上能开需求'}</small>
                 </div>
               )}
               <div className="imp-go">
@@ -1022,7 +1019,7 @@ const IMP_CSS = `
 .imp-preview-head { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; }
 .imp-preview-head > b { color: var(--text-strong); font-weight: 750; }
 .imp-preview-head > b small { color: var(--muted); font-weight: 500; font-size: .8em; margin-left: 6px; }
-.imp-preview > .br-hint { margin: -4px 0 0; }
+.imp-preview-head > .br-hint { margin: 0; }
 .imp-kv { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .imp-kv li { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--kt-info) 50%, var(--border)); background: color-mix(in srgb, var(--kt-info) 9%, transparent); }

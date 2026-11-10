@@ -362,7 +362,7 @@ describe('导入仓库', () => {
     expect(inplace.closest('label')).toHaveTextContent('推送到 origin 以后就能开需求（这会直接改团队的 main，没有 MR 评审）')
     const form = screen.getByRole('form', { name: '这个仓库的 brain-kit 设置' })
     expect(within(form).queryByLabelText('新分支名')).toBeNull()                         // no branch to name
-    expect(within(form).getByLabelText('提交在哪')).toHaveTextContent('main你现在的检出，提交在这里；推送以后就能开需求')
+    expect(within(form).queryByLabelText('提交在哪')).toBeNull()                        // the picked way's line says it
     expect(screen.getByTestId('install-safe')).toHaveTextContent(SAFE_INPLACE)
     await user.click(within(form).getByRole('button', { name: '直接装在 main' }))
     expect(apiCalls.find((c) => c.path === `${API}/import/install`)?.body).toMatchObject({ path: REPO, branch: '', mode: 'inplace' })
