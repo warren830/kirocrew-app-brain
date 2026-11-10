@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import { fx } from '../test/data'
-import { Inline, Markdown } from './Markdown'
+import { Inline, Markdown, pathPieces } from './Markdown'
 
 describe('Markdown as text', () => {
   test('a 变更说明: headings, lists and tables as such; no pipes, hashes or backticks left; nothing is HTML', () => {
@@ -12,7 +12,7 @@ describe('Markdown as text', () => {
     expect(within(md).getByRole('heading', { name: '验收标准和证据' })).toBeInTheDocument()
     const [ac, dec] = within(md).getAllByRole('table')
     expect(within(ac).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['AC', '要求', '测试', '结果'])
-    expect(within(ac).getByRole('cell', { name: 'tests/test_export.py::test_range' }).querySelector('code')).not.toBeNull()
+    expect(within(ac).getAllByRole('cell').find((c) => c.textContent === 'tests/test_export.py::test_range')?.querySelector('code')).not.toBeNull()
     expect(within(dec).getAllByRole('row')).toHaveLength(2)
     expect(within(md).getByText('先看 AC-1 的测试', { exact: false }).closest('ol')).not.toBeNull()
     expect(md.textContent).not.toMatch(/\||^#|`|\*\*/m)
@@ -28,5 +28,18 @@ describe('Markdown as text', () => {
     expect(within(p).getByText('calc.py').tagName).toBe('CODE')
     expect(within(p).getByText('乘法').tagName).toBe('B')
     expect(p.querySelector('a')).toBeNull()
+  })
+
+  test('a branch or a path in a line breaks only next to a 「/」: each name between them is one piece (DETAIL-24)', () => {
+    render(<p data-testid="p"><Inline text="工作目录 /Users/alice/workplace/brain-app/shop-pay/refund-export，分支 ai/alice/PAY-3-refund-export；见 `construction/build-and-test/review.md`" /></p>)
+    const p = screen.getByTestId('p')
+    expect(p).toHaveTextContent('工作目录 /Users/alice/workplace/brain-app/shop-pay/refund-export，分支 ai/alice/PAY-3-refund-export；见 construction/build-and-test/review.md')
+    const pieces = [...p.querySelectorAll('.br-path')].map((x) => [...x.children].map((c) => c.textContent))
+    expect(pieces).toEqual([
+      ['/Users', '/alice', '/workplace', '/brain-app', '/shop-pay', '/refund-export'],
+      ['ai', '/alice', '/PAY-3-refund-export'],
+      ['construction', '/build-and-test', '/review.md'],
+    ])
+    expect(pathPieces('aidlc-docs/261107-refund-export/')).toEqual(['aidlc-docs', '/261107-refund-export/'])
   })
 })

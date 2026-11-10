@@ -28,7 +28,7 @@ import { APPROVAL_META, Icon, LoadState, MrLink, STAGE_META, StateChip, TYPE_IT_
 import {
   ACT, CHECK_GROUP_NAME, DECIDED_BY, DO_NAME, WHERE_NAME, approvalName, leanProgress, missingSourceName, sourceName, stageName,
 } from '../vocab'
-import { Inline } from './Markdown'
+import { Inline, Paths, pathPieces } from './Markdown'
 import type { ViewProps } from './props'
 import { EntryChip, MrDescCard, QuestionCard, ReviewButton, ReviewSay, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
@@ -395,16 +395,9 @@ function Header({ x, localOnly }: { x: RequirementDetail; localOnly: boolean }) 
   )
 }
 
-/** A path that breaks only after a 「/」, never inside a name. */
+/** A path that breaks only next to a 「/」, never inside a name. */
 function PathText({ path }: { path: string }) {
-  const parts = path.split('/').map((p, i) => (i ? `/${p}` : p))
-  // a folder's trailing 「/」 stays with its name
-  if (parts.length > 1 && parts[parts.length - 1] === '/') parts.splice(-2, 2, `${parts[parts.length - 2]}/`)
-  return (
-    <code className="br-path" title={path}>
-      {parts.map((p, i) => <span key={i}><span>{p}</span><wbr /></span>)}
-    </code>
-  )
+  return <code className="br-path" title={path}>{pathPieces(path).map((p, i) => <span key={i}><span>{p}</span><wbr /></span>)}</code>
 }
 
 function Facts({ x, start, localOnly }: { x: RequirementDetail; start: number | null; localOnly: boolean }) {
@@ -453,7 +446,7 @@ function Facts({ x, start, localOnly }: { x: RequirementDetail; start: number | 
       {raw.length > 0 && (
         <details className="br-raw">
           <summary>细节</summary>
-          <dl className="br-rawlist">{raw.map(([k, v]) => <div key={k} style={{ display: 'contents' }}><dt>{k}</dt><dd><code>{v}</code></dd></div>)}</dl>
+          <dl className="br-rawlist">{raw.map(([k, v]) => <div key={k} style={{ display: 'contents' }}><dt>{k}</dt><dd><code><Paths text={v} /></code></dd></div>)}</dl>
         </details>
       )}
     </dl>
@@ -867,7 +860,7 @@ function LeanCard({ x, sessionUrl, mrUrl, waiter }: { x: RequirementDetail; sess
                   {a.at !== null && <span className="br-dim br-small">{fmtTime(a.at)}</span>}
                   <details className="br-raw">
                     <summary>细节</summary>
-                    <code>{[a.kind, a.sha8, a.path].filter(Boolean).join(' · ')}</code>
+                    <code><Paths text={[a.kind, a.sha8, a.path].filter(Boolean).join(' · ')} /></code>
                   </details>
                 </div>
                 {a.state === 'pending' && (onMr
@@ -1130,8 +1123,8 @@ function BrainUseCard({ x, board, repo, reqKey, go }: { x: RequirementDetail; bo
       {b.proposals !== null && b.proposals > 0 && (
         <div className="br-row" data-testid="brain-proposals">
           <span>
-            提议 {b.proposals} 条新知识：{reflect === 'merged' ? <>已合进 Brain{branch && <span className="br-dim">（回写分支 <code>{branch}</code>）</span>}</>
-              : branch || reflect === 'done' ? <>已写到回写分支{branch && <> <code>{branch}</code></>}，等合并</> : '还没回写到 Brain'}
+            提议 {b.proposals} 条新知识：{reflect === 'merged' ? <>已合进 Brain{branch && <span className="br-dim">（回写分支 <PathText path={branch} />）</span>}</>
+              : branch || reflect === 'done' ? <>已写到回写分支{branch && <> <PathText path={branch} /></>}，等合并</> : '还没回写到 Brain'}
           </span>
           <button type="button" className="cto-link" onClick={toReflect}>在 Brain 里看 ↗</button>
         </div>
@@ -1223,8 +1216,8 @@ function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: b
                     <time>{clock(it.at)}</time>
                     <span title={k.label}><RoleIcon role={k.icon} size={16} /><span className="br-sr">{k.label}</span></span>
                     <span>
-                      <span className="br-strong">{s.label}</span>
-                      {s.detail && !long && <span className="br-dim"> · {s.detail}</span>}
+                      <span className="br-strong"><Paths text={s.label} /></span>
+                      {s.detail && !long && <span className="br-dim"> · <Paths text={s.detail} /></span>}
                       {who && <span className="br-dim br-small"> · {who}</span>}
                       {long && <details><summary className="br-small">看说明</summary><span className="br-dim br-small"><Inline text={s.detail} /></span></details>}
                     </span>

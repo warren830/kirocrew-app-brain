@@ -11,7 +11,7 @@ import { ENTRY_RE, fileOfEntry } from '../nav'
 import type { MrDesc, OpenSessionBody, OpenSessionResult, Question } from '../types'
 import { AnswerForm, ExtLink, Icon, isOpenQuestion, questionMeta } from '../ui'
 import { ACT, approvalName } from '../vocab'
-import { Inline, Markdown, takeRefs } from './Markdown'
+import { Inline, Markdown, Paths, takeRefs } from './Markdown'
 import type { ViewProps } from './props'
 
 const SOURCE_LABEL: Record<Question['source'], string> = { park: '本地会话', bridge: '运行机', mr: 'MR' }
@@ -174,7 +174,7 @@ export function ReviewSay({ say }: { say: string }) {
     <details className="br-raw" data-testid="review-say">
       <summary>细节：{ACT.review}对新会话说的那一句</summary>
       <div className="br-now-say">
-        <code>{say}</code>
+        <code><Paths text={say} /></code>
         <button type="button" className="kt-btn is-small" onClick={() => void c.copy()}><Icon name="Copy" size={13} />复制那一句</button>
         {c.copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}
         {c.copied === 'fail' && <span className="br-small br-bad-text" role="status">没复制成：请手动选中</span>}

@@ -6,18 +6,46 @@
 import type { ReactNode } from 'react'
 
 const INLINE = /`([^`]+)`|\*\*([^*]+)\*\*|\[([^\]]+)\]\([^)\s]*\)/g
+/** a path or a branch (ai/alice/PAY-3-refund-export, /Users/alice/…, aidlc-docs/…/): names joined by 「/」 */
+const PATH = /\/?[\w.~@+-]+(?:\/[\w.~@+-]*)+/g
 
-/** One line's `code`, **bold** and [links](…) (their words only). */
+/** A path's pieces as it may break: only next to a 「/」 (a folder's trailing 「/」 stays with its name). */
+export function pathPieces(path: string): string[] {
+  const parts = path.split('/').map((p, i) => (i ? `/${p}` : p)).filter((p, i) => p || i)
+  if (parts.length > 1 && parts[parts.length - 1] === '/') parts.splice(-2, 2, `${parts[parts.length - 2]}/`)
+  return parts
+}
+
+/** A path drawn so that it breaks only at a 「/」, never at a 「-」 inside a name (.br-path > span is nowrap). */
+export function PathPieces({ path }: { path: string }) {
+  return <span className="br-path">{pathPieces(path).map((p, i) => <span key={i}><span>{p}</span><wbr /></span>)}</span>
+}
+
+/** Plain text with its paths and branches drawn by PathPieces. */
+export function Paths({ text }: { text: string | null | undefined }) {
+  if (!text) return null
+  const out: ReactNode[] = []
+  let last = 0
+  for (const m of text.matchAll(PATH)) {
+    if (m.index > last) out.push(text.slice(last, m.index))
+    out.push(<PathPieces key={m.index} path={m[0]} />)
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return <>{out}</>
+}
+
+/** One line's `code`, **bold** and [links](…) (their words only); a path in it breaks only at a 「/」. */
 export function Inline({ text }: { text: string | null | undefined }) {
   if (!text) return null
   const out: ReactNode[] = []
   let last = 0
   for (const m of text.matchAll(INLINE)) {
-    if (m.index > last) out.push(text.slice(last, m.index))
-    out.push(m[1] !== undefined ? <code key={m.index}>{m[1]}</code> : m[2] !== undefined ? <b key={m.index}>{m[2]}</b> : m[3])
+    if (m.index > last) out.push(<Paths key={`t${m.index}`} text={text.slice(last, m.index)} />)
+    out.push(m[1] !== undefined ? <code key={m.index}><Paths text={m[1]} /></code> : m[2] !== undefined ? <b key={m.index}><Paths text={m[2]} /></b> : m[3])
     last = m.index + m[0].length
   }
-  if (last < text.length) out.push(text.slice(last))
+  if (last < text.length) out.push(<Paths key="end" text={text.slice(last)} />)
   return <>{out}</>
 }
 
