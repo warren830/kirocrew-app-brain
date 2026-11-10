@@ -271,7 +271,7 @@ def test_clone_failures_are_said_in_plain_chinese(tmp_path, home, monkeypatch):
     assert got["creds"].code == "credentials_in_url" and "token" in str(got["creds"])
     assert got["ext"].code == "invalid_url" and got["inside"].code == "inside_work_root"
     assert got["notrepo"]["state"] == "failed" and "找不到这个仓库" in got["notrepo"]["error"]
-    assert got["auth"]["state"] == "failed" and "刷新你的 SSH 凭据" in got["auth"]["error"] and "再试" in got["auth"]["error"]
+    assert got["auth"]["state"] == "failed" and "刷新你的 SSH 登录凭证" in got["auth"]["error"] and "再试" in got["auth"]["error"]
     assert "连不上 gitlab.example.com" in got["dns"]["error"]
     assert "找不到这个仓库，或者你没有权限" in got["404"]["error"]
     assert "克隆超过" in got["slow"]["error"] and got["slow"]["steps"][0]["state"] == "fail"

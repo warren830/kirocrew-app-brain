@@ -160,7 +160,7 @@ RULES: list[Rule] = [
     Rule(r"^(?P<dir>\S+?)/ is git-ignored", lambda g, lv: ("%s/ 不进 git" % g["dir"]) if lv == "OK" else
          ("%s/ 没被 git 忽略" % g["dir"]), "需求材料不能进 git：点「%s」，会把它加进 .gitignore" % FIX_BUTTON["kit"], "kit"),
     Rule(r"^cannot fetch origin/(?P<b>\S+): Brain freshness unknown$", "取不到远端的 {b}：不知道 Brain 是不是最新",
-         "检查网络或登录（比如 mwinit），再检查一次"),
+         "检查网络，或者刷新你的 SSH 登录凭证，再检查一次"),
     Rule(r"^Brain vs origin/(?P<b>\S+): same$", "Brain 和远端 {b} 上的一样"),
     Rule(r"^Brain vs origin/(?P<b>\S+): differs", "Brain 和远端 {b} 上的不一样",
          "把远端 {b} 的新提交拉进这个仓库（合并或 rebase 都行）", cmd="git pull"),
