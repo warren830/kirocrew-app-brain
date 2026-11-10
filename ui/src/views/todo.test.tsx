@@ -25,7 +25,7 @@ describe('待办', () => {
     renderTodo()
     await screen.findByRole('region', { name: 'Lean 审批' })
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(
-      ['会话在等你回话', 'Lean 审批', '本地澄清', '运行机上的问题', '等验收', '认领了还没开工', '接手被拒', '没交出去的交接', 'KiroCrew 的问题'])
+      ['等审查', 'Lean 审批', '本地澄清', '运行机上的问题', '等验收', '认领了还没开工', '接手被拒', '没交出去的交接', 'KiroCrew 的问题'])
     // one card per item; KiroCrew's problems are its checks' rows, with their fixes
     expect(screen.getAllByTestId('todo-item')).toHaveLength(8)
     expect(screen.queryByText(TEAM_SENTENCE)).toBeNull()
@@ -43,10 +43,10 @@ describe('待办', () => {
     renderTodo()
     const count = await screen.findByTestId('todo-count')
     expect(count).toHaveTextContent('9件')
-    expect(within(count).getByRole('img')).toHaveAccessibleName('会话在等你回话 1，Lean 审批 1，本地澄清 1，运行机上的问题 1，等验收 1，认领了还没开工 1，接手被拒 1，没交出去的交接 1，KiroCrew 的问题 1')
+    expect(within(count).getByRole('img')).toHaveAccessibleName('等审查 1，Lean 审批 1，本地澄清 1，运行机上的问题 1，等验收 1，认领了还没开工 1，接手被拒 1，没交出去的交接 1，KiroCrew 的问题 1')
     expect(Array.from(count.querySelectorAll('.td-cells i')).map((i) => i.className)).toEqual(['is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-wait', 'is-bad', 'is-warn', 'is-bad'])
     const jumps = within(screen.getByRole('navigation', { name: '待办的种类' })).getAllByRole('button')
-    expect(jumps.map((b) => b.textContent)).toEqual(['会话在等你回话 1', 'Lean 审批 1', '本地澄清 1', '运行机上的问题 1', '等验收 1', '认领了还没开工 1', '接手被拒 1', '没交出去的交接 1', 'KiroCrew 的问题 1'])
+    expect(jumps.map((b) => b.textContent)).toEqual(['等审查 1', 'Lean 审批 1', '本地澄清 1', '运行机上的问题 1', '等验收 1', '认领了还没开工 1', '接手被拒 1', '没交出去的交接 1', 'KiroCrew 的问题 1'])
     const scroll = vi.mocked(HTMLElement.prototype.scrollIntoView)
     scroll.mockClear()
     fireEvent.click(jumps[6])
@@ -57,13 +57,15 @@ describe('待办', () => {
     const items = fx.todo().items.filter((i) => i.kind === 'reply' || i.kind === 'start')
     const reply = items.find((i) => i.kind === 'reply')!
     reply.since = Date.now() / 1000 - 3 * 3600 - 60
+    reply.review = false
+    reply.text = '代码生成做完了，下一步是构建测试：在会话里让它接着做'
     installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items }) })
     const status = fx.status()
     status.counts.todo = 2
     const { go } = renderTodo({ status })
     const waiting = await screen.findByRole('region', { name: '会话在等你回话' })
     // what to tell the session, in Lean's words, and how long it has waited, as 交付总览 says it
-    expect(waiting).toHaveTextContent('构建测试做完了，下一步是发布：先开一个新会话做审查')
+    expect(waiting).toHaveTextContent('代码生成做完了，下一步是构建测试：在会话里让它接着做')
     expect(waiting).toHaveTextContent('已等 3 小时')
     fireEvent.click(within(waiting).getByRole('button', { name: '打开会话' }))
     expect(navigations).toEqual(['/chat?sid=brain-PAY-1-3d8e'])
@@ -73,6 +75,20 @@ describe('待办', () => {
     // 开需求 with this very key and title: it starts PAY-8 itself, not the next free key
     expect(go).toHaveBeenCalledWith({ kind: 'new', repo: 'r1', key: 'PAY-8', title: '退款失败的提醒' })
     expect(screen.getByTestId('todo-count')).toHaveTextContent('2件')
+  })
+
+  test('Lean’s review is 等审查, opened in a new session (开审查会话), never the session that wrote the code', async () => {
+    const items = fx.todo().items.filter((i) => i.kind === 'reply')
+    installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items }),
+      [`POST ${API}/requirements/*`]: () => ({ ok: true, slot: 'brain-PAY-1-review', url: '/chat?sid=brain-PAY-1-review' }) })
+    renderTodo()
+    const review = await screen.findByRole('region', { name: '等审查' })
+    expect(review).toHaveTextContent('先开一个新会话做审查（这个会话写了代码，不能自己审）')
+    expect(screen.queryByRole('region', { name: '会话在等你回话' })).toBeNull()
+    expect(within(review).queryByRole('button', { name: '打开会话' })).toBeNull()
+    fireEvent.click(within(review).getByRole('button', { name: '开审查会话' }))
+    await waitFor(() => expect(navigations).toEqual(['/chat?sid=brain-PAY-1-review']))
+    expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/requirements/r1/PAY-1/session`, body: { trust: true, kickoff: true, review: true } })
   })
 
   test('a merge whose new knowledge is not written back yet leads to Brain’s 回写, on it', async () => {

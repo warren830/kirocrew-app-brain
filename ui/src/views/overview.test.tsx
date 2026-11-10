@@ -20,7 +20,8 @@ const reqRows = (table: HTMLElement) => table.querySelectorAll('tr[data-key]')
 const keysOf = (table: HTMLElement) => Array.from(reqRows(table)).map((r) => r.getAttribute('data-key'))
 const cardOf = (flow: HTMLElement, key: string) => flow.querySelector(`[data-testid="flow-card"][data-key="${key}"]`) as HTMLElement
 
-/** the review's real case: a repo with no remote, two sessions idle waiting on the person, three claims not started */
+/** the review's real case: a repo with no remote, two sessions idle waiting on the person for Lean's review in a new
+ * session, three claims not started */
 function localWorld(): { ov: Overview; status: Status } {
   const ov = fx.overview()
   const status = fx.status()
@@ -28,7 +29,8 @@ function localWorld(): { ov: Overview; status: Status } {
   const base = ov.rows[0]
   const lean = { stage: 'release', stage_label: '发布', stage_n: 11, stage_state: 'todo' as const, done: 10, total: 11, done_n: 4, skipped_n: 6, next: { id: 'release', label: '发布', n: 11 } }
   const reply = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'ychchen', state: 'local', state_label: '本地开发中', lean, stage: '做完 4 · 跳过 6 · 下一步：发布', overlap: [], open_questions: [], mr: null, local_only: true,
-    waits: { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: ov.at - 11 * 3600 - 120, where: 'session' } })
+    waits: { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: ov.at - 11 * 3600 - 120, where: 'session', review: true },
+    session_url: `/chat?sid=brain-${key}-dev`, worktree: `/Users/ychchen/workplace/demo/${key}` })
   const claim = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'ychchen', state: 'claimed', state_label: '已认领', summary: null, credits: null, updated_at: null, overlap: [], open_questions: [], mr: null, local_only: true,
     lean: { stage: null, stage_label: null, stage_n: null, stage_state: null, done: 0, total: 11, done_n: 0, skipped_n: 0, next: null }, stage: null,
     waits: { who: 'you', text: '已认领，还没开工', line: null, raw: '', do: 'start', since: ov.at - 3 * 3600, where: 'app' } })
@@ -117,28 +119,33 @@ describe('交付总览', () => {
     expect(screen.getByTestId('overlaps')).toHaveTextContent('都是 ychchen 的：先合一个，再做另一个，免得冲突')
   })
 
-  test('轮到你: an idle session is the person’s turn, not 「AI 在本机做」; a claim is 等开工; each has its step and how long it has waited', async () => {
+  test('轮到你: an idle session is the person’s turn, not 「AI 在本机做」; Lean’s review is 等审查, a claim 等开工; each has its step and how long it has waited', async () => {
     const user = userEvent.setup()
     const { ov, status } = localWorld()
-    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov,
+      [`POST ${API}/requirements/*`]: () => ({ ok: true, slot: 'brain-DEMO-1-review', url: '/chat?sid=brain-DEMO-1-review' }) })
     const p = props({ status })
     render(<OverviewView entry={{}} {...p} />)
     const flow = await screen.findByTestId('flow')
-    expect(within(flow).getByTestId('flow-stats')).toHaveTextContent('进行中 5 个·轮到你 5（等回话 2 · 等开工 3）·等别人 0·AI 在本机做 0')
+    expect(within(flow).getByTestId('flow-stats')).toHaveTextContent('进行中 5 个·轮到你 5（等审查 2 · 等开工 3）·等别人 0·AI 在本机做 0')
     for (const k of ['DEMO-1', 'DEMO-3', 'DEMO-2', 'DEMO-4', 'DEMO-5']) expect((cardOf(flow, k).closest('[data-lane]') as HTMLElement).dataset.lane).toBe('you')
     expect(cardOf(flow, 'DEMO-3')).toHaveTextContent('已等 11 小时')
     expect(cardOf(flow, 'DEMO-5')).toBeInTheDocument() // three in a cell, none hidden behind 「+1 个」
     // the first screen: what waits on the person, the longest wait first, each with its one step
     const yours = screen.getByTestId('your-turn')
-    expect(yours).toHaveTextContent('5 个需求 · 等回话 2 · 等开工 3')
+    expect(yours).toHaveTextContent('5 个需求 · 等审查 2 · 等开工 3')
+    expect(yours).not.toHaveTextContent(/去回话|打开会话|等回话/)
     expect(Array.from(yours.querySelectorAll('li')).map((li) => li.dataset.key)).toEqual(['DEMO-1', 'DEMO-3', 'DEMO-2', 'DEMO-4', 'DEMO-5'])
     const demo2 = yours.querySelector('li[data-key="DEMO-2"]') as HTMLElement
     expect(demo2).toHaveTextContent('已认领，还没开工已等 3 小时')
     await user.click(within(demo2).getByRole('button', { name: '去开工 ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'new', repo: 'r1', key: 'DEMO-2', title: 'AGENTS.md 缺仓库简介' })
-    await user.click(within(cardOf(flow, 'DEMO-1')).getByRole('button', { name: '去回话 ↗' }))
-    expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'DEMO-1', from: 'overview' })
-    expect(p.go).toHaveBeenCalledTimes(2) // the step does not open the card's board as well
+    // the review is a new session's (the one that wrote the code may not review it): 开审查会话 opens it right here
+    expect(within(cardOf(flow, 'DEMO-1')).queryByRole('button', { name: /去回话|打开会话/ })).toBeNull()
+    await user.click(within(cardOf(flow, 'DEMO-1')).getByRole('button', { name: '开审查会话' }))
+    await waitFor(() => expect(navigations).toEqual(['/chat?sid=brain-DEMO-1-review']))
+    expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/requirements/r1/DEMO-1/session`, body: { trust: true, kickoff: true, review: true } })
+    expect(p.go).toHaveBeenCalledTimes(1) // the step does not open the card's board as well
     // the ledger says the same: Lean the one way, and the step
     const table = screen.getByTestId('req-table')
     expect(within(rowOf(table, 'DEMO-3')).getByTestId('lean-cell')).toHaveTextContent('做完 4 · 跳过 6 · 下一步：发布')
@@ -146,6 +153,8 @@ describe('交付总览', () => {
     expect(within(rowOf(table, 'DEMO-2')).getByTestId('lean-cell')).toHaveTextContent(/^还没开工$/)
     expect(rowOf(table, 'DEMO-3')).toHaveTextContent('只在本机')
     expect(rowOf(table, 'DEMO-3')).not.toHaveTextContent('本机做完')
+    expect(within(rowOf(table, 'DEMO-3')).getByRole('button', { name: '开审查会话' })).toBeInTheDocument()
+    expect(within(yours.querySelector('li[data-key="DEMO-3"]') as HTMLElement).getByRole('button', { name: '开审查会话' })).toBeInTheDocument()
   })
 
   test('需求流动: every open card sits in the column colOf and the lane laneOf (waits.who) say; merged ones in 已合并', async () => {

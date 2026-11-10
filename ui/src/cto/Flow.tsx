@@ -10,7 +10,8 @@ import { RoleIcon } from '../board/RoleIcon'
 import type { View } from '../nav'
 import type { Requirement, WaitWho } from '../types'
 import { ago, fmtCredits, fmtWaited } from '../format'
-import { ACT, DO_NAME, WAIT_NAME, waitsOn } from '../vocab'
+import { ACT, DO_NAME, waitName, waitsOn } from '../vocab'
+import { ReviewButton } from '../views/Question'
 
 export type Col = '需求' | '设计' | '构建' | '交给运行机' | '发布验收' | '已合并'
 export type Lane = 'you' | 'people' | 'agent' | 'runner'
@@ -51,11 +52,12 @@ export function laneOf(r: Requirement): Lane {
 }
 
 /** The one step a person takes on a requirement that waits on them: the button's words and where it goes (a view of
- * this app, or the MR). null: it does not wait on you, or the backend did not say the step. */
-export type Step = { label: string; view?: View; href?: string }
+ * this app, the MR, or 开审查会话 right here). null: it does not wait on you, or the backend did not say the step. */
+export type Step = { label: string; view?: View; href?: string; review?: { repo: string; key: string; slot: string | null; worktree: string | null } }
 export function stepOf(r: Requirement): Step | null {
   const d = r.waits.do
   if (r.waits.who !== 'you' || !d || d === 'none' || d === 'watch') return null
+  if (r.waits.review) return { label: ACT.review, review: { repo: r.repo, key: r.key, slot: slotOf(r.session_url), worktree: r.worktree } }
   if (d === 'start') return { label: DO_NAME.start, view: { kind: 'new', repo: r.repo, key: r.key, title: r.title } }
   if (d === 'answer' && r.waits.where === 'mr' && r.mr?.url) return { label: ACT.answerOnMr, href: r.mr.url }
   if (d === 'write_back') return { label: DO_NAME.write_back, view: { kind: 'brain', repo: r.repo, reflect: r.key } }
@@ -68,9 +70,16 @@ export function waitedText(r: Requirement, at: number): string {
   return typeof s === 'number' && Number.isFinite(s) ? `已等 ${fmtWaited(at - s)}` : ''
 }
 
+/** The session a KiroCrew chat URL opens (/chat?sid=<slot>). */
+const slotOf = (url: string | null | undefined): string | null => (url ? new URLSearchParams(url.split('?')[1] ?? '').get('sid') : null)
+
 export function StepButton({ step, onGo, primary = true }: { step: Step; onGo: (v: View) => void; primary?: boolean }) {
   const cls = `kt-btn is-small${primary ? ' is-primary' : ''} br-step`
   const stop = (e: { stopPropagation: () => void }) => e.stopPropagation()
+  if (step.review) {
+    const x = step.review
+    return <span className="br-step br-review" onClick={stop} onKeyDown={stop}><ReviewButton repo={x.repo} reqKey={x.key} liveSlot={x.slot} worktree={x.worktree} /></span>
+  }
   if (step.href) {
     return <a className={cls} href={step.href} target="_blank" rel="noopener noreferrer" onClick={stop}>{step.label} ↗</a>
   }
@@ -128,7 +137,7 @@ export function Flow({ rows, at, hl, onNew, repoName, localOnly = false, ...h }:
   const yours = inLane('you')
   const mergedYours = merged.filter((r) => laneOf(r) === 'you')
   const byDo = Object.entries(yours.reduce<Record<string, number>>((m, r) => {
-    const w = r.waits.do ? WAIT_NAME[r.waits.do] : ''
+    const w = waitName(r.waits)
     return w ? { ...m, [w]: (m[w] ?? 0) + 1 } : m
   }, {}))
   const longest = yours.map((r) => r.waits.since).filter((s): s is number => typeof s === 'number').sort((a, b) => a - b)[0]

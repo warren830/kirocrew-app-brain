@@ -3,7 +3,7 @@
  * these words and no other. A code name (stage id, field, enum) is never shown to a person: look it up here; one that
  * is missing gets added here, not spelled out in a view.
  */
-import type { LeanSummary, WaitDo, WaitWho } from './types'
+import type { LeanSummary, WaitDo, WaitWho, Waits } from './types'
 
 /** Lean's stage ids → the stage's Chinese name (backend/core/lean_view.py STAGES) */
 export const STAGE_NAME: Record<string, string> = {
@@ -80,6 +80,12 @@ export const WAIT_NAME: Record<WaitDo, string> = {
   approve: '等批准', reply: '等回话', tool: '等批准工具调用', start: '等开工', answer: '等回答', accept: '等验收',
   redo_handoff: '要重做交接', label_handoff: '要补交接标签', write_back: '要回写 Brain', watch: '观察中', none: '',
 }
+
+/** Lean's review in a new session (Waits.review) is its own step: the session that wrote the code may not review it,
+ * so it is 「开审查会话」 / 「等审查」, never the open session's 去回话 / 等回话 */
+export const REVIEW_WAIT = '等审查'
+export const doName = (w: Pick<Waits, 'do' | 'review'>): string => (w.review ? ACT.review : w.do ? DO_NAME[w.do] : '')
+export const waitName = (w: Pick<Waits, 'do' | 'review'>): string => (w.review ? REVIEW_WAIT : w.do ? WAIT_NAME[w.do] : '')
 
 /** where a requirement's facts were read (Requirement.where) → where it is, in words (需求详情's head) */
 export const WHERE_NAME: Record<string, string> = {

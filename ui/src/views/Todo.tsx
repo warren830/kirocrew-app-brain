@@ -6,6 +6,7 @@
  * who a requirement waits on (`waits.who`), so it holds what the rows, the tab's count and the sidebar badge say:
  *
  *   reply               the local session is idle: your turn to talk               打开会话
+ *   review              (a reply) Lean's review, in a new session                  开审查会话
  *   lean_approval       Lean asks for an approval: the line to type in the session  复制那一行 · 打开会话
  *   clarify             the local session asks you: answered here
  *   question            a question on the MR (the team runner's)                    去 MR 上回答
@@ -26,19 +27,20 @@ import { paths, usePoll } from '../api'
 import { fmtWaited } from '../format'
 import type { Todo, TodoItem } from '../types'
 import { CheckRows, EmptyHero, ExtLink, Icon, LoadState, RoleIcon, TypeLine, type FlowStep } from '../ui'
-import { ACT, DO_NAME, approvalName } from '../vocab'
-import { QuestionCard } from './Question'
+import { ACT, DO_NAME, REVIEW_WAIT, approvalName } from '../vocab'
+import { QuestionCard, ReviewButton } from './Question'
 import type { ViewProps } from './props'
 
 export const TODO_POLL_MS = 10_000
 
 type GroupTone = 'wait' | 'bad' | 'warn'
 /** what an item is on this page: its kind, except a runner question no answer can move any more */
-type GroupKey = TodoItem['kind'] | 'stuck' | 'write_back'
+type GroupKey = TodoItem['kind'] | 'stuck' | 'write_back' | 'review'
 interface Group { key: GroupKey; heading: string; icon: string; tone: GroupTone; hint: string }
 
 const GROUPS: Group[] = [
   { key: 'reply', heading: '会话在等你回话', icon: 'laptop', tone: 'wait', hint: '本机会话空着：轮到你说' },
+  { key: 'review', heading: REVIEW_WAIT, icon: 'reviewer', tone: 'wait', hint: '写代码的会话不能自己审：开一个新会话审查' },
   { key: 'lean_approval', heading: 'Lean 审批', icon: 'req', tone: 'wait', hint: '读完在会话里自己打一行批准' },
   { key: 'clarify', heading: '本地澄清', icon: 'question', tone: 'wait', hint: '在这里回答' },
   { key: 'question', heading: '运行机上的问题', icon: 'question', tone: 'wait', hint: '在 MR 上回答' },
@@ -52,8 +54,9 @@ const GROUPS: Group[] = [
 ]
 const TONE_WORD: Record<GroupTone, string> = { wait: '等你', bad: '被拒或卡住', warn: '看一眼' }
 
-/** A runner question without its question (team mode): the run is left waiting for good (refused, void, not asked). */
-const groupOf = (it: TodoItem): GroupKey => (it.kind === 'question' && !it.question ? 'stuck' : it.kind)
+/** A runner question without its question (team mode): the run is left waiting for good (refused, void, not asked);
+ * a reply that is Lean's review: a new session's. */
+const groupOf = (it: TodoItem): GroupKey => (it.kind === 'question' && !it.question ? 'stuck' : it.kind === 'reply' && it.review ? 'review' : it.kind)
 
 /** The Lean approval's own drawing: the requirements, else the design. */
 const approvalIcon = (approval: string | null) => (approval && /DESIGN|PLAN|INCEPTION/i.test(approval) ? 'design' : 'req')
@@ -104,7 +107,7 @@ export function TodoView(props: ViewProps) {
         <EmptyHero
           testid="todo-empty"
           title="现在没有等你做的事"
-          text={['需求走到要你动手的地方，就会出现在这里，按种类分好：会话等你回话、Lean 的审批、会话问你的澄清、认领了还没开工、交接被拒、MR 上的问题和验收，还有 KiroCrew 这边要修的。']}
+          text={['需求走到要你动手的地方，就会出现在这里，按种类分好：会话等你回话、等你开会话审查、Lean 的审批、会话问你的澄清、认领了还没开工、交接被拒、MR 上的问题和验收，还有 KiroCrew 这边要修的。']}
           punch="这一页空着，就是没有谁在等你。"
           flow={WAITS_FLOW}
         >
@@ -197,7 +200,8 @@ function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; 
           </button>
         )}
         {mr && mrFirst && <ExtLink href={mr} className={`br-btn is-small${group.tone !== 'bad' || group.key === 'stuck' ? ' is-primary' : ''}`}>{mrAct}</ExtLink>}
-        {session && !line && it.kind !== 'start' && (
+        {group.key === 'review' && it.key && <ReviewButton repo={it.repo} reqKey={it.key} liveSlot={it.session?.slot ?? null} worktree={null} />}
+        {session && !line && it.kind !== 'start' && group.key !== 'review' && (
           <button type="button" className={`br-btn is-small${it.kind === 'reply' ? ' is-primary' : ''}`} onClick={() => navigate(session)}>
             <Icon name="MessageSquare" size={13} />{ACT.openSession}
           </button>
@@ -253,5 +257,7 @@ const TD_CSS = `
 .td-do b { color: var(--muted); font-weight: 650; margin-right: .5em; }
 .td-acts { display: flex; align-items: center; gap: .5em; flex-wrap: wrap; }
 .td-acts a.br-btn { text-decoration: none; }
+.td-acts .kt-btn { padding: 4px 10px; font-size: .84em; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; }
+.td-acts .br-note, .td-acts .br-error { flex-basis: 100%; margin: 0; }
 .td-acts a.br-btn.is-primary { color: var(--accent-fg, #fff); }
 `

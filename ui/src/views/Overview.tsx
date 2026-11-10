@@ -24,7 +24,7 @@ import { ago, fmtCredits } from '../format'
 import type { OverviewEntry, View } from '../nav'
 import type { CtoNumbers, CtoRun, EvalMetric, EvalView, Funnel, Overview, RefreshResult, ReqState, RepoInfo, Requirement } from '../types'
 import { STATE_LABEL } from '../types'
-import { ACT, DECIDED_BY, WAIT_NAME, leanProgress } from '../vocab'
+import { ACT, DECIDED_BY, leanProgress, waitName } from '../vocab'
 import { EmptyHero, Icon, ImportCta, LeanCell, LoadState, MrLink, PendingRepo, STATE_TONE, StateChip } from '../ui'
 import type { ViewProps } from './props'
 
@@ -77,6 +77,9 @@ export const OV_CSS = `
 .br-ov .cto-kcard.is-live.is-wait .br-kwait { color: var(--kt-approve); font-weight: 650; }
 .br-ov .cto-kcard .cto-gate { display: inline-flex; align-items: center; gap: 4px; }
 .br-ov .cto-kcard .br-step { justify-self: start; margin-top: 4px; max-width: 100%; white-space: normal; text-align: left; }
+.br-ov .br-review { display: inline-grid; gap: 4px; justify-items: start; }
+.br-ov .br-review .kt-btn { padding: 3px 10px; font-size: 13px; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.br-ov .br-review .br-note, .br-ov .br-review .br-error { margin: 0; font-size: 12px; }
 .br-ov .cto-kcard .cto-ktop { flex-wrap: wrap; }
 .br-ov .cto-kmore.cto-link { text-align: left; padding: 0 4px; font-size: 12px; color: var(--accent); }
 .br-ov .cto-stats small { font-size: 14px; font-weight: 500; color: var(--text); margin-left: 4px; }
@@ -406,7 +409,7 @@ function YourTurn({ rows, at, repoName, onGo, onOpen, onAll }: {
 }) {
   const SHOWN = 5
   const by = Object.entries(rows.reduce<Record<string, number>>((m, r) => {
-    const w = r.waits.do ? WAIT_NAME[r.waits.do] : ''
+    const w = waitName(r.waits)
     return w ? { ...m, [w]: (m[w] ?? 0) + 1 } : m
   }, {}))
   return (
