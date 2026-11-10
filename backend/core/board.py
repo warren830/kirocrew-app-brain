@@ -707,8 +707,12 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
         fo.put("local", "waiting", "认领了，还没开工", _first(since, (f.get("claim") or {}).get("created_at")))
     elif state == "handed_over":
         if waits.get("who") == "you":
-            fo.put("handover", "stalled", "推上去了，但 MR 上没有交接标签", _first(since, hand_at, now))
-            fo.put("bridge", "waiting", "MR 上没有交接标签：桥不会接", _first(since, hand_at, now))
+            at = _first(since, hand_at, now)
+            fo.put("handover", "stalled", "推上去了，但 MR 上没有交接标签", at, "you")
+            fo.put("bridge", "waiting", "MR 上没有交接标签：桥不会接", at)
+            # nothing was handed over: the bridge never had it, the hand-over waits on the person to label it
+            A["bridge"]["spans"] = [x for x in A["bridge"]["spans"] if x["b"] is not None]
+            fo.open("handover", "wait", at)
         else:
             if A["handover"]["status"] not in ("queued",):
                 fo.put("handover", "queued", "等桥核对交接", _first(since, hand_at, now))

@@ -514,3 +514,19 @@ def test_a_gate_history_stays_in_time_order_with_no_repeats_under_a_later_plan()
     assert (h[-1]["status"], h[-1]["at"], design["line"]) == ("awaiting_approval", p2, "approve PLAN cccccccc")
     during_first_plan = [x for x in h if x["at"] <= p1 - 10 * M][-1]
     assert during_first_plan["status"] == "awaiting_approval"
+
+
+def test_a_push_without_its_label_waits_on_the_person_not_on_the_runner():
+    """DETAIL-1 (PAY-10): pushed, but the MR has no hand-over label, so nothing was handed over. The hours since are
+    the person's to label it, not the bridge or the runner at work."""
+    hand = T + 30 * M
+    f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "ychchen"})
+    row = row_of("handed_over", "you", "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次",
+                 do="label_handoff", since=hand)
+    now = hand + 7 * H + 46 * M
+    b = snapshot(f, row, local_only=False, now=now)
+    runners = [s for a in b["actors"] if a["key"] in ("handover", "bridge", "signer", "runner") for s in a["spans"]
+               if s["kind"] == "work"]
+    assert runners == [], runners
+    assert spent(b, ("wait",), now) >= 7 * H + 46 * M
+    assert actor(b, "handover")["history"][-1]["who"] == "you"
