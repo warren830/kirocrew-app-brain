@@ -423,7 +423,7 @@ function importRoutes() {
       // importer.inspect without brain-kit loaded: it cannot install
       c.next = 'fix'
       c.install = null
-      c.checks = c.checks.map((x) => (x.id === 'kit' ? { ...x, level: 'FAIL' as const, why: '没装（没有 .brain/kit.json），app 现在也没装载 brain-kit，装不了', todo: '先在设置里写对 brain-kit 的位置' } : x))
+      c.checks = c.checks.map((x) => (x.id === 'kit' ? { ...x, level: 'FAIL' as const, why: '还没装 brain-kit，app 现在也没装载 brain-kit，装不了', todo: '先在设置里写对 brain-kit 的位置' } : x))
       return c
     }
     if (path.endsWith('/ready') || listed || readyPaths.has(path)) {
