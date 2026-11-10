@@ -359,6 +359,19 @@ describe('交付总览', () => {
     expect(screen.getByTestId('repo-error')).toHaveTextContent('shop-web：还没装 brain-kit')
   })
 
+  test('a repo whose scan threw: its English error folded under 细节, the banner in words with 做什么', async () => {
+    const ov = fx.overview()
+    ov.errors = [{ repo: 'r1', error: "KeyError: 'runs' while reading runs/PAY-3/run.json" }]
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    render(<OverviewView entry={{}} {...props()} />)
+    const banner = await screen.findByTestId('repo-error')
+    expect(banner).toHaveTextContent('shop-pay：这次没读出来')
+    expect(banner).toHaveTextContent('做什么：看看这个仓库的目录还在不在、能不能读，再去导入仓库检查它')
+    const raw = within(banner).getByText('细节').closest('details') as HTMLDetailsElement
+    expect(raw.open).toBe(false)
+    expect(raw).toHaveTextContent("KeyError: 'runs'")
+  })
+
   test('a summary shows no Markdown and no internal ids: `code` as code, the ids on hover, 规模 in Chinese, no 「现在：」', () => {
     const s = plainSummary('给 `calc.py` 加乘法 `multiply(a, b)`，返回 `a * b`（D01#S002 · 097f2e9e）（规模 small）。现在：Lean 在「构建测试」做完，在本地开发（还没交接）。')
     expect(s.parts).toEqual([

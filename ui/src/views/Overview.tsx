@@ -265,11 +265,15 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
       <LoadState loading={ov.loading} error={ov.error} has={!!data} />
       {!noKit && data?.errors.map((e) => {
         const r = repos.find((x) => x.id === e.repo)
+        // the backend's words when it said them; an error it passed on as it came (a scan that threw) is folded
+        const plain = /[\u3400-\u9fff]/.test(e.error)
         return (
           <div key={e.repo} className="br-banner" role="status" data-testid="repo-error">
             <div className="br-row">
-              <span><b className="br-strong">{r?.name ?? e.repo}：</b>{e.error}</span>
+              <span><b className="br-strong">{r?.name ?? e.repo}：</b>{plain ? e.error : '这次没读出来'}</span>
+              {!plain && <span className="br-dim">做什么：看看这个仓库的目录还在不在、能不能读，再去导入仓库检查它</span>}
               {r && <button type="button" className="br-btn is-small" onClick={() => go({ kind: 'import', path: r.path })}>去导入仓库</button>}
+              {!plain && <details className="br-raw"><summary>细节</summary><pre>{e.error}</pre></details>}
             </div>
           </div>
         )

@@ -44,6 +44,8 @@ export const runWords = (id: string, req = true): string => {
   const m = /^RUN-(.+)-(\d+)$/.exec(id)
   return m ? `${req ? `${m[1]} 的` : ''}第 ${m[2]} 次运行` : '一次运行'
 }
+/** brain-kit's own words are said as they are when they are Chinese; English ones are folded under 细节. */
+const said = (s: string) => /[\u3400-\u9fff]/.test(s)
 /** The steps a round could not do (loop_error: 「poll: …；collect: …」), in words. */
 const failedSteps = (loopError: string) => Array.from(new Set(loopError.split('；').map((x) => x.split(':', 1)[0].trim()).filter(Boolean)))
   .map((k) => LOOP_STEP[k]?.name ?? '其他一步')
@@ -162,7 +164,13 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
               <Icon name="Play" size={15} />{loop.busy ? '正在跑…' : '现在跑一轮'}
             </button>
           </div>
-          {st.error && <p className="br-error br-pre">{st.error}</p>}
+          {st.error && (said(st.error) ? <p className="br-error br-pre">{st.error}</p> : (
+            <div className="tm-loop-error" data-testid="team-error">
+              <p className="br-bad-text"><b>桥没准备好</b></p>
+              <span className="tm-do"><b>做什么</b>看设置里团队模式填的配置文件（桥、运行机工作区）对不对，改好再跑一轮。</span>
+              <details className="br-raw"><summary>细节</summary><pre>{st.error}</pre></details>
+            </div>
+          ))}
           {st.loop_error && (
             <div className="tm-loop-error" data-testid="loop-error">
               <p className="br-bad-text"><b>上一轮有一步没成：</b>{failedSteps(st.loop_error).join('、')}</p>
@@ -307,7 +315,7 @@ function Handovers({ rows, at }: { rows: TeamHandover[]; at: number | null }) {
           <ol className="kt-belt tm-belt">
             {rows.map((h) => {
               const m = handoverMeta(h.result)
-              const hint = h.error || m.hint
+              const hint = h.error ? (said(h.error) ? h.error : '没查成：原话在细节里') : m.hint
               return (
                 <li key={`${h.project}!${h.iid}`} className={`kt-belt-chip ${CHIP_CLASS[h.result] ?? ''}`} data-result={h.result}
                   title={h.sha ? `交接的提交 ${h.sha.slice(0, 12)}` : undefined}>
@@ -316,6 +324,7 @@ function Handovers({ rows, at }: { rows: TeamHandover[]; at: number | null }) {
                     <span className={`kt-pill tone-${m.tone}`}>{m.label}</span>
                   </span>
                   {hint && <span className="tm-hint">{hint}</span>}
+                  {h.error && !said(h.error) && <details className="br-raw tm-hint"><summary>细节</summary><pre>{h.error}</pre></details>}
                 </li>
               )
             })}

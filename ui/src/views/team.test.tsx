@@ -104,6 +104,20 @@ describe('运行机', () => {
     expect(await screen.findByRole('region', { name: '交接' })).toHaveTextContent('上一轮没有打着交接标签的 MR')
   })
 
+  test('brain-kit’s English (the bridge not set up, an MR it could not check) is said in words, the original folded', async () => {
+    const tv = fx.team()
+    tv.status = { ...tv.status, ok: false, error: "FileNotFoundError: [Errno 2] No such file or directory: 'bridge.json'" }
+    tv.handovers = tv.handovers.map((h) => (h.result === 'error' ? { ...h, error: 'GitLab 502: Bad Gateway' } : h))
+    installFixtureRoutes({ [`GET ${API}/team`]: () => tv })
+    render(<TeamPage {...props()} />)
+    const err = await screen.findByTestId('team-error')
+    expect(err).toHaveTextContent('桥没准备好做什么看设置里团队模式填的配置文件')
+    expect((within(err).getByText('细节').closest('details') as HTMLDetailsElement).open).toBe(false)
+    const chip = screen.getByRole('region', { name: '交接' }).querySelector('[data-result="error"]') as HTMLElement
+    expect(chip).toHaveTextContent('没查成：原话在细节里')
+    expect(within(chip).getByText('GitLab 502: Bad Gateway').closest('details')).not.toHaveAttribute('open')
+  })
+
   test('the vouchers the signer did not answer last round are listed (asked for again next round); none, no heading', async () => {
     installFixtureRoutes()
     const { unmount } = render(<TeamPage {...props()} />)
