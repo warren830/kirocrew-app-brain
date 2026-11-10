@@ -17410,7 +17410,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -19364,7 +19365,8 @@
     "status": "awaiting_approval",
     "doing": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -20764,7 +20766,8 @@
     "status": "waiting",
     "doing": "等产品在 MR 上回答 D-2（设计）",
     "owner": "carol",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -21915,7 +21918,8 @@
     "status": "waiting",
     "doing": "等产品在 MR 上验收 D-3（approve / reject）",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -23370,7 +23374,8 @@
     "status": "awaiting_approval",
     "doing": "接手被拒：标签是 bob 打的，不是负责人 alice",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -24383,7 +24388,8 @@
     "status": "waiting",
     "doing": "等 carol 开工",
     "owner": "carol",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -24775,7 +24781,8 @@
     "status": "awaiting_approval",
     "doing": "已认领，还没开工",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -25173,7 +25180,8 @@
     "status": "awaiting_approval",
     "doing": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -26123,7 +26131,8 @@
     "status": "awaiting_approval",
     "doing": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -27039,7 +27048,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -28535,7 +28545,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "dave",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -30132,7 +30143,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -31772,7 +31784,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "dave",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -33290,7 +33303,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -34286,7 +34300,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "dave",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -35975,7 +35990,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -37484,7 +37500,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "dave",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -39168,7 +39185,8 @@
     "status": "merged",
     "doing": "已合并，有 1 条新知识等 erin 回写 Brain",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -40781,7 +40799,8 @@
     "status": "running",
     "doing": "运行机在跑",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -41863,7 +41882,8 @@
     "status": "running",
     "doing": "AI 在做「应用设计」",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -42496,7 +42516,8 @@
     "status": "running",
     "doing": "签名服务在签接手合同",
     "owner": null,
-    "me": false
+    "me": false,
+    "you": true
    },
    "actors": [
     {
@@ -42902,7 +42923,8 @@
     "status": "waiting",
     "doing": "等产品在 MR 上回答 D-2（设计）",
     "owner": "carol",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {
@@ -44040,7 +44062,8 @@
     "status": "waiting",
     "doing": "等产品在 MR 上验收 D-3（approve / reject）",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -45491,7 +45514,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
    },
    "actors": [
     {
@@ -47466,7 +47490,8 @@
     "status": "waiting",
     "doing": "D-1 的回答签名服务不签：看运行机页的拒签原因",
     "owner": "erin",
-    "me": false
+    "me": false,
+    "you": false
    },
    "actors": [
     {

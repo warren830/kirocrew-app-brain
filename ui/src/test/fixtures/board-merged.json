@@ -63,7 +63,8 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "alice",
-    "me": true
+    "me": true,
+    "you": true
   },
   "actors": [
     {

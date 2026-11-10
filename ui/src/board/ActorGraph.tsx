@@ -21,7 +21,7 @@ import { NODE_H, NODE_W, ORCH_BOX, ROSTER, anchorBox, commandPath, headX, partic
 import { Overlay } from './overlay'
 import { RoleGlyph, RoleIcon } from './RoleIcon'
 import { NodeCard } from './NodeCard'
-import { actorDo, reviewNext } from './next'
+import { actorDo, reviewNext, waitCount } from './next'
 
 export type FlashMap = Record<string, { n: number; tone: string }>
 
@@ -109,11 +109,13 @@ export function ActorGraph({ board, lay, focus, onActor, flashes, reducedMotion,
   useEffect(() => () => overlay.current?.dispose(), [])
 
   const working = board.actors.filter((a) => WORKING.has(a.status)).length
-  const waiting = board.actors.filter((a) => a.status === 'awaiting_approval').length
+  // what waits, counted and named as 这条路走到哪了 says it (a hand-over to label waits on you with no actor asking);
+  // nothing waiting is not said
+  const waiting = waitCount(board, quiet)
   const done = board.actors.filter((a) => a.status === 'merged').length
   const mine = waitsOnMe(board)
   const who = boardWho(board)
-  const label = `需求的路：${board.actors.length} 个环节，${working} 个在做，${waiting} 个${mine ? '等你' : who}，${done} 个完成；检查 ${board.checks.passed}/${board.checks.total}。点一个环节只看它。`
+  const label = `需求的路：${board.actors.length} 个环节，${working} 个在做${waiting ? `，${waiting} 个${mine ? '等你' : who}` : ''}，${done} 个完成；检查 ${board.checks.passed}/${board.checks.total}。点一个环节只看它。`
 
   return (
     <div className="kt-graph is-phased br-graph" data-testid="kt-graph">

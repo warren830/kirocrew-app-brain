@@ -884,11 +884,17 @@ def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str,
         cell("verify", "verify", "自动检查", "自动检查", "skip", None, "还没跑过自动检查（构建和测试阶段跑）", "ci", later="自动检查")
     # the hand-over: the bridge and the signer (not on the way of a repo done only here, or of one done here and merged)
     if not local_only and not (hand_at is None and merged_at is not None):
-        cell("bridge", "handover", "桥", "桥核对交接", "pass" if A["handover"]["status"] == "merged" else
-             "fail" if A["handover"]["status"] == "failed" else "wait" if hand_at else "skip",
-             A["handover"]["since"] if A["handover"]["status"] in ("merged", "failed") else None,
-             {"merged": "接手了", "failed": A["bridge"]["doing"]}.get(A["handover"]["status"], "还没交接" if not hand_at else "在核对"),
-             "bridge")
+        if A["handover"]["status"] == "stalled":
+            # pushed without the hand-over label: nothing reached the bridge and nothing is checked; the person labels it
+            cell("bridge", "handover", "标签", "补上交接标签", "wait", None,
+                 A["bridge"]["doing"] or "MR 上没有交接标签：桥不会接", "handover")
+        else:
+            cell("bridge", "handover", "桥", "桥核对交接", "pass" if A["handover"]["status"] == "merged" else
+                 "fail" if A["handover"]["status"] == "failed" else "wait" if hand_at else "skip",
+                 A["handover"]["since"] if A["handover"]["status"] in ("merged", "failed") else None,
+                 {"merged": "接手了", "failed": A["bridge"]["doing"]}.get(A["handover"]["status"],
+                                                                         "还没交接" if not hand_at else "在核对"),
+                 "bridge")
         cell("signer", "handover", "签名", "签名服务签接手合同", "pass" if A["signer"]["status"] == "merged" else
              "fail" if A["signer"]["status"] == "failed" else "skip", A["signer"]["since"] if A["signer"]["status"] == "merged" else None,
              "签了" if A["signer"]["status"] == "merged" else "还没签", "signer",

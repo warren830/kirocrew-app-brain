@@ -547,6 +547,12 @@ def test_a_push_without_its_label_waits_on_the_person_not_on_the_runner():
     assert runners == [], runners
     assert spent(b, ("wait",), now) >= 7 * H + 46 * M
     assert actor(b, "handover")["history"][-1]["who"] == "you"
+    # the check wall (and 需求详情's 检查, which shows it) says the label is missing, as the bridge's node does: nothing
+    # is being checked, the person labels it
+    cell = next(c for c in b["checks"]["cells"] if c["group"] == "handover" and c["id"] == "bridge")
+    assert (cell["label"], cell["name"], cell["status"], cell["actor"]) == ("标签", "补上交接标签", "wait", "handover"), cell
+    assert cell["detail"] == actor(b, "bridge")["doing"] == "MR 上没有交接标签：桥不会接"
+    assert "在核对" not in json.dumps(b["checks"], ensure_ascii=False)
 
 
 def test_a_question_the_runner_asks_on_the_mr_waits_on_whom_park_json_asks_as_the_row_says():

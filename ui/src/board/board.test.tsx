@@ -252,6 +252,29 @@ describe('需求看板', () => {
     expect(screen.queryByTestId('kt-lanes-out')).toBeNull()
   })
 
+  test('the graph’s name counts and names what waits as 这条路走到哪了 does: a hand-over to label is 1 个等你; nothing waiting is not said', async () => {
+    const b = fx.board()
+    Object.assign(b.row, { state: 'handed_over', state_label: '已交接', waits: { ...b.row.waits, who: 'you', do: 'label_handoff', line: null, text: '推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次' } })
+    b.actors = b.actors.map((a) => (a.status === 'awaiting_approval' ? { ...a, status: 'done' as const, line: null } : a))
+    b.questions = []
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    const graph = await loaded()
+    const kpi = within(screen.getByRole('group', { name: '指标' }))
+    expect(kpi.getByText('· 1 个等你', { exact: false })).toBeInTheDocument()
+    expect(within(graph).getByRole('group', { name: /^需求的路/ })).toHaveAccessibleName(/，1 个等你，/)
+    cleanup()
+    const c = fx.board()
+    Object.assign(c.row, { waits: { ...c.row.waits, who: 'runner', do: 'none', line: null, text: '运行机在跑' } })
+    c.actors = c.actors.map((a) => (a.status === 'awaiting_approval' ? { ...a, status: 'done' as const, line: null } : a))
+    installFixtureRoutes(boardRoute(() => structuredClone(c)))
+    renderBoard()
+    const g2 = await loaded()
+    const name = within(g2).getByRole('group', { name: /^需求的路/ }).getAttribute('aria-label')
+    expect(name).not.toMatch(/0 个等/)
+    expect(name).not.toContain('等运行机')
+  })
+
   test('the lanes’ time starts at 开工, the moment 需求详情 says it started; the claim before it is 认领, not 开工', async () => {
     installFixtureRoutes()
     renderBoard()

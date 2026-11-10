@@ -10,7 +10,7 @@ import { StateChip } from '../ui'
 import { ACT, leanProgress } from '../vocab'
 import { WORKING, actorLabel, actorMeta, boardWho, checksSay, fmtCredits, fmtWhen, leanOf, localOnly, waitsOnMe } from './format'
 import { useChangeCount, useTween } from './hooks'
-import { nextOf } from './next'
+import { waitCount } from './next'
 import { RoleIcon } from './RoleIcon'
 
 export function TopBar({ board, replaying, follow, onReplay, onFollow, onDetail, onSession, onStart }: {
@@ -168,9 +168,7 @@ function StepsKpi({ board, onActor, replaying }: { board: ReqBoard; onActor?: (k
   const done = on.filter((a) => a.status === 'merged' || a.status === 'done').length
   const working = on.filter((a) => WORKING.has(a.status)).length
   const mine = waitsOnMe(board)
-  // what waits on the person looking is what 你要做的一步 lists (a stalled hand-over to label too); on someone else, the
-  // actors that wait for them
-  const waiting = mine && !replaying ? nextOf(board).steps.length : on.filter((a) => a.status === 'awaiting_approval').length
+  const waiting = waitCount(board, replaying)
   return (
     <div className="kt-kpi kt-kpi-roles">
       <div className="kt-kpi-label">这条路走到哪了</div>
