@@ -752,6 +752,33 @@ describe('交付总览', () => {
     expect(p.go).toHaveBeenCalledWith({ kind: 'import', path: '/Users/alice/workplace/shop-web' })
   })
 
+  test('opened at a repo it cannot read (an old link): why and 去导入仓库, not 「只在本机」 and 开需求; one not listed any more says so', async () => {
+    const user = userEvent.setup()
+    const status = fx.status()
+    status.repos = status.repos.map((r) => (r.id === 'r2' ? { ...r, remote: false } : r))
+    const empty = (repo: string): Overview => ({ ...fx.overview(), rows: [], overlaps: [],
+      errors: repo === 'r2' ? [{ repo: 'r2', error: '还没装 brain-kit：在「导入仓库」里检查它，装上就能用', raw: '/Users/alice/workplace/shop-web' }] : [] })
+    installFixtureRoutes({ [`GET ${API}/overview*`]: (_b, path) => empty(new URL(path, 'http://x').searchParams.get('repo') ?? 'all') })
+    const p = props({ status })
+    const { unmount } = render(<OverviewView entry={{ repo: 'r2' }} {...p} />)
+    const hero = await screen.findByTestId('ov-unreadable')
+    expect(hero).toHaveTextContent('shop-web 还读不了还没装 brain-kit：在「导入仓库」里检查它，装上就能用')
+    expect(screen.queryByTestId('ov-local-tag')).toBeNull()
+    expect(screen.queryByRole('region', { name: '还没有需求' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '开需求' })).toBeNull()
+    expect(screen.queryByTestId('repo-error')).toBeNull()    // said once, in the hero
+    expect(document.querySelector('.cto-org')).toHaveTextContent('shop-web 还读不了')
+    await user.click(within(hero).getByRole('button', { name: '去导入仓库' }))
+    expect(p.go).toHaveBeenCalledWith({ kind: 'import', path: '/Users/alice/workplace/shop-web' })
+    unmount()
+    const q = props({ status })
+    render(<OverviewView entry={{ repo: 'r9' }} {...q} />)
+    const gone = await screen.findByTestId('ov-unreadable')
+    expect(gone).toHaveTextContent('这个仓库不在列表里')
+    await user.click(within(gone).getByRole('button', { name: '看全部' }))
+    expect(q.replace).toHaveBeenLastCalledWith({ kind: 'overview' })
+  })
+
   test('an overview that cannot be read shows errorText', async () => {
     installFixtureRoutes({ [`GET ${API}/overview*`]: () => { throw apiError(500, 'scan_failed', '读仓库失败：r1 不是 git 仓库') } })
     render(<OverviewView entry={{}} {...props()} />)

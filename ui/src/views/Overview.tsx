@@ -226,8 +226,13 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
   const repoName = (id: string) => repos.find((x) => x.id === id)?.name
   const elsewhere = pillCounts.runner
   const scope = repo === 'all' ? repos.filter((r) => r.ok) : repos.filter((r) => r.id === repo)
+  // opened at a repo the app cannot read (an old link: brain-kit not installed there, not listed any more): its way in
+  // is 导入仓库 (or its brain-kit on the way: PendingRepo's banner), not 开需求
+  const picked = repo !== 'all' ? repos.find((r) => r.id === repo) : undefined
+  const unreadable = !!status && repo !== 'all' && !noKit && (!picked || !picked.ok)
+  const readable = scope.filter((r) => r.ok)
   // nothing here can be handed over: no origin to push to, or no GitLab for the bridge (the backend's local_only rule)
-  const localOnly = scope.length > 0 && scope.every((r) => r.remote === false || !(r.kit?.gitlab_base && r.kit?.gitlab_project))
+  const localOnly = readable.length > 0 && readable.every((r) => r.remote === false || !(r.kit?.gitlab_base && r.kit?.gitlab_project))
   const manyRepos = repo === 'all' && repos.length > 1
   const team = !!status && (status.app.team || status.team.enabled)
   const newReq = () => go({ kind: 'new', ...(repo !== 'all' ? { repo } : {}) })
@@ -252,16 +257,16 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
       <header className="cto-top">
         {localOnly && <span className="cto-tag" data-testid="ov-local-tag" title="没有远端：需求只在这台机器上做，不交给运行机">只在本机</span>}
         {team && <span className="cto-tag is-real" title="交给运行机的需求由团队的运行机接手">团队模式</span>}
-        <span className="cto-org">{noKit ? `${repos.length} 个仓库 · 现在一个都读不了`
+        <span className="cto-org">{noKit ? `${repos.length} 个仓库 · 现在一个都读不了` : unreadable ? (picked ? `${picked.name} 还读不了` : '这个仓库不在列表里')
           : [status ? `${scope.length} 个仓库` : '', data ? `${data.rows.length} 个需求` : '…'].filter(Boolean).join(' · ')}</span>
         <span className="cto-grow" />
-        <RefreshButton repos={scope.filter((r) => r.remote !== false)} onDone={ov.reload} />
+        <RefreshButton repos={readable.filter((r) => r.remote !== false)} onDone={ov.reload} />
       </header>
       {repos.filter((r) => r.pending && (repo === 'all' || r.id === repo)).map((r) => (
         <PendingRepo key={r.id} repo={r} banner onOpen={() => go({ kind: 'import', path: r.path })} onDone={reloadStatus} />
       ))}
       <LoadState loading={ov.loading} error={ov.error} has={!!data} />
-      {!noKit && data?.errors.map((e) => {
+      {!noKit && data?.errors.filter((e) => !(unreadable && e.repo === repo)).map((e) => {
         const r = repos.find((x) => x.id === e.repo)
         // the backend's words when it said them; an error it passed on as it came (a scan that threw) is folded
         const plain = /[\u3400-\u9fff]/.test(e.error)
@@ -318,7 +323,10 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
       {empty && noKit && (
         <section className="cto-card" data-testid="ov-nokit"><p className="cto-was">brain-kit 读不到，这里的需求和数字要等它能读了才有：照最上面那条提示修。</p></section>
       )}
-      {empty && !noKit && (
+      {data && unreadable && !picked?.pending && (
+        <Unreadable repo={picked} error={data.errors.find((e) => e.repo === repo)} onImport={(path) => go({ kind: 'import', ...(path ? { path } : {}) })} onAll={() => pickRepo('all')} />
+      )}
+      {empty && !noKit && !unreadable && (
         <EmptyHero title="还没有需求" text={[`${where}还没有需求。认领一个需求，交它的文档过五关，开工：它会在这里一路走到合并——在哪一步、等谁、花了多少。`]}
           punch="人只在判断点上出手：批准、回答、验收。"
           flow={localOnly
@@ -412,6 +420,25 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
         </details>
       )}
     </main>
+  )
+}
+
+/** The page opened at a repo the app cannot read: why, in the backend's words when it said them (else /status's), with
+ * the way in, 导入仓库 for that path; one not listed any more says so. Its own words (a scan that threw) under 细节. */
+function Unreadable({ repo, error, onImport, onAll }: {
+  repo?: RepoInfo; error?: Overview['errors'][number]; onImport: (path?: string) => void; onAll: () => void
+}) {
+  const said = error?.error || repo?.error || ''
+  const plain = /[\u3400-\u9fff]/.test(said)
+  const raw = plain ? error?.raw : said
+  return (
+    <EmptyHero testid="ov-unreadable" title={repo ? `${repo.name} 还读不了` : '这个仓库不在列表里'}
+      text={[repo ? (plain ? said : '这次没读出来：看看这个仓库的目录还在不在、能不能读，再去导入仓库检查它') : '这个链接里的仓库已经不在这台机器的仓库列表里了：要看它就去导入仓库把它加回来。']}
+      punch="能读了，它的需求、数字和交付清单就都在这里。">
+      <button type="button" className="br-btn is-primary is-big" onClick={() => onImport(repo?.path)}><RoleIcon role="import" size={17} />去导入仓库</button>
+      <button type="button" className="br-btn" onClick={onAll}>看全部</button>
+      {raw && <details className="br-raw"><summary>细节</summary><pre>{raw}</pre></details>}
+    </EmptyHero>
   )
 }
 
