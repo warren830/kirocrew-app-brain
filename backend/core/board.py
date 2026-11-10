@@ -191,7 +191,7 @@ def missing_sources(raw: list[Any], *, local_only: bool, handed: bool) -> list[s
 
 
 def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any] | None, app_events: list[dict[str, Any]],
-              team_decisions: list[dict[str, Any]], subjects: dict[str, str], reflect_refs: list[tuple[str, float]],
+              team_decisions: list[dict[str, Any]], subjects: dict[str, str], reflect_refs: list[tuple[str, float, float | None]],
               default_branch: str, you: str = "你") -> list[dict[str, Any]]:
     """Every recorded event of the requirement, oldest first, in the board's words (BoardEvent without seq). *you*: the
     requirement's person as the reader calls them (你, or their name)."""
@@ -366,7 +366,7 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
         else:
             add(at, "app", "person", "person", label)
     applied = [e for e in out if e["kind"] == "reflect"]
-    for ref, at in reflect_refs:   # the branch this app's write-back made is the same write-back: one event (BOARD-32)
+    for ref, at, _ in reflect_refs:   # the branch this app's write-back made is the same write-back: one event (BOARD-32)
         hit = next((e for e in applied if e.get("ref") == ref or (not e.get("ref") and abs(e["at"] - at) < 120)), None)
         if hit:
             hit["text"] = _clip("%s（回写分支 %s）" % (hit["text"], ref), 200)
@@ -379,7 +379,7 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
 
 def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any] | None,
           sessions: list[dict[str, Any]], app_events: list[dict[str, Any]], team_decisions: list[dict[str, Any]],
-          subjects: dict[str, str], reflect_refs: list[tuple[str, float]], default_branch: str, local_only: bool,
+          subjects: dict[str, str], reflect_refs: list[tuple[str, float, float | None]], default_branch: str, local_only: bool,
           kit_rows: list[dict[str, Any]], decisions: list[dict[str, Any]], brain: dict[str, Any] | None,
           me: str | None, now: float, changes: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, Any]:
     """The board's graph part (actors, events, belt, checks, accept, person, live, direct, missing); the service adds
@@ -565,6 +565,9 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
     if merged_at is not None:   # what the clocks put a moment after the merge (Lean's ms, git's seconds) ends there too
         _merged(fo, merged_at, hand_at, proposals, again=True, you=you)
     _live_overlay(fo, f, row, sessions, now, hand_at, merged_at, evs, last_local[0], you)
+    newest = max(reflect_refs, key=lambda x: x[1], default=None)
+    if newest and newest[2] is not None and A["reflect"]["status"] == "done":   # the write-back is in the Brain now
+        fo.put("reflect", "merged", "回写分支 %s 已合并" % newest[0], newest[2])
     last = evs[-1]["at"] if evs else None
     for x in A.values():   # spans still open end at the last event (or at the merge)
         for s in x["spans"]:

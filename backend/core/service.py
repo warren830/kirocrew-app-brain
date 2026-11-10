@@ -802,9 +802,13 @@ class Service:
         return got
 
     @staticmethod
-    def _reflect_refs(git: Git, key: str) -> list[tuple[str, float]]:
-        """brain reflect's branches for *key* (brain/<KEY>-reflect-<n>, local or origin's) and when they were made."""
+    def _reflect_refs(git: Git, key: str, default_branch: str) -> list[tuple[str, float, float | None]]:
+        """brain reflect's branches for *key* (brain/<KEY>-reflect-<n>, local or origin's): when each was made, and
+        when it was merged into the default branch (the merge commit on its first-parent line; its own time when the
+        branch is on that line, fast-forwarded), or None while it waits."""
         out, seen = [], set()
+        main = next((r for r in ("refs/remotes/origin/" + default_branch, "refs/heads/" + default_branch)
+                     if git.ok("rev-parse", "-q", "--verify", r + "^{commit}")), None)
         rx = re.compile(r"^refs/(?:heads|remotes/origin)/(brain/%s-reflect-[1-9][0-9]*)$" % re.escape(key))
         for ref in sorted(git.refs("refs/heads/brain/", "refs/remotes/origin/brain/")):
             m = rx.match(ref)
@@ -812,7 +816,13 @@ class Service:
                 at = git.commit_time(ref)
                 if at:
                     seen.add(m.group(1))
-                    out.append((m.group(1), at))
+                    merged = None
+                    if main and git.ok("merge-base", "--is-ancestor", ref, main):
+                        line = git.out("rev-list", "--first-parent", "--ancestry-path", "--reverse",
+                                       "%s..%s" % (ref, main)).split()
+                        ff = not line or git.out("rev-parse", line[0] + "^1") == git.out("rev-parse", ref)
+                        merged = at if ff else git.commit_time(line[0])
+                    out.append((m.group(1), at, merged))
         return out
 
     def _board_sync(self, rid: str, key: str, snap: dict[str, Any]) -> dict[str, Any]:
@@ -829,7 +839,7 @@ class Service:
         g = board_mod.build(
             f, d["row"], t, mr=parts.get("mr"), sessions=sessions, app_events=app_events,
             team_decisions=parts.get("decisions") or [], subjects=subjects, changes=changes,
-            reflect_refs=self._reflect_refs(git, key) if git is not None else [],
+            reflect_refs=self._reflect_refs(git, key, str(cfg.get("default_branch") or "main")) if git is not None else [],
             default_branch=str(cfg.get("default_branch") or "main"), local_only=bool(parts.get("local_only")),
             kit_rows=board_mod.kit_cells(self.crew.get("rows") or [], parts.get("path") or ""),
             decisions=d["decisions"], brain=d["brain"], me=parts.get("me"), now=self.now())

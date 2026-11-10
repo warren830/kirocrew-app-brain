@@ -620,7 +620,7 @@ def main() -> None:
                                   ("application-design", "重复和非法单号在入口直接拒", "下游对账按单号去重", None, "agent", ["T-12"]),
                                   ("code-generation", "校验写成纯函数，接口和批量导入共用", "照 Brain 的约定", "P-7", "brain", ["P-7"])])
     board_later(p2, row, decisions=p2_decisions,
-                                  reflect=[("brain/PAY-2-reflect-1", p2.merged_at + 15 * H)],
+                                  reflect=[("brain/PAY-2-reflect-1", p2.merged_at + 15 * H, p2.merged_at + 2 * D)],
                                   sessions=[p2_sess,
                                             dict(det["sessions"][0], slot="brain-run-RUN-PAY-2-1", url="/chat?sid=brain-run-RUN-PAY-2-1", title="RUN-PAY-2-1",
                                                  agent="brain-run", kind="runner", credits=14.4, turns=41, busy=False, awaiting=False, last_activity=p2.merged_at)],
@@ -831,7 +831,7 @@ def main() -> None:
         reqs["r3"].append(r)
         order_rows.append(classified(r, row, reflected=bool(i % 2 and ago_d > 5)))
         board_later(r, row, credits=cr, mr_desc=mrdesc(r, "%s：做完了，合并进 main" % title),
-                                         reflect=[("brain/%s-reflect-1" % key, r.merged_at + 20 * H)] if i % 2 and ago_d > 5 else [])
+                                         reflect=[("brain/%s-reflect-1" % key, r.merged_at + 20 * H, None)] if i % 2 and ago_d > 5 else [])
         n_hum = sum(1 for h in r.humans if h["judgment_point"])
         runs.append({"key": key, "repo": "r3", "how": how, "beyond": ["交接后推代码"] if how == "people" and not i % 2 else (["回答问题"] if how == "people" else []),
                      "at_points": n_hum, "outside": 1 if how == "people" and not i % 2 else 0, "credits": cr, "merged_at": r.merged_at})

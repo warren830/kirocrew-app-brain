@@ -374,7 +374,7 @@ def test_the_merge_ends_the_requirements_time_and_its_14_days_are_watched_not_wa
     b = snapshot(facts(evs, merged=True), row_of("merged", "nobody", "已合并"), sessions=[session(T + 17 * M)],
                  t=merged_trace(merged_at, merged_at + 14 * 86400), brain_={"proposals": 2},
                  app_events=[{"at": iso(merged_at + 15 * H), "label": "回写 Brain：成功", "detail": "brain/DEMO-3-reflect-1"}],
-                 reflect_refs=[("brain/DEMO-3-reflect-1", merged_at + 15 * H)], now=merged_at + 2 * 86400)
+                 reflect_refs=[("brain/DEMO-3-reflect-1", merged_at + 15 * H, None)], now=merged_at + 2 * 86400)
     assert b["ended_at"] == merged_at
     assert all(s["b"] is not None and s["b"] <= merged_at for a in b["actors"] for s in a["spans"])
     cells = {c["id"]: c for c in b["checks"]["cells"]}
@@ -386,6 +386,13 @@ def test_the_merge_ends_the_requirements_time_and_its_14_days_are_watched_not_wa
     assert [e["text"] for e in b["events"] if e["kind"] == "reflect"] == ["回写 Brain：成功（回写分支 brain/DEMO-3-reflect-1）"]
     # the owner approved the release in their own session: they are named, never a pseudonym
     assert b["accept"]["done"]["who"] == "ychchen"
+    # DETAIL-25: the write-back branch waits to be merged, then it is in the default branch
+    assert (actor(b, "reflect")["status"], actor(b, "reflect")["doing"]) == ("done", "回写 Brain：成功（回写分支 brain/DEMO-3-reflect-1）")
+    b = snapshot(facts(evs, merged=True), row_of("merged", "nobody", "已合并"), t=merged_trace(merged_at, merged_at + 14 * 86400),
+                 brain_={"proposals": 2}, reflect_refs=[("brain/DEMO-3-reflect-1", merged_at + 15 * H, merged_at + 16 * H)],
+                 now=merged_at + 2 * 86400)
+    a = actor(b, "reflect")
+    assert (a["status"], a["doing"], a["since"]) == ("merged", "回写分支 brain/DEMO-3-reflect-1 已合并", merged_at + 16 * H)
 
 
 def test_the_replay_knows_whose_turn_each_wait_was():
@@ -530,3 +537,27 @@ def test_a_push_without_its_label_waits_on_the_person_not_on_the_runner():
     assert runners == [], runners
     assert spent(b, ("wait",), now) >= 7 * H + 46 * M
     assert actor(b, "handover")["history"][-1]["who"] == "you"
+
+
+def test_a_write_back_branch_says_when_it_was_merged_into_the_default_branch(tmp_path):
+    """DETAIL-25: brain/<KEY>-reflect-<n> fast-forwarded into main is merged at its own time, one merged with a merge
+    commit at that commit's, and one still waiting is not merged."""
+    from appkit import commit_file, git_repo, sh
+    svc = mod("service")
+    repo = git_repo(tmp_path / "r")
+    commit_file(repo, "a.md", "a\n", "init")
+    for n, how in ((1, "ff"), (2, "merge"), (3, "wait")):
+        sh("git", "-C", repo, "checkout", "-q", "-b", "brain/DEMO-3-reflect-%d" % n, "main")
+        commit_file(repo, "b%d.md" % n, "b\n", "Brain: DEMO-3 reflect %d" % n)
+        sh("git", "-C", repo, "checkout", "-q", "main")
+        if how == "ff":
+            sh("git", "-C", repo, "merge", "-q", "--ff-only", "brain/DEMO-3-reflect-1")
+        elif how == "merge":
+            commit_file(repo, "c.md", "c\n", "main moves on")
+            sh("git", "-C", repo, "merge", "-q", "--no-ff", "-m", "merge reflect 2", "brain/DEMO-3-reflect-2",
+               env={"GIT_COMMITTER_DATE": "2030-01-01T00:00:00Z", "GIT_AUTHOR_DATE": "2030-01-01T00:00:00Z"})
+    git = mod("repo").Git(repo)
+    got = {ref: (at, merged) for ref, at, merged in svc.Service._reflect_refs(git, "DEMO-3", "main")}
+    assert got["brain/DEMO-3-reflect-1"][1] == got["brain/DEMO-3-reflect-1"][0]
+    assert got["brain/DEMO-3-reflect-2"][1] == 1893456000.0
+    assert got["brain/DEMO-3-reflect-3"][1] is None
