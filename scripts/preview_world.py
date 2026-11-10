@@ -65,6 +65,13 @@ ME = "alice"
 NO_KIT = "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"     # service.reload_sync's words for a repo without it
 CFG = {"default_branch": "main", "handoff_label": "ai-handoff", "running_label": "ai-running",
        "rejected_label": "ai-handoff-rejected"}
+# brain-kit's own words: an old committed hook adapter (cli.crew_hook_problem), the credits note and a run it could not
+# read (evaluate)
+ADAPTER_OLD = (".kiro/brain/lean-hook.py is an older adapter (version 0, needs 2): the team runner could not write "
+               "runs/<KEY>/park.json, its only way to ask a person, before the Lean approvals; run `brain install` and "
+               "commit it on main through an MR")
+COST_NOTE = "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+SKIPPED_RAW = "runs/PAY-1/run.json is not valid JSON: line 3"
 # what brainkit.trace says it could not read on a person's machine (its own words)
 TRACE_MISSING = ["bridge ledger (--ledger not given)", "vouchers (--vouchers not given and no intake store)",
                  "pushes (git keeps no push log; person commits after hand-over stand in for them)",
@@ -172,8 +179,9 @@ class Req:
     def rejected(self, at: float, reason: str) -> None:
         self.hands.append({"at": iso(at), "kind": "bridge rejected", "run_id": None, "mr_iid": None, "reason": reason})
 
-    def question_park(self, at: float, status: str, kind: str) -> None:
-        self.park.append({"at": iso(at), "status": status, "kind": kind})
+    def question_park(self, at: float, status: str, kind: str, ask: str | None = None) -> None:
+        """park.json's question as the run wrote it: whom it asks (brain-kit's ask: owner, product, …) when it says."""
+        self.park.append(dict({"at": iso(at), "status": status, "kind": kind}, **({"ask": ask} if ask else {})))
 
     def ask(self, did: str, kind: str, asked: float, answered: float | None = None, choice: str | None = None,
             state: str = "open", who: str = "P-7C1D") -> None:
@@ -237,6 +245,14 @@ class Req:
                             "merged_at": {"value": iso(self.merged_at) if self.merged_at else None, "how": self.merge_how,
                                           "commit": sha(self.key, "merge") if self.merged_at else None, "src": "git", "note": None},
                             "reverted_or_hotfixed_within_14d": self.after14 or {"value": None, "window_closed": None, "window_end": None, "evidence": []}}}
+
+
+def crew_rows() -> list[dict]:
+    """KiroCrew's checks of the fixtures' machine as crewcheck makes them (problems.py's words): brain-dev.json lacks
+    Lean's hook before a tool call; shop-pay's committed hook adapter is the old one (a reminder there: it is not handed
+    to the runner); the engine is kas."""
+    return [problems.agent_lacks([("preToolUse", "PreToolUse")]),
+            problems.row("FAIL", ADAPTER_OLD, repo="/Users/alice/workplace/shop-pay", team=False), problems.engine("kas")]
 
 
 def app_event(at: float, label: str, detail: str | None = None) -> dict:
@@ -313,23 +329,25 @@ def no_trace_brain(r: Req) -> dict:
     return detail.brain_block(None, None, r.facts()["decisions_text"] if r.start_at is not None else None)
 
 
-def brain_views(reqs: dict[str, list[Req]], rows: list[dict], said: dict[str, list[dict]]) -> tuple[dict[str, dict], dict[str, dict]]:
+def brain_views(reqs: dict[str, list[Req]], rows: list[dict], said: dict[str, list[dict]]) -> tuple[dict[str, dict], dict[str, dict], dict[str, dict]]:
     """Each repo's Brain page (GET /brain) as brainview.view makes it with brain-kit, on a scratch git repo that holds
     what the world says: the Brain on main, each merged run (its run.json at the Brain it loaded, its decisions.md
     citing what it used) and the write-back that followed it, each run not merged yet on its branch (a local one in
     its worktree). Its decisions.md holds the decisions 需求详情 shows for it (*said*, by "<repo>/<key>"), so its 决定
     and its 用到的 Brain cite the same entries. And each run's Brain block, by "<repo>/<key>", as 需求详情 and 需求看板 get it: detail.brain_block of
     brainkit.trace's, the usage row of the run read where the service reads its trace (its worktree, else its ref), the
-    very read and row the Brain page's numbers come from. ({}, {}) without brain-kit (BRAIN_TEST_BRAINKIT)."""
+    very read and row the Brain page's numbers come from. And each run's 回写 Brain preview (POST /brain/reflect/preview)
+    by "<repo>/<key>", for the runs the Brain page offers to write back. ({}, {}, {}) without brain-kit
+    (BRAIN_TEST_BRAINKIT)."""
     if not (BRAINKIT / "brainkit" / "__init__.py").is_file():
         print("no brain-kit at %s: the Brain pages are left out" % BRAINKIT)
-        return {}, {}
+        return {}, {}, {}
     bk.load(str(BRAINKIT))
     E = bk.m("entries")
     paths = {"r1": "/Users/alice/workplace/shop-pay", "r3": "/Users/alice/workplace/shop-order",
              "r4": "/Users/alice/workplace/shop-tools"}
     prefix = {"r1": "PAY", "r3": "ORD", "r4": "TOOL"}
-    out, uses = {}, {}
+    out, uses, reflects = {}, {}, {}
     with tempfile.TemporaryDirectory() as tmp:
         for rid, path in paths.items():
             top = Path(tmp) / rid
@@ -371,8 +389,11 @@ def brain_views(reqs: dict[str, list[Req]], rows: list[dict], said: dict[str, li
                     x["id"], x["date"], x["stage"], x["text"], x["why"],
                     "brain %s" % ", ".join(x["cites"]) if x["by"] == "brain" and x["cites"] else
                     " ".join([x["who"] or x["by"]] + x["cites"])) for x in rows_)
+                # its proposals as the run writes them (brain reflect reads these): what it learned, from its first decision
+                props = "".join("```brain-proposal\nfile: TECH\ntype: guideline\nsrc: D-1\n---\n%s 学到的第 %d 条：%s\n```\n" % (
+                    r.key, n, r.title) for n in range(1, r.proposals + 1))
                 (d / "decisions.md").write_text("# Decisions\n\n| ID | Date | Stage | Decision | Why | Who |\n|---|---|---|---|---|---|\n"
-                                                + table + "```brain-proposal\n```\n" * r.proposals, encoding="utf-8")
+                                                + table + props, encoding="utf-8")
                 cited = {c for x in rows_ for c in x["cites"]}
                 (d / "inception" / "requirements" / "requirements.md").write_text(
                     "# %s\n\n" % r.title + "".join("- 照 Brain 的 %s\n" % c for c in CITES.get(r.key, []) if c not in cited),
@@ -410,12 +431,15 @@ def brain_views(reqs: dict[str, list[Req]], rows: list[dict], said: dict[str, li
                 r = by_key.get(f["key"])
                 if r is None or not f.get("run"):
                     continue
+                if any(x["key"] == r.key for x in reflect):     # brainview.preview, as the reflect route answers
+                    reflects["%s/%s" % (rid, r.key)] = json.loads(json.dumps(brainview.preview(repo, f, None),
+                                                                             ensure_ascii=False).replace(repo.path, path))
                 src, ref = (f["worktree"], None) if f.get("worktree") else (repo.path, f.get("ref"))   # service._timeline
                 got = trace_row(bk.m("usage").collect(src, repo.cfg, ref=ref), r.intent, r.key) or {}
                 uses["%s/%s" % (rid, r.key)] = detail.brain_block(
                     {"loaded": got.get("loaded"), "cited": got.get("cited"), "stale": got.get("stale"),
                      "unknown": got.get("unknown"), "proposals": {"total": r.proposals}}, None, None)
-    return out, uses
+    return out, uses, reflects
 
 
 def standard(r: Req, t: float, *, design_back: bool = False, units: tuple[str, ...] = ()) -> float:
@@ -466,9 +490,9 @@ def runner_half(r: Req, t: float, *, iid: int, question: tuple[str, str, float, 
         r.commit(c, "bot", "%s：%s（%s）" % (r.key, subj, u), files=3 + i)
     if question:
         did, kind, wait, choice = question
-        r.question_park(c + 2 * M, "waiting", kind)
+        r.question_park(c + 2 * M, "waiting", kind, "owner" if kind == "clarify" else "product")
         r.ask(did, kind, c + 3 * M, c + 3 * M + wait, choice, state="delivered")
-        r.question_park(c + 4 * M + wait, "answered", kind)
+        r.question_park(c + 4 * M + wait, "answered", kind, "owner" if kind == "clarify" else "product")
         c = c + 6 * M + wait
         r.commit(c + 18 * M, "bot", "%s：按 %s 的回答改" % (r.key, did), files=2)
         c += 18 * M
@@ -483,17 +507,17 @@ def runner_half(r: Req, t: float, *, iid: int, question: tuple[str, str, float, 
         r.commit(c + 31 * M, "bot", "%s：修好 pytest 里没过的两个用例" % r.key, files=2)
         c += 32 * M
     r.verify(c + 15 * M, checks)
-    r.stage(c + 16 * M, "build-and-test", "done", note="verify PASS：3 项")
+    r.stage(c + 16 * M, "build-and-test", "done", note="verify PASS: %d checks on code fingerprint %s" % (len(checks), sha(r.key, "fp")[:8]))
     r.stage(c + 17 * M, "release", "started")
     h = r.request(c + 25 * M, "RELEASE")
-    r.question_park(c + 26 * M, "waiting", "acceptance")
+    r.question_park(c + 26 * M, "waiting", "acceptance", "product")
     return c + 26 * M + accept_after, h
 
 
 def merged(r: Req, t: float, h: str, did: str, how: str = "merge commit") -> None:
     r.ask(did, "acceptance", t - 50 * M, t, "approve", state="delivered", who="P-9E3B")
     r.approve(t + 1 * M, "RELEASE", h, who="P-9E3B")
-    r.stage(t + 2 * M, "release", "done", note="发布批准了")
+    r.stage(t + 2 * M, "release", "done", note="RELEASE approved (sha %s)" % h[:8])
     r.merge(t + 35 * M, how)
 
 
@@ -559,12 +583,26 @@ def main() -> None:
         r_["label"] = deliveries.CAT_LABEL.get(r_["id"], r_["label"])
     det = json.loads((FIX / "detail.json").read_text(encoding="utf-8"))
     status = json.loads((FIX / "status.json").read_text(encoding="utf-8"))
+    status["crew"]["rows"] = crew_rows()
+    status["crew"]["fix"] = {"agent": True, "engine": False}
     rows = {r["key"]: r for r in ov["rows"]}
     for q in ov["eval"]["queue"]:
-        q["reasons"] = [deliveries.acts_in_words(x) for x in q["reasons"]]
+        q["reasons"] = [deliveries.eval_reason(x) for x in q["reasons"]]
+    # brainkit.evaluate's notes and its skipped run, as deliveries.evaluate says them
+    ov["eval"]["note_rows"] = deliveries.eval_notes(COST_NOTE, ["PAY-2"], [])
+    ov["eval"]["notes"] = [x["text"] for x in ov["eval"]["note_rows"]]
+    ov["eval"]["skipped"] = [{"key": "PAY-1", "why": deliveries.skip_why({"why": SKIPPED_RAW}), "raw": SKIPPED_RAW}]
+    ov["eval"]["computing"] = False
+    for m in ov["eval"]["metrics"]:
+        if m["id"] == "repeat_rate":     # the app's own rule (the others are brainkit.evaluate's)
+            m["rule"] = deliveries.REPEAT_RULE
     for e in ov["errors"] + [r_ for r_ in status["repos"] if r_.get("error")]:
         if "还没装 brain-kit" in e["error"]:
             e["error"] = NO_KIT
+    for e in ov["errors"]:      # service._overview_sync: what the app said, and its path (or the exception) for 细节
+        e["raw"] = e.get("raw") or "/Users/alice/workplace/shop-web"
+    for d_ in det["decisions"]:     # detail.decisions: the in-session questions each records the answer of
+        d_["asked"] = detail.asked_in(d_["text"], d_["why"])
     # each row's 变更说明 first line (service._row: mrdesc_view.plain_line of it): the requirement's own
     first = {"PAY-2": "退款单号加上校验位，重复和非法单号在入口就拒掉。", "PAY-4": "对账单按商户拆成一户一份，大商户按小时切。",
              "PAY-5": "退款回调失败自动重试，第 6 次转人工处理。", "PAY-7": "退款时选原因，原因列表在后台维护。"}
@@ -599,7 +637,7 @@ def main() -> None:
         day = iso(r.start_at or T0)[:10]
         return [{"id": "D-%d" % i, "date": day, "stage": st, "text": text, "why": why, "who": who, "by": by,
                  "cites": list(cites), "vouchers": ["V-%s" % sha(r.key, i)[:10]] if by == "person" else [],
-                 "src": "aidlc-docs/%s/decisions.md#L%d" % (r.intent, 7 + i)}
+                 "src": "aidlc-docs/%s/decisions.md#L%d" % (r.intent, 7 + i), "asked": detail.asked_in(text, why)}
                 for i, (st, text, why, who, by, cites) in enumerate(rows, 1)]
 
     # ---------------------------------------------------------------- shop-pay
@@ -620,7 +658,7 @@ def main() -> None:
                                   ("application-design", "重复和非法单号在入口直接拒", "下游对账按单号去重", None, "agent", ["T-12"]),
                                   ("code-generation", "校验写成纯函数，接口和批量导入共用", "照 Brain 的约定", "P-7", "brain", ["P-7"])])
     board_later(p2, row, decisions=p2_decisions,
-                                  reflect=[("brain/PAY-2-reflect-1", p2.merged_at + 15 * H)],
+                                  reflect=[("brain/PAY-2-reflect-1", p2.merged_at + 15 * H, None)],
                                   sessions=[p2_sess,
                                             dict(det["sessions"][0], slot="brain-run-RUN-PAY-2-1", url="/chat?sid=brain-run-RUN-PAY-2-1", title="RUN-PAY-2-1",
                                                  agent="brain-run", kind="runner", credits=14.4, turns=41, busy=False, awaiting=False, last_activity=p2.merged_at)],
@@ -651,7 +689,7 @@ def main() -> None:
     p3.turn(T0 - 5 * H)                                         # the next morning: alice tells it to go on
     p3.stage(T0 - 5 * H + 2 * M, "code-generation", "started", unit="refund-api")
     p3.commit(T0 - 40 * M, "person", "PAY-3：refund-api 的代码计划", files=1, records=True)
-    p3.question_park(T0 - 20 * M, "waiting", "clarify")
+    p3.question_park(T0 - 20 * M, "waiting", "clarify", "owner")
     p3.request(T0 - 6 * M, "PLAN", unit="refund-api", sha8="5d1e7a90")
     reqs["r1"].append(p3)
     q3 = det["questions"][0]
@@ -677,14 +715,19 @@ def main() -> None:
     p4.accepted(t + 32 * M, 41, "RUN-PAY-4-1")
     p4.stage(t + 35 * M, "functional-design", "started", unit="split-job")
     p4.commit(t + 2 * H, "bot", "PAY-4：拆分任务的骨架（split-job）", files=5)
-    p4.question_park(T0 - 3 * H - 2 * M, "waiting", "design")
+    p4.question_park(T0 - 3 * H - 2 * M, "waiting", "design", "product")
     p4.ask("D-2", "design", T0 - 3 * H)
     p4_park = {"status": "waiting", "kind": "design", "ask": "product"}
     reqs["r1"].append(p4)
     row = classified(p4, rows["PAY-4"], park=p4_park, mr={"state": "opened", "labels": ["ai-running"], "questions": [
         {"id": "D-2", "kind": "design", "state": "open", "lean_request": None, "at": iso(T0 - 3 * H)}]})
-    board_later(p4, row, park=p4_park, decisions=decisions(p4, [
-                                      ("application-design", "按商户拆成一户一份", "财务按商户对账", None, "agent", ["T-12"])]),
+    # its decisions.md: D-1 the agent's; D-2 is the question still open on the MR; D-3 a Who outside the runner's
+    # vocabulary, the one brainkit.evaluate's funnel lists as 没归类 (交付总览 links to it)
+    p4_dec = decisions(p4, [("application-design", "按商户拆成一户一份", "财务按商户对账", None, "agent", ["T-12"]),
+                            ("functional-design", "拆分任务按商户号排好再按日期写", "对账脚本按这个顺序读", "split-job 规划", "unclassified", [])])
+    p4_dec[1].update(id="D-3", src=p4_dec[1]["src"].replace("#L9", "#L10"))
+    ov["funnel"]["unclassified"] = [{"key": "PAY-4", "id": "D-3", "src": p4_dec[1]["src"]}]
+    board_later(p4, row, park=p4_park, decisions=p4_dec,
                                   questions=[{"source": "mr", "id": "D-2", "kind": "design", "kind_label": "设计", "question": "按商户拆分时，一个商户一天超过 10 万行要不要再按小时切？",
                                               "options": [{"id": "A", "text": "按小时切成多份"}, {"id": "B", "text": "一份，压缩成 zip"}], "recommend": "A",
                                               "lean_request": None, "refs": ["D01#S002"], "state": "open", "answer": None, "answerer": None, "voucher_id": None,
@@ -724,7 +767,7 @@ def main() -> None:
     p7.commit(t + 50 * M, "person", "PAY-7：下拉框和原因列表", files=3)
     p7.stage(t + 70 * M, "code-generation", "done", unit="refund-ui", note="代码写完")
     p7.verify(t + 80 * M, [("pytest -q", 0), ("npm test", 0)])
-    p7.stage(t + 81 * M, "build-and-test", "done", note="verify PASS：2 项")
+    p7.stage(t + 81 * M, "build-and-test", "done", note="verify PASS: 2 checks on code fingerprint %s" % sha("PAY-7", "fp")[:8])
     p7.handoff(t + 85 * M)
     reqs["r1"].append(p7)
     why, raw = problems.reasons_text(["label 'ai-handoff' was added by bob, not by the branch owner alice"])
@@ -770,7 +813,7 @@ def main() -> None:
                mr={"iid": 52, "url": "%s/shop/shop-pay/-/merge_requests/52" % GL, "state": "opened"}, open_questions=[])
     extra_rows.append(classified(p10, row, mr={"state": "opened", "labels": [], "questions": []}, at_handover=True))
     board_later(p10, row, mr_desc=mrdesc(p10, row["summary"]), credits=12.6,
-                decisions=decisions(p10, [("requirements", "超过一万的退款要二次确认", "产品定的", "P-1A2B", "person", [])]))
+                decisions=decisions(p10, [("requirements", "超过一万的退款要二次确认", "Q1 答\"按推荐\"（产品定的）", "P-1A2B", "person", [])]))
 
     # PAY-1: on this machine, built and verified; its session is idle since; Lean's next is the release, after a
     # review in a new session (the one that wrote the code cannot review it)
@@ -816,7 +859,7 @@ def main() -> None:
             r.stage(t + 96 * M, "build-and-test", "done")
             h = r.request(t + 100 * M, "RELEASE")
             r.approve(t + 115 * M, "RELEASE", h)
-            r.stage(t + 116 * M, "release", "done", note="发布批准了")
+            r.stage(t + 116 * M, "release", "done", note="RELEASE approved (sha %s)" % h[:8])
             r.merge(t + 140 * M, "fast-forward")
         else:
             end, h = runner_half(r, t + 30 * M, iid=10 + i, question=("D-1", "clarify", 35 * M, "B") if how == "people" and i % 2 else None,
@@ -831,7 +874,8 @@ def main() -> None:
         reqs["r3"].append(r)
         order_rows.append(classified(r, row, reflected=bool(i % 2 and ago_d > 5)))
         board_later(r, row, credits=cr, mr_desc=mrdesc(r, "%s：做完了，合并进 main" % title),
-                                         reflect=[("brain/%s-reflect-1" % key, r.merged_at + 20 * H)] if i % 2 and ago_d > 5 else [])
+                                         reflect=[("brain/%s-reflect-1" % key, r.merged_at + 20 * H,
+                                                   r.merged_at + 20 * H if i == 1 else None)] if i % 2 and ago_d > 5 else [])   # ORD-2's is in main
         n_hum = sum(1 for h in r.humans if h["judgment_point"])
         runs.append({"key": key, "repo": "r3", "how": how, "beyond": ["交接后推代码"] if how == "people" and not i % 2 else (["回答问题"] if how == "people" else []),
                      "at_points": n_hum, "outside": 1 if how == "people" and not i % 2 else 0, "credits": cr, "merged_at": r.merged_at})
@@ -902,13 +946,16 @@ def main() -> None:
     local = {"r4"}      # no GitLab: done only on this machine (shop-web, r2, is not loaded)
 
     runner_rows: list[dict] = []     # the team runner's rows (service._team_rows), made below with team mode's 待办
+    taken: set[tuple[str, str]] = set()     # team mode: the repos' rows the runner's stand for (service._team_split)
 
-    def overview_of(repo: str, evaluated: bool) -> dict:
+    def overview_of(repo: str, evaluated: bool, team: bool = False) -> dict:
         """交付总览 for 全部 or one repo, as service._overview_sync makes it: its rows, its repos' numbers; without
-        brainkit.evaluate the funnel is the app's own count and every merge is still 还没评."""
+        brainkit.evaluate the funnel is the app's own count and every merge is still 还没评. *team*: on the team
+        runner's machine, where each requirement is listed once (a handed-over one as the runner's)."""
         ids = [x for x in ("r1", "r3", "r4") if repo in ("all", x)]
         o = copy.deepcopy(ov)
-        o["rows"] = [r_ for r_ in all_rows if r_["repo"] in ids] + (copy.deepcopy(runner_rows) if repo == "runner" else [])
+        o["rows"] = [r_ for r_ in all_rows if r_["repo"] in ids and not (team and (r_["repo"], r_["key"]) in taken)] + (
+            copy.deepcopy(runner_rows) if team and repo in ("all", "runner") else [])
         o["overlaps"] = [x for x in ov["overlaps"] if any(r_["key"] == x["keys"][0] for r_ in o["rows"])]
         o["counts"] = deliveries.counts(o["rows"])
         o["errors"] = [e for e in ov["errors"] if repo in ("all", e["repo"])]
@@ -948,7 +995,7 @@ def main() -> None:
                for r_ in all_rows if r_["state"] != "closed" and (r_["state"] != "merged" or r_["waits"]["who"] == "you")]
     crew_fail = problems.agent_missing()
     world_todo = {"ok": todo.build(entries, team=False, crew_rows=[]), "crewfail": todo.build(entries, team=False, crew_rows=[crew_fail])}
-    brains, uses = brain_views(reqs, all_rows, {bid: kw.get("decisions") or [] for bid, (_, _, kw) in LATER.items()})
+    brains, uses, reflects = brain_views(reqs, all_rows, {bid: kw.get("decisions") or [] for bid, (_, _, kw) in LATER.items()})
     for bid, (r_, row_, kw) in LATER.items():
         boards[bid] = snapshot(r_, row_, brain=uses.get(bid) or no_trace_brain(r_), **kw)
     det["brain"] = boards["r1/PAY-3"]["brain"]
@@ -991,10 +1038,16 @@ def main() -> None:
         row_t.update(run_ids=[run_id], credits=round(sum(x.get("credits") or 0 for x in sess), 3) or None, sessions=len(sess),
                      mr={"iid": int(rr["iid"]), "url": url, "state": None}, updated_at=lean_view.epoch(rr.get("updated")),
                      summary=mrdesc_view.plain_line((kw.get("mr_desc") or {}).get("first")) if f.get("run") else None)
-        team_entries.append({"row": row_t, "decisions": decs, "mr_url": url})
-        runner_rows.append(row_t)
+        rid = {"shop/shop-pay": "r1", "shop/shop-order": "r3"}.get(rr["project"])
+        mine = next((r_ for r_ in all_rows if (r_["repo"], r_["key"]) == (rid, key)), None)
+        own = next((x for x in reqs.get(rid, []) if x.key == key), None)
+        if deliveries.runner_takes(own.facts() if own and mine else None, mine, row_t):
+            team_entries.append({"row": row_t, "decisions": decs, "mr_url": url})
+            runner_rows.append(row_t)
+            if mine is not None:
+                taken.add((rid, key))
         brain_t = boards[bid]["brain"] if path and bid in boards else no_trace_brain(Req("r1", key, "", "", "", ""))
-        b = snapshot(q, row_t, brain=brain_t, park=park, facts=f, team_decisions=decs, sessions=sess, me=None,
+        b = snapshot(q, row_t, brain=brain_t, park=park, facts=f, team_decisions=decs, sessions=sess, me=ME,
                      decisions=kw.get("decisions") or [], reflect=kw.get("reflect") or [],
                      mr_desc=kw.get("mr_desc") if path else mrdesc_view.empty("还没开工：开工以后才有变更说明"),
                      questions=detail.ledger_questions(decs, url), credits=row_t["credits"], bid="runner/%s" % key)
@@ -1019,10 +1072,13 @@ def main() -> None:
             "sessions": [{k: x.get(k) for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                                  "last_activity", "opened_at", "project", "url", "error")} for x in sess],
             "credits": {"total": row_t["credits"], "note": detail.NO_TOKENS}, "brain": brain_t, "mr_desc": b["mr_desc"]}
-    world_todo["team"] = {"items": world_todo["ok"]["items"] + todo.build(team_entries, team=True, crew_rows=[])["items"],
+    team_items = todo.build(team_entries, team=True, crew_rows=[])["items"]
+    world_todo["team"] = {"items": [i for i in world_todo["ok"]["items"] if (i["repo"], i["key"]) not in taken] + team_items,
                           "team": True}
-    for e in ("eval", "noeval"):   # 交付总览 of 运行机 (team mode's 全部 is the repos' and these together)
-        overviews[e]["runner"] = overview_of("runner", e == "eval")
+    for e in ("eval", "noeval"):   # 交付总览 of 运行机, and team mode's 全部 and repos (each requirement once)
+        overviews[e]["runner"] = overview_of("runner", e == "eval", team=True)
+    overviews_team = {e: {x: overview_of(x, e == "eval", team=True) for x in ("all", "r1", "r2", "r3", "r4", "runner")}
+                      for e in ("eval", "noeval")}
     world_status = copy.deepcopy(status)
     world_status["repos"] = status["repos"] + [
         {"id": "r3", "path": "/Users/alice/workplace/shop-order", "name": "shop-order", "ok": True, "error": "", "pending": None,
@@ -1036,13 +1092,16 @@ def main() -> None:
          "me": {"name": "alice", "source": "login", "gitlab": "", "text": "alice（这台机器的登录名：这个仓库不用 GitLab）",
                 "ask": False, "label": "", "why": "", "suggest": "", "error": ""}}]
     # KiroCrew is fine in the world (the 「KiroCrew 有 FAIL」 switch shows a failing row); shop-tools keeps its ! reminder
-    ok_hook = {"level": "OK", "text": "brain-dev.json 的 Lean hook 都在", "todo": "", "fix": None, "repo": None, "raw": ""}
-    world_status["crew"]["rows"] = [ok_hook if r_["level"] == "FAIL" else r_ for r_ in status["crew"]["rows"] if r_.get("fix") != "kit"] + tool_kit
+    world_status["crew"]["rows"] = [problems.agent_ok(0) if r_["level"] == "FAIL" else r_ for r_ in status["crew"]["rows"]
+                                    if r_.get("fix") != "kit"] + tool_kit
+    world_status["crew"]["fix"] = {"agent": any(r_.get("fix") == "agent" for r_ in world_status["crew"]["rows"]),
+                                   "engine": any(r_.get("fix") == "engine" for r_ in world_status["crew"]["rows"])}
     world_status["counts"]["todo"] = len(world_todo["ok"]["items"])
     for r_ in world_status["repos"]:
         r_["remote"] = r_["id"] not in local and r_["id"] != "r2"
     world = {"note": "made by scripts/preview_world.py: do not edit by hand", "at": T0, "status": world_status, "overview": world_ov,
-             "overviews": overviews, "todo": world_todo, "boards": boards, "details": details, "stages": STAGES,
+             "overviews": overviews, "overviews_team": overviews_team, "todo": world_todo, "reflects": reflects,
+             "crew_missing": crew_fail, "boards": boards, "details": details, "stages": STAGES,
              "brains": brains}
     (ROOT / "ui" / "preview" / "world.json").write_text(json.dumps(world, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     # the contract fixtures the UI tests read: the overview's numbers for its own rows, one live board and one merged
@@ -1053,10 +1112,11 @@ def main() -> None:
     # 待办's fixture: one item of every kind, each as todo.build made it in the world (team mode's runner questions, and
     # the KiroCrew item of the fixture's own /status rows, included), in the order the UI tests read them
     mine = world_todo["ok"]["items"]
-    pool = mine + world_todo["team"]["items"][len(mine):] + todo.build([], team=False, crew_rows=status["crew"]["rows"])["items"]
+    pool = mine + team_items + todo.build([], team=False, crew_rows=status["crew"]["rows"])["items"]
     tj = {"items": [next(i for i in pool if i["kind"] == k) for k in TODO_KINDS], "team": False}
     (FIX / "todo.json").write_text(json.dumps(tj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     st = json.loads((FIX / "status.json").read_text(encoding="utf-8"))   # as read: the world changed its crew rows
+    st["crew"]["rows"] = crew_rows()                                        # … but in the backend's words
     for r_ in st["repos"]:
         r_["error"] = NO_KIT if "还没装 brain-kit" in r_["error"] else r_["error"]
     st["counts"]["todo"] = len(tj["items"])                             # /status counts the very list /todo answers

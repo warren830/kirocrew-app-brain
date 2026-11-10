@@ -3,14 +3,14 @@
     {
       "mode": "inplace",
       "title": "直接更新在 main",
-      "line": "更新在你现在的检出里，提交在 main 上；推送到 origin 以后生效（这会直接改团队的 main，没有 MR 评审）",
+      "line": "更新在你现在的检出里，提交在 main 上；推送到远端以后生效（这会直接改团队的 main，没有 MR 评审）",
       "ok": true,
       "why": ""
     },
     {
       "mode": "branch",
       "title": "更新到新分支，开 MR 给团队看",
-      "line": "从 origin/main 建新分支，放在单独的工作目录里，不动你的检出；推送、开 MR 给团队看，MR 合进 main 以后才生效",
+      "line": "从远端的 main 建新分支，放在单独的工作目录里，不动你的检出；推送、开 MR 给团队看，MR 合进 main 以后才生效",
       "ok": true,
       "why": ""
     }

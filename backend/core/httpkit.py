@@ -11,6 +11,9 @@ from typing import Any, Awaitable, Callable
 
 from .constants import APP_NAME
 
+UNREADABLE = "页面发来的内容读不懂：刷新页面再试"
+OWNER_ONLY = "只有 KiroCrew 仪表盘的主人本人能用这个 app"
+
 
 class AppError(Exception):
     """An error a route answers with ``{"error", "code"}`` and *status*."""
@@ -39,9 +42,9 @@ async def read_body(request: Any) -> dict[str, Any]:
     try:
         data = await request.json()
     except (ValueError, UnicodeDecodeError):
-        raise AppError("请求体不是合法 JSON", "invalid_json")
+        raise AppError(UNREADABLE, "invalid_json")
     if not isinstance(data, dict):
-        raise AppError("请求体必须是 JSON 对象", "invalid_json")
+        raise AppError(UNREADABLE, "invalid_json")
     return data
 
 
@@ -61,15 +64,15 @@ class Kit:
     def deny(self, request: Any) -> Any | None:
         """Only the dashboard owner's own requests get through: these routes start agents and spend credits."""
         if request.get("user") is None:
-            return self.err(401, "unauthenticated", "需要登录 KiroCrew dashboard")
+            return self.err(401, "unauthenticated", "没登录 KiroCrew 仪表盘：重新打开它，登录以后再试")
         if request.get("app"):
-            return self.err(403, "app_token_forbidden", "这些接口只接受 dashboard 主人本人的请求")
+            return self.err(403, "app_token_forbidden", OWNER_ONLY + "：别的 app 不能调用它")
         try:
             owner = bool(self.is_owner(request))
         except Exception:  # noqa: BLE001
             owner = False
         if not owner:
-            return self.err(403, "owner_only", "这些接口只接受 dashboard 主人本人的请求")
+            return self.err(403, "owner_only", OWNER_ONLY + "：用主人的账号登录仪表盘")
         return None
 
     def guarded(self, fn: Callable[[Any], Awaitable[Any]]) -> Callable[[Any, Any], Awaitable[Any]]:

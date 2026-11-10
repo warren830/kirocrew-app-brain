@@ -40,8 +40,8 @@ NOT_LABELLED_RAW = "MR 上要有标签 %s。再交接一次：在这个需求的
 # bridge process is posting it right now, 72b278e)
 NOT_POSTED = ("posting", "asking")
 STUCK_DECISION = {"refused": "%s 的回答签名服务不签：看运行机页的拒签原因",
-                  "void": "%s 作废（问题没绑上这次推送和 park.json）：run 要重新推送才会重新提问",
-                  "invalid": "%s 发不出去（park.json 不对）：run 要改好重新推送"}
+                  "void": "%s 作废（问题和这次推送对不上）：运行机要重新推送一次才会重新提问",
+                  "invalid": "%s 发不出去（AI 停下来写的问题不对）：运行机要改好再推送一次"}
 
 
 def park_waiting(park: Any) -> bool:
@@ -257,29 +257,49 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
     if st == "failed":
         return put("rejected", "people", "redo_handoff", "工作区没建成，要人看一下", where="mr")
     if st == "signing":
-        return put("handed_over", "bridge", "none", "签名服务在签接手合同（%s 先占着）" % (run_row.get("run_id") or "run 号"))
+        return put("handed_over", "bridge", "none", "签名服务在签接手合同")
     if st in ("spooled", "ready"):
         return put("handed_over", "runner", "none", "运行机在准备工作区")
     if st == "send_unknown":
-        return put("running", "people", "none", "消息送没送到不清楚：要人看一下会话 %s" % (run_row.get("slot") or ""))
+        return put("running", "people", "none", "不知道消息送到运行机没有：去 KiroCrew 看一下它的会话")
     if open_d:
         d = open_d[-1]
         since = lean_view.epoch(d.get("created"))
         if d.get("kind") == "acceptance":
             return put("acceptance", "product", "accept", mr_ask("product", "验收", d["id"], approval=True),
                        where="mr", since=since)
-        return put("parked", "people", "answer", mr_ask("people", KIND_LABEL.get(str(d.get("kind")), str(d.get("kind"))),
-                                                       d["id"], approval=bool(d.get("lean_request"))),
+        # who answers: the decision's ask, else the question park.json asks it about (as a person's row says it); the
+        # owner is named here, never 你 (the runner's page has no reader to be the owner)
+        ask = str(d.get("ask") or (park.get("ask") if park_waiting(park) else "") or "")
+        who = ASK_WHO.get(ask, "people")
+        who = "people" if who == "you" else who
+        return put("parked", who, "answer", mr_ask(who, KIND_LABEL.get(str(d.get("kind")), str(d.get("kind"))), d["id"],
+                                                   approval=bool(d.get("lean_request")),
+                                                   owner=row.get("owner") if ask == "owner" else None),
                    where="mr", since=since)
     if posting:
-        return put("parked", "bridge", "none", "run 停下了：等桥把问题贴到 MR 上")
+        return put("parked", "bridge", "none", "运行机停下来问人了：等桥把问题贴到 MR 上")
     last = mine[-1] if mine else None
     if last and last.get("state") in STUCK_DECISION and (park is None or park_waiting(park)) and \
             (not run_row.get("last_sha") or not last.get("sha") or last["sha"] == run_row["last_sha"]):
         return put("parked", "people", "answer", STUCK_DECISION[last["state"]] % last["id"], where="mr")
     if park_waiting(park):
-        return put("parked", "bridge", "none", "run 停下了：等桥把问题贴到 MR 上")
+        return put("parked", "bridge", "none", "运行机停下来问人了：等桥把问题贴到 MR 上")
     return put("running", "runner", "none", "运行机在跑")
+
+
+def runner_takes(f: dict[str, Any] | None, row: dict[str, Any] | None, runner_row: dict[str, Any]) -> bool:
+    """Team mode lists each requirement once. One the runner's ledger has a run of is the runner's (its facts win:
+    this machine's row is what it saw last), unless this machine's run of it was never handed over (taken back), or
+    its run is over by both counts (merged or closed): then its repo's row reads the merge, the 14 days after it and
+    the write-back into the Brain, which the ledger does not."""
+    if f is None or row is None:
+        return True
+    run = f.get("run") or {}
+    if run and not run.get("handoff"):
+        return False
+    ended = ("merged", "closed")
+    return not (runner_row["state"] in ended and row["state"] in ended)
 
 
 def overlaps(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -369,6 +389,14 @@ def _pair(x: Any) -> list[int] | None:
 
 
 NO_EVALUATE = "这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit"
+REPEAT_RULE = "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
+# how brainkit.evaluate counts each number (its eval.md and its own rule texts), said in words
+METRIC_RULE = {
+    "autonomy": "交接以后没有人插手就合并的需求 ÷ 交接过、已经合并的需求（批准、验收这些必经的审批不算插手）",
+    "delivery": "一次通过验收、合并后 14 天里没有回滚也没有修补的需求 ÷ 合并满 14 天的需求",
+    "judgment": "人做的事里落在判断点的（批准、退回、回答停下来问的问题）÷ 人做的全部",
+    "credits_per_success": "做完的需求花的 credits 合计 ÷ 正确交付的需求数（只用来看，不设上限）",
+}
 
 
 def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict[str, Any] | None,
@@ -391,10 +419,6 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
         view["error"], view["raw"] = "交付评估的结果读不懂：brain-kit 的原话在细节里", repr(data)[:2000]
         return view, None
 
-    def rule(k: str) -> str:
-        v = data.get(k)
-        return str(v.get("rule") or "")[:300] if isinstance(v, dict) else ""
-
     def val(k: str) -> Any:
         v = data.get(k)
         return _pair(v.get("value")) if isinstance(v, dict) else _pair(v)
@@ -402,42 +426,36 @@ def evaluate(repo_path: str, cfg: dict[str, Any], ref: str | None, credits: dict
     cost = data.get("cost") if isinstance(data.get("cost"), dict) else {}
     stale = data.get("staleness") if isinstance(data.get("staleness"), dict) else {}
     view["metrics"] = [
-        {"id": "autonomy", "label": "自主度", "value": val("autonomy"), "rule": rule("autonomy")},
-        {"id": "delivery", "label": "交付正确率", "value": val("delivery"), "rule": rule("delivery")},
-        {"id": "judgment", "label": "介入落在判断点", "value": val("judgment"), "rule": rule("judgment")},
+        {"id": "autonomy", "label": "自主度", "value": val("autonomy"), "rule": METRIC_RULE["autonomy"]},
+        {"id": "delivery", "label": "交付正确率", "value": val("delivery"), "rule": METRIC_RULE["delivery"]},
+        {"id": "judgment", "label": "介入落在判断点", "value": val("judgment"), "rule": METRIC_RULE["judgment"]},
         {"id": "repeat_rate", "label": "重复纠正率", "value": _pair(data.get("repeat_rate")),
-         "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"},
+         "rule": REPEAT_RULE},
         {"id": "useful", "label": "知识有用率", "value": _pair(data.get("useful")),
          "rule": "已经合并进默认分支的需求引用过的条目 ÷ Brain 里现有的条目（还在分支上、没合并的需求引用的不算）"},
         {"id": "staleness", "label": "过时与冲突", "value": stale.get("total") if isinstance(stale.get("total"), int)
          else None, "rule": "过时引用 + 同名术语 + 本期覆盖或撤回"},
         {"id": "credits_per_success", "label": "每个正确交付的 credits",
          "value": cost.get("per_success") if isinstance(cost.get("per_success"), (int, float)) else None,
-         "rule": str(cost.get("rule") or "")[:300]},
+         "rule": METRIC_RULE["credits_per_success"]},
     ]
     queue = []
     for q in data.get("review_queue") or []:
         if isinstance(q, dict) and q.get("key"):
             queue.append({"key": str(q["key"]), "intent": q.get("intent"),
-                          "reasons": [acts_in_words(str(r.get("text") if isinstance(r, dict) else r))[:200]
-                                      for r in q.get("reasons") or []][:10]})
-    skipped = [{"key": str(x.get("key") or ""), "why": str(x.get("why") or "")[:300]}
+                          "reasons": [eval_reason(r)[:200] for r in q.get("reasons") or []][:10]})
+    skipped = [{"key": str(x.get("key") or ""), "why": skip_why(x), "raw": str(x.get("why") or "")[:300]}
                for x in data.get("skipped") or [] if isinstance(x, dict)][:50]
-    notes = []
-    if cost.get("note"):
-        notes.append(str(cost["note"])[:300])
     d = data.get("delivery") if isinstance(data.get("delivery"), dict) else {}
     wrong_open = [str(k) for k in d.get("wrong_open") or []]
-    if wrong_open:
-        notes.append("已知有问题、14 天还没满（满了再算进交付正确率）：%s" % "、".join(wrong_open[:20]))
     # brain-kit 72b278e: a run whose acceptance was rejected waits for its merge and 14 days like a merged one
-    # (autonomy.runs[].correct "wrong_open"); the merged ones are in the line above already
+    # (autonomy.runs[].correct "wrong_open"); the merged ones are in wrong_open already
     a = data.get("autonomy") if isinstance(data.get("autonomy"), dict) else {}
     unmerged = sorted({str(r["key"]) for r in a.get("runs") or [] if isinstance(r, dict) and r.get("key")
                        and r.get("correct") == "wrong_open"} - set(wrong_open))
-    if unmerged:
-        notes.append("已知有问题、还没合并（验收被驳回过；合并满 14 天才算进自主度）：%s" % "、".join(unmerged[:20]))
-    view.update(available=True, queue=queue, ref=data.get("ref") or ref, skipped=skipped, notes=notes)
+    rows = eval_notes(cost.get("note"), wrong_open, unmerged)
+    view.update(available=True, queue=queue, ref=data.get("ref") or ref, skipped=skipped,
+                notes=[x["text"] for x in rows], note_rows=rows)
     view["_cto"] = cto_part(data)   # the 交付总览's numbers (the service takes it out before the page gets the view)
     f = data.get("funnel") if isinstance(data.get("funnel"), dict) else None
     funnel = None
@@ -491,6 +509,70 @@ def acts_in_words(text: str) -> str:
     """brain-kit's act kinds in brackets (「判断点之外有人介入 2 次（push_after_handover）」) in words."""
     return re.sub(r"[（(]([a-z_]+(?:[、,，][a-z_]+)*)[）)]",
                   lambda m: "（%s）" % "、".join(act_label(k) for k in re.split(r"[、,，]", m.group(1))), text)
+
+
+# brain-kit's review-queue reasons (evaluate.py) whose words carry code names, by their rule, said again; the rest keep
+# brain-kit's Chinese with its act kinds in words
+STUCK_ON = (("run 没接着做（park.json 还在等：去 KiroCrew 看 slot）", "运行机没接着做（它的问题还在等：去 KiroCrew 看一下它的会话）"),
+            ("桥不知道送到没有（看桥的日志和 KiroCrew 的 slot）", "桥不知道回答送到没有（看桥的日志和 KiroCrew 里它的会话）"))
+
+
+def eval_reason(r: Any) -> str:
+    """One reason brain-kit's review queue gives for a run, in words."""
+    if not isinstance(r, dict):
+        r = {"text": r}
+    rule, text = str(r.get("rule") or ""), str(r.get("text") or "")
+    if rule == "verify_fail_rounds":
+        m = re.match(r"verify 失败 (\d+) 次（≥(\d+)）", text)
+        return "自动检查没过 %s 次（%s 次就要人看一眼）" % m.groups() if m else "自动检查没过好几次"
+    if rule == "state_unknown":
+        return "不知道运行机收没收到这次派单：去 KiroCrew 看一下它的会话"
+    if rule == "runner_failed":
+        return "运行机没能开始做它（工作区没建成）"
+    if rule == "merge_not_here":
+        return "桥说 MR 合并了，这台机器的默认分支上还没有：从远端取最新"
+    if rule == "question_problem":
+        text = re.sub(r"（[a-z_]+）", "", text)
+    if rule == "stuck":   # its last activity as a moment, not an ISO time
+        text = re.sub(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", lambda m: time.strftime(
+            "%m-%d %H:%M", time.localtime(lean_view.epoch(m.group(0)) or 0)), text)
+    for was, now in STUCK_ON:
+        text = text.replace(was, now)
+    return acts_in_words(text.replace("驳回", "退回"))     # the board's and 需求详情's word for a rejection
+
+
+def skip_why(x: dict[str, Any]) -> str:
+    """Why brain-kit could not read a run (evaluate's skipped), in words; its own words go under 细节."""
+    why = str(x.get("why") or "")
+    if x.get("state") == "not_readable":
+        return "运行机上有它，这台机器读不到它的记录：从远端取最新再看"
+    if "run.json" in why:
+        return "它的开工记录读不了"
+    if re.search(r"[A-Za-z]{4,}", why):
+        return "读它的记录时出错了"
+    return why[:300]
+
+
+def eval_note(text: str, todo: str, raw: str = "") -> dict[str, str]:
+    return {"text": text, "todo": todo, "raw": raw}
+
+
+def eval_notes(cost_note: Any, wrong_open: list[str], unmerged: list[str]) -> list[dict[str, str]]:
+    """brain-kit's notes on the numbers, each in words with what to do (EvalNote); its own words under 细节."""
+    out = []
+    if cost_note:
+        raw = str(cost_note)[:300]
+        m = re.search(r"只有一条记录，却有 (\d+) 个需求", raw)
+        out.append(eval_note("花费只有一个总数，却有 %s 个需求：分不出是谁的，没有算给任何一个" % m.group(1), "在这个 app 里开会话做需求，"
+                             "花费就按需求分开记，下一次评估会算进来", raw) if m else
+                   eval_note(raw, "看细节里的原话", raw))
+    if wrong_open:
+        out.append(eval_note("已知有问题、14 天还没满（满了再算进交付正确率）：%s" % "、".join(wrong_open[:20]),
+                             "不用管：满 14 天会自动算进去；要看是什么问题，点开需求"))
+    if unmerged:
+        out.append(eval_note("已知有问题、还没合并（验收被退回过；合并满 14 天才算进自主度）：%s" % "、".join(unmerged[:20]),
+                             "改好再请产品验收；合并满 14 天会自动算进来"))
+    return out
 
 
 def cto_part(data: dict[str, Any]) -> dict[str, Any]:

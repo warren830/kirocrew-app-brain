@@ -49,6 +49,7 @@ def test_todo_lists_the_approval_line_and_the_app_never_sends_it(tmp_path, home)
     assert len(items) == 1 and items[0]["line"] == line and items[0]["approval"] == "REQUIREMENTS"
     # what it waits on, said once: the row's own words (REST-11), the line beside them
     assert items[0]["session"]["slot"] == opened["slot"] and items[0]["text"] == "等你批准需求：读完再在会话里自己打那一行"
+    assert items[0]["path"].endswith("/inception/requirements/requirements.md")    # what to read first (REST-11)
     sent = [m["content"] for msgs in gw.msgs.values() for m in msgs if m["role"] == "user"]
     assert sent and not any("approve" in s.lower() for s in sent)
     assert status["counts"]["todo"] >= 1 and status["me"]["user"] == "alice" and status["me"]["token"] is False

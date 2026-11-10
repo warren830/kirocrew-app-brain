@@ -43,7 +43,7 @@ describe('format', () => {
 describe('errorText: the SDK rejects with `API <status>: <body>`', () => {
   it('says the backend’s own Chinese words, or what the status means; never English', () => {
     expect(errorText(new Error('API 409: {"error": "PAY-3 已经有人认领了", "code": "claimed"}'))).toBe('PAY-3 已经有人认领了（409）')
-    expect(errorText(new Error('API 403: {"error": "这些接口只接受 dashboard 主人本人的请求", "code": "owner_only"}'))).toBe('这些接口只接受 dashboard 主人本人的请求（403）')
+    expect(errorText(new Error('API 403: {"error": "只有 KiroCrew 仪表盘的主人本人能用这个 app：用主人的账号登录仪表盘", "code": "owner_only"}'))).toBe('只有 KiroCrew 仪表盘的主人本人能用这个 app：用主人的账号登录仪表盘（403）')
     // KiroCrew's host when the dashboard login is gone
     expect(errorText(new Error('API 403: {"error": "Token required"}'))).toBe('登录过期了（403）')
     expect(errorText(new Error('API 401: '))).toBe('登录过期了（401）')

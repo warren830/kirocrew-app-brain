@@ -103,7 +103,7 @@ def expected_paths(v: Any) -> list[str]:
     elif isinstance(v, list) and all(isinstance(x, str) for x in v):
         items = v
     else:
-        raise IntakeError("paths 要是路径的列表，或一串用逗号、空格分开的路径")
+        raise IntakeError("预计改动的路径要写成一串，用逗号或空格分开")
     out = []
     for p in (x.strip() for x in items):
         if p and p not in out:
@@ -154,6 +154,13 @@ def clean_body(repo: Repo, body: dict[str, Any], *, start: bool) -> dict[str, An
             "exclude": exclude, "paths": paths}
 
 
+def store_path(repo: Repo) -> str:
+    """Where brain-kit keeps material packages on this machine, as cli._store finds it, without making the folder: a
+    dry run only reads it (the next package id), so 先检查 creates nothing (BRAINKIT_REQUESTS.md 35)."""
+    s = os.environ.get("BRAIN_INTAKE_DIR") or repo.git.out("config", "brain.intake") or "~/.brain/intake"
+    return os.path.abspath(os.path.expanduser(s))
+
+
 def check(repo: Repo, body: dict[str, Any], me: str | None) -> dict[str, Any]:
     """brain-kit's dry run of the five gates (blocking: call it in a thread)."""
     out = {"ok": False, "key": None, "package": None, "classification": None, "segments": 0, "sources": 0,
@@ -169,9 +176,8 @@ def check(repo: Repo, body: dict[str, Any], me: str | None) -> dict[str, Any]:
         out["error"] = "没有文档：不用检查，可以直接开工"
         return out
     pkg = bk.m("intake.package")
-    cli = bk.m("cli")
     try:
-        store = cli._store(repo.path, None)
+        store = store_path(repo)
         rep = pkg.build(b["docs"], key, store, submitter=me or "unknown", consent=b["consent"],
                         classification=b["classification"], business=b["business"] or None,
                         kit_intake=repo.cfg["intake"], dry_run=True, exclude=b["exclude"])
@@ -187,8 +193,8 @@ def check(repo: Repo, body: dict[str, Any], me: str | None) -> dict[str, Any]:
                segments=int(rep.get("segments") or 0), sources=int(rep.get("sources") or 0),
                findings=[str(x) for x in rep.get("findings") or []], blocking=[gate_text(x) for x in raw],
                blocking_raw=raw,
-               refused=[{"id": str(r.get("id")), "name": str(r.get("name")), "reason": str(r.get("reason"))}
-                        for r in rep.get("refused") or []])
+               refused=[{"id": str(r.get("id")), "name": str(r.get("name")), "reason": refused_text(str(r.get("reason"))),
+                         "raw": str(r.get("reason"))} for r in rep.get("refused") or []])
     out["review"] = review_items(out["findings"])
     out["files"] = file_items(out["findings"], b["business"])
     return out
@@ -238,6 +244,30 @@ def gate_text(line: str) -> str:
     return s
 
 
+# why brain-kit did not take a file (intake/convert.py's Refused), said as what to do; its own words stay in findings
+REFUSED_ZH = [(re.compile(rx), say) for rx, say in (
+    (r"^图片(?:文件)?不(?:单独)?收（没有 OCR）", "图片里的字读不出来：把图里的文字写进文档再交"),
+    (r"^PDF 几乎没有文字", "这份 PDF 几乎没有文字（像是扫描件），读不出来：请交文字版"),
+    (r"^PDF 需要 MarkItDown", "这台机器读不了 PDF：请另存为 docx 再交"),
+    (r"^PDF 转换失败", "这份 PDF 读不出来：请另存为 docx 再交"),
+    (r"^文本编码无法识别", "文字的编码认不出来：请另存为 UTF-8 的文本再交"),
+    (r"^文件里有 XML DOCTYPE", "文件里有不安全的声明：另存一份再交"),
+    (r"^XML 损坏", "文件里的内容坏了：另存一份再交"),
+    (r"^不是有效的 (?:xlsx|docx)", "这份文件不完整：另存一份再交"),
+    (r"^解压后过大", "解开以后太大"),
+    (r"^文件内容损坏或格式不对", "文件内容坏了或格式不对：另存一份再交"),
+    (r"^看起来不是文本文件", "看起来不是文本文件"),
+)]
+
+
+def refused_text(reason: str) -> str:
+    """brain-kit's reason a file was not taken, in words (REFUSED_ZH); one nobody mapped as it is."""
+    for rx, say in REFUSED_ZH:
+        if rx.match(reason):
+            return say
+    return reason
+
+
 def file_items(findings: list[str], business: str) -> list[dict[str, Any]]:
     """brain-kit's finding lines, one per file, said plainly: {id, name, items (what was found and what happened to
     it), review (请你确认: '' when none), refused (why the file was not taken: '' when it was)}."""
@@ -249,7 +279,7 @@ def file_items(findings: list[str], business: str) -> list[dict[str, Any]]:
         rest = m.group("rest")
         f = {"id": m.group("id"), "name": m.group("name"), "items": [], "review": "", "refused": ""}
         if rest.startswith("没收——"):
-            f["refused"] = rest[len("没收——"):]
+            f["refused"] = refused_text(rest[len("没收——"):])
             out.append(f)
             continue
         rv = REVIEW_RE.search(rest)

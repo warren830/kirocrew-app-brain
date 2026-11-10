@@ -8,7 +8,7 @@
       "id": "branch",
       "label": "建分支和工作目录",
       "state": "ok",
-      "detail": "brain/upgrade-kit，从 origin/main（a8b44abc）建的，在 /Users/alice/workplace/brain-app/shop-pay/_brain-upgrade-kit"
+      "detail": "brain/upgrade-kit，从远端的 main（a8b44abc）建的，在 /Users/alice/workplace/brain-app/shop-pay/_brain-upgrade-kit"
     },
     {
       "id": "install",
@@ -62,7 +62,7 @@
         },
         {
           "level": "OK",
-          "text": "Lean 的 hook 在这里还没跑过：开过 brain-dev 会话以后就有了",
+          "text": "Lean 的拦截在这里还没跑过：开过 brain-dev 会话以后就有了",
           "todo": "",
           "fix": null,
           "repo": null,
@@ -70,7 +70,7 @@
         },
         {
           "level": "OK",
-          "text": "Lean 不把 runs/ 下的记录算成代码",
+          "text": "Lean 不把变更说明和 AI 停下来写的问题算成代码",
           "todo": "",
           "fix": null,
           "repo": null,
@@ -94,7 +94,7 @@
         },
         {
           "level": "OK",
-          "text": "Brain 文件都在（brain/）",
+          "text": "Brain 文件都在",
           "todo": "",
           "fix": null,
           "repo": null,
@@ -110,7 +110,7 @@
         },
         {
           "level": "OK",
-          "text": ".brain-materials/ 不进 git",
+          "text": "需求材料不进 git",
           "todo": "",
           "fix": null,
           "repo": null,
@@ -118,11 +118,11 @@
         },
         {
           "level": "WARN",
-          "text": "没有 origin：没查 Brain 是不是最新",
-          "todo": "要推送和开 MR 时再加：git remote add origin <地址>",
+          "text": "没有远端：没查 Brain 是不是最新",
+          "todo": "只在本机做就不用管；要推送和开 MR 时，再给这个仓库加上远端地址",
           "fix": null,
           "repo": null,
-          "raw": "no origin remote: Brain freshness not checked"
+          "raw": "no origin remote: Brain freshness not checked\n做法：git remote add origin <地址>"
         },
         {
           "level": "OK",
@@ -134,7 +134,7 @@
         },
         {
           "level": "OK",
-          "text": "kirocrew 0.11.2",
+          "text": "KiroCrew 0.11.2",
           "todo": "",
           "fix": null,
           "repo": null,

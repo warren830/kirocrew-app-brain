@@ -90,7 +90,7 @@ describe('设置', () => {
     const pick = await within(crew).findByTestId('mode-pick')
     const rec = pick.querySelector('[data-mode="branch"]') as HTMLElement
     expect(rec).toHaveTextContent('更新到新分支，开 MR 给团队看推荐')
-    expect(pick.querySelector('[data-mode="inplace"]')).toHaveTextContent('更新在你现在的检出里，提交在 main 上；推送到 origin 以后生效（这会直接改团队的 main，没有 MR 评审）')
+    expect(pick.querySelector('[data-mode="inplace"]')).toHaveTextContent('更新在你现在的检出里，提交在 main 上；推送到远端以后生效（这会直接改团队的 main，没有 MR 评审）')
     await user.click(within(pick).getByRole('button', { name: '直接更新在 main' }))
     expect(apiCalls.find((c) => c.path === `${API}/import/upgrade`)?.body).toEqual({ path: '/Users/alice/workplace/shop-pay', mode: 'inplace' })
     expect(await within(crew).findByText(job.result!.text)).toBeInTheDocument()
@@ -102,7 +102,7 @@ describe('设置', () => {
     await user.click(within(box).getByRole('button', { name: '先不推送' }))
     expect(p.reloadStatus).toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByTestId('push-box')).toBeNull())
-    expect(screen.getByRole('region', { name: 'KiroCrew' })).not.toHaveTextContent('lean-hook.py 是旧版')
+    expect(screen.getByRole('region', { name: 'KiroCrew' })).not.toHaveTextContent('适配文件是旧版')
     expect(apiCalls.some((c) => c.path === `${API}/import/push`)).toBe(false)
   })
 
@@ -179,7 +179,7 @@ describe('设置', () => {
 
   test('the status: brain-kit and its modules, each repo, who I am (a token is only 有/没有), KiroCrew’s checks with a fix', async () => {
     const user = userEvent.setup()
-    installFixtureRoutes({ [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '装好了 ~/.kiro/agents/brain-dev.json', rows: fx.crew().rows.slice(0, 2) }) })
+    installFixtureRoutes({ [`POST ${API}/crew/fix`]: () => ({ ok: true, text: '给 brain-dev 的设置补上了 Lean 的拦截：调用工具前。别的都没动；改之前的那份留作备份：brain-dev.json.bak-20261110-091500。新开的会话才会用上。', rows: fx.crew().rows.slice(0, 2) }) })
     const p = props()
     render(<SettingsView {...p} />)
     const kit = screen.getByRole('region', { name: 'brain-kit' })
@@ -204,11 +204,11 @@ describe('设置', () => {
     expect(me).toHaveTextContent('GitLab token 有')
     expect(me).not.toHaveTextContent('glpat')
     const crew = screen.getByRole('region', { name: 'KiroCrew' })
-    expect(crew).toHaveTextContent('brain-dev.json 缺 Lean 的 hook：调用工具前')
+    expect(crew).toHaveTextContent('brain-dev 的设置缺 Lean 的拦截：调用工具前')
     expect(within(crew).getByRole('img', { name: '1 正常，1 注意，1 有问题' })).toBeInTheDocument()
     expect(crew).toHaveClass('is-bad')
     await user.click(within(crew).getByRole('button', { name: '补上 Lean 的 hook' }))
-    expect(await within(crew).findByText('装好了 ~/.kiro/agents/brain-dev.json')).toBeInTheDocument()
+    expect(await within(crew).findByText('给 brain-dev 的设置补上了 Lean 的拦截：调用工具前。别的都没动；改之前的那份留作备份：brain-dev.json.bak-20261110-091500。新开的会话才会用上。')).toBeInTheDocument()
     expect(apiCalls.find((c) => c.method === 'POST')).toEqual({ method: 'POST', path: `${API}/crew/fix`, body: { what: 'agent' } })
     expect(p.reloadStatus).toHaveBeenCalled()
   })
@@ -265,7 +265,7 @@ describe('设置', () => {
       label: '', why: '', suggest: '', error: '' }
     const ask: RepoMe = { name: null, source: 'none', gitlab: 'https://gitlab.example.com', text: '', ask: true, label: '你的 GitLab 用户名',
       why: '这个仓库用 GitLab：认领和交接都按这个名字认人，要和你在 GitLab 上的用户名一样', suggest: 'alice', error: '' }
-    s.me = { user: null, token: false, how: 'GitLab token（没有）' }
+    s.me = { user: null, token: false, how: 'GitLab 令牌（没有）' }
     s.repos = [{ ...s.repos[0], me: login }, { ...s.repos[0], id: 'r2', path: '/Users/alice/workplace/shop-web', name: 'shop-web', me: ask }]
     const after = fx.status()
     installFixtureRoutes({ [`POST ${API}/me/name`]: () => ({ ok: true, text: '这个仓库的 git config brain.user 设成了 alice',

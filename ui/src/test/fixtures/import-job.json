@@ -8,7 +8,7 @@
       "id": "branch",
       "label": "建分支和工作目录",
       "state": "ok",
-      "detail": "brain/install，从 origin/main（a8b44abc）建的，在 /Users/alice/workplace/brain-app/refund/_brain-install"
+      "detail": "brain/install，从远端的 main（a8b44abc）建的，在 /Users/alice/workplace/brain-app/refund/_brain-install"
     },
     {
       "id": "install",
@@ -68,7 +68,7 @@
         },
         {
           "level": "OK",
-          "text": "Lean 的 hook 在这里还没跑过：开过 brain-dev 会话以后就有了",
+          "text": "Lean 的拦截在这里还没跑过：开过 brain-dev 会话以后就有了",
           "todo": "",
           "fix": null,
           "repo": null,
@@ -76,7 +76,7 @@
         },
         {
           "level": "OK",
-          "text": "Lean 不把 runs/ 下的记录算成代码",
+          "text": "Lean 不把变更说明和 AI 停下来写的问题算成代码",
           "todo": "",
           "fix": null,
           "repo": null,
@@ -100,7 +100,7 @@
         },
         {
           "level": "OK",
-          "text": "Brain 文件都在（brain/）",
+          "text": "Brain 文件都在",
           "todo": "",
           "fix": null,
           "repo": null,
@@ -116,7 +116,7 @@
         },
         {
           "level": "OK",
-          "text": ".brain-materials/ 不进 git",
+          "text": "需求材料不进 git",
           "todo": "",
           "fix": null,
           "repo": null,
@@ -132,7 +132,7 @@
         },
         {
           "level": "OK",
-          "text": "kirocrew 0.11.2",
+          "text": "KiroCrew 0.11.2",
           "todo": "",
           "fix": null,
           "repo": null,

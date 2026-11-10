@@ -2,6 +2,8 @@
 mode), overlaps, the decision funnel's fallback."""
 
 import json
+import re
+import time
 
 import pytest
 
@@ -121,7 +123,19 @@ def test_team_states_from_the_ledger():
     assert (r["state_label"], r["waits"]["text"]) == ("已合并", "MR 已合并，运行结束")    # not 「运行机在跑」
     r = row()
     deliveries.team_classify(r, {"state": "signing", "run_id": "RUN-PAY-1-1"}, [], None)
-    assert "签接手合同" in r["waits"]["text"] and "RUN-PAY-1-1" in r["waits"]["text"]
+    assert "签接手合同" in r["waits"]["text"] and "RUN-" not in r["waits"]["text"]
+    # who answers a question on the runner: park.json's ask, as a person's row of it says (the owner by name)
+    for ask, who, text in (("product", "product", "等产品在 MR 上回答 D-2（设计）"), ("owner", "people", "等carol在 MR 上回答 D-2（设计）"),
+                           ("security", "people", "等人在 MR 上回答 D-2（设计）")):
+        r = dict(row(), owner="carol")
+        deliveries.team_classify(r, {"state": "dispatched"}, [{"id": "D-2", "state": "open", "kind": "design"}],
+                                 {"status": "waiting", "kind": "design", "ask": ask})
+        assert (r["waits"]["who"], r["waits"]["text"]) == (who, text), r["waits"]
+    for st in ("send_unknown", "void", "invalid"):
+        r = row()
+        deliveries.team_classify(r, {"state": st if st == "send_unknown" else "dispatched", "slot": "run-pay-1-1"},
+                                 [] if st == "send_unknown" else [{"id": "D-5", "state": st}], {"status": "waiting"})
+        assert not re.search(r"park\.json|\brun\b|slot|run-pay", r["waits"]["text"]), r["waits"]["text"]
 
 
 def test_overlaps_and_the_funnel_fallback():
@@ -303,7 +317,7 @@ def test_commit_dates_and_how_a_run_was_merged_in_the_timeline():
     items = {i["detail"].split(" ")[0]: i for i in detail.trace_timeline(t) if i["kind"] in ("commit", "merge")}
     assert items["1" * 12]["detail"] == "1" * 12
     assert items["2" * 12]["detail"] == "%s · 提交于 2026-11-09 02:30Z" % ("2" * 12) and items["2" * 12]["label"] == "运行机提交"
-    assert items["3" * 12]["detail"] == "%s （squash 合并（分支还在））" % ("3" * 12)
+    assert items["3" * 12]["detail"] == "%s （压缩成一个提交合并（分支还在））" % ("3" * 12)
     t["outcome"]["merged_at"]["how"] = "a new way"
     assert any(i["detail"] == "%s （a new way）" % ("3" * 12) for i in detail.trace_timeline(t))
 
@@ -336,7 +350,17 @@ def test_evaluate_notes_say_which_runs_wait_for_their_merge():
         {"key": "PAY-3", "correct": "wrong_open", "status": "pending"},
         {"key": "PAY-4", "correct": "wrong_open", "status": "pending"},
         {"key": "PAY-5", "correct": "correct", "status": "counted"}]},
-        "delivery": {"value": [1, 1], "rule": "", "wrong_open": ["PAY-4"]}}
+        "delivery": {"value": [1, 1], "rule": "", "wrong_open": ["PAY-4"]},
+        "cost": {"note": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"},
+        "review_queue": [{"key": "PAY-9", "reasons": [
+            {"rule": "verify_fail_rounds", "text": "verify 失败 3 次（≥2）"},
+            {"rule": "state_unknown", "text": "桥不知道派单成没成（send_unknown）：去 KiroCrew 看 slot"},
+            {"rule": "stuck", "text": "30 小时没有进展（最后一次 2026-11-08T01:00:00Z，≥24 小时算停住）：run 没接着做（park.json "
+                                      "还在等：去 KiroCrew 看 slot）"},
+            {"rule": "question_problem", "text": "桥上的问题没走通：D-2 作废（void）"},
+            {"rule": "outside_judgment", "text": "判断点之外有人介入 2 次（push_after_handover）"},
+            {"rule": "acceptance_rejected", "text": "验收被驳回 1 次"}]}],
+        "skipped": [{"key": "PAY-1", "why": "runs/PAY-1/run.json is not valid JSON"}]}
     mods = bk._state["mods"]
     saved = mods.get("evaluate")
     mods["evaluate"] = type("FakeEvaluate", (), {"collect": staticmethod(lambda *a, **k: data)})
@@ -349,7 +373,18 @@ def test_evaluate_notes_say_which_runs_wait_for_their_merge():
             mods["evaluate"] = saved
     assert view["available"] is True
     assert "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-4" in view["notes"]
-    assert "已知有问题、还没合并（验收被驳回过；合并满 14 天才算进自主度）：PAY-3" in view["notes"]
+    assert "已知有问题、还没合并（验收被退回过；合并满 14 天才算进自主度）：PAY-3" in view["notes"]
+    # OVERVIEW-20: every note says what to do, brain-kit's own words under 细节
+    assert view["notes"] == [x["text"] for x in view["note_rows"]] and all(x["todo"] for x in view["note_rows"])
+    assert view["note_rows"][0]["text"] == "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个"
+    assert view["note_rows"][0]["raw"].startswith("--credits 只有一条记录")
+    # REST-29: the review queue's reasons and the skipped run in words
+    assert view["queue"][0]["reasons"] == [
+        "自动检查没过 3 次（2 次就要人看一眼）", "不知道运行机收没收到这次派单：去 KiroCrew 看一下它的会话",
+        "30 小时没有进展（最后一次 %s，≥24 小时算停住）：运行机没接着做（它的问题还在等：去 KiroCrew 看一下它的会话）" % time.strftime(
+            "%m-%d %H:%M", time.localtime(1794099600)),
+        "桥上的问题没走通：D-2 作废", "判断点之外有人介入 2 次（交接后推代码）", "验收被退回 1 次"]
+    assert view["skipped"] == [{"key": "PAY-1", "why": "它的开工记录读不了", "raw": "runs/PAY-1/run.json is not valid JSON"}]
 
 
 def test_review_findings_are_listed_per_file():
@@ -491,3 +526,74 @@ def test_what_an_older_app_wrote_is_read_in_words(tmp_path):
     assert [(e["label"], e["detail"]) for e in st.events("r1-DEMO-1")] == [
         ("开了本机会话", "工具调用不用逐个批准"), ("回写 Brain：成功", "brain/DEMO-1-reflect-1"), ("回写 Brain 并推送：失败", None),
         ("开了审查会话", None)]
+
+
+@needs_brainkit
+def test_a_decision_says_which_question_asked_in_the_session_it_answers():
+    """DETAIL-16 (real DEMO-1, DEMO-3): the AI asked Q1…Q3 straight in the session; decisions.md records the answers,
+    in the decision (「（Q1 选 A）」) or in its why (「Q2 答"按推荐"」). Each row says which."""
+    if not bk.load(str(BRAINKIT))["ok"]:
+        pytest.skip("brain-kit checkout not found")
+    detail = mod("detail")
+    text = ("| ID | Date | Stage | Decision | Why | Who |\n|---|---|---|---|---|---|\n"
+            "| D-1 | 2026-11-09 | requirements | 用乘号（Q1 选 A） | 用户要的 | owner |\n"
+            "| D-2 | 2026-11-09 | requirements | 小数照常算 | Q2 答\"按推荐\" | owner |\n"
+            "| D-3 | 2026-11-09 | code-generation | 一行 return a * b | 跟 add 一样，不是 Q10x | agent |\n")
+    rows = detail.decisions(text, "decisions.md", [])
+    assert {d["id"]: d["asked"] for d in rows} == {"D-1": ["Q1"], "D-2": ["Q2"], "D-3": []}
+
+
+def test_lean_s_own_stage_lines_are_said_in_words_and_the_agent_s_stay():
+    """DETAIL-20 (real DEMO-3: 「构建测试：完成 · verify PASS: 1 check on code fingerprint 66bad1cf」): the notes Lean writes
+    itself are said in Chinese, in the stages and in the timeline; what the agent wrote is its own and stays."""
+    lean_view = mod("lean_view")
+    agent = "Inputs: calc.py. Key finding: str * int does not raise"
+    evs = [{"event": "STAGE_COMPLETED", "ts": "2026-11-09T01:%02d:00Z" % i, "_at": i, "seq": i, "data": d}
+           for i, d in enumerate([{"stage": "reverse-engineering", "note": agent},
+                                  {"stage": "build-and-test", "note": "verify PASS: 1 check on code fingerprint 66bad1cf"},
+                                  {"stage": "release", "note": "RELEASE approved (sha 0c9a7e21)"}], 1)]
+    notes = {s["id"]: s["note"] for s in lean_view.stages(evs) if s["state"] == "done"}
+    assert notes == {"reverse-engineering": agent, "build-and-test": "1 项自动检查都过了", "release": "发布审批通过了"}
+    assert [i["detail"] for i in lean_view.stage_events(evs)] == [agent, "1 项自动检查都过了", "发布审批通过了"]
+    assert lean_view.say_note("verify PASS: 3 checks on code fingerprint 0123abcd") == "3 项自动检查都过了"
+
+
+def test_the_timeline_says_who_did_what_and_why_without_record_codes(tmp_path):
+    """REST-29 on 需求详情's timeline, in the board's words: an answer without its D-n or choice is not 「回答 ：」;
+    approve / reject in words; a refused approval line says why (Lean's check), not the check's code; a tool call by
+    its kind; the bridge's refusal, a Lean request asked on the MR and a squash merge's note in words; no brain-kit
+    module named when brain-kit cannot read the run."""
+    detail, lv = mod("detail"), mod("lean_view")
+    t = {"humans": [{"at": "2026-11-09T01:00:00Z", "kind": "answer", "what": "clarify", "who": "P-7C1D"},
+                    {"at": "2026-11-09T01:01:00Z", "kind": "answer", "what": "acceptance", "decision": "D-2",
+                     "choice": "approve", "voucher_id": "V-0123456789"},
+                    {"at": "2026-11-09T01:02:00Z", "kind": "approval_refused", "what": "REQUIREMENTS", "check": "hash"},
+                    {"at": "2026-11-09T01:03:00Z", "kind": "rejection", "what": "DESIGN"},
+                    {"at": "2026-11-09T01:04:00Z", "kind": "platform_restart"}],
+         "actions": {"blocked": [{"at": "2026-11-09T00:10:00Z", "gate": "plan", "tool": "execute_bash"}],
+                     "questions": [{"at": "2026-11-09T00:20:00Z", "kind": "design", "status": "waiting",
+                                    "lean_request": "DESIGN " + "a" * 8}],
+                     "handovers": [{"at": "2026-11-09T02:00:00Z", "kind": "bridge rejected", "reason": "MR comes from a fork"}]},
+         "decisions": [{"source": "bridge", "id": "D-3", "state": "answered", "at": "2026-11-09T03:00:00Z", "choice": "reject"}],
+         "outcome": {"merged_at": {"value": "2026-11-09T04:00:00Z", "commit": "c" * 40, "how": "squash merge (the branch is still here)",
+                                   "note": "the squash commit carries exactly the branch's changes"}}}
+    said = [(i["label"], i["detail"]) for i in detail.trace_timeline(t)]
+    assert said == [("Lean 拦下了一个不该做的改动：代码生成计划还没批", "跑命令"), ("停下问人：设计", "要批准设计"),
+                    ("回答了澄清问题", None), ("回答 D-2：通过", "凭证 V-0123456789"),
+                    ("批准的那一行没被接受（需求）", "那一行的编号和请求对不上（文件改过了，或者没带编号）"), ("退回设计", None),
+                    ("在 KiroCrew 上手动操作了一次", None), ("桥拒绝接手", "MR 是从复制出去的仓库开的"), ("D-3 回答了", "退回"),
+                    ("合并进默认分支", "%s （压缩成一个提交合并（分支还在）） 压缩出来的提交正好是分支的全部改动" % ("c" * 12))]
+    ledger = [{"event": e, "data": dict(d, kind="REQUIREMENTS", sha256="b" * 64), "ts": "2026-11-09T00:0%dZ" % i}
+              for i, (e, d) in enumerate((("APPROVAL_REQUESTED", {}), ("APPROVAL_REFUSED", {"check": "approvers"}),
+                                          ("REJECTED", {})))]
+    assert [(i["label"], i["detail"]) for i in lv.stage_events(ledger)] == [
+        ("请求批准需求", None), ("批准的那一行没被接受（需求）", "批的人不在批准人名单里"), ("退回需求", None)]
+    mods = bk._state["mods"]
+    saved = mods.pop("trace", None)
+    try:
+        err = detail.timeline(str(tmp_path), {}, "PAY-1", ref=None, events=[])["error"]
+    finally:
+        if saved is not None:
+            mods["trace"] = saved
+    assert err.endswith("在设置里换新一点的 brain-kit") and not re.search(r"[A-Za-z]{4,}", re.sub(r"brain-kit|Lean", "", err))
+    assert detail.NO_TOKENS == "KiroCrew 只报 credits，没有别的用量数"

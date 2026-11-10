@@ -32,6 +32,8 @@ def test_saving_settings_reloads_repos_and_reports_bad_ones(tmp_path, home):
     assert "还没装 brain-kit" in st["repos"][1]["error"] and "导入仓库" in st["repos"][1]["error"]
     assert json.loads((tmp_path / "data" / "settings.json").read_text())["repos"][1] == str(plain.resolve())
     assert view["errors"] and view["errors"][0]["repo"] == "r2"
+    e = view["errors"][0]    # what happened and what to do in words; the path under 细节
+    assert "还没装 brain-kit" in e["error"] and str(plain.resolve()) not in e["error"] and e["raw"] == str(plain.resolve())
 
 
 def test_a_wrong_brainkit_path_turns_the_app_off_politely(tmp_path, home):

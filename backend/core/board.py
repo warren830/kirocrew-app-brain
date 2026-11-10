@@ -16,8 +16,8 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
-from . import lean_view
-from .deliveries import CAT_LABEL, CAT_ORDER, KIND_LABEL, category, park_waiting
+from . import lean_view, problems
+from .deliveries import ASK_NAME, ASK_WHO, CAT_LABEL, CAT_ORDER, KIND_LABEL, category, park_waiting
 
 # (key, title, sub, icon): the actors in the order of the way
 ACTORS = (
@@ -32,6 +32,8 @@ ACTORS = (
     ("release", "发布验收", "发布审批 · 验收", "release"),
     ("reflect", "回写 Brain", "合并后写回新知识", "brain"),
 )
+# a repo done only on this machine has no MR for anyone to accept on: its release is Lean's own approval
+LOCAL_ONLY_ACTORS = {"release": ("发布审批", "Lean 请人批发布")}
 RUNNER_SIDE = ("handover", "bridge", "signer", "runner")
 DESIGN_STAGES = ("user-stories", "application-design", "units", "functional-design", "nfr-design", "infrastructure-design")
 AFTER_PLAN = ("build-and-test", "release")   # Lean is past code generation, and so past any PLAN approval
@@ -50,6 +52,7 @@ FINAL = ("merged", "skipped", "failed")
 MAX_EVENTS = 400
 MAX_BELT = 80
 NOT_NEEDED = "这次不需要"
+KIT_LABEL = "kit 文件"   # a kit row's short name on the check wall, as the button 重装 kit 文件 says it
 # brainkit.trace's `missing` sources (trace.py): the ones a repo done only on this machine, or a requirement not handed
 # over yet, has nothing to read from are not missing
 MISSING = (("bridge ledger", "runner", "桥的账本：这台机器上读不到，交接以后桥的核对和转的问题看不全"),
@@ -57,7 +60,7 @@ MISSING = (("bridge ledger", "runner", "桥的账本：这台机器上读不到�
            ("pushes", "runner", "推送记录：git 不记推送，交接以后人的提交当作推送"),
            ("CI pipelines", "remote", "CI 流水线：在 GitLab 上，这里读不到"),
            ("credits", None, "花费：KiroCrew 还没报 credits"),
-           ("Lean audit", None, "Lean 的记录：没找到 aidlc-docs/audit，阶段和审批都看不到"),
+           ("Lean audit", None, "Lean 的记录：这个需求的分支上没有，阶段和审批都看不到"),
            ("run branch", None, "需求的分支：本机、远端、默认分支上都没找到"))
 
 
@@ -151,9 +154,29 @@ def _who(you: str) -> str:
     return "you" if you == "你" else "people"
 
 
-def _you(me: str | None, owner: str | None) -> str:
-    """Who the requirement's person is to the one reading the board: 你, or their name (UI问题清单 BOARD-11)."""
-    if not me or not owner or me == owner:
+def _asked(you: str, ask: Any = None, kind: Any = None, lean: Any = None) -> tuple[str, str]:
+    """(Waits.who, the name the text says) of what the runner asks on the MR, by the row's rule (deliveries.classify):
+    an acceptance or the release approval is the product's; else park.json's `ask`, the owner being 你 only to the
+    owner (*you*: the requirement's person as the reader calls them)."""
+    if kind == "acceptance" or str(lean or "").split(" ")[0] == "RELEASE":
+        return "product", ASK_NAME["product"]
+    who = ASK_WHO.get(str(ask or ""), "people")
+    return (_who(you), you) if who == "you" else (who, ASK_NAME.get(who, "人"))
+
+
+def _park_for(parks: list[dict[str, Any]], at: float | None, *, kind: Any = None,
+              lean: tuple[str, ...] = ()) -> dict[str, Any]:
+    """The park.json question (the trace's, waiting) a question on the MR or a Lean request on the runner was asked
+    from: of that kind, or asking one of the Lean approvals *lean*; the nearest in time."""
+    hits = [q for q in parks if (not kind or q.get("kind") == kind)
+            and (not lean or str(q.get("lean_request") or "").split(" ")[0] in lean)]
+    return min(hits, key=lambda q: abs((_epoch(q.get("at")) or 0) - (at or 0)), default={})
+
+
+def _you(me: str | None, owner: str | None, *, runner: bool = False) -> str:
+    """Who the requirement's person is to the one reading the board: 你, or their name (UI问题清单 BOARD-11). On a
+    person's machine an unknown reader is the person; on the team runner's page only the owner is 你."""
+    if not owner or me == owner or (not me and not runner):
         return "你"
     return " %s " % owner
 
@@ -179,9 +202,9 @@ def missing_sources(raw: list[Any], *, local_only: bool, handed: bool) -> list[s
                 continue
             text = hit[2]
         elif "decisions.md" in s:
-            text = "决定记录：decisions.md 还没有"
+            text = "决定记录：AI 还没写下决定"
         elif s.endswith("(ignored)"):
-            text = "run.json 里有一项格式不对，没用上"
+            text = "开工记录里有一项格式不对，没用上"
         else:
             text = "还有一个来源没读到"
         if text not in out:
@@ -190,7 +213,7 @@ def missing_sources(raw: list[Any], *, local_only: bool, handed: bool) -> list[s
 
 
 def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any] | None, app_events: list[dict[str, Any]],
-              team_decisions: list[dict[str, Any]], subjects: dict[str, str], reflect_refs: list[tuple[str, float]],
+              team_decisions: list[dict[str, Any]], subjects: dict[str, str], reflect_refs: list[tuple[str, float, float | None]],
               default_branch: str, you: str = "你") -> list[dict[str, Any]]:
     """Every recorded event of the requirement, oldest first, in the board's words (BoardEvent without seq). *you*: the
     requirement's person as the reader calls them (你, or their name)."""
@@ -211,11 +234,13 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
     def side(at: float | None) -> str:
         return "runner" if hand_at is not None and at is not None and at > hand_at else "local"
 
+    parks = [q for q in ((t or {}).get("actions") or {}).get("questions") or []
+             if isinstance(q, dict) and q.get("status") == "waiting"]
     claim = f.get("claim") or {}
     add(_epoch(claim.get("created_at")), "claim", "person", "person", "认领 %s：%s" % (f["key"], _clip(claim.get("title"), 40)),
-        src="claim/%s" % f["key"])
+        src="认领记录 claim/%s" % f["key"])
     add(_epoch(run.get("created_at")), "start", "person", "local", "开工：在它自己的工作目录里",
-        src="runs/%s/run.json" % f["key"])
+        src="开工记录 runs/%s/run.json" % f["key"])
     humans = [h for h in (t or {}).get("humans") or [] if isinstance(h, dict)]
 
     def approver(kind: str, at: float | None, s: str) -> str:
@@ -263,8 +288,12 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
                 continue
             name = GATE_KIND_LABEL.get(kind, kind)
             if ev == "APPROVAL_REQUESTED":
-                add(at, "request", s, gates[0], "请%s批准%s" % (you, name) if s == "local" else "请人在 MR 上批准%s" % name,
-                    gates=list(gates), lean=kind)
+                # after the hand-over the bridge asks it on the MR (an INCEPTION as its two approvals), of whom the
+                # park.json written for it asks
+                who, asker = (_who(you), you) if s == "local" else _asked(you, _park_for(
+                    parks, at, lean=("REQUIREMENTS", "DESIGN") if kind == "INCEPTION" else (kind,)).get("ask"), lean=kind)
+                add(at, "request", s, gates[0], "请%s批准%s" % (you, name) if s == "local" else
+                    "请%s在 MR 上批准%s" % (asker, name), gates=list(gates), lean=kind, wait_who=who, asker=asker)
             elif ev == "APPROVED":
                 add(at, "approve", "person", gates[0], "%s批准了%s" % (approver(kind, at, s), name), gates=list(gates),
                     lean=kind, who=approver(kind, at, s))
@@ -272,7 +301,9 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
                 add(at, "reject", "person", gates[0], "%s退回了%s" % (approver(kind, at, s), name), gates=list(gates),
                     lean=kind, who=approver(kind, at, s))
             else:
-                add(at, "refused", gates[0], gates[0], "批准的那一行没被接受（%s）" % name, gates=list(gates), lean=kind)
+                why = lean_view.refused_why(d.get("check"))
+                add(at, "refused", gates[0], gates[0], "%s（%s）%s" % (lean_view.REFUSED, name, "：%s" % why if why else ""),
+                    gates=list(gates), lean=kind)
         elif ev == "BLOCKED":
             what = "写 %s" % _clip(d.get("path"), 50) if d.get("path") else "一次%s" % lean_view.BLOCK_TOOL.get(str(d.get("tool") or ""), "工具调用")
             add(at, "blocked", s, s, "Lean 拦下了%s：%s" % (what, lean_view.block_rule(d.get("gate"))),
@@ -315,26 +346,35 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
     for h in hands:
         at, kind = _epoch(h.get("at")), str(h.get("kind") or "")
         if kind == "bridge accepted":
-            add(at, "accepted", "handover", "bridge", "桥接手了%s" % (" !%s" % h["mr_iid"] if h.get("mr_iid") else ""))
+            add(at, "accepted", "handover", "bridge", "桥接手了%s" % ("（MR !%s）" % h["mr_iid"] if h.get("mr_iid") else ""))
         elif kind == "bridge rejected":
-            add(at, "rejected", "bridge", "handover", "桥拒绝接手%s" % ("：%s" % _clip(h.get("reason"), 90) if h.get("reason") else ""))
+            why = problems.reasons_text(str(h.get("reason") or "").split("; "), 90)[0]   # the bridge's English, said as the MR's is
+            add(at, "rejected", "bridge", "handover", "桥拒绝接手%s" % ("：%s" % why if why else ""))
         elif kind == "voucher":
-            add(at, "signed", "bridge", "signer", "签名服务签了接手合同（%s）" % (h.get("run_id") or ""), run_id=h.get("run_id"))
+            add(at, "signed", "bridge", "signer", "签名服务签了接手合同%s" % ("（%s）" % h["run_id"] if h.get("run_id") else ""),
+                run_id=h.get("run_id"))
     for q in ((t or {}).get("actions") or {}).get("questions") or []:
         at, st = _epoch(q.get("at")), q.get("status")
         s = side(at)
         label = KIND_LABEL.get(str(q.get("kind")), q.get("kind") or "问题")
         if st == "waiting":
-            add(at, "question", s, "person", "停下问%s：%s" % (you if s == "local" else "人", label), park=True, qkind=q.get("kind"))
+            who, asker = (_who(you), you) if s == "local" else _asked(you, q.get("ask"), q.get("kind"), q.get("lean_request"))
+            add(at, "question", s, "person", "停下问%s：%s" % (asker.rstrip(), label), park=True, qkind=q.get("kind"),
+                wait_who=who, asker=asker)
         elif st == "answered":
             add(at, "answer", "person", s, "%s的问题回答了，接着做" % label, park=True)
+
+    def on_mr(did: Any, kind: Any, lean: Any, at: float | None, ask: Any = None) -> None:
+        """A question the bridge put on the MR: of whom its park.json asks."""
+        who, asker = _asked(you, ask or _park_for(parks, at, kind=kind).get("ask"), kind, lean)
+        add(at, "question", "bridge", "person", "%s 在 MR 上问%s：%s" % (did, asker.rstrip(), KIND_LABEL.get(
+            str(kind), kind or "问题")), did=did, qkind=kind, wait_who=who, asker=asker)
+
     decisions = [d for d in (t or {}).get("decisions") or [] if d.get("source") == "bridge"] or [
         dict(d, source="bridge", asked_at=d.get("created"), at=d.get("updated") if d.get("answer") else None, choice=d.get("answer"))
         for d in team_decisions]
     for d in decisions:
-        label = KIND_LABEL.get(str(d.get("kind")), d.get("kind") or "问题")
-        add(_epoch(d.get("asked_at")), "question", "bridge", "person", "%s 在 MR 上问人：%s" % (d.get("id"), label),
-            did=d.get("id"), qkind=d.get("kind"))
+        on_mr(d.get("id"), d.get("kind"), d.get("lean_request"), _epoch(d.get("asked_at")), d.get("ask"))
         if d.get("choice"):
             add(_epoch(d.get("at")), "answer", "person", "bridge", "%s 回答了：%s" % (d.get("id"), _clip(d.get("choice"), 20)), did=d.get("id"))
             if d.get("state") == "delivered":
@@ -342,8 +382,7 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
                     "桥把 %s 的回答签好送回运行机" % d.get("id"), did=d.get("id"))
     if not decisions:   # person mode without the ledger: the MR's questions, at the time they were posted
         for q in (mr or {}).get("questions") or []:
-            add(_epoch(q.get("at")), "question", "bridge", "person", "%s 在 MR 上问人：%s" % (q.get("id"), q.get("kind_label") or "问题"),
-                did=q.get("id"), qkind=q.get("kind"))
+            on_mr(q.get("id"), q.get("kind"), q.get("lean_request"), _epoch(q.get("at")))
     m = ((t or {}).get("outcome") or {}).get("merged_at") or {}
     if m.get("value"):
         how = {"merge commit": "合并提交", "fast-forward": "快进"}.get(str(m.get("how") or ""), "")
@@ -365,20 +404,22 @@ def events_of(f: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any]
         else:
             add(at, "app", "person", "person", label)
     applied = [e for e in out if e["kind"] == "reflect"]
-    for ref, at in reflect_refs:   # the branch this app's write-back made is the same write-back: one event (BOARD-32)
+    for ref, at, merged in reflect_refs:   # the branch this app's write-back made is the same write-back: one event (BOARD-32)
         hit = next((e for e in applied if e.get("ref") == ref or (not e.get("ref") and abs(e["at"] - at) < 120)), None)
         if hit:
             hit["text"] = _clip("%s（回写分支 %s）" % (hit["text"], ref), 200)
             hit["ref"] = ref
         else:
             add(at, "reflect", "person", "reflect", "写好了回写分支 %s" % ref, ref=ref)
+        if merged is not None and merged > at + 60:     # merged later (a merge commit): that moment is an event too
+            add(merged, "reflect", "person", "reflect", "回写分支 %s 已合并" % ref, ref=ref, merged=True)
     out.sort(key=lambda x: (x["at"], x["_n"]))
     return out
 
 
 def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, mr: dict[str, Any] | None,
           sessions: list[dict[str, Any]], app_events: list[dict[str, Any]], team_decisions: list[dict[str, Any]],
-          subjects: dict[str, str], reflect_refs: list[tuple[str, float]], default_branch: str, local_only: bool,
+          subjects: dict[str, str], reflect_refs: list[tuple[str, float, float | None]], default_branch: str, local_only: bool,
           kit_rows: list[dict[str, Any]], decisions: list[dict[str, Any]], brain: dict[str, Any] | None,
           me: str | None, now: float, changes: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, Any]:
     """The board's graph part (actors, events, belt, checks, accept, person, live, direct, missing); the service adds
@@ -388,7 +429,7 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
     handoff = run.get("handoff") if isinstance(run.get("handoff"), dict) else None
     hand_at = _epoch((handoff or {}).get("requested_at"))
     local_only = bool(local_only or row.get("local_only"))
-    you = _you(me, f.get("owner"))
+    you = _you(me, f.get("owner"), runner=row.get("where") == "runner")
     evs = events_of(f, t, mr=mr, app_events=app_events, team_decisions=team_decisions, subjects=subjects,
                     reflect_refs=reflect_refs, default_branch=default_branch, you=you)
     fo = _Fold()
@@ -397,6 +438,8 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
     merged_at = next((e["at"] for e in evs if e["kind"] == "merge"), None)
     first_at = evs[0]["at"] if evs else None
     if local_only:
+        for k, (title, sub) in LOCAL_ONLY_ACTORS.items():
+            A[k].update(title=title, sub=sub)
         for k in RUNNER_SIDE:
             fo.put(k, "skipped", "%s：这个仓库只在本机做" % NOT_NEEDED, first_at)
 
@@ -442,15 +485,15 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
         elif kind == "request":
             if e.get("lean") == "RELEASE":
                 past_design(at)
+            what = GATE_KIND_LABEL.get(e.get("lean") or "", "")
             for g in e.get("gates") or []:
-                fo.put(g, "awaiting_approval", "等%s批准%s" % (you if e["from"] == "local" else "人在 MR 上",
-                                                          GATE_KIND_LABEL.get(e.get("lean") or "", "")), at,
-                       _who(you) if e["from"] == "local" else "product" if e.get("lean") == "RELEASE" else "people")
+                fo.put(g, "awaiting_approval", "等%s批准%s" % (you if e["from"] == "local" else "%s在 MR 上" % e["asker"], what),
+                       at, e["wait_who"])
                 fo.open(g, "wait", at)
                 fo.mark(g, at, "request", e["text"])
             s = e["from"]
             if A[s]["status"] not in FINAL:
-                fo.put(s, "done", "交给%s批准%s" % (you if s == "local" else "人", GATE_KIND_LABEL.get(e.get("lean") or "", "")), at)
+                fo.put(s, "done", "交给%s批准%s" % (e["asker"], what), at)
                 fo.close(s, at)
             if e.get("lean") == "RELEASE":
                 for k in ("ci",):
@@ -520,9 +563,8 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
             s = "local" if e["from"] == "local" else "runner"
             label = KIND_LABEL.get(str(e.get("qkind") or ""), "问题")
             if A[s]["status"] not in FINAL:
-                fo.put(s, "awaiting_approval", "停下问%s：%s%s" % (you if s == "local" else "人", label,
-                                                                  "（%s）" % e["did"] if e.get("did") else ""), at,
-                       _who(you) if s == "local" else "product" if e.get("qkind") == "acceptance" else "people")
+                fo.put(s, "awaiting_approval", "停下问%s：%s%s" % (e["asker"].rstrip(), label,
+                                                                  "（%s）" % e["did"] if e.get("did") else ""), at, e["wait_who"])
                 fo.open(s, "wait", at)
             fo.mark(s, at, "question", e["text"])
             if e["from"] == "bridge":
@@ -555,6 +597,9 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
                 fo.open("ci", "fix", at)
         elif kind == "merge":
             _merged(fo, at, hand_at, proposals, you=you)
+        elif kind == "reflect" and e.get("merged"):
+            fo.put("reflect", "merged", e["text"], at)
+            fo.mark("reflect", at, "reflect", e["text"])
         elif kind == "reflect":
             fo.put("reflect", "done", e["text"].replace("写好了回写分支 ", "回写分支 "), at)
             fo.close("reflect", at)
@@ -564,6 +609,9 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
     if merged_at is not None:   # what the clocks put a moment after the merge (Lean's ms, git's seconds) ends there too
         _merged(fo, merged_at, hand_at, proposals, again=True, you=you)
     _live_overlay(fo, f, row, sessions, now, hand_at, merged_at, evs, last_local[0], you)
+    newest = max(reflect_refs, key=lambda x: x[1], default=None)
+    if newest and newest[2] is not None and A["reflect"]["status"] == "done":   # the write-back is in the Brain now
+        fo.put("reflect", "merged", "回写分支 %s 已合并" % newest[0], newest[2])
     last = evs[-1]["at"] if evs else None
     for x in A.values():   # spans still open end at the last event (or at the merge)
         for s in x["spans"]:
@@ -575,7 +623,8 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
                           for s in x["spans"] if s["a"] < merged_at]
     for x in A.values():
         x["spans"] = [s for s in x["spans"] if s["b"] is None or s["b"] > s["a"]]
-    asked = {"you": you, "product": "产品"}.get(str((row.get("waits") or {}).get("who")), "人")
+    wait_who = str((row.get("waits") or {}).get("who"))
+    asked = you if wait_who == "you" else ASK_NAME.get(wait_who, "人")
     checks = _checks(f, evs, A, kit_rows, t, local_only, hand_at, merged_at, you, asked)
     actors = [A[k] for k, *_ in ACTORS]
     _facts(fo, f, evs, row, sessions, proposals)
@@ -667,9 +716,12 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
             if A[g]["since"] is not None and at < A[g]["since"]:
                 continue
             if a.get("state") == "pending" and A[g]["status"] != "awaiting_approval":
-                fo.put(g, "awaiting_approval", "等%s批准%s" % (you if hand_at is None else "人在 MR 上",
-                                                          GATE_KIND_LABEL.get(a["kind"], "")), at,
-                       _who(you) if hand_at is None else "product" if a.get("kind") == "RELEASE" else "people")
+                req = next((e for e in reversed(evs) if e["kind"] == "request" and e["from"] == "runner"
+                            and e.get("lean") == a.get("kind")), None)
+                who, asker = (_who(you), you) if hand_at is None else (req["wait_who"], req["asker"]) if req \
+                    else _asked(you, lean=a.get("kind"))
+                fo.put(g, "awaiting_approval", "等%s批准%s" % (you if hand_at is None else "%s在 MR 上" % asker,
+                                                          GATE_KIND_LABEL.get(a["kind"], "")), at, who)
             elif a.get("state") == "stale" and A[g]["status"] != "merged":
                 fo.put(g, "stalled", "文件改过了：要重新请求批准", at)
             elif a.get("state") == "approved" and A[g]["status"] in ("waiting", "awaiting_approval"):
@@ -706,8 +758,12 @@ def _live_overlay(fo: _Fold, f: dict[str, Any], row: dict[str, Any], sessions: l
         fo.put("local", "waiting", "认领了，还没开工", _first(since, (f.get("claim") or {}).get("created_at")))
     elif state == "handed_over":
         if waits.get("who") == "you":
-            fo.put("handover", "stalled", "推上去了，但 MR 上没有交接标签", _first(since, hand_at, now))
-            fo.put("bridge", "waiting", "MR 上没有交接标签：桥不会接", _first(since, hand_at, now))
+            at = _first(since, hand_at, now)
+            fo.put("handover", "stalled", "推上去了，但 MR 上没有交接标签", at, "you")
+            fo.put("bridge", "waiting", "MR 上没有交接标签：桥不会接", at)
+            # nothing was handed over: the bridge never had it, the hand-over waits on the person to label it
+            A["bridge"]["spans"] = [x for x in A["bridge"]["spans"] if x["b"] is not None]
+            fo.open("handover", "wait", at)
         else:
             if A["handover"]["status"] not in ("queued",):
                 fo.put("handover", "queued", "等桥核对交接", _first(since, hand_at, now))
@@ -807,7 +863,7 @@ def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str,
             cell("gate-" + lean, "gate", label, name, "fail", e["at"], "%s退回了：等它改好再批" % (e.get("who") or you), actor)
         else:
             cell("gate-" + lean, "gate", label, name, "wait", None,
-                 "等%s批准" % (you if e["from"] == "local" else "人在 MR 上"), actor)
+                 "等%s批准" % (you if e["from"] == "local" else "%s在 MR 上" % e["asker"]), actor)
     # verify: the last round's checks
     rounds = [e for e in evs if e["kind"] == "verify"]
     history = []
@@ -841,7 +897,7 @@ def _checks(f: dict[str, Any], evs: list[dict[str, Any]], A: dict[str, dict[str,
     # for a repo done only on this machine it is not on the way
     for i, k in enumerate(kit_rows):
         warn = k.get("level") == "WARN"
-        cell("kit-%d" % i, "brain", k.get("label") or "kit", k.get("text") or "", "fail" if k.get("level") == "FAIL" else
+        cell("kit-%d" % i, "brain", k.get("label") or KIT_LABEL, k.get("text") or "", "fail" if k.get("level") == "FAIL" else
              ("not_needed" if local_only else "wait") if warn else "pass", None,
              "只在本机做，用不上：交给运行机时才要紧" if warn and local_only else (k.get("todo") or k.get("text") or ""), None)
     # the Brain the run used: a citation that is stale or unknown fails; no citation is no check at all
@@ -1149,9 +1205,10 @@ def kit_cells(rows: list[dict[str, Any]], repo_path: str) -> list[dict[str, Any]
             continue
         if not r.get("repo") and "仓库" not in str(r.get("text") or ""):
             continue
-        txt = str(r.get("text") or "")
-        label = "适配" if ("适配" in txt or "adapter" in txt) else "Lean" if "Lean" in txt and "提交" in txt else \
-            "runs/**" if "runs/" in txt else "kit"
+        txt, raw = str(r.get("text") or ""), str(r.get("raw") or "")
+        # its short name on the wall: brain-kit's own line (raw) says which file it is about
+        label = "适配" if ("适配" in txt or "adapter" in txt + raw) else "Lean" if "Lean" in txt and "提交" in txt else \
+            "记录" if "runs/" in txt + raw else KIT_LABEL
         out.append({"level": r.get("level"), "label": label, "text": txt, "todo": r.get("todo") or ""})
     return out
 

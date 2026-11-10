@@ -120,7 +120,7 @@ def test_a_fix_round_continues_the_same_session_and_a_deleted_session_fails_the_
             await mgr.poll()
         assert fix.done and "找不到这个会话" in fix.error
         gone = await mgr.continue_conversation_async("s-nope", "x", parent_session_key="aidlc-team:r3", cwd="", model=None)
-        assert gone.done and gone.error.startswith("conversation_gone")
+        assert gone.done and gone.error == "找不到这个会话了：先点「打开会话」，再试一次"
 
     asyncio.run(go())
 
@@ -196,6 +196,38 @@ def test_a_strict_session_boots_exactly_its_template_or_fails(tmp_path):
         assert ok.slot and ok.agent_kind == "template" and "trust" not in gw.slot_rows[ok.slot]
         folder = next(f for f in gw.folder_rows if f["name"] == "PAY-2 · x")
         assert folder["project_dir"] == str(tmp_path)
+
+    asyncio.run(go())
+
+
+def test_what_a_person_reads_when_kirocrew_fails_says_what_happened_and_what_to_do(tmp_path):
+    """REST-29: a session that will not open, a turn that is not sent: what happened and what to do in words (再试一次,
+    打开会话), never the HTTP line or the exception (the log keeps those)."""
+    async def go():
+        gw, mgr = make(tmp_path)
+        folders = gw.folders
+
+        async def down():
+            raise GatewayError(0, "gateway unreachable (ClientConnectorError)", "unreachable", "/api/chat/folders")
+
+        gw.folders = down
+        info = await mgr.open_session("开工", parent_session_key="brain:r1-PAY-1", cwd=str(tmp_path), title="t",
+                                      folder="PAY-1 · x", agent="brain-dev", strict_agent=True, project_dir=str(tmp_path),
+                                      kind="local", key="r1-PAY-1")
+        assert info.error == "开不了 KiroCrew 会话：连不上 KiroCrew：看它是不是还开着，再试一次"
+        gw.folders, gw.templates = folders, set()
+        info = await mgr.open_session("开工", parent_session_key="brain:r1-PAY-2", cwd=str(tmp_path), title="t",
+                                      folder="PAY-2 · x", agent="brain-dev", strict_agent=True, project_dir=str(tmp_path),
+                                      kind="local", key="r1-PAY-2")
+        assert info.error == "开不了 KiroCrew 会话：KiroCrew 里没有 brain-dev：在设置里点「装上 brain-dev」，再试一次"
+        gw.templates = {"brain-dev"}
+        ok = await mgr.open_session("开工", parent_session_key="brain:r1-PAY-3", cwd=str(tmp_path), title="t",
+                                    folder="PAY-3 · x", agent="brain-dev", strict_agent=True, project_dir=str(tmp_path),
+                                    kind="local", key="r1-PAY-3")
+        await settle(mgr, gw, ok.slot)
+        gw.fail_send = True
+        turn = await mgr.continue_conversation_async(ok.id, "A", parent_session_key="brain:r1-PAY-3")
+        assert turn.error == "没送进会话：KiroCrew 没答应：等一会儿再试一次；一直这样，在 KiroCrew 里看一下它"
 
     asyncio.run(go())
 

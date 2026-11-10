@@ -36,7 +36,7 @@ describe('运行机', () => {
     expect(signer).toHaveTextContent('交接的合同')
     expect(signer).not.toHaveTextContent('answer')
     expect(signer).not.toHaveTextContent('handoff')
-    expect(signer).toHaveTextContent('MR 的作者 dave 不在 decision_roles.owner 里')
+    expect(signer).toHaveTextContent('负责人和认领记录对不上')
     expect(screen.getByTestId('signer-same-user')).toHaveTextContent('签名服务和 app 是同一个系统用户')
     expect(screen.getByTestId('signer-same-user')).toHaveTextContent('做什么正式给团队用之前，让签名服务换成另一个系统用户来跑')
     expect(screen.getByRole('region', { name: '运行机状态' })).toHaveTextContent('等签名 1 · 拒签 1')

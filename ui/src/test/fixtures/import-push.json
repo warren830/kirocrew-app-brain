@@ -3,6 +3,6 @@
   "pushed": true,
   "branch": "main",
   "remote_url": "git@gitlab.example.com:shop/refund.git",
-  "text": "推上去了：main → origin",
+  "text": "推上去了：main → 远端",
   "output": "To gitlab.example.com:shop/refund.git\n   04174d9..d634228  main -> main"
 }

@@ -566,15 +566,18 @@ describe('交付总览', () => {
     expect(batch.querySelector('[data-metric="credits_per_success"]')).toHaveTextContent(/^每个正确交付的 credits还没有/)
     expect(batch.querySelector('[data-metric="useful"]')).toHaveTextContent('只看默认分支')
     const queue = within(batch).getByTestId('eval-queue')
-    expect(queue).toHaveTextContent('要复看PAY-4 ↗验收被驳回 1 次')
+    expect(queue).toHaveTextContent('要复看PAY-4 ↗验收被退回 1 次')
     await user.click(within(queue).getByRole('button', { name: 'PAY-4 ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-4', from: 'overview' })
     const skipped = within(batch).getByTestId('eval-skipped')
-    expect(skipped).toHaveTextContent('读不了，不算进数字：runs/PAY-1/run.json 不是合法的 JSON：第 3 行')
+    expect(skipped).toHaveTextContent('读不了，不算进数字：它的开工记录读不了')
     expect(skipped).toHaveTextContent('做什么：在它的分支上把这个文件改对')
     await user.click(within(skipped).getByRole('button', { name: 'PAY-1 ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-1', from: 'overview' })
-    expect(within(batch).getByTestId('eval-notes')).toHaveTextContent(`brain-kit 说：${fx.overview().eval.notes.join('；')}`)
+    // each of brain-kit's notes on its own line, with what to do (the backend's note_rows)
+    const notes = within(batch).getAllByTestId('eval-notes')
+    expect(notes.map((n) => n.textContent)).toEqual((fx.overview().eval.note_rows ?? []).map((n) =>
+      expect.stringContaining(`brain-kit 说：${n.text}做什么：${n.todo}`)))
   })
 
   test('without the evaluate module the eval card says so plainly and what to do, brain-kit’s words folded; another error is said as it is', async () => {

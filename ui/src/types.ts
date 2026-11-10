@@ -548,11 +548,15 @@ export interface EvalView {
   metrics: EvalMetric[]
   /** 复看队列 (low-score queue): runs that need a human look */
   queue: { key: string; intent: string | null; reasons: string[] }[]
-  /** runs brain-kit could not read: listed with brain-kit's reason, not counted in any metric */
-  skipped: { key: string; why: string }[]
+  /** runs brain-kit could not read: listed with the reason in words (brain-kit's own in raw), not counted in any metric */
+  skipped: { key: string; why: string; raw?: string }[]
   /** brain-kit's notes on the numbers, verbatim (credits it could not attribute to a run, deliveries already known
    * wrong whose 14 days are not over …) */
   notes: string[]
+  /** the same notes, each in words with what to do (做什么) and brain-kit's own words for 细节 */
+  note_rows?: EvalNote[]
+  /** true while brainkit.evaluate is still computing a repo's numbers: say 正在算, not 还没有 */
+  computing?: boolean
   /** brain-kit's own words behind error (for 细节); '' when none. The backend always sends it */
   raw?: string
 }
@@ -584,7 +588,8 @@ export interface Overview {
   cto: CtoNumbers
   /** state → count */
   counts: Partial<Record<ReqState, number>>
-  errors: { repo: string; error: string }[]
+  /** a repo whose requirements could not be read: what happened and what to do, in words; raw: the original (细节) */
+  errors: { repo: string; error: string; raw?: string }[]
 }
 
 // ---------------------------------------------------------------- GET /requirements/{repo}/{key}
@@ -631,6 +636,8 @@ export interface Decision {
   cites: string[]
   vouchers: string[]
   src: string
+  /** the questions the AI asked straight in the session (Q1 …) whose answer this row records, from its text and why */
+  asked?: string[]
 }
 
 export interface QuestionOption { id: string; text: string }
@@ -814,7 +821,8 @@ export interface IntakeCheck {
   blocking_raw?: string[]
   /** the findings per file, said plainly: what was found and what happened to it, 请你确认, why a file was not taken */
   files?: { id: string; name: string; items: string[]; review: string; refused: string }[]
-  refused: { id: string; name: string; reason: string }[]
+  /** files not taken: why, in words (raw: brain-kit's own words) */
+  refused: { id: string; name: string; reason: string; raw?: string }[]
   /** a hard stop before any finding (no consent, nothing to take in …), verbatim */
   error: string
 }
@@ -953,6 +961,8 @@ export interface TodoItem {
   /** the brain-dev session to open, for lean_approval / clarify */
   session: { slot: string; title: string; url: string } | null
   since: number | null
+  /** lean_approval: the document to read before approving (the approval's path), shown as 要读的 */
+  path?: string | null
 }
 export interface Todo { items: TodoItem[]; team: boolean }
 
@@ -1246,3 +1256,6 @@ export interface CtoNumbers {
   /** merged per week (Monday, YYYY-MM-DD), by how: the last 12 weeks */
   weekly: { week: string; unattended: number; people: number; local: number; pending: number }[]
 }
+
+/** One of brain-kit's notes on the 交付评估 numbers: what it says, what to do, its own words (细节). */
+export interface EvalNote { text: string; todo: string; raw: string }

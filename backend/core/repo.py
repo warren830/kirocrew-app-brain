@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import threading
 import time
@@ -420,7 +421,10 @@ class Repo:
         self.invalidate()
         if p.returncode != 0:
             raw = (p.stderr or p.stdout).strip()[:1000]
-            return {"ok": False, "raw": raw, "text": fetch_failed(p.returncode, raw)}
+            text, cmd = fetch_failed(p.returncode, raw)
+            if cmd:
+                raw = (raw + "\n\n" if raw else "") + "做法：" + cmd.format(path=shlex.quote(self.path))
+            return {"ok": False, "raw": raw, "text": text}
         return {"ok": True, "raw": "", "text": "已经从远端取到最新。"}
 
     def invalidate(self) -> None:
@@ -430,26 +434,28 @@ class Repo:
             self._reflected = None
 
 
-FETCH_WHY = (   # (git's words, lower case; what it means and what to do), the first that matches
+FETCH = "git -C {path} fetch origin"
+FETCH_WHY = (   # (git's words, lower case; what it means and what to do; the command for 细节), the first that matches
     (("could not resolve host", "unable to access", "network is unreachable", "connection refused",
       "connection timed out", "failed to connect"),
-     "连不上远端：检查网络或 VPN，再点一次。"),
+     "连不上远端：检查网络或 VPN，再点一次。", ""),
     (("authentication failed", "permission denied", "could not read username", "access denied", "403", "401",
       "host key verification failed"),
-     "远端不让读：没有权限，或登录过期了。在终端里对这个仓库跑一次 git fetch，按提示登录，再点一次。"),
+     "远端不让读：没有权限，或登录过期了。在终端里对这个仓库取一次最新（细节里有命令），按提示登录，再点一次。", FETCH),
     (("does not appear to be a git repository", "repository not found", "not found", "no such file"),
-     "远端的地址不对，或者远端仓库没有了：在终端里用 git remote -v 看看地址。"),
+     "远端的地址不对，或者远端仓库没有了：在终端里看看这个仓库的远端地址（细节里有命令）。", "git -C {path} remote -v"),
 )
 
 
-def fetch_failed(code: int, raw: str) -> str:
-    """A failed git fetch, said plainly with what to do."""
+def fetch_failed(code: int, raw: str) -> tuple[str, str]:
+    """A failed git fetch, said plainly with what to do; and the command a person types for it ('' none), with
+    {path} for the repo's folder."""
     if code == 124:
-        return "从远端取最新没成功：等了 2 分钟远端也没回。网络慢或远端没响应，过一会再点一次。"
+        return "从远端取最新没成功：等了 2 分钟远端也没回。网络慢或远端没响应，过一会再点一次。", ""
     low = raw.lower()
-    why = next((t for words, t in FETCH_WHY if any(w in low for w in words)),
-               "原因看下面的细节；在终端里对这个仓库跑一次 git fetch origin 也能看到。")
-    return "从远端取最新没成功：" + why
+    why, cmd = next(((t, c) for words, t, c in FETCH_WHY if any(w in low for w in words)),
+                    ("原因看下面的细节；在终端里对这个仓库取一次最新也能看到（细节里有命令）。", FETCH))
+    return "从远端取最新没成功：" + why, cmd
 
 
 def _key_order(key: str) -> tuple:

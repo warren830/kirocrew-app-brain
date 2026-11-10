@@ -118,10 +118,10 @@
         "req_id": "SIG-0039",
         "kind": "handoff",
         "reasons": [
-          "MR 的作者 dave 不在 decision_roles.owner 里"
+          "负责人和认领记录对不上"
         ],
         "raw": [
-          "MR 的作者 dave 不在 decision_roles.owner 里"
+          "claim.json owner bob is not the branch owner alice"
         ]
       }
     ],
