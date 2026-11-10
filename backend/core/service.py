@@ -64,6 +64,15 @@ def scrub_tree(obj: Any, scrub: Callable[[str], str], key: str = "") -> Any:
     return obj
 
 
+def me_line(repos: list[dict[str, Any]], token: bool, env: str) -> dict[str, Any]:
+    """/status's machine-wide 你是谁: $BRAIN_USER (*env*), else the name of the first repo that has one (each repo's is
+    in its row: identity.of), and whether a GitLab token is there."""
+    first = next((x["me"] for x in repos if x["me"] and x["me"]["name"]), None)
+    how = "GitLab 令牌（%s）" % ("有" if token else "没有") + (
+        "；这台机器的环境变量里设的 %s" % env if env else "；%s" % first["text"] if first else "")
+    return {"user": env or (first["name"] if first else None), "token": token, "how": how}
+
+
 class Service:
     def __init__(self, ctx: Any, *, sessions: Any = None, transport: Any = None, now: Callable[[], float] = time.time,
                  signer_kick: Callable[[], Any] | None = None, sign_timeout: float | None = None) -> None:
@@ -1116,17 +1125,11 @@ class Service:
         mes = await asyncio.to_thread(lambda: {rid: self._me_view(r, token) for rid, r in loaded.items()})
         for x in repos:
             x["me"] = mes.get(x["id"])
-        # machine-wide: $BRAIN_USER, else the name of the first repo that has one (each repo's is in its row)
-        env = os.environ.get("BRAIN_USER", "").strip().lower()
-        first = next((x["me"] for x in repos if x["me"] and x["me"]["name"]), None)
-        me = env or (first["name"] if first else None)
-        how = "GitLab 令牌（%s）" % ("有" if token else "没有") + (
-            "；这台机器的环境变量里设的 %s" % env if env else "；%s" % first["text"] if first else "")
         return {"app": {"name": self.name, "version": VERSION, "team": self.team is not None},
                 "brainkit": {"path": info["path"], "ok": info["ok"], "version": info["version"], "error": info["error"],
                              "modules": info["modules"]},
                 "repos": repos, "crew": self.crew,
-                "me": {"user": me, "token": token, "how": how},
+                "me": me_line(repos, token, os.environ.get("BRAIN_USER", "").strip().lower()),
                 "team": self._team_status(), "counts": {"todo": len(todo["items"])}}
 
     def settings_view(self) -> dict[str, Any]:

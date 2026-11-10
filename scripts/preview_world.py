@@ -1116,7 +1116,7 @@ def main() -> None:
     world_status["repos"] = status["repos"] + [
         {"id": "r3", "path": "/Users/alice/workplace/shop-order", "name": "shop-order", "ok": True, "error": "", "pending": None,
          "kit": {"tracker": "none", "req_prefix": "ORD", "default_branch": "main", "gitlab_base": GL, "gitlab_project": "shop/shop-order"},
-         # 你是谁: GitLab, no token, no brain.user there: the page asks for the GitLab username
+         # 你是谁 without a GitLab token (no brain.user there): the page would ask; the world has one (identity.of below)
          "me": {"name": None, "source": "none", "gitlab": GL, "text": "", "ask": True, "label": identity.LABEL_GITLAB,
                 "why": identity.WHY_GITLAB, "suggest": "alice", "error": ""}},
         {"id": "r4", "path": "/Users/alice/workplace/shop-tools", "name": "shop-tools", "ok": True, "error": "", "pending": None,
@@ -1129,12 +1129,21 @@ def main() -> None:
                                     if r_.get("fix") != "kit"] + tool_kit
     world_status["crew"]["fix"] = {"agent": any(r_.get("fix") == "agent" for r_ in world_status["crew"]["rows"]),
                                    "engine": any(r_.get("fix") == "engine" for r_ in world_status["crew"]["rows"])}
+    # 你是谁 as identity.of says it on this machine, which has a GitLab token (status.me.token): a GitLab repo goes by
+    # GitLab's name and nothing is asked; a repo without GitLab by the login name
+    token = bool(world_status["me"]["token"])
+    for r_ in world_status["repos"]:
+        base = (r_.get("kit") or {}).get("gitlab_base") or ""
+        if r_.get("me") and base:
+            r_["me"] = identity.of(r_["path"], base, token=token) if token else r_["me"]
+    world_status["me"] = service.me_line(world_status["repos"], token, "")
     world_status["counts"]["todo"] = len(world_todo["ok"]["items"])
     for r_ in world_status["repos"]:
         r_["remote"] = r_["id"] not in local and r_["id"] != "r2"
     world = {"note": "made by scripts/preview_world.py: do not edit by hand", "at": T0, "status": world_status, "overview": world_ov,
              "overviews": overviews, "overviews_team": overviews_team, "todo": world_todo, "reflects": reflects,
-             "crew_missing": crew_fail, "crew_not_ready": crewcheck.not_ready([crew_fail]), "boards": boards, "details": details, "stages": STAGES,
+             "crew_missing": crew_fail, "crew_not_ready": crewcheck.not_ready([crew_fail]),
+             "me_token": identity.of("", GL, token=True), "boards": boards, "details": details, "stages": STAGES,
              "brains": brains, "intake_gates": intake_gates()}
     (ROOT / "ui" / "preview" / "world.json").write_text(json.dumps(world, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     # the contract fixtures the UI tests read: the overview's numbers for its own rows, one live board and one merged
