@@ -38,6 +38,12 @@ export const waitingRef = (ref: string): string => {
   const [kind, what] = ref.split(/\s+/, 2)
   return SIGN_KIND[kind] ? `${kind === 'answer' ? '回答' : '交接'} ${what ?? ''}`.trim() : ref
 }
+/** brain-kit's run id (RUN-<requirement>-<n>) in words, 「PAY-9 的第 1 次运行」 (*req*: say the requirement); the id
+ * itself goes on hover. */
+export const runWords = (id: string, req = true): string => {
+  const m = /^RUN-(.+)-(\d+)$/.exec(id)
+  return m ? `${req ? `${m[1]} 的` : ''}第 ${m[2]} 次运行` : '一次运行'
+}
 /** The steps a round could not do (loop_error: 「poll: …；collect: …」), in words. */
 const failedSteps = (loopError: string) => Array.from(new Set(loopError.split('；').map((x) => x.split(':', 1)[0].trim()).filter(Boolean)))
   .map((k) => LOOP_STEP[k]?.name ?? '其他一步')
@@ -190,7 +196,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
                   <tbody>
                     {data.runs.map((r) => (
                       <tr key={r.run_id} data-state={r.state}>
-                        <td className="br-mono">{r.run_id}</td>
+                        <td title={r.run_id}>{runWords(r.run_id, false)}</td>
                         <td>
                           <button type="button" className="br-link br-key" onClick={() => go({ kind: 'item', repo: 'runner', key: r.req, from: 'team' })}>{r.req}</button>
                         </td>
@@ -303,12 +309,12 @@ function Handovers({ rows, at }: { rows: TeamHandover[]; at: number | null }) {
               const m = handoverMeta(h.result)
               const hint = h.error || m.hint
               return (
-                <li key={`${h.project}!${h.iid}`} className={`kt-belt-chip ${CHIP_CLASS[h.result] ?? ''}`} data-result={h.result}>
+                <li key={`${h.project}!${h.iid}`} className={`kt-belt-chip ${CHIP_CLASS[h.result] ?? ''}`} data-result={h.result}
+                  title={h.sha ? `交接的提交 ${h.sha.slice(0, 12)}` : undefined}>
                   <span className="tm-chip-top">
                     <ExtLink href={h.mr_url} className="kt-belt-role tm-mr">{h.project}!{h.iid}</ExtLink>
                     <span className={`kt-pill tone-${m.tone}`}>{m.label}</span>
                   </span>
-                  {h.sha && <span className="kt-belt-meta"><code>{h.sha.slice(0, 12)}</code></span>}
                   {hint && <span className="tm-hint">{hint}</span>}
                 </li>
               )
@@ -339,7 +345,7 @@ function Signer({ signer }: { signer: TeamView['signer'] }) {
               {signer.pending.map((p) => (
                 <li key={p.req_id} className="tm-sig is-wait">
                   <span className="br-row"><b>{signKind(p.kind)}</b><span className="br-grow" /><span className="br-dim br-small">{fmtIso(p.since)}</span></span>
-                  <span className="br-mono br-dim br-small" title={p.req_id}>{p.run_id}</span>
+                  <span className="br-dim br-small" title={`${p.run_id} · ${p.req_id}`}>{runWords(p.run_id)}</span>
                 </li>
               ))}
             </ul>
@@ -366,7 +372,7 @@ function Signer({ signer }: { signer: TeamView['signer'] }) {
               {signer.waiting.map((w) => (
                 <li key={w.ref} className="tm-sig is-warn">
                   <span className="br-row"><b>{waitingRef(w.ref)}</b><span className="br-tag">{signKind(w.kind)}</span><span className="br-grow" /><span className="br-dim br-small">{fmtIso(w.since)}</span></span>
-                  <span className="br-mono br-dim br-small">{w.run_id}</span>
+                  <span className="br-dim br-small" title={w.run_id}>{runWords(w.run_id)}</span>
                 </li>
               ))}
             </ul>
@@ -422,12 +428,15 @@ const TM_CSS = `
 .tm-cells { display: flex; flex-wrap: wrap; gap: 4px; min-height: 1.4em; margin-top: .2em; }
 .tm-cells i { width: 1.4em; height: 1.4em; border-radius: .4em; border: 2px solid var(--kt-c); background: color-mix(in srgb, var(--kt-c) 22%, transparent); }
 .tm-cells i.is-wait { --kt-c: var(--kt-approve); } .tm-cells i.is-bad { --kt-c: var(--kt-bad); } .tm-cells i.is-warn { --kt-c: var(--kt-warn); border-style: dashed; }
-.tm-belt { align-items: stretch; padding-top: .5em; padding-bottom: .5em; }
+/* the hand-overs wrap onto more rows instead of scrolling (a hidden scrollbar hid the third one) */
+.tm-belt { align-items: stretch; padding-top: .5em; padding-bottom: .5em; flex-wrap: wrap; overflow: visible; }
+.tm-belt::before { display: none; }
+.tm-belt > li { flex: 1 1 15em; min-width: 0; }
 @container br-app (max-width: 760px) { .tm-belt-row { grid-template-columns: minmax(0, 1fr); } .tm-belt-row > .kt-belt-end { justify-self: start; } }
 .tm-belt .kt-belt-chip { gap: .25em; max-width: 26em; padding: .55em .8em .6em; }
 .tm-belt .kt-belt-chip.is-pending { border-color: color-mix(in srgb, var(--kt-warn) 55%, var(--border)); background: color-mix(in srgb, var(--kt-warn) 6%, var(--card)); }
 .tm-belt .kt-belt-chip.is-seen { border: 1px solid var(--border); background: var(--card); }
-.tm-chip-top { display: flex; align-items: center; gap: .6em; }
+.tm-chip-top { display: flex; align-items: center; gap: .3em .6em; flex-wrap: wrap; }
 .tm-mr { display: inline-flex; align-items: center; gap: .25em; text-decoration: none; }
 .tm-mr:hover { text-decoration: underline; }
 .tm-hint { font-size: .8em; color: var(--text); white-space: normal; line-height: 1.4; }
