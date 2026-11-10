@@ -254,7 +254,8 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
       <header className="cto-top">
         {localOnly && <span className="cto-tag" data-testid="ov-local-tag" title="没有远端：需求只在这台机器上做，不交给运行机">只在本机</span>}
         {team && <span className="cto-tag is-real" title="交给运行机的需求由团队的运行机接手">团队模式</span>}
-        <span className="cto-org">{noKit ? `${repos.length} 个仓库 · 现在一个都读不了` : `${scope.length} 个仓库 · ${data ? `${data.rows.length} 个需求` : '…'}`}</span>
+        <span className="cto-org">{noKit ? `${repos.length} 个仓库 · 现在一个都读不了`
+          : [status ? `${scope.length} 个仓库` : '', data ? `${data.rows.length} 个需求` : '…'].filter(Boolean).join(' · ')}</span>
         <span className="cto-grow" />
         <RefreshButton repos={scope.filter((r) => r.remote !== false)} onDone={ov.reload} />
       </header>

@@ -97,6 +97,13 @@ describe('交付总览', () => {
     expect(screen.getByRole('article', { name: '无人值守' })).not.toHaveTextContent('0/0')
   })
 
+  test('/status not read (the login expired): the top says how many requirements, not 「0 个仓库」', async () => {
+    installFixtureRoutes()
+    render(<OverviewView entry={{}} {...props({ status: null })} />)
+    await screen.findByTestId('ov-hero')
+    expect(document.querySelector('.cto-org')).toHaveTextContent(/^6 个需求$/)
+  })
+
   test('while brain-kit works the eval out (the backend’s computing flag), the page says 正在算, not 还没有', async () => {
     const ov = fx.overview()
     ov.cto = { ...ov.cto, available: false, unattended: null, stepped_in: null }
