@@ -483,5 +483,27 @@ def test_a_bridge_that_did_not_start_says_what_is_wrong_and_what_to_do_in_words(
 
 def test_a_bridge_error_nobody_mapped_keeps_it_under_details():
     assert P.team_start("something brain-kit says tomorrow") == {
-        "text": "桥没准备好", "todo": P.START_TODO, "raw": "something brain-kit says tomorrow"}
+        "text": "桥没准备好", "todo": P.TEAM_START_TODO, "raw": "something brain-kit says tomorrow"}
     assert P.team_start("") == {"text": "", "todo": "", "raw": ""}
+
+
+def test_no_backend_module_defines_a_name_twice():
+    """A second top-level START_RULES in problems.py once replaced the first, so `brain start`'s 「PAY-2 是 bob 认领的」
+    quietly fell back to brain-kit's English: a module-level name (rule table, function, class) is defined once."""
+    import ast
+    import collections
+    from pathlib import Path
+    twice = {}
+    for f in sorted((Path(__file__).resolve().parents[1] / "backend" / "core").glob("*.py")):
+        seen = collections.Counter()
+        for n in ast.parse(f.read_text(encoding="utf-8")).body:
+            if isinstance(n, ast.Assign):
+                seen.update(t.id for t in n.targets if isinstance(t, ast.Name))
+            elif isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name):
+                seen[n.target.id] += 1
+            elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                seen[n.name] += 1
+        dup = sorted(k for k, v in seen.items() if v > 1 and k != "__all__")
+        if dup:
+            twice[f.name] = dup
+    assert twice == {}

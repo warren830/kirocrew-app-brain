@@ -662,10 +662,10 @@ def reasons_text(raws: Iterable[Any], limit: int = 200) -> tuple[str, str]:
 # ---- why the team runner's bridge did not start (bridgehost.TeamRuntime.start) ------------------------------------- #
 
 SAME_USER_BOX = "本机试用：签名器和 app 用同一个系统用户"     # 设置's checkbox (ui/src/views/Settings.tsx)
-START_TODO = "看设置里团队模式填的两个配置文件（桥的、运行机的）对不对，改好再跑一轮"
+TEAM_START_TODO = "看设置里团队模式填的两个配置文件（桥的、运行机的）对不对，改好再跑一轮"
 # (the app's own start errors and brain-kit's load_bridge_config ones, what is wrong, what to do): the file names and
 # keys stay in raw (细节)
-START_RULES: list[tuple[re.Pattern, str, str]] = [(re.compile(rx, re.S), t, d) for rx, t, d in (
+TEAM_START_RULES: list[tuple[re.Pattern, str, str]] = [(re.compile(rx, re.S), t, d) for rx, t, d in (
     (r"^bridge\.json 不能写 signing_key", "桥的配置文件里写了私钥",
      "把私钥从桥的配置文件里删掉：私钥只给签名服务，桥只把要签的东西交给签名服务"),
     (r"^bridge\.json 要有 \"signer\"|^bridge\.json 的 signer 不是签名服务|^bridge config: signing_key is required",
@@ -697,7 +697,7 @@ def team_start(raw: Any) -> dict[str, str]:
     s = " ".join(str(raw or "").split())
     if not s:
         return {"text": "", "todo": "", "raw": ""}
-    for rx, text, todo in START_RULES:
+    for rx, text, todo in TEAM_START_RULES:
         if rx.search(s):
             return {"text": text, "todo": todo, "raw": s}
-    return {"text": "桥没准备好", "todo": START_TODO, "raw": s}
+    return {"text": "桥没准备好", "todo": TEAM_START_TODO, "raw": s}
