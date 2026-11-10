@@ -203,6 +203,27 @@ export function waitedOn(a: Pick<Actor, 'history'>, t: number): WaitWho | null {
   return h?.who ?? null
 }
 
+/** Whom a wait span of *a* was on: the requirement's wait now for one that goes on, its own history for one that is
+ * over (an older backend did not say: the wait now) — every wait in a lane said by the one rule (boardWho). */
+export function spanWho(a: Pick<Actor, 'status' | 'history'>, board: Pick<ReqBoard, 'row'>, s: { a: number; b: number | null }): WaitWho {
+  if (s.b === null && a.status === 'awaiting_approval') return board.row.waits.who
+  return waitedOn(a, s.a) ?? board.row.waits.who
+}
+
+/** The waits on someone other than the person looking that this board shows (a lane's wait span, a node or lane pill
+ * that waits), in the words they are said there: 「等产品」, 「等 carol」. */
+export function otherWaits(b: Pick<ReqBoard, 'row' | 'person' | 'actors'>): string[] {
+  const words = new Set<string>()
+  for (const a of b.actors) {
+    if (a.status === 'awaiting_approval' && !waitsOnMe(b)) words.add(boardWho(b))
+    for (const s of a.spans) {
+      const who = s.kind === 'wait' ? spanWho(a, b, s) : 'you'
+      if (who !== 'you') words.add(boardWho(b, who))
+    }
+  }
+  return [...words]
+}
+
 /** The ones a requirement may wait on that are people. */
 export const PERSON: ReadonlySet<WaitWho> = new Set<WaitWho>(['you', 'product', 'people', 'builder'])
 

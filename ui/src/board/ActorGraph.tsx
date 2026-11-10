@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, 
 import type { Actor, ReqBoard, WaitDo } from '../types'
 import { ACT, DO_NAME } from '../vocab'
 import { Engine, type Item } from './engine'
-import { LIVE, WORKING, actorLabel, actorMeta, boardWho, clip, fmtCredits, fmtWhen, isFinal, localOnly, runnerBlind, waitsOnMe } from './format'
+import { LIVE, WORKING, actorLabel, actorMeta, boardWho, clip, fmtCredits, fmtWhen, isFinal, localOnly, otherWaits, runnerBlind, waitsOnMe } from './format'
 import { useLatest } from './hooks'
 import { NODE_H, NODE_W, ORCH_BOX, ROSTER, anchorBox, commandPath, headX, particlePath, pathD, SCALE, type GraphLayout, type NodeBox } from './layout'
 import { Overlay } from './overlay'
@@ -173,7 +173,7 @@ export function ActorGraph({ board, lay, focus, onActor, flashes, reducedMotion,
           )
         })()}
       </Scroller>
-      <Legend handover={board.actors.some((a) => (a.key === 'handover' || a.key === 'signer') && a.status !== 'skipped')} />
+      <Legend handover={board.actors.some((a) => (a.key === 'handover' || a.key === 'signer') && a.status !== 'skipped')} others={otherWaits(board)} />
     </div>
   )
 }
@@ -576,14 +576,15 @@ const LEGEND: { status: Actor['status'] | 'other'; text: string }[] = [
   { status: 'skipped', text: '这次不需要' },
 ]
 
-/** *handover*: the way has a hand-over (a repo done only here has none, so its particle is not explained) */
-function Legend({ handover }: { handover: boolean }) {
+/** *handover*: the way has a hand-over (a repo done only here has none, so its particle is not explained); *others*: the
+ * waits on someone else the board shows, named as its pills name them (none: the colour's general word) */
+function Legend({ handover, others }: { handover: boolean; others: string[] }) {
   return (
     <div className="kt-legend" role="note" aria-label="图例">
       {LEGEND.map((l) => (
-        <span key={l.status} className={`kt-legend-item is-${l.status}`}>
+        <span key={l.status} className={`kt-legend-item is-${l.status}`} data-testid={l.status === 'other' ? 'kt-legend-other' : undefined}>
           <i aria-hidden="true" />
-          {l.text}
+          {l.status === 'other' && others.length ? others.join(' / ') : l.text}
         </span>
       ))}
       <span className="kt-legend-sep" aria-hidden="true" />

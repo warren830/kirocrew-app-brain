@@ -176,6 +176,26 @@ describe('需求看板', () => {
     expect(within(graph).getByTestId('kt-station')).toHaveAccessibleName('检查 2/4')
     expect(within(graph).getByTestId('kt-orch')).toHaveTextContent(b.person.owner as string)
     expect(within(graph).getByRole('note', { name: '图例' })).toHaveTextContent('等你')
+    // nothing here waits on anyone else: the blue key keeps its general word
+    expect(within(graph).getByTestId('kt-legend-other')).toHaveTextContent('等别人')
+  })
+
+  test('the legend names whom the blue waits are on, as the lanes’ pills and spans do (等产品, 等 carol), not 等别人', async () => {
+    installFixtureRoutes(boardRoute(() => fx.boardMerged()))
+    renderBoard(PAY2)
+    let graph = await loaded()
+    expect(within(graph).getByTestId('kt-legend-other')).toHaveTextContent(/^等产品$/)
+    expect(region('各环节的泳道').querySelector('.kt-track-span.is-other')?.getAttribute('title')).toMatch(/^等产品：/)
+    cleanup()
+    // carol's requirement waiting on her, read by alice
+    const b = fx.board()
+    Object.assign(b.row, { owner: 'carol', waits: { ...b.row.waits, who: 'people', line: null } })
+    b.person = { ...b.person, owner: 'carol', me: false, you: false }
+    installFixtureRoutes(boardRoute(() => structuredClone(b)))
+    renderBoard()
+    graph = await loaded()
+    expect(within(graph).getByTestId('kt-legend-other')).toHaveTextContent('等 carol')
+    expect(within(graph).getByTestId('kt-legend-other')).not.toHaveTextContent('等别人')
   })
 
   test('a node’s card on hover: what it is, what it waits for, the line to type; 打开会话 opens its session', async () => {

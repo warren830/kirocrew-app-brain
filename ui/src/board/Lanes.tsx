@@ -11,10 +11,10 @@
  * width. Read down the lanes and the way lines up like a Gantt chart.
  */
 import { useNavigate } from '@kirocrew/app-sdk'
-import type { Actor, ActorSpan, BeltItem, ReqBoard, WaitWho } from '../types'
+import type { Actor, ActorSpan, BeltItem, ReqBoard } from '../types'
 import { TypeLine } from '../ui'
 import { ACT, leanProgress } from '../vocab'
-import { WORKING, actorLabel, actorMeta, boardWho, fmtAgo, fmtCredits, fmtSpan, fmtWhen, leanOf, waitedOn, waitsOnMe } from './format'
+import { WORKING, actorLabel, actorMeta, boardWho, fmtAgo, fmtCredits, fmtSpan, fmtWhen, leanOf, spanWho, waitsOnMe } from './format'
 import { useServerNow } from './hooks'
 import { RoleIcon } from './RoleIcon'
 
@@ -158,13 +158,6 @@ const MARK_TITLE: Record<string, string> = {
   commit: '提交', approved: '批准', rejected: '退回', request: '请求批准', refused: '批准的那一行没被接受', blocked: 'Lean 拦下',
   handover: '交接', accepted: '桥接手', signed: '签名', question: '问人', answer: '回答', 'verify-ok': '自动检查通过',
   'verify-fail': '自动检查没过', reflect: '回写', session: '会话',
-}
-
-/** Whom a wait span of *a* was on: the requirement's wait now for one that goes on, its own history for one that is
- * over (an older backend did not say: the wait now) — every wait in a lane said by the one rule (boardWho). */
-export function spanWho(a: Actor, board: ReqBoard, s: { a: number; b: number | null }): WaitWho {
-  if (s.b === null && a.status === 'awaiting_approval') return board.row.waits.who
-  return waitedOn(a, s.a) ?? board.row.waits.who
 }
 
 function LaneTrack({ a, board, ax }: { a: Actor; board: ReqBoard; ax: Axis }) {
