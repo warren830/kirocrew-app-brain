@@ -433,6 +433,10 @@ def test_someone_elses_requirement_names_them_and_a_question_for_the_product_is_
     assert step["who"] == "产品" and step["text"].startswith("在 MR 上回答 D-2（A / B）")
     assert step["mr_url"] == mr["url"] and step["line"] is None and step["session_url"] is None
     assert "在会话里" not in step["text"]
+    # the team runner's board of it, whoever reads it (or nobody known), names carol too
+    for me in ("alice", None):
+        b = snapshot(f, dict(row, where="runner", repo="runner"), me=me, mr=mr, local_only=False, now=hand + 3 * H)
+        assert "carol 批准了需求" in [e["text"] for e in b["events"]], (me, [e["text"] for e in b["events"]])
 
 
 def test_a_claim_not_started_says_since_when_and_to_start_it():

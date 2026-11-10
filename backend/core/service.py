@@ -736,7 +736,9 @@ class Service:
                 cfg_t = bk.m("config").load(path) if path else dict(bk.m("config").DEFAULTS)
             except Exception:  # noqa: BLE001
                 cfg_t = dict(bk.m("config").DEFAULTS)
-            parts.update(repo=None, facts=f, trace=tl.get("trace"), mr=None, scope=None, decisions=decs, me=None,
+            home = next((r for r in self.repos.values() if f.get("project") and self._gitlab_of(r)[1] == f["project"]), None)
+            parts.update(repo=None, facts=f, trace=tl.get("trace"), mr=None, scope=None, decisions=decs,
+                         me=self.me_in(home) if home is not None else None,   # who reads it, as in its repo
                          cfg=cfg_t, path=path, local_only=False, sessions=sess,
                          app_events=[e for rid in row["run_ids"] for e in self.store.events(rid)])
         return {

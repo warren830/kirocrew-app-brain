@@ -151,9 +151,10 @@ def _who(you: str) -> str:
     return "you" if you == "你" else "people"
 
 
-def _you(me: str | None, owner: str | None) -> str:
-    """Who the requirement's person is to the one reading the board: 你, or their name (UI问题清单 BOARD-11)."""
-    if not me or not owner or me == owner:
+def _you(me: str | None, owner: str | None, *, runner: bool = False) -> str:
+    """Who the requirement's person is to the one reading the board: 你, or their name (UI问题清单 BOARD-11). On a
+    person's machine an unknown reader is the person; on the team runner's page only the owner is 你."""
+    if not owner or me == owner or (not me and not runner):
         return "你"
     return " %s " % owner
 
@@ -388,7 +389,7 @@ def build(f: dict[str, Any], row: dict[str, Any], t: dict[str, Any] | None, *, m
     handoff = run.get("handoff") if isinstance(run.get("handoff"), dict) else None
     hand_at = _epoch((handoff or {}).get("requested_at"))
     local_only = bool(local_only or row.get("local_only"))
-    you = _you(me, f.get("owner"))
+    you = _you(me, f.get("owner"), runner=row.get("where") == "runner")
     evs = events_of(f, t, mr=mr, app_events=app_events, team_decisions=team_decisions, subjects=subjects,
                     reflect_refs=reflect_refs, default_branch=default_branch, you=you)
     fo = _Fold()
