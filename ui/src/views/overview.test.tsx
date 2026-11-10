@@ -566,7 +566,7 @@ describe('交付总览', () => {
     expect(batch.querySelector('[data-metric="credits_per_success"]')).toHaveTextContent(/^每个正确交付的 credits还没有/)
     expect(batch.querySelector('[data-metric="useful"]')).toHaveTextContent('只看默认分支')
     const queue = within(batch).getByTestId('eval-queue')
-    expect(queue).toHaveTextContent('要复看PAY-4 ↗验收被驳回 1 次')
+    expect(queue).toHaveTextContent('要复看PAY-4 ↗验收被退回 1 次')
     await user.click(within(queue).getByRole('button', { name: 'PAY-4 ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-4', from: 'overview' })
     const skipped = within(batch).getByTestId('eval-skipped')

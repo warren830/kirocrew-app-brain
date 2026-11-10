@@ -538,7 +538,7 @@ def eval_reason(r: Any) -> str:
             "%m-%d %H:%M", time.localtime(lean_view.epoch(m.group(0)) or 0)), text)
     for was, now in STUCK_ON:
         text = text.replace(was, now)
-    return acts_in_words(text)
+    return acts_in_words(text.replace("驳回", "退回"))     # the board's and 需求详情's word for a rejection
 
 
 def skip_why(x: dict[str, Any]) -> str:

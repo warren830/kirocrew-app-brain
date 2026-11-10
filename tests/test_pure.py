@@ -358,7 +358,8 @@ def test_evaluate_notes_say_which_runs_wait_for_their_merge():
             {"rule": "stuck", "text": "30 小时没有进展（最后一次 2026-11-08T01:00:00Z，≥24 小时算停住）：run 没接着做（park.json "
                                       "还在等：去 KiroCrew 看 slot）"},
             {"rule": "question_problem", "text": "桥上的问题没走通：D-2 作废（void）"},
-            {"rule": "outside_judgment", "text": "判断点之外有人介入 2 次（push_after_handover）"}]}],
+            {"rule": "outside_judgment", "text": "判断点之外有人介入 2 次（push_after_handover）"},
+            {"rule": "acceptance_rejected", "text": "验收被驳回 1 次"}]}],
         "skipped": [{"key": "PAY-1", "why": "runs/PAY-1/run.json is not valid JSON"}]}
     mods = bk._state["mods"]
     saved = mods.get("evaluate")
@@ -382,7 +383,7 @@ def test_evaluate_notes_say_which_runs_wait_for_their_merge():
         "自动检查没过 3 次（2 次就要人看一眼）", "不知道运行机收没收到这次派单：去 KiroCrew 看一下它的会话",
         "30 小时没有进展（最后一次 %s，≥24 小时算停住）：运行机没接着做（它的问题还在等：去 KiroCrew 看一下它的会话）" % time.strftime(
             "%m-%d %H:%M", time.localtime(1794099600)),
-        "桥上的问题没走通：D-2 作废", "判断点之外有人介入 2 次（交接后推代码）"]
+        "桥上的问题没走通：D-2 作废", "判断点之外有人介入 2 次（交接后推代码）", "验收被退回 1 次"]
     assert view["skipped"] == [{"key": "PAY-1", "why": "它的开工记录读不了", "raw": "runs/PAY-1/run.json is not valid JSON"}]
 
 
