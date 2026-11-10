@@ -22,10 +22,11 @@ const STATE: Record<ReqBoard['accept']['state'], { label: string; tone: string }
 /** who settled the decisions, in words (decisions.md's Who column is never named to a person) */
 const BY_WORD: Record<string, string> = { unclassified: '没归类（「谁定的」没按规定写）' }
 
-/** A person named in a decision or on the merge: 「负责人（alice）」 for the run's owner, 「一位组员」 for a pseudonym. */
-export function personName(who: string | null, owner: string | null): string {
+/** A person named in a decision or on the merge, as 需求详情 says it: the run's owner 「负责人 alice」 (「你（负责人）」 to
+ * them), 「一位组员」 for a pseudonym. */
+export function personName(who: string | null, owner: string | null, me = false): string {
   if (!who) return ''
-  if (who === 'owner') return owner ? `负责人（${owner}）` : '负责人'
+  if (who === 'owner') return me ? '你（负责人）' : owner ? `负责人 ${owner}` : '负责人'
   if (/^P-[0-9A-F]{4,}$/i.test(who)) return '一位组员'
   return who
 }
@@ -52,7 +53,7 @@ export function Accept({ board, onDetail, quiet = false }: { board: ReqBoard; on
   const people = board.decisions.filter((d) => d.by === 'person')
   const total = ac.by.reduce((n, x) => n + x.count, 0)
   const signed = ac.state === 'merged' || ac.state === 'accepted'
-  const say = checksSay(board.checks, board.row.waits.who, owner)
+  const say = checksSay(board.checks, board)
   const sessions = board.sessions.length
   return (
     <section id="br-accept" className={`kt-sign${signed ? ' is-signed' : ''}${ac.state === 'not_yet' ? ' is-idle' : ''}`} aria-label="验收" data-testid="br-accept">
@@ -97,7 +98,7 @@ export function Accept({ board, onDetail, quiet = false }: { board: ReqBoard; on
           <dt>人做的决定</dt>
           <dd>
             {quiet ? '回放时不列：决定没有自己的时间' : people.length ? (
-              <ul>{people.slice(0, 4).map((d) => <li key={d.id}><b>{d.id}</b> <DescText text={d.text} />{d.who ? `（${personName(d.who, owner)}）` : ''}</li>)}</ul>
+              <ul>{people.slice(0, 4).map((d) => <li key={d.id}><b>{d.id}</b> <DescText text={d.text} />{d.who ? <span className="kt-dim"> · {personName(d.who, owner, board.person.me)}</span> : null}</li>)}</ul>
             ) : '（这次没有人拍板的决定）'}
             {people.length > 4 && <span className="kt-dim br-small">还有 {people.length - 4} 条：在需求详情里看</span>}
           </dd>
@@ -114,7 +115,7 @@ export function Accept({ board, onDetail, quiet = false }: { board: ReqBoard; on
       </dl>
       {ac.done ? (
         <p className="kt-sign-done" role="status">
-          <RoleIcon role="merge" size={16} /> {ac.done.who ? <b>{personName(ac.done.who, owner)}</b> : null} {fmtWhen(ac.done.at)} {ac.done.how}
+          <RoleIcon role="merge" size={16} /> {ac.done.who ? <b>{personName(ac.done.who, owner, board.person.me)}</b> : null} {fmtWhen(ac.done.at)} {ac.done.how}
           {onDetail && <button type="button" className="kt-btn kt-sign-cto" onClick={onDetail}>需求详情 ↗</button>}
         </p>
       ) : null}

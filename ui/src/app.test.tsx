@@ -86,6 +86,20 @@ describe('the app: one bar over the views', () => {
     expect(screen.getByRole('button', { name: '导入仓库' })).toHaveAttribute('title', '本机目录或克隆：先检查它，没装 brain-kit 的直接装上')
   })
 
+  test('a requirement its repo does not have: 需求详情 says so, and the 需求看板 tab says it cannot open it rather than opening it', async () => {
+    window.history.replaceState(null, '', '/apps/brain?view=item&repo=r1&key=PAY-99')
+    installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => { throw apiError(404, 'not_found', '没有这个需求') } })
+    const user = userEvent.setup()
+    render(<BrainApp pollMs={60_000} />)
+    expect(await screen.findByTestId('detail-missing')).toBeInTheDocument()
+    const tab = bar().getByRole('tab', { name: '需求看板 PAY-99' })
+    await waitFor(() => expect(tab).toHaveAttribute('aria-disabled', 'true'))
+    expect(tab).toHaveAttribute('title', '没有 PAY-99 这个需求：需求看板打不开')
+    await user.click(tab)
+    expect(parseView(window.location.search)).toEqual({ kind: 'item', repo: 'r1', key: 'PAY-99' })
+    expect(apiCalls.some((c) => c.path.startsWith(`${API}/board/`))).toBe(false)
+  })
+
   test('运行机 opened outside team mode is still the selected tab, greyed, so a person sees where they are', () => {
     render(<AppBar view="team" onView={() => {}} todo={0} team={false} />)
     const tab = screen.getByRole('tab', { name: '运行机' })

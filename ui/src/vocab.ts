@@ -66,12 +66,14 @@ export const CLASS_NAME: Record<string, string> = {
   public: '公开', internal: '内部', confidential: '机密', restricted: '严格受限', unsure: '不确定', secret: '绝密',
 }
 
-/** 4 done · 6 skipped · next: 发布 — the one way the whole app says Lean's progress (#8) */
-export function leanProgress(lean: Pick<LeanSummary, 'done_n' | 'skipped_n' | 'next'>): string {
+/** 4 done · 6 skipped · next: 发布 — the one way the whole app says Lean's progress (#8); a next stage already started
+ * is 「在做：代码生成」 (LeanSummary.stage_state of that stage) */
+export function leanProgress(lean: Pick<LeanSummary, 'done_n' | 'skipped_n' | 'next'> & Partial<Pick<LeanSummary, 'stage' | 'stage_state'>>): string {
   if (!lean.next) return lean.skipped_n ? `全部做完（跳过 ${lean.skipped_n}）` : '全部做完'
   const parts = [`做完 ${lean.done_n}`]
   if (lean.skipped_n) parts.push(`跳过 ${lean.skipped_n}`)
-  parts.push(`下一步：${lean.next.label}`)
+  const started = lean.stage_state === 'started' && (!lean.stage || lean.stage === lean.next.id)
+  parts.push(`${started ? '在做' : '下一步'}：${lean.next.label}`)
   return parts.join(' · ')
 }
 

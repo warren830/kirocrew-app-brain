@@ -68,7 +68,7 @@ export const BOARD_EXTRA_CSS = `
 .br-board .br-kpis > * { grid-column: auto; order: 0; }
 @container kt-root (max-width: 860px) { .br-board .br-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); } .br-board .br-kpis > * { grid-column: span 2; } .br-board .br-kpis > :nth-child(n+4) { grid-column: span 3; } }
 @container kt-root (max-width: 560px) { .br-board .br-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .br-board .br-kpis > *, .br-board .br-kpis > :nth-child(n+4) { grid-column: auto; } }
-.br-board .kt-kpi-note { white-space: normal; overflow: visible; }
+.br-board .kt-kpi-note { white-space: normal; overflow: visible; word-break: keep-all; overflow-wrap: break-word; }
 .br-board .br-lean-next b { color: var(--kt-approve); }
 .kt-segs i.is-skip { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 38%, transparent) 0 3px, transparent 3px 6px); }
 .kt-segs i.is-next { background: color-mix(in srgb, var(--kt-approve) 30%, transparent); box-shadow: inset 0 0 0 2px var(--kt-approve); }
@@ -97,13 +97,15 @@ export const BOARD_EXTRA_CSS = `
 .br-board .br-board-qs { display: grid; gap: 10px; }
 .br-board .kt-sign-blocked { font-size: .95em; }
 
-/* the introduction: five phases (four for a repo done only here); a name never breaks inside a word */
-.br-way.kt-team-intro.is-phased { grid-template-columns: .7fr 1.25fr 1.7fr 1.1fr .8fr; }
-.br-way.kt-team-intro.is-phased.is-local { grid-template-columns: .8fr 1.4fr 1.2fr .8fr; }
-@container kt-root (max-width: 1180px) { .br-way.kt-team-intro.is-phased, .br-way.kt-team-intro.is-phased.is-local { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* the introduction: five phases (four for a repo done only here) in a row while they fit, the next row when they do
+   not; a card never gets narrower than its words, which break only after a 、 (never inside a word) */
+.br-way.kt-team-intro.is-phased { display: flex; flex-wrap: wrap; }
+.br-way .kt-intro-phase { flex: 1 1 auto; }
+.br-way .kt-intro-phase-body > .kt-intro-stage { flex: 1 0 auto; min-width: auto; }
+.br-way .kt-intro-role { grid-template-columns: 36px minmax(min-content, 1fr); }
 .br-board .kt-intro-name b { white-space: nowrap; }
-/* what a step does breaks at its 、 only, never inside a word (a long one still wraps rather than overflow) */
-.br-board .kt-intro-does { word-break: keep-all; overflow-wrap: anywhere; }
+.br-board .kt-intro-does { overflow-wrap: normal; }
+.br-board .kt-intro-does .br-phrase { display: inline-block; white-space: nowrap; }
 /* a requirement the repo does not have: the same card as 需求详情's */
 .br-board .br-notfound { padding: 16px 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); max-width: 720px; }
 .br-board .br-notfound h3 { margin: 0 0 6px; }
@@ -122,6 +124,22 @@ export const BOARD_EXTRA_CSS = `
 .br-board .kt-track-span.is-wait.is-other { background: color-mix(in srgb, var(--kt-info) 55%, transparent); }
 .br-board .kt-track-span.is-wait.is-other.is-live { background: var(--kt-info); box-shadow: none; }
 .br-board .kt-track-span.is-wait.is-other.is-live::after { display: none; }
+
+/* the graph keeps its text readable: an app too narrow for it scrolls the graph sideways (layout.ts graphWidth); the
+   hidden part's edge fades and says so */
+.br-graph-view { position: relative; }
+/* its smallest words are 12 px too, so at that scale nothing on the graph is under 10 px (BOARD-31) */
+.br-board .kt-graph-svg :is(.kt-orch-sub, .kt-rail-n, .kt-phase-stages, .kt-roster-title, .kt-roster-item text) { font-size: 12px; }
+.br-graph-scroll { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.br-graph-view::before, .br-graph-view::after { content: ''; position: absolute; top: 0; bottom: 0; width: 56px; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 2; }
+.br-graph-view::before { left: 0; background: linear-gradient(90deg, var(--card), transparent); }
+.br-graph-view::after { right: 0; background: linear-gradient(270deg, var(--card), transparent); }
+.br-graph-view.has-left::before, .br-graph-view.has-right::after { opacity: 1; }
+.br-graph-more { position: absolute; top: 50%; transform: translateY(-50%); z-index: 3; padding: 5px 11px; border-radius: 999px; font: inherit; font-size: 12.5px; font-weight: 750; cursor: pointer;
+  color: var(--text-strong); background: var(--card); border: 1px solid var(--border-strong, var(--border)); box-shadow: 0 2px 10px rgba(0, 0, 0, .25); }
+.br-graph-more:hover { border-color: var(--accent); }
+.br-graph-more.is-right { right: 10px; }
+.br-graph-more.is-left { left: 10px; }
 
 /* a phase not on the way, folded to a narrow band */
 .br-board .kt-phase.is-folded .kt-phase-title { font-size: 14px; }

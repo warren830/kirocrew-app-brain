@@ -11,10 +11,10 @@
  * width. Read down the lanes and the way lines up like a Gantt chart.
  */
 import { useNavigate } from '@kirocrew/app-sdk'
-import type { Actor, BeltItem, ReqBoard } from '../types'
+import type { Actor, ActorSpan, BeltItem, ReqBoard, WaitWho } from '../types'
 import { TypeLine } from '../ui'
 import { ACT, leanProgress } from '../vocab'
-import { WORKING, actorLabel, actorMeta, fmtAgo, fmtCredits, fmtSpan, fmtWhen, leanOf, waitsOnMe } from './format'
+import { WORKING, actorLabel, actorMeta, boardWho, fmtAgo, fmtCredits, fmtSpan, fmtWhen, leanOf, waitedOn, waitsOnMe } from './format'
 import { useServerNow } from './hooks'
 import { RoleIcon } from './RoleIcon'
 
@@ -147,15 +147,16 @@ const MARK_TITLE: Record<string, string> = {
   'verify-fail': '自动检查没过', reflect: '回写', session: '会话',
 }
 
-function spanWord(kind: string, wait: string) {
-  return kind === 'wait' ? wait : kind === 'fix' ? '返工' : '在做'
+/** Whom a wait span of *a* was on: the requirement's wait now for one that goes on, its own history for one that is
+ * over (an older backend did not say: the wait now) — every wait in a lane said by the one rule (boardWho). */
+export function spanWho(a: Actor, board: ReqBoard, s: { a: number; b: number | null }): WaitWho {
+  if (s.b === null && a.status === 'awaiting_approval') return board.row.waits.who
+  return waitedOn(a, s.a) ?? board.row.waits.who
 }
 
 function LaneTrack({ a, board, ax }: { a: Actor; board: ReqBoard; ax: Axis }) {
   const now = useServerNow()
-  // a wait that still goes on says whom it waits for; one that is over, that a person was waited for
-  const now_ = actorLabel('awaiting_approval', board.row.waits.who, board.person.owner)
-  const word = (s: { kind: string; b: number | null }) => (s.kind === 'wait' && s.b === null && a.status === 'awaiting_approval' ? now_ : spanWord(s.kind, '等人'))
+  const word = (s: ActorSpan) => (s.kind === 'wait' ? boardWho(board, spanWho(a, board, s)) : s.kind === 'fix' ? '返工' : '在做')
   // an open span glows only while it really goes on: work while the actor works, a wait while it waits
   const going = (kind: string) => (kind === 'wait' ? a.status === 'awaiting_approval' : WORKING.has(a.status))
   return (
@@ -163,7 +164,7 @@ function LaneTrack({ a, board, ax }: { a: Actor; board: ReqBoard; ax: Axis }) {
       <div className="kt-track-line" />
       {ax.tail !== null && <div className="kt-track-tail" style={{ left: `${100 - TAIL_PCT}%`, width: `${TAIL_PCT}%` }} />}
       {a.spans.map((s, i) => (
-        <span key={i} className={`kt-track-span is-${s.kind}${s.b === null && going(s.kind) ? ' is-live' : ''}${s.kind === 'wait' && !waitsOnMe(board) ? ' is-other' : ''}`}
+        <span key={i} className={`kt-track-span is-${s.kind}${s.b === null && going(s.kind) ? ' is-live' : ''}${s.kind === 'wait' && spanWho(a, board, s) !== 'you' ? ' is-other' : ''}`}
           style={{ left: `${ax.pct(s.a)}%`, width: `${Math.max(0.6, ax.pct(s.b ?? now) - ax.pct(s.a))}%` }}
           title={`${word(s)}：${fmtWhen(s.a)} 起，${s.b === null ? `到现在（${fmtSpan(now - s.a)}）` : `用了 ${fmtSpan(s.b - s.a)}`}（开工后 ${fmtSpan(s.a - ax.t0)}）`} />
       ))}
@@ -182,7 +183,7 @@ function LaneRow({ a, board, ax, focused, dim, bump, onActor, quiet }: {
   const other = a.status === 'awaiting_approval' && !waitsOnMe(board)
   return (
     <article className={`kt-lane is-${a.status} tone-${other ? 'info' : meta.tone}${focused ? ' is-focus' : ''}${dim ? ' is-dim' : ''}${waiting ? ' is-compact' : ''}`}
-      data-testid="kt-lane" data-role={a.key} data-status={a.status} aria-label={`${a.title}：${actorLabel(a.status, board.row.waits.who, board.person.owner)}`}>
+      data-testid="kt-lane" data-role={a.key} data-status={a.status} aria-label={`${a.title}：${actorLabel(a.status, board)}`}>
       {bump > 0 && <span key={bump} className="kt-lane-bump" aria-hidden="true" />}
       <LaneId a={a} board={board} focused={focused} onActor={onActor} quiet={quiet} />
       <div className="kt-lane-live">
@@ -199,7 +200,7 @@ function LaneId({ a, board, focused, onActor, quiet }: { a: Actor; board: ReqBoa
   const navigate = useNavigate()
   const awaiting = a.status === 'awaiting_approval'
   const mine = waitsOnMe(board)
-  const label = actorLabel(a.status, board.row.waits.who, board.person.owner)
+  const label = actorLabel(a.status, board)
   return (
     <div className="kt-lane-id">
       <button type="button" className="kt-avatar" onClick={() => onActor(a.key)} aria-pressed={focused} aria-label={focused ? `不再只看${a.title}` : `只看${a.title}`} title={focused ? '再点一次看全部' : '只看这一环'}>
@@ -245,8 +246,10 @@ function Situation({ a, board, quiet }: { a: Actor; board: ReqBoard; quiet: bool
   const meta = actorMeta(a.status)
   const mine = waitsOnMe(board)
   const other = a.status === 'awaiting_approval' && !mine
+  // a wait says whom it is on once: the line itself when it starts so (「等产品在 MR 上回答 D-2」), else the lead
+  const says = a.status === 'awaiting_approval' && a.doing.startsWith('等')
   const strong: Record<string, string> = {
-    awaiting_approval: `${mine ? '✋ ' : ''}${actorLabel(a.status, board.row.waits.who, board.person.owner)}：`, failed: '✕ 没过：', stalled: '⚠ 卡住：',
+    awaiting_approval: says ? (mine ? '✋' : '') : `${mine ? '✋ ' : ''}${actorLabel(a.status, board)}：`, failed: '✕ 没过：', stalled: '⚠ 卡住：',
     fixing: '↻ 返工：', queued: '⏸ 排队：', merged: '✔ 完成', done: '✓ 做完这步', running: '●', waiting: '还没轮到：',
   }
   const lead = strong[a.status] ?? meta.label

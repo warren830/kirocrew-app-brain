@@ -28,13 +28,13 @@ import type { BoardDiff } from './diff'
 import type { Item } from './engine'
 import { EventFeed } from './EventFeed'
 import { BOARD_EXTRA_CSS } from './extra'
-import { WORKING } from './format'
+import { PERSON, WORKING, boardWho } from './format'
 import { NextStep } from './NextStep'
 import { openHere, reviewNext } from './next'
 import { Intro, Kpis, TopBar } from './Header'
 import { ClockContext, useReducedMotion, type SnapshotClock } from './hooks'
 import { Lanes } from './Lanes'
-import { SLOTS, edgesOf, foldedPhases, layoutGraph } from './layout'
+import { SLOTS, edgesOf, foldedPhases, graphWidth, layoutGraph } from './layout'
 import { ReplayBar, useReplay } from './Replay'
 import { RoleIcon } from './RoleIcon'
 import { useBoard } from './useBoard'
@@ -79,11 +79,13 @@ export function boardProblem(b: ReqBoard): { text: string; todo: string; raw: st
   return { text: '这个需求的运行记录没读全：图上只画了 Lean 的记录和仓库里看得到的', todo: '到需求详情看细节；一直这样的话，到设置里看 brain-kit 能不能用', raw: b.error }
 }
 
-export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs }: {
+export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, status, pollMs }: {
   entry: BoardEntry
   onBack?: () => void
   /** 切换需求: open another requirement's board here (default: a move to it) */
   onSwitch?: (repo: string, key: string) => void
+  /** told whether the repo has this requirement (the app bar's other tab cannot open one it does not have) */
+  onMissing?: (missing: boolean) => void
 } & ViewProps) {
   const api = useAppApi()
   const navigate = useNavigate()
@@ -100,6 +102,10 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
   }, [])
   const onDiff = useCallback((d: BoardDiff) => void (replaying.current || animate(d)), [animate])
   const live = useBoard(api, { repo: entry.repo, reqKey: entry.key, pollMs, onDiff })
+  const gone = live.missing && !live.board
+  useEffect(() => {
+    if (gone || live.board) onMissing?.(gone)
+  }, [gone, !!live.board]) // eslint-disable-line react-hooks/exhaustive-deps
   const rp = useReplay(live.board, animate)
   replaying.current = rp.on
   const board = rp.board ?? live.board
@@ -127,15 +133,31 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
     if (where) setTimeout(() => rootRef.current?.querySelector(where)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 80)
   }, [live.board]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // the live board's shape: a replay moves through the same picture
+  // the live board's shape: a replay moves through the same picture; the graph's width is the app's (its text keeps
+  // its size: layout.ts graphWidth)
   const shape = live.board
   const structure = shape ? structureKey(shape) : ''
+  const [graphW, setGraphW] = useState<number | null>(null)
+  const watch = useRef<ResizeObserver | null>(null)
+  const graphBox = useCallback((el: HTMLDivElement | null) => {
+    watch.current?.disconnect()
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const read = () => {
+      // the graph card's own inner width (its border and a scrollbar left out)
+      const w = (el.firstElementChild as HTMLElement | null)?.clientWidth || el.clientWidth
+      if (w > 0) setGraphW((old) => (old !== null && Math.abs(old - w) < 8 ? old : w))
+    }
+    read()
+    watch.current = new ResizeObserver(read)
+    watch.current.observe(el)
+  }, [])
+  useEffect(() => () => watch.current?.disconnect(), [])
   const lay = useMemo(() => {
     if (!shape) return null
     const fold = foldedPhases(shape.actors)
     const keys = shape.actors.map((a) => a.key).filter((k) => !fold.includes(SLOTS[k]?.phase ?? ''))
-    return layoutGraph(keys, edgesOf(new Set(keys), shape.direct), rosterRows(shape), fold)
-  }, [structure]) // eslint-disable-line react-hooks/exhaustive-deps
+    return layoutGraph(keys, edgesOf(new Set(keys), shape.direct), rosterRows(shape), fold, graphWidth(graphW, fold))
+  }, [structure, graphW]) // eslint-disable-line react-hooks/exhaustive-deps
   const liveClock: SnapshotClock = useMemo(() => ({ at: live.board?.at ?? Date.now() / 1000, receivedAt: live.receivedAt || Date.now() }), [live.board?.at, live.receivedAt])
   const clock = rp.clock ?? liveClock
 
@@ -171,6 +193,8 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
   }, [board, navigate]) // eslint-disable-line react-hooks/exhaustive-deps
   const quiet = rp.on
   const side = board ? board.questions.filter((q) => (q.state === 'waiting' || q.state === 'open') && !(board.row.waits.who === 'you' && openHere(q))) : []
+  // whom those wait on when it is not the person looking (the one rule, as the strip says it)
+  const waiter = !board || board.row.waits.who === 'you' ? null : PERSON.has(board.row.waits.who) ? boardWho(board) : '等人' 
   const acceptTop = !!board && board.accept.state !== 'not_yet'
   const problem = board ? boardProblem(board) : null
 
@@ -217,8 +241,10 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
                 {acceptTop && <Accept board={board} onDetail={toDetail} quiet={quiet} />}
                 <div className="kt-body">
                   <div className="kt-col">
-                    <ActorGraph key={`${entry.repo}/${entry.key}${rp.on ? ':replay' : ''}`} board={board} lay={lay} focus={focus} onActor={onActor} flashes={fx.flashes}
-                      reducedMotion={reducedMotion} feed={feed} quiet={quiet} onSession={(url) => navigate(url)} onAct={quiet ? undefined : onAct} />
+                    <div ref={graphBox}>
+                      <ActorGraph key={`${entry.repo}/${entry.key}${rp.on ? ':replay' : ''}`} board={board} lay={lay} focus={focus} onActor={onActor} flashes={fx.flashes}
+                        reducedMotion={reducedMotion} feed={feed} quiet={quiet} onSession={(url) => navigate(url)} onAct={quiet ? undefined : onAct} />
+                    </div>
                     {focus && <FocusBar board={board} focus={focus} onClear={() => setFocus(null)} />}
                     <Conveyor board={board} fresh={fx.belt} focus={focus} onActor={onActor} />
                     <Lanes board={board} focus={focus} bumps={fx.bumps} onActor={onActor} quiet={quiet} />
@@ -229,7 +255,7 @@ export function BoardPage({ entry, onBack, onSwitch, go, replace, status, pollMs
                     {!quiet && side.length > 0 && (
                       <section className="kt-card br-board-qs" aria-label="等回答的问题" data-testid="br-board-questions">
                         <header className="kt-card-head"><h2>等回答的问题</h2><span className={`kt-badge tone-${board.row.waits.who === 'you' ? 'approve' : 'info'}`}>{side.length}</span></header>
-                        {side.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={entry.repo} reqKey={entry.key} onAnswered={live.reload} />)}
+                        {side.map((q, i) => <QuestionCard key={`${q.id ?? 'q'}-${i}`} q={q} repo={entry.repo} reqKey={entry.key} onAnswered={live.reload} waiter={waiter} />)}
                       </section>
                     )}
                     <EventFeed board={board} focus={focus} onActor={onActor} fresh={fx.fresh} />
