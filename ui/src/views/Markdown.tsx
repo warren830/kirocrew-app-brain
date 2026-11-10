@@ -35,9 +35,14 @@ export function Paths({ text }: { text: string | null | undefined }) {
   return <>{out}</>
 }
 
+/** A text cut short (「…」) inside its `code` keeps the code: its open backtick is closed before the 「…」, so no lone
+ * backtick shows (brain-kit cuts long table cells at a length, wherever that falls). */
+const closeCut = (text: string) => ((text.match(/`/g)?.length ?? 0) % 2 && /…$/.test(text) ? text.replace(/…$/, '`…') : text)
+
 /** One line's `code`, **bold** and [links](…) (their words only); a path in it breaks only at a 「/」. */
-export function Inline({ text }: { text: string | null | undefined }) {
-  if (!text) return null
+export function Inline({ text: raw }: { text: string | null | undefined }) {
+  if (!raw) return null
+  const text = closeCut(raw)
   const out: ReactNode[] = []
   let last = 0
   for (const m of text.matchAll(INLINE)) {
@@ -113,8 +118,12 @@ export function blocks(text: string): Block[] {
   return out
 }
 
-/** A whole Markdown text as formatted text (the 变更说明's 看全文). */
-export function Markdown({ text, testid }: { text: string; testid?: string }) {
+/** A whole Markdown text as formatted text (the 变更说明's 看全文). *foldRefs*: the material refs (「（D01#S002 · 097f2e9e）」)
+ * are taken out of the lines and said once, at the end (BOARD-17). */
+export function Markdown({ text: raw, testid, foldRefs = false }: { text: string; testid?: string; foldRefs?: boolean }) {
+  const refs: string[] = []
+  const text = foldRefs ? raw.split('\n').map((l) => { const t = takeRefs(l); refs.push(...t.refs); return t.text }).join('\n') : raw
+  const once = [...new Set(refs)]
   return (
     <div className="br-md" data-testid={testid}>
       {blocks(text).map((b, i) => {
@@ -136,6 +145,7 @@ export function Markdown({ text, testid }: { text: string; testid?: string }) {
           default: return <p key={i}>{b.lines.map((t, j) => <span key={j}>{j > 0 && <br />}<Inline text={t} /></span>)}</p>
         }
       })}
+      {once.length > 0 && <p className="br-hint" data-testid="md-refs">引用的材料段落：{once.join('、')}</p>}
     </div>
   )
 }

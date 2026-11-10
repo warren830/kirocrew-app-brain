@@ -155,7 +155,7 @@ export function MrDescCard({ m, bare = false }: { m: MrDesc; bare?: boolean }) {
       {m.text && (
         <details className="br-raw br-mdfold">
           <summary>看全文</summary>
-          <Markdown text={m.text} testid="mr-desc-text" />
+          <Markdown text={m.text} testid="mr-desc-text" foldRefs />
         </details>
       )}
       {copied === 'ok' && <span className="br-small br-ok-text" role="status">已复制</span>}

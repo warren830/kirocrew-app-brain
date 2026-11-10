@@ -42,4 +42,19 @@ describe('Markdown as text', () => {
     ])
     expect(pathPieces('aidlc-docs/261107-refund-export/')).toEqual(['aidlc-docs', '/261107-refund-export/'])
   })
+
+  test('a 变更说明 says its material ref once, and a cell cut inside its code keeps the code (BOARD-17, DETAIL-22)', () => {
+    const text = ['**一句话**：给 `calc.py` 加乘法 `multiply(a, b)`（D01#S002 · 097f2e9e）（规模 small）。', '',
+      '- 目标：给 `calc.py` 加乘法（D01#S002 · 097f2e9e）。', '',
+      '| AC | 要求 |', '|---|---|', '| AC-2 | `multiply(0, 7)`、`multiply(0, -7)`、`multip… |'].join('\n')
+    render(<Markdown text={text} testid="md" foldRefs />)
+    const md = screen.getByTestId('md')
+    expect(md.textContent?.match(/D01#S002 · 097f2e9e/g)).toHaveLength(1)
+    expect(screen.getByTestId('md-refs')).toHaveTextContent(/^引用的材料段落：D01#S002 · 097f2e9e$/)
+    expect(md).toHaveTextContent('给 calc.py 加乘法 multiply(a, b)（规模 small）。')
+    const cell = within(md).getAllByRole('cell')[1]
+    expect(cell).toHaveTextContent(/^multiply\(0, 7\)、multiply\(0, -7\)、multip…$/)
+    expect([...cell.querySelectorAll('code')].map((c) => c.textContent)).toEqual(['multiply(0, 7)', 'multiply(0, -7)', 'multip'])
+    expect(md.textContent).not.toContain('`')
+  })
 })
