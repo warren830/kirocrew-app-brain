@@ -90,7 +90,7 @@ describe('设置', () => {
     const pick = await within(crew).findByTestId('mode-pick')
     const rec = pick.querySelector('[data-mode="branch"]') as HTMLElement
     expect(rec).toHaveTextContent('更新到新分支，开 MR 给团队看推荐')
-    expect(pick.querySelector('[data-mode="inplace"]')).toHaveTextContent('更新在你现在的检出里，提交在 main 上；推送到 origin 以后生效（这会直接改团队的 main，没有 MR 评审）')
+    expect(pick.querySelector('[data-mode="inplace"]')).toHaveTextContent('更新在你现在的检出里，提交在 main 上；推送到远端以后生效（这会直接改团队的 main，没有 MR 评审）')
     await user.click(within(pick).getByRole('button', { name: '直接更新在 main' }))
     expect(apiCalls.find((c) => c.path === `${API}/import/upgrade`)?.body).toEqual({ path: '/Users/alice/workplace/shop-pay', mode: 'inplace' })
     expect(await within(crew).findByText(job.result!.text)).toBeInTheDocument()

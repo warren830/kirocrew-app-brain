@@ -252,7 +252,7 @@ describe('导入仓库', () => {
     expect(screen.getByLabelText('目录名（可不填）')).toHaveAttribute('placeholder', 'refund')
     await user.click(screen.getByRole('button', { name: '克隆' }))
     expect(apiCalls.find((c) => c.path === `${API}/import/clone`)?.body).toEqual({ url: 'git@gitlab.example.com:shop/refund.git', parent: '/Users/alice/workplace', name: '' })
-    expect(await screen.findByText(/刷新你的 SSH 凭据/, { selector: '[role="alert"]' })).toBeInTheDocument()
+    expect(await screen.findByText(/刷新你的 SSH 登录凭证/, { selector: '[role="alert"]' })).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: '克隆的进度' })).getByText('克隆没成')).toBeInTheDocument()
     expect(apiCalls.some((c) => c.path === `${API}/import/inspect`)).toBe(false)
     await user.click(screen.getByRole('button', { name: '克隆' }))
@@ -351,7 +351,7 @@ describe('导入仓库', () => {
     const inplace = within(modes).getByLabelText(/直接装在 main/)
     expect(inplace).toBeChecked()
     expect(within(modes).getByText('推荐').closest('label')).toHaveAttribute('data-mode', 'inplace')
-    expect(inplace.closest('label')).toHaveTextContent('推送到 origin 以后就能开需求（这会直接改团队的 main，没有 MR 评审）')
+    expect(inplace.closest('label')).toHaveTextContent('推送到远端以后就能开需求（这会直接改团队的 main，没有 MR 评审）')
     const form = screen.getByRole('form', { name: '这个仓库的 brain-kit 设置' })
     expect(within(form).queryByLabelText('新分支名')).toBeNull()                         // no branch to name
     expect(within(form).getByLabelText('提交在哪')).toHaveTextContent('main你现在的检出，提交在这里；推送以后就能开需求')
@@ -433,7 +433,7 @@ describe('导入仓库', () => {
     moved.pending!.merge = { ok: false, why: 'main 在装完以后又有了新提交（装时 04174d9a，现在 9e8d7c6b），这个安装分支合不进去了：在「导入仓库」里改成直接装在 main 上', confirm: false }
     moved.install = { ...fx.importInspect().install!, remote_url: '', recommend: 'inplace', options: [{ mode: 'inplace', title: '直接装在 main', line: '装在你现在的检出里，提交在 main 上，马上能开需求', ok: true, why: '' }] }
     const merged = fx.importInspectPending()
-    merged.pending = { ...merged.pending!, state: 'merged', branch: 'origin/main', word: '要拉取', text: '已经合进 origin/main，这个目录还没更新',
+    merged.pending = { ...merged.pending!, state: 'merged', branch: 'origin/main', word: '要拉取', text: '已经合进远端的 main，这个目录还没更新',
       next: '点「拉取」更新这个目录（git pull --ff-only）', merge: null, pull: { ok: true, why: '' } }
     const seq = [local, installed(), moved, merged, installed()]
     let n = 0

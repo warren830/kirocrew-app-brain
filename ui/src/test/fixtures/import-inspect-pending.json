@@ -28,13 +28,13 @@
       "id": "default",
       "level": "OK",
       "label": "默认分支",
-      "why": "main（origin/HEAD）",
+      "why": "main（远端标的默认分支）",
       "todo": ""
     },
     {
       "id": "origin",
       "level": "OK",
-      "label": "origin",
+      "label": "远端",
       "why": "git@gitlab.example.com:shop/refund.git（GitLab https://gitlab.example.com，项目 shop/refund）",
       "todo": ""
     },

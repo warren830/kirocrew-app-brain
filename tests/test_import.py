@@ -126,12 +126,13 @@ def test_an_installed_repo_is_one_click_inspect_then_add(tmp_path, home):
     assert c["branch"]["why"] == "在 main 上" and c["default"]["why"].startswith("main")
     assert c["kit"]["why"] == "装了，已提交" and c["listed"]["why"] == "还不在列表里"
     # a repo done only on this machine: no origin is no warning (UI问题清单 #5)
-    assert c["origin"]["level"] == "OK" and c["origin"]["why"].startswith("没有 origin：这个仓库只在本机做")
+    assert c["origin"]["level"] == "OK" and c["origin"]["why"].startswith("没有远端：这个仓库只在本机做")
+    assert c["origin"]["label"] == "远端"
     assert got["kit"]["state"] == "checkout" and got["kit"]["values"]["req_prefix"] == "PAY"
     assert any(r["text"].startswith("KiroCrew 引擎") for r in got["crew"]["rows"])   # crewcheck's rows for it
     assert added["ok"] and added["id"] == "r1" and added["status"]["repos"][0]["ok"] is True
     assert json.loads((tmp_path / "data" / "settings.json").read_text())["repos"] == [str(repo.resolve())]
-    assert again["next"] == "listed" and again["listed"] == "r1" and checks(again)["listed"]["why"] == "已经在列表里（r1）"
+    assert again["next"] == "listed" and again["listed"] == "r1" and checks(again)["listed"]["why"] == "已经在列表里"
 
 
 def test_a_subfolder_and_a_linked_worktree_point_at_the_main_checkout(tmp_path, home):
@@ -162,7 +163,7 @@ def test_a_plain_dirty_repo_each_check_says_why_and_the_form_is_prefilled(tmp_pa
     got = started(svc, lambda: svc.import_inspect({"path": "  %s  " % repo}))
     c = checks(got)
     assert got["next"] == "install" and got["pending"] is None and got["listed"] is None
-    assert c["default"]["level"] == "OK" and c["default"]["why"] == "main（origin/HEAD）"
+    assert c["default"]["level"] == "OK" and c["default"]["why"] == "main（远端标的默认分支）"
     assert c["origin"]["level"] == "OK" and "GitLab https://gitlab.example.com，项目 grp/pay" in c["origin"]["why"]
     assert got["origin"] == {"url": "git@gitlab.example.com:grp/pay.git", "base": "https://gitlab.example.com",
                              "project": "grp/pay"}
@@ -268,7 +269,7 @@ def test_clone_failures_are_said_in_plain_chinese(tmp_path, home, monkeypatch):
 
     got = started(svc, go)
     assert got["exists"].code == "exists" and got["exists"].status == 409 and "已经有了" in str(got["exists"])
-    assert got["creds"].code == "credentials_in_url" and "token" in str(got["creds"])
+    assert got["creds"].code == "credentials_in_url" and "令牌" in str(got["creds"])
     assert got["ext"].code == "invalid_url" and got["inside"].code == "inside_work_root"
     assert got["notrepo"]["state"] == "failed" and "找不到这个仓库" in got["notrepo"]["error"]
     assert got["auth"]["state"] == "failed" and "刷新你的 SSH 登录凭证" in got["auth"]["error"] and "再试" in got["auth"]["error"]
@@ -453,7 +454,7 @@ def test_add_installed_and_pending_repos_then_merge_and_pull(tmp_path, home):
     assert got["overview"]["errors"] == []                                      # pending is no error
     assert got["changed"] is True and got["pulled_seen"] is True
     m = got["merged"]["repos"][1]
-    assert m["pending"]["state"] == "merged" and "已经合进 origin/main" in m["pending"]["text"] and "「拉取」" in m["pending"]["next"]
+    assert m["pending"]["state"] == "merged" and "已经合进远端的 main，" in m["pending"]["text"] and "「拉取」" in m["pending"]["next"]
     assert got["pulled"]["repos"][1]["ok"] is True and got["pulled"]["repos"][1]["pending"] is None
 
 

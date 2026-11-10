@@ -28,13 +28,13 @@
       "id": "default",
       "level": "OK",
       "label": "默认分支",
-      "why": "main（origin/HEAD）",
+      "why": "main（远端标的默认分支）",
       "todo": ""
     },
     {
       "id": "origin",
       "level": "OK",
-      "label": "origin",
+      "label": "远端",
       "why": "git@gitlab.example.com:shop/refund.git（GitLab https://gitlab.example.com，项目 shop/refund）",
       "todo": ""
     },
@@ -115,14 +115,14 @@
         "title": "直接装在 main",
         "ok": true,
         "why": "",
-        "line": "装在你现在的检出里，提交在 main 上；推送到 origin 以后就能开需求（这会直接改团队的 main，没有 MR 评审）；只提交安装写的文件，你自己没提交的改动不动"
+        "line": "装在你现在的检出里，提交在 main 上；推送到远端以后就能开需求（这会直接改团队的 main，没有 MR 评审）"
       },
       {
         "mode": "branch",
         "title": "装到新分支，开 MR 给团队看",
         "ok": true,
         "why": "",
-        "line": "从 origin/main 建新分支，放在单独的工作目录里，不动你的检出；推送、开 MR 给团队看，MR 合进 main 以后才能开需求"
+        "line": "从远端的 main 建新分支，放在单独的工作目录里，不动你的检出；推送、开 MR 给团队看，MR 合进 main 以后才能开需求"
       }
     ],
     "recommend": "inplace",

@@ -111,12 +111,16 @@ def test_in_place_with_unrelated_changes_commits_only_what_brain_install_wrote(t
     svc = make_service(tmp_path, [])
 
     async def go():
-        return (await svc.import_inspect({"path": str(repo)}))["install"], await install_mode(svc, repo, "inplace")
+        c = (await svc.import_inspect({"path": str(repo)}))["install"]
+        done = await install_mode(svc, repo, "inplace")
+        return c, done, await svc.import_choices({"path": str(repo), "purpose": "upgrade"})
 
-    c, done = started(svc, go)
+    c, done, up = started(svc, go)
     assert svc.settings["repos"] == [done["result"]["path"]]   # listed once its commit went in, page open or not (SETUP-18)
     assert c["recommend"] == "inplace" and [o["mode"] for o in c["options"]] == ["inplace", "branch"]   # offered
-    assert c["options"][0]["ok"] and "只提交安装写的文件，你自己没提交的改动不动" in c["options"][0]["line"]
+    # said once: an install's line leaves it to 导入仓库's safety line next to it; the kit update's picker has none
+    assert c["options"][0]["ok"] and "只提交安装写的文件" not in c["options"][0]["line"]
+    assert "只提交安装写的文件，你自己没提交的改动不动" in up["options"][0]["line"]
     assert c["overlap"] == [] and set(c["dirty"]) == set(mine)
     assert done["state"] == "done" and done["result"]["commit"]["ok"], done
     committed = names_in(repo)
@@ -166,8 +170,8 @@ def test_in_place_is_refused_when_changes_touch_what_it_writes_or_the_checkout_i
         assert err.code == "inplace_refused" and err.status == 409 and opt["why"] in str(err), k
         assert str(err).endswith("可以装到新分支")
     assert ".gitignore" in got["overlap"][0]["options"][0]["why"] and got["overlap"][0]["overlap"] == [".gitignore"]
-    assert "detached" in got["detached"][0]["options"][0]["why"]
-    assert "变基（rebase）" in got["rebasing"][0]["options"][0]["why"] and "git rebase --abort" in got["rebasing"][0]["options"][0]["why"]
+    assert "不在任何分支上" in got["detached"][0]["options"][0]["why"]
+    assert "正在变基的中间" in got["rebasing"][0]["options"][0]["why"] and "git rebase --abort" in got["rebasing"][0]["options"][0]["why"]
     assert "合并" in got["merging"][0]["options"][0]["why"]
     for k, r in repos.items():
         assert sh("git", "-C", r, "status", "--porcelain").stdout == states[k] and not (r / ".brain").exists(), k
@@ -194,9 +198,9 @@ def test_the_recommended_option_follows_the_remote_and_the_changes(tmp_path, hom
                     "team": ("inplace", [("inplace", True), ("branch", True)]),
                     "feature": ("inplace", [("inplace", True)])}
     t = got["team"]
-    assert "推送到 origin 以后就能开需求" in t["options"][0]["line"] and "直接改团队的 main，没有 MR 评审" in t["options"][0]["line"]
+    assert "推送到远端以后就能开需求" in t["options"][0]["line"] and "直接改团队的 main，没有 MR 评审" in t["options"][0]["line"]
     assert t["options"][1]["title"] == "装到新分支，开 MR 给团队看"
-    assert t["options"][1]["line"].startswith("从 origin/main 建新分支") and "MR 合进 main 以后才能开需求" in t["options"][1]["line"]
+    assert t["options"][1]["line"].startswith("从远端的 main 建新分支") and "MR 合进 main 以后才能开需求" in t["options"][1]["line"]
     assert "马上能开需求" in got["alone"]["options"][0]["line"]
     assert got["dirty"]["options"][1]["title"] == "装到新分支" and "「合并到 main」" in got["dirty"]["options"][1]["line"]
     assert got["feature"]["options"][0]["title"] == "直接装在 wip" and "wip 不是默认分支 main" in got["feature"]["options"][0]["line"]
