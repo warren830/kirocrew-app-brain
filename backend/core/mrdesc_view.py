@@ -16,16 +16,21 @@ The overview shows each row's first line from it and makes what is missing in on
 from __future__ import annotations
 
 import collections
+import logging
 import re
 import threading
 from typing import Any, Callable
 
 from . import bk
+from .constants import APP_NAME
 from .repo import Git
 
 DESC_MAX_CHARS = 60000      # brain-kit's bridge.decisions.DESC_MAX_CHARS: what it posts of an MR.md
 MAX_RAW = 4 * 1024 * 1024
 ONE_LINE = "**一句话**："      # render()'s summary line
+# what the page says when brain-kit cannot make it (its own words go to the app's log: the answer has no 细节)
+NO_MODULE = "这个 brain-kit 写不出变更说明（它太旧，或者没装好）：在设置里换新一点的 brain-kit"
+NOT_MADE = "变更说明这次生成不了：brain-kit 读不出它的记录。在设置里看 brain-kit 能不能用"
 TREE_RE = re.compile(r"^(100644|100755) blob ([0-9a-f]{40,64})\s+([0-9]+)\t")
 
 
@@ -91,8 +96,8 @@ def plain_line(line: str | None) -> str | None:
 def describe(path: str, cfg: dict[str, Any], key: str, sha: str, credits: Any = None) -> dict[str, Any]:
     """The 变更说明 of *key* at commit *sha* of the repo at *path* (blocking: call it in a thread)."""
     if not bk.has("mrdesc"):
-        why = bk.info()["module_errors"].get("mrdesc") or "没有这个模块"
-        return empty("brain-kit 的 mrdesc 用不了（%s）：要 72b278e 或更新的 brain-kit" % why)
+        logging.getLogger(APP_NAME).info("brainkit.mrdesc: %s", bk.info()["module_errors"].get("mrdesc") or "not there")
+        return empty(NO_MODULE)
     M = bk.m("mrdesc")
     out = empty()
     rel = "%s/%s/%s" % (cfg.get("runs_dir") or "runs", key, getattr(M, "MR_FILE", "MR.md"))
@@ -102,7 +107,7 @@ def describe(path: str, cfg: dict[str, Any], key: str, sha: str, credits: Any = 
         text = raw.decode("utf-8", "replace").replace("\r\n", "\n").strip("\n")
         cut = ""
         if len(text) > DESC_MAX_CHARS:
-            text, cut = text[:DESC_MAX_CHARS], "\n\n（MR.md 太长，这里只显示前 %d 个字，全文见文件。）" % DESC_MAX_CHARS
+            text, cut = text[:DESC_MAX_CHARS], "\n\n（变更说明太长，这里只显示前 %d 个字；全文在需求分支上它的文件里。）" % DESC_MAX_CHARS
         text = M.inert(text) + cut + "\n"
         out.update(text=text, first=first_line(text), source="file")
         return out
@@ -110,7 +115,8 @@ def describe(path: str, cfg: dict[str, Any], key: str, sha: str, credits: Any = 
         from .deliveries import _call
         text = M.render(_call(M.build, path, cfg, key, ref=sha, credits=credits))
     except Exception as exc:  # noqa: BLE001 - a run without records, or a module still growing: said, not raised
-        out["error"] = "变更说明生成不了：%s" % str(exc).replace(path, ".").split("\n", 1)[0][:300]
+        logging.getLogger(APP_NAME).info("brain mr-desc %s at %s: %s", key, sha[:12], str(exc).split("\n", 1)[0][:300])
+        out["error"] = NOT_MADE
         return out
     out.update(text=text, first=first_line(text), source="records")
     return out
@@ -176,5 +182,6 @@ class DescCache:
             try:
                 result = make()
             except Exception as exc:  # noqa: BLE001
-                result = empty("变更说明生成不了：%s" % str(exc)[:200])
+                logging.getLogger(APP_NAME).info("brain mr-desc: %s", str(exc).split("\n", 1)[0][:300])
+                result = empty(NOT_MADE)
             self.put(sig, result)

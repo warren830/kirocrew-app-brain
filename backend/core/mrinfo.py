@@ -166,7 +166,7 @@ class MrCache:
         rest = bk.m("rest")
         tok = rest.read_token()
         if not base or not project or not tok:
-            raise RuntimeError("这台机器上没有 GitLab token（~/.brain/gitlab-token）：去 MR 上回答")
+            raise RuntimeError("这台机器上没有 GitLab 的令牌：去 MR 上回答")
         gl = rest.GitLab(base, tok, transport)
         line = "answer %s %s" % (did, choice) + ((" " + note) if note else "")
         return gl.comment(project, int(iid), line) or {}

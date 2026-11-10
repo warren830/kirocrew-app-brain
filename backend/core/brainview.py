@@ -211,7 +211,7 @@ def preview(repo: Repo, facts: dict[str, Any], vouchers_dir: str | None) -> dict
            "problems": [], "substantive": False, "error": "", "raw": []}
     base = repo.main_ref()
     if not base:
-        out["error"] = "这个仓库没有 %s 分支" % repo.cfg["default_branch"]
+        out["error"] = "这个仓库没有 %s 分支：回写要从它开新分支，先把它建好" % repo.cfg["default_branch"]
         return out
     src_repo, ref = _where(repo, facts)
     try:
