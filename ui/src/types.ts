@@ -243,7 +243,12 @@ export interface Status {
 export interface TeamStatus {
   enabled: boolean
   ok: boolean
+  /** why the bridge did not start, in words ('' when it did) */
   error: string
+  /** what to do about it, in words (problems.team_start). The backend always sends it */
+  error_todo?: string
+  /** the error as it was (file names, keys), for 细节. The backend always sends it */
+  error_raw?: string
   last_loop_at: number | null
   loop_error: string
   /** the signer runs as this app's OS user (the local trial, or its signed/ and refused/ are writable here): it would

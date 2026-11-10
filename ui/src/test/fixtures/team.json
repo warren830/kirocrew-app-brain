@@ -3,6 +3,8 @@
     "enabled": true,
     "ok": true,
     "error": "",
+    "error_todo": "",
+    "error_raw": "",
     "last_loop_at": 1794146350,
     "loop_error": "",
     "same_user": true,

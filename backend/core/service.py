@@ -1089,7 +1089,8 @@ class Service:
     def _team_status(self) -> dict[str, Any]:
         if self.team is None:
             on = bool(self.settings["team"].get("enabled"))
-            return {"enabled": on, "ok": False, "error": "brain-kit 没装载" if on else "",
+            why = problems.team_start("brain-kit 没装载" if on else "")
+            return {"enabled": on, "ok": False, "error": why["text"], "error_todo": why["todo"], "error_raw": why["raw"],
                     "last_loop_at": None, "loop_error": "", "same_user": False, "signer": {"pending": 0, "refused": 0}}
         return self.team.status()
 
@@ -1494,7 +1495,8 @@ class Service:
 
     async def team_loop(self) -> dict[str, Any]:
         if self.team is None or self.team.host is None:
-            raise AppError((self.team.error if self.team else "") or "运行机模式没打开", "team_off", 409)
+            raise AppError((problems.team_start(self.team.error)["text"] if self.team else "") or "运行机模式没打开",
+                           "team_off", 409)
         try:
             summary = await self._in_team(self.team.loop_once)
         except Exception as exc:  # noqa: BLE001

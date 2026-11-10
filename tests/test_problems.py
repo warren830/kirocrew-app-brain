@@ -453,3 +453,35 @@ def test_levels_are_normalized_and_whitespace_folded():
     assert P.row("WARN", OLDER, repo=REPO, team=True)["level"] == "FAIL"
     assert P.row("OK", "Lean does not count runs/ as code (x)", team=False)["level"] == "OK"
     assert P.mk("OK", "好", "不该有", "kit")["todo"] == "" and P.mk("FAIL", "坏", fix="nope")["fix"] is None
+
+
+# ---- why the team runner's bridge did not start ---------------------------------------------------------------------- #
+
+def _start_errors() -> list[str]:
+    """Every error bridgehost.TeamRuntime.start raises itself, read from its source (the first string literal, %s
+    filled), and brain-kit's load_bridge_config ones (bridge/handoff.py, sign.signer_problems)."""
+    import ast
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "backend" / "core" / "team" / "bridgehost.py").read_text(encoding="utf-8")
+    own = [ast.literal_eval(m.group(1)).replace("%s", "/etc/brain/x.json")
+           for m in re.finditer(r'BrainError\(("(?:[^"\\]|\\.)*")', src)]
+    assert len(own) >= 8, own
+    return own + ["bridge config: spool_dir is required", "bridge config: signing_key is required (or a signer of type spool)",
+                  "bridge config: signer.allowed_signers is required for a spool signer", "bridge config: projects is empty",
+                  "[Errno 2] No such file or directory: '/etc/brain/bridge.json'", "brain-kit 没装载"]
+
+
+@pytest.mark.parametrize("raw", _start_errors())
+def test_a_bridge_that_did_not_start_says_what_is_wrong_and_what_to_do_in_words(raw):
+    """运行机 page (REST-29): the start error in words with its 做什么; the file names and keys only under 细节."""
+    got = P.team_start(raw)
+    assert got["raw"] == " ".join(raw.split())
+    assert got["text"] != "桥没准备好", raw              # every one the app or brain-kit says has its own words
+    said = got["text"] + got["todo"]
+    assert got["todo"] and not CODE_WORD.search(said) and not re.search(r"[A-Za-z]{4,}|/", re.sub("GitLab|brain-kit", "", said)), got
+
+
+def test_a_bridge_error_nobody_mapped_keeps_it_under_details():
+    assert P.team_start("something brain-kit says tomorrow") == {
+        "text": "桥没准备好", "todo": P.START_TODO, "raw": "something brain-kit says tomorrow"}
+    assert P.team_start("") == {"text": "", "todo": "", "raw": ""}

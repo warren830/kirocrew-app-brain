@@ -111,11 +111,27 @@ describe('运行机', () => {
     installFixtureRoutes({ [`GET ${API}/team`]: () => tv })
     render(<TeamPage {...props()} />)
     const err = await screen.findByTestId('team-error')
-    expect(err).toHaveTextContent('桥没准备好做什么看设置里团队模式填的配置文件')
+    expect(err).toHaveTextContent('桥没准备好做什么看设置里团队模式填的两个配置文件')
     expect((within(err).getByText('细节').closest('details') as HTMLDetailsElement).open).toBe(false)
     const chip = screen.getByRole('region', { name: '交接' }).querySelector('[data-result="error"]') as HTMLElement
     expect(chip).toHaveTextContent('没查成：原话在细节里')
     expect(within(chip).getByText('GitLab 502: Bad Gateway').closest('details')).not.toHaveAttribute('open')
+  })
+
+  test('a bridge that did not start: what is wrong and what to do in words; the file names and keys only under 细节', async () => {
+    const tv = fx.team()
+    const raw = 'bridge.json 不能写 signing_key：私钥只给签名服务（signer/），桥用 "signer": {"type": "spool", …} 请签名服务签'
+    tv.status = { ...tv.status, ok: false, error: '桥的配置文件里写了私钥', error_todo: '把私钥从桥的配置文件里删掉：私钥只给签名服务，桥只把要签的东西交给签名服务', error_raw: raw }
+    installFixtureRoutes({ [`GET ${API}/team`]: () => tv })
+    render(<TeamPage {...props()} />)
+    const err = await screen.findByTestId('team-error')
+    expect(err).toHaveTextContent('桥的配置文件里写了私钥做什么把私钥从桥的配置文件里删掉')
+    const fold = within(err).getByText('细节').closest('details') as HTMLDetailsElement
+    expect(fold.open).toBe(false)
+    expect(within(fold).getByText(raw)).toBeInTheDocument()
+    // nothing of the file names or keys outside the fold
+    const face = Array.from(err.childNodes).filter((n) => n !== fold).map((n) => n.textContent).join('')
+    expect(face).not.toMatch(/bridge\.json|signing_key|signer|spool/)
   })
 
   test('the vouchers the signer did not answer last round are listed (asked for again next round); none, no heading', async () => {
