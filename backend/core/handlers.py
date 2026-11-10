@@ -10,6 +10,8 @@ from typing import Any
 from .constants import KEY_RE, REPO_ID_RE
 from .httpkit import AppError, Kit
 
+NO_REPO = "页面没说是哪个仓库：刷新页面再试"
+
 try:  # always there in the gateway; plain pytest passes a fake web module
     from aiohttp import web as _web
 except ImportError:  # pragma: no cover
@@ -52,7 +54,7 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
         body = await kit.body(request)
         rid = str(body.get("repo") or "")
         if not REPO_ID_RE.match(rid):
-            raise AppError("repo 要写仓库号（r1 …）", "invalid_repo")
+            raise AppError(NO_REPO, "invalid_repo")
         return kit.json(await svc.refresh(rid))
 
     async def overview(request: Any) -> Any:
@@ -74,16 +76,16 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
         body = await kit.body(request)
         did = body.get("id")
         if did is not None and (not isinstance(did, str) or not re.fullmatch(r"D-[1-9][0-9]{0,6}", did)):
-            raise AppError("id 是问题号 D-<n>", "invalid_id")
+            raise AppError("问题号不对（要像 D-3）：刷新页面再试", "invalid_id")
         note = body.get("note")
         if note is not None and not isinstance(note, str):
-            raise AppError("note 是一句话", "invalid_note")
+            raise AppError("「补一句」要是一段文字：刷新页面再试", "invalid_note")
         return kit.json(await svc.answer(_rid(request), _key(request), body.get("choice"), note, did))
 
     async def intake_next(request: Any) -> Any:
         rid = str(request.query.get("repo") or "")
         if not REPO_ID_RE.match(rid):
-            raise AppError("repo 要写仓库号（r1 …）", "invalid_repo")
+            raise AppError(NO_REPO, "invalid_repo")
         return kit.json(await svc.intake_next(rid))
 
     async def intake_check(request: Any) -> Any:
@@ -101,13 +103,13 @@ def build_routes(svc: Any, AppRoute: Any, *, web: Any = None, is_owner: Any = No
     async def brain(request: Any) -> Any:
         rid = str(request.query.get("repo") or "")
         if not REPO_ID_RE.match(rid):
-            raise AppError("repo 要写仓库号（r1 …）", "invalid_repo")
+            raise AppError(NO_REPO, "invalid_repo")
         return kit.json(await svc.brain(rid))
 
     def _rk(body: dict[str, Any]) -> tuple[str, str]:
         rid, key = str(body.get("repo") or ""), str(body.get("key") or "")
         if not REPO_ID_RE.match(rid) or not KEY_RE.match(key):
-            raise AppError("要写 repo（r1 …）和需求号 key", "invalid_body")
+            raise AppError("页面没说是哪个仓库、哪个需求：刷新页面再试", "invalid_body")
         return rid, key
 
     async def reflect_preview(request: Any) -> Any:
