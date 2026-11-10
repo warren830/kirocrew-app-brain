@@ -406,6 +406,7 @@ def test_the_replay_knows_whose_turn_each_wait_was():
     waits = [(h["status"], h["who"]) for h in actor(b, "release")["history"] if h["status"] == "awaiting_approval"]
     assert waits and all(who == "product" for _, who in waits)
     assert [h["who"] for h in actor(b, "req")["history"] if h["status"] == "awaiting_approval"] == ["you"]
+    assert (actor(b, "release")["title"], actor(b, "release")["sub"]) == ("发布验收", "发布审批 · 验收")
 
 
 def test_a_repo_done_only_here_has_no_runner_half_and_reads_no_runner_sources():
@@ -420,6 +421,8 @@ def test_a_repo_done_only_here_has_no_runner_half_and_reads_no_runner_sources():
         assert a["status"] == "skipped" and a["doing"].startswith("这次不需要") and a["facts"] == []
     assert not [c for c in b["checks"]["cells"] if c["group"] == "handover"]
     assert b["missing"] == ["花费：KiroCrew 还没报 credits"]
+    # nobody accepts it on an MR: its release is Lean's approval, named so on the graph and the lanes
+    assert (actor(b, "release")["title"], actor(b, "release")["sub"]) == ("发布审批", "Lean 请人批发布")
 
 
 def test_someone_elses_requirement_names_them_and_a_question_for_the_product_is_not_yours():
@@ -537,6 +540,66 @@ def test_a_push_without_its_label_waits_on_the_person_not_on_the_runner():
     assert runners == [], runners
     assert spent(b, ("wait",), now) >= 7 * H + 46 * M
     assert actor(b, "handover")["history"][-1]["who"] == "you"
+
+
+def test_a_question_the_runner_asks_on_the_mr_waits_on_whom_park_json_asks_as_the_row_says():
+    """Preview r1/PAY-2: after the hand-over the runner's 澄清 asks the owner (park.json's ask), yet the replay said
+    等别人 to the owner. Each wait on the runner's side is on whom the row's waits would name (deliveries.classify):
+    park.json's ask, the owner being 你 only to the owner; the bridge's D-n asks whom its park.json asks; a code
+    generation plan asked of the builder on the MR waits for the builder."""
+    hand, q_at, plan_at = T + 30 * M, T + 90 * M, T + 3 * H
+    plan = "PLAN " + "b" * 8
+
+    def trace(ask):
+        return {"actions": {"questions": [
+            {"at": iso(q_at), "kind": "clarify", "ask": ask, "status": "waiting", "lean_request": None},
+            {"at": iso(q_at + 40 * M), "kind": "clarify", "ask": ask, "status": "answered", "lean_request": None},
+            {"at": iso(plan_at + M), "kind": "plan", "ask": "builder", "status": "waiting", "lean_request": plan}]},
+            "decisions": [{"source": "bridge", "id": "D-1", "kind": "clarify", "state": "delivered",
+                           "asked_at": iso(q_at + M), "at": iso(q_at + 30 * M), "choice": "A"}]}
+
+    evs = demo3_events()[:12] + [ev(plan_at, "APPROVAL_REQUESTED", kind="PLAN", unit="api", sha256="b" * 64)]
+    f = facts(evs, handoff={"requested_at": iso(hand), "by": "ychchen"})
+    row = row_of("parked", "builder", "等开发的人在 MR 上回答 D-2（approve / reject）", do="answer", where="mr")
+
+    def waits(b, key):
+        return [(h["doing"], h["who"]) for h in actor(b, key)["history"] if h["status"] == "awaiting_approval"]
+
+    b = snapshot(f, row, t=trace("owner"), local_only=False, now=plan_at + H)
+    assert waits(b, "runner")[:2] == [("停下问你：澄清", "you"), ("停下问你：澄清（D-1）", "you")]
+    assert {"停下问你：澄清", "D-1 在 MR 上问你：澄清"} <= {e["text"] for e in b["events"]}
+    assert waits(b, "design")[-1] == ("等开发的人在 MR 上批准代码生成计划", "builder")
+    assert "请开发的人在 MR 上批准代码生成计划" in [e["text"] for e in b["events"]]
+    b = snapshot(f, row, t=trace("owner"), me="alice", local_only=False, now=plan_at + H)
+    assert waits(b, "runner")[:2] == [("停下问 ychchen：澄清", "people"), ("停下问 ychchen：澄清（D-1）", "people")]
+    b = snapshot(f, row, t=trace("product"), local_only=False, now=plan_at + H)
+    assert waits(b, "runner")[:2] == [("停下问产品：澄清", "product"), ("停下问产品：澄清（D-1）", "product")]
+
+
+def test_the_board_says_the_bridges_refusal_the_repos_kit_and_what_it_could_not_read_in_words():
+    """REST-29: the bridge's English reason for a refused hand-over is said as the MR's is; the kit's cells are named
+    in words (适配 for the hook adapter, as brain-kit's own line tells, 记录 for Lean counting runs/ as code), never a
+    glob; a source it could not read is said without its file name; an event's source says what record it is."""
+    hand = T + 30 * M
+    t = {"actions": {"handovers": [{"at": iso(hand + 2 * M), "kind": "bridge rejected", "reason": "MR comes from a fork"}]},
+         "missing": ["Lean audit (no aidlc-docs/audit/*.jsonl in worktree)", "aidlc-docs/261109-x/decisions.md (not in worktree)",
+                     "runs/DEMO-3/run.json: intent is not a string (ignored)"]}
+    rows = [{"level": "FAIL", "text": ".kiro/brain/lean-hook.py 是旧版（第 1 版，要第 2 版）", "todo": "点「重装 kit 文件」",
+             "repo": "/r", "raw": ".kiro/brain/lean-hook.py is an older adapter (version 1, needs 2)"},
+            {"level": "FAIL", "text": "Lean 把 runs/ 下的记录算成代码", "todo": "点「重装 kit 文件」", "repo": "/r", "raw": ""},
+            {"level": "FAIL", "text": "仓库根目录没有 AGENTS.md", "todo": "点「重装 kit 文件」", "repo": "/r",
+             "raw": "AGENTS.md at repo root"}]
+    f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "ychchen"})
+    b = board.build(f, row_of("rejected", "you", "接手被拒：MR 是从复制出去的仓库开的", do="redo_handoff"), t, mr=None,
+                    sessions=[], app_events=[], team_decisions=[], subjects={}, reflect_refs=[], default_branch="main",
+                    local_only=False, kit_rows=board.kit_cells(rows, "/r"), decisions=[], brain=None, me="ychchen",
+                    now=hand + H)
+    assert "桥拒绝接手：MR 是从复制出去的仓库开的" in [e["text"] for e in b["events"]]
+    assert [c["label"] for c in b["checks"]["cells"] if c["id"].startswith("kit")] == ["适配", "记录", "kit 文件"]
+    assert b["missing"] == ["Lean 的记录：这个需求的分支上没有，阶段和审批都看不到", "决定记录：AI 还没写下决定",
+                            "开工记录里有一项格式不对，没用上"]
+    assert {e["kind"]: e["src"] for e in b["events"] if e["src"]} == {
+        "claim": "认领记录 claim/DEMO-3", "start": "开工记录 runs/DEMO-3/run.json"}
 
 
 def test_a_write_back_branch_says_when_it_was_merged_into_the_default_branch(tmp_path):
