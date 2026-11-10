@@ -13,6 +13,7 @@ import { ago, fmtIso } from '../format'
 import type { HandoverResult, RunState, TeamHandover, TeamLoopResult, TeamStatus, TeamView } from '../types'
 import { EmptyHero, ExtLink, Icon, LoadState, RoleIcon, questionMeta, type FlowStep } from '../ui'
 import type { Tone } from '../styles'
+import { ACT } from '../vocab'
 import type { ViewProps } from './props'
 
 export const TEAM_POLL_MS = 10_000
@@ -200,7 +201,7 @@ export function TeamPage({ status, go, reloadStatus, pollMs }: ViewProps) {
                         <td>
                           {r.slot ? (
                             <button type="button" className="br-btn is-small" onClick={() => navigate(`/chat?sid=${encodeURIComponent(r.slot as string)}`)}>
-                              <Icon name="MessageSquare" size={13} />打开会话
+                              <Icon name="MessageSquare" size={13} />{ACT.openSession}
                             </button>
                           ) : <span className="br-dim">—</span>}
                         </td>

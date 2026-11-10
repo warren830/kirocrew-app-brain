@@ -67,7 +67,7 @@ describe('待办', () => {
     // what to tell the session, in Lean's words, and how long it has waited, as 交付总览 says it
     expect(waiting).toHaveTextContent('代码生成做完了，下一步是构建测试：在会话里让它接着做')
     expect(waiting).toHaveTextContent('已等 3 小时')
-    fireEvent.click(within(waiting).getByRole('button', { name: '打开会话' }))
+    fireEvent.click(within(waiting).getByRole('button', { name: '去回话' }))
     expect(navigations).toEqual(['/chat?sid=brain-PAY-1-3d8e'])
     const claimed = group('认领了还没开工')
     expect(claimed).toHaveTextContent('已认领，还没开工')

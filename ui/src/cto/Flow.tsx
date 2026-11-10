@@ -6,6 +6,7 @@
  * (`waits.do`, stepOf). Column names, lane names and 「+N 个」 filter the ledger (onCell). In a repo done only on this
  * machine the runner's column and lane fold to a narrow 「这次不需要」.
  */
+import { useNavigate } from '@kirocrew/app-sdk'
 import { RoleIcon } from '../board/RoleIcon'
 import type { View } from '../nav'
 import type { Requirement, WaitWho } from '../types'
@@ -52,12 +53,13 @@ export function laneOf(r: Requirement): Lane {
 }
 
 /** The one step a person takes on a requirement that waits on them: the button's words and where it goes (a view of
- * this app, the MR, or 开审查会话 right here). null: it does not wait on you, or the backend did not say the step. */
-export type Step = { label: string; view?: View; href?: string; review?: { repo: string; key: string; slot: string | null; worktree: string | null } }
+ * this app, the MR, its idle session, or 开审查会话 right here). null: it does not wait on you, or the backend did not say the step. */
+export type Step = { label: string; view?: View; href?: string; session?: string; review?: { repo: string; key: string; slot: string | null; worktree: string | null } }
 export function stepOf(r: Requirement): Step | null {
   const d = r.waits.do
   if (r.waits.who !== 'you' || !d || d === 'none' || d === 'watch') return null
   if (r.waits.review) return { label: ACT.review, review: { repo: r.repo, key: r.key, slot: slotOf(r.session_url), worktree: r.worktree } }
+  if ((d === 'reply' || d === 'tool') && r.session_url) return { label: DO_NAME[d], session: r.session_url }
   if (d === 'start') return { label: DO_NAME.start, view: { kind: 'new', repo: r.repo, key: r.key, title: r.title } }
   if (d === 'answer' && r.waits.where === 'mr' && r.mr?.url) return { label: ACT.answerOnMr, href: r.mr.url }
   if (d === 'write_back') return { label: DO_NAME.write_back, view: { kind: 'brain', repo: r.repo, reflect: r.key } }
@@ -74,6 +76,7 @@ export function waitedText(r: Requirement, at: number): string {
 const slotOf = (url: string | null | undefined): string | null => (url ? new URLSearchParams(url.split('?')[1] ?? '').get('sid') : null)
 
 export function StepButton({ step, onGo, primary = true }: { step: Step; onGo: (v: View) => void; primary?: boolean }) {
+  const navigate = useNavigate()
   const cls = `kt-btn is-small${primary ? ' is-primary' : ''} br-step`
   const stop = (e: { stopPropagation: () => void }) => e.stopPropagation()
   if (step.review) {
@@ -83,7 +86,7 @@ export function StepButton({ step, onGo, primary = true }: { step: Step; onGo: (
   if (step.href) {
     return <a className={cls} href={step.href} target="_blank" rel="noopener noreferrer" onClick={stop}>{step.label} ↗</a>
   }
-  return <button type="button" className={cls} onClick={(e) => { stop(e); if (step.view) onGo(step.view) }}>{step.label} ↗</button>
+  return <button type="button" className={cls} onClick={(e) => { stop(e); if (step.session) navigate(step.session); else if (step.view) onGo(step.view) }}>{step.label} ↗</button>
 }
 
 type Handlers = {

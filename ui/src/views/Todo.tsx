@@ -5,7 +5,7 @@
  * step to take right there, under the one name the app gives it (vocab.ts). The list is the backend's one judgment of
  * who a requirement waits on (`waits.who`), so it holds what the rows, the tab's count and the sidebar badge say:
  *
- *   reply               the local session is idle: your turn to talk               打开会话
+ *   reply               the local session is idle: your turn to talk               去回话 (opens it)
  *   review              (a reply) Lean's review, in a new session                  开审查会话
  *   lean_approval       Lean asks for an approval: the line to type in the session  复制那一行 · 打开会话
  *   clarify             the local session asks you: answered here
@@ -203,7 +203,7 @@ function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; 
         {group.key === 'review' && it.key && <ReviewButton repo={it.repo} reqKey={it.key} liveSlot={it.session?.slot ?? null} worktree={null} />}
         {session && !line && it.kind !== 'start' && group.key !== 'review' && (
           <button type="button" className={`br-btn is-small${it.kind === 'reply' ? ' is-primary' : ''}`} onClick={() => navigate(session)}>
-            <Icon name="MessageSquare" size={13} />{ACT.openSession}
+            <Icon name="MessageSquare" size={13} />{it.kind === 'reply' ? DO_NAME.reply : ACT.openSession}
           </button>
         )}
         {mr && !mrFirst && <ExtLink href={mr} className="br-btn is-small">{ACT.viewMr}</ExtLink>}

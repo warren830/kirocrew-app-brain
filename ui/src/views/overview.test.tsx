@@ -157,6 +157,19 @@ describe('交付总览', () => {
     expect(within(yours.querySelector('li[data-key="DEMO-3"]') as HTMLElement).getByRole('button', { name: '开审查会话' })).toBeInTheDocument()
   })
 
+  test('an idle session that is not a review: 去回话 opens that session, as 待办 does', async () => {
+    const { ov, status } = localWorld()
+    ov.rows = ov.rows.map((r) => (r.key === 'DEMO-1' ? { ...r, waits: { ...r.waits, review: false, text: '代码生成做完了，下一步是构建测试：在会话里让它接着做' } } : r))
+    installFixtureRoutes({ [`GET ${API}/overview*`]: () => ov })
+    const p = props({ status })
+    render(<OverviewView entry={{}} {...p} />)
+    const yours = await screen.findByTestId('your-turn')
+    expect(yours).toHaveTextContent('5 个需求 · 等回话 1 · 等审查 1 · 等开工 3')
+    await userEvent.setup().click(within(yours.querySelector('li[data-key="DEMO-1"]') as HTMLElement).getByRole('button', { name: '去回话 ↗' }))
+    expect(navigations).toEqual(['/chat?sid=brain-DEMO-1-dev'])
+    expect(p.go).not.toHaveBeenCalled()
+  })
+
   test('需求流动: every open card sits in the column colOf and the lane laneOf (waits.who) say; merged ones in 已合并', async () => {
     installFixtureRoutes()
     render(<OverviewView entry={{}} {...props()} />)
@@ -334,7 +347,7 @@ describe('交付总览', () => {
     expect(cell('PAY-6')).toHaveTextContent(/^还没开工$/)
   })
 
-  test('a row opens its 需求看板; 详情 opens its 需求详情; the overlap card names both, their owners and what they share', async () => {
+  test('a row opens its 需求看板; 需求详情 opens its 需求详情; the overlap card names both, their owners and what they share', async () => {
     const user = userEvent.setup()
     installFixtureRoutes()
     const p = props()
@@ -342,7 +355,7 @@ describe('交付总览', () => {
     const table = await screen.findByTestId('req-table')
     await user.click(within(rowOf(table, 'PAY-4')).getByText('对账单按商户拆分'))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-4', from: 'overview' })
-    await user.click(within(rowOf(table, 'PAY-4')).getByRole('button', { name: '详情' }))
+    await user.click(within(rowOf(table, 'PAY-4')).getByRole('button', { name: '需求详情' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-4', from: 'overview' })
     expect(p.go).toHaveBeenCalledTimes(2) // the button does not open the board as well
     const overlaps = screen.getByTestId('overlaps')

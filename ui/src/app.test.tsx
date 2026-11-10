@@ -113,11 +113,11 @@ describe('the app: one bar over the views', () => {
     expect(window.location.search).toBe('?view=overview&state=acceptance')
   })
 
-  test('详情 on a ledger row opens 需求详情 (from=overview); its tab then holds it; ← 返回 goes back to the overview', async () => {
+  test('需求详情 on a ledger row opens 需求详情 (from=overview); its tab then holds it; ← 返回 goes back to the overview', async () => {
     const user = userEvent.setup()
     installFixtureRoutes()
     render(<BrainApp pollMs={60_000} />)
-    await user.click(within(await ledgerRow('PAY-3')).getByRole('button', { name: '详情' }))
+    await user.click(within(await ledgerRow('PAY-3')).getByRole('button', { name: '需求详情' }))
     expect(parseView(window.location.search)).toEqual({ kind: 'item', repo: 'r1', key: 'PAY-3', from: 'overview' })
     // the requirement, then its board (the value stream)
     await waitFor(() => expect(apiCalls.some((c) => c.path === `${API}/board/r1/PAY-3`)).toBe(true))
@@ -157,7 +157,7 @@ describe('the app: one bar over the views', () => {
     const user = userEvent.setup()
     installFixtureRoutes()
     render(<BrainApp pollMs={60_000} />)
-    await user.click(within(await ledgerRow('PAY-3')).getByRole('button', { name: '详情' }))
+    await user.click(within(await ledgerRow('PAY-3')).getByRole('button', { name: '需求详情' }))
     const pick = await screen.findByRole('combobox', { name: '切换需求' })
     expect(pick).toHaveValue(`r1\u0001PAY-3`)
     const keys = within(pick).getAllByRole('option').map((o) => o.textContent?.split(' ')[0])
@@ -239,7 +239,7 @@ describe('the app: one bar over the views', () => {
       ['team', () => user.click(bar().getByRole('tab', { name: '运行机' }))],
       ['import', () => user.click(bar().getByRole('button', { name: '导入仓库' }))],
       ['overview', () => user.click(bar().getByRole('tab', { name: '交付总览' }))],
-      ['item', async () => user.click(within(await ledgerRow('PAY-3')).getByRole('button', { name: '详情' }))],
+      ['item', async () => user.click(within(await ledgerRow('PAY-3')).getByRole('button', { name: '需求详情' }))],
       ['board', () => user.click(bar().getByRole('tab', { name: /^需求看板/ }))],
     ]
     for (const [kind, open] of others) {

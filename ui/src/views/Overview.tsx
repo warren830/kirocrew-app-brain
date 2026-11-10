@@ -650,7 +650,7 @@ function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
   const review = ev.queue.find((q) => q.key === r.key)
   const skipped = ev.skipped.find((x) => x.key === r.key)
   return (
-    <tr data-key={r.key} className={`cto-row-pick${r.state === 'merged' ? ' is-merged' : ''}`} onClick={onOpen} title="需求看板" tabIndex={0}
+    <tr data-key={r.key} className={`cto-row-pick${r.state === 'merged' ? ' is-merged' : ''}`} onClick={onOpen} title={`打开它的${ACT.openBoard}`} tabIndex={0}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (e.preventDefault(), onOpen())}>
       <td className="br-col-req">
         <div className="br-row" style={{ gap: 6 }}>
@@ -687,7 +687,7 @@ function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
       <td className="br-col-nowrap" onClick={(e) => e.stopPropagation()}><MrLink mr={r.mr} /></td>
       <td onClick={(e) => e.stopPropagation()}>
         <span className="br-acts">
-          <button type="button" className="kt-btn is-small" onClick={onItem} title="需求详情">详情</button>
+          <button type="button" className="kt-btn is-small" onClick={onItem}>{ACT.openDetail}</button>
           {r.state === 'merged' && <button type="button" className="kt-btn is-small" onClick={onReplay} title="在需求看板上从头回放">▶ 回放</button>}
         </span>
       </td>
