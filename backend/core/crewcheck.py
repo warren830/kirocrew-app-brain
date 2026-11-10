@@ -44,7 +44,7 @@ from . import bk
 from . import problems as P
 from .constants import kirocrew_bin
 
-NEEDS = ("CREW_HOOK","CREW_EVENTS", "agent_hook_commands", "missing_lean_hooks", "add_lean_hooks",
+NEEDS = ("CREW_HOOK", "CREW_EVENTS", "agent_hook_commands", "missing_lean_hooks", "add_lean_hooks",
          "runner_kit_problems")
 AGENT_OK = P.AGENT_OK   # the one row agent_ok accepts (always the start of its text)
 
