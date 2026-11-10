@@ -374,7 +374,7 @@ function InspectCard({ c, busy, state, asked, onRecheck, onFixed }: {
   const crewLook = c.crew.rows.filter((r) => r.level !== 'OK')
   const crewFine = c.crew.rows.filter((r) => r.level === 'OK')
   return (
-    <section ref={ref} className={`br-card imp-sec${c.next === 'fix' ? ' is-bad' : ''}`} aria-label="检查" data-testid="inspect">
+    <section ref={ref} className={`br-card imp-sec imp-inspect${c.next === 'fix' ? ' is-bad' : ''}`} aria-label="检查" data-testid="inspect">
       <StepHead n={2} title="检查" state={state}>
         {c.path && <code className="imp-path">{c.path}</code>}
         <Counts levels={c.checks.filter((x) => !next(x)).map((x) => x.level)} />
@@ -386,7 +386,7 @@ function InspectCard({ c, busy, state, asked, onRecheck, onFixed }: {
       {c.error && <p className="br-error" role="alert">{c.error}</p>}
       {look.length > 0 && <CheckList rows={look} next={next} todo={meBox} />}
       {fine.length > 0 && (
-        <details className="imp-more" data-testid="checks-fine" open={look.length === 0 || undefined}>
+        <details className="imp-more imp-fold" data-testid="checks-fine" open={look.length === 0 || undefined}>
           <summary>{look.length ? `另外 ${fine.length} 项正常` : `${fine.length} 项都正常`}</summary>
           <CheckList rows={fine} />
         </details>
@@ -403,7 +403,7 @@ function InspectCard({ c, busy, state, asked, onRecheck, onFixed }: {
           <div className="imp-block-head"><RoleIcon role="settings" size={18} /><b>KiroCrew</b><Counts levels={c.crew.rows.map((r) => r.level)} /></div>
           <CheckRows rows={crewLook} fix={c.crew.fix} onFixed={onFixed} />
           {crewFine.length > 0 && (
-            <details className="imp-more">
+            <details className="imp-more imp-fold">
               <summary>另外 {crewFine.length} 项正常</summary>
               <CheckRows rows={crewFine} />
             </details>
@@ -997,6 +997,13 @@ const IMP_CSS = `
 .imp-todo.is-box { padding-top: 4px; }
 .imp-todo b { color: var(--muted); font-weight: 650; margin-right: 6px; }
 .imp-block { display: grid; gap: 8px; }
+/* 「另外 N 项正常」 sits on its block's head line while closed, so after 检查 the install button is on the first screen
+   at 1050 (SETUP-18); opened, it takes its own row under the rows it adds to */
+.imp-inspect, .imp-block { grid-template-columns: minmax(0, 1fr) auto; }
+.imp-inspect > *, .imp-block > * { grid-column: 1 / -1; }
+.imp-inspect > .imp-head, .imp-block > .imp-block-head { grid-column: 1; grid-row: 1; }
+.imp-inspect > .imp-fold:not([open]), .imp-block > .imp-fold:not([open]) { grid-column: 2; grid-row: 1; align-self: center; }
+@container imp (max-width: 760px) { .imp-inspect > .imp-fold:not([open]), .imp-block > .imp-fold:not([open]) { grid-column: 1 / -1; grid-row: auto; } }
 .imp-block-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .imp-block-head > .kt-role-icon { color: var(--text-strong); opacity: .85; }
 .imp-block-head b { color: var(--text-strong); font-weight: 750; }
