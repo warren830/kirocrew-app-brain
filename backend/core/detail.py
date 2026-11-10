@@ -204,7 +204,7 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                       "label": "%s：%s" % (lean_view.STAGE_LABEL.get(stage, stage),
                                           {"started": "开始", "done": "完成", "skipped": "跳过"}.get(s.get("state"), s.get("state")))
                       + ("（%s）" % unit if unit else ""),
-                      "detail": s.get("note"), "who": None, "src": s.get("src")})
+                      "detail": lean_view.say_note(s.get("note")), "who": None, "src": s.get("src")})
     for h in t.get("humans") or []:
         items.append({"at": h.get("at"), "kind": "human", "label": _human_label(h), "detail": h.get("voucher_id"),
                       "who": h.get("who"), "src": ", ".join(h.get("src") or [])[:200] or None})

@@ -483,7 +483,7 @@ def runner_half(r: Req, t: float, *, iid: int, question: tuple[str, str, float, 
         r.commit(c + 31 * M, "bot", "%s：修好 pytest 里没过的两个用例" % r.key, files=2)
         c += 32 * M
     r.verify(c + 15 * M, checks)
-    r.stage(c + 16 * M, "build-and-test", "done", note="verify PASS：3 项")
+    r.stage(c + 16 * M, "build-and-test", "done", note="verify PASS: %d checks on code fingerprint %s" % (len(checks), sha(r.key, "fp")[:8]))
     r.stage(c + 17 * M, "release", "started")
     h = r.request(c + 25 * M, "RELEASE")
     r.question_park(c + 26 * M, "waiting", "acceptance")
@@ -493,7 +493,7 @@ def runner_half(r: Req, t: float, *, iid: int, question: tuple[str, str, float, 
 def merged(r: Req, t: float, h: str, did: str, how: str = "merge commit") -> None:
     r.ask(did, "acceptance", t - 50 * M, t, "approve", state="delivered", who="P-9E3B")
     r.approve(t + 1 * M, "RELEASE", h, who="P-9E3B")
-    r.stage(t + 2 * M, "release", "done", note="发布批准了")
+    r.stage(t + 2 * M, "release", "done", note="RELEASE approved (sha %s)" % h[:8])
     r.merge(t + 35 * M, how)
 
 
@@ -724,7 +724,7 @@ def main() -> None:
     p7.commit(t + 50 * M, "person", "PAY-7：下拉框和原因列表", files=3)
     p7.stage(t + 70 * M, "code-generation", "done", unit="refund-ui", note="代码写完")
     p7.verify(t + 80 * M, [("pytest -q", 0), ("npm test", 0)])
-    p7.stage(t + 81 * M, "build-and-test", "done", note="verify PASS：2 项")
+    p7.stage(t + 81 * M, "build-and-test", "done", note="verify PASS: 2 checks on code fingerprint %s" % sha("PAY-7", "fp")[:8])
     p7.handoff(t + 85 * M)
     reqs["r1"].append(p7)
     why, raw = problems.reasons_text(["label 'ai-handoff' was added by bob, not by the branch owner alice"])

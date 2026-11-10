@@ -34,6 +34,24 @@ STAGES = (
 STAGE_LABEL = {s[0]: s[1] for s in STAGES}
 STAGE_N = {s[0]: i for i, s in enumerate(STAGES, 1)}
 STAGE_STATE = {"STAGE_STARTED": "started", "STAGE_COMPLETED": "done", "STAGE_SKIPPED": "skipped"}
+# the notes Lean writes itself (aidlc_lean.py: verify's build-and-test completion, the RELEASE approval's, `lean new`'s
+# Ideation skip), said in words; a note the agent wrote is its own and stays as written
+LEAN_NOTES = (
+    (re.compile(r"^verify PASS: (\d+) checks? on code fingerprint [0-9a-f]*$"), lambda m: "%s 项自动检查都过了" % m.group(1)),
+    (re.compile(r"^RELEASE approved \(sha [0-9a-f]*\)$"), lambda m: "发布审批通过了"),
+    (re.compile(r"^not requested \(lean new without --ideation\)$"), lambda m: "这次没要构想这一段"),
+)
+
+
+def say_note(note: Any) -> str | None:
+    """A stage's note as the page says it: Lean's own lines in words (LEAN_NOTES), the agent's as written."""
+    if not isinstance(note, str) or not note.strip():
+        return None
+    for rx, say in LEAN_NOTES:
+        m = rx.match(note.strip())
+        if m:
+            return say(m)
+    return note
 PASSED_OVER = "Lean 没记这一步，直接往后做了"
 APPROVAL_EVENTS = ("APPROVAL_REQUESTED", "APPROVED", "REJECTED", "APPROVAL_REFUSED")
 KIND_LABEL = {"REQUIREMENTS": "需求", "DESIGN": "设计", "INCEPTION": "需求和设计", "PLAN": "代码生成计划",
@@ -118,7 +136,7 @@ def stages(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
             d.get("reason") if latest and latest.get("event") == "STAGE_SKIPPED" else None
         out.append({"id": sid, "label": label, "n": n, "state": state,
                     "units": [{"unit": u, "state": s} for u, s in units] if per_unit else [],
-                    "note": str(note)[:300] if isinstance(note, str) else None,
+                    "note": say_note(str(note)[:300]) if isinstance(note, str) else None,
                     "at": latest.get("_at") if latest else (whole.get("_at") if whole else None)})
     # a stage Lean went past without a word (a later one is recorded) was not on this intent's way: skipped
     last = max((r["n"] for r in out if r["state"] != "todo"), default=0)
@@ -316,7 +334,7 @@ def stage_events(evs: list[dict[str, Any]]) -> list[dict[str, Any]]:
                                {"started": "开始", "done": "完成", "skipped": "跳过"}[STAGE_STATE[ev]])
             if d.get("unit"):
                 label += "（%s）" % d["unit"]
-            out.append({"at": at, "kind": "stage", "label": label, "detail": (d.get("note") or d.get("reason") or None),
+            out.append({"at": at, "kind": "stage", "label": label, "detail": say_note(d.get("note") or d.get("reason")),
                         "who": None, "src": src})
         elif ev in APPROVAL_EVENTS:
             kind = str(d.get("kind") or "")

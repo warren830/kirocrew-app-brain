@@ -506,3 +506,18 @@ def test_a_decision_says_which_question_asked_in_the_session_it_answers():
             "| D-3 | 2026-11-09 | code-generation | 一行 return a * b | 跟 add 一样，不是 Q10x | agent |\n")
     rows = detail.decisions(text, "decisions.md", [])
     assert {d["id"]: d["asked"] for d in rows} == {"D-1": ["Q1"], "D-2": ["Q2"], "D-3": []}
+
+
+def test_lean_s_own_stage_lines_are_said_in_words_and_the_agent_s_stay():
+    """DETAIL-20 (real DEMO-3: 「构建测试：完成 · verify PASS: 1 check on code fingerprint 66bad1cf」): the notes Lean writes
+    itself are said in Chinese, in the stages and in the timeline; what the agent wrote is its own and stays."""
+    lean_view = mod("lean_view")
+    agent = "Inputs: calc.py. Key finding: str * int does not raise"
+    evs = [{"event": "STAGE_COMPLETED", "ts": "2026-11-09T01:%02d:00Z" % i, "_at": i, "seq": i, "data": d}
+           for i, d in enumerate([{"stage": "reverse-engineering", "note": agent},
+                                  {"stage": "build-and-test", "note": "verify PASS: 1 check on code fingerprint 66bad1cf"},
+                                  {"stage": "release", "note": "RELEASE approved (sha 0c9a7e21)"}], 1)]
+    notes = {s["id"]: s["note"] for s in lean_view.stages(evs) if s["state"] == "done"}
+    assert notes == {"reverse-engineering": agent, "build-and-test": "1 项自动检查都过了", "release": "发布审批通过了"}
+    assert [i["detail"] for i in lean_view.stage_events(evs)] == [agent, "1 项自动检查都过了", "发布审批通过了"]
+    assert lean_view.say_note("verify PASS: 3 checks on code fingerprint 0123abcd") == "3 项自动检查都过了"
