@@ -614,7 +614,7 @@
       "to": "person",
       "text": "认领 PAY-3：退款单导出 CSV",
       "detail": false,
-      "src": "claim/PAY-3"
+      "src": "认领记录 claim/PAY-3"
     },
     {
       "seq": 2,
@@ -624,7 +624,7 @@
       "to": "local",
       "text": "开工：在它自己的工作目录里",
       "detail": false,
-      "src": "runs/PAY-3/run.json"
+      "src": "开工记录 runs/PAY-3/run.json"
     },
     {
       "seq": 3,
@@ -1225,7 +1225,8 @@
         "P-PAY-2-1"
       ],
       "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L8"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L8",
+      "asked": []
     },
     {
       "id": "D-2",
@@ -1240,7 +1241,8 @@
         "T-12"
       ],
       "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L9"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L9",
+      "asked": []
     },
     {
       "id": "D-3",
@@ -1254,7 +1256,8 @@
       "vouchers": [
         "V-1a2b3c4d5e"
       ],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L10"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L10",
+      "asked": []
     },
     {
       "id": "D-4",
@@ -1266,7 +1269,8 @@
       "by": "unclassified",
       "cites": [],
       "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L11"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L11",
+      "asked": []
     }
   ],
   "questions": [
@@ -1378,7 +1382,7 @@
   ],
   "credits": {
     "total": 12.4,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
   },
   "source": "trace",
   "error": "",

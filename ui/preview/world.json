@@ -118,7 +118,7 @@
    "rows": [
     {
      "level": "OK",
-     "text": "brain-dev.json 的 Lean hook 都在",
+     "text": "brain-dev 的设置里 Lean 的拦截都在",
      "todo": "",
      "fix": null,
      "repo": null,
@@ -134,15 +134,15 @@
     },
     {
      "level": "WARN",
-     "text": ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）",
-     "todo": "运行机上的 run 停下来问人时写不了 park.json。点「重装 kit 文件」：重装 brain-kit 并提交（默认直接在当前分支上，团队仓库可以选新分支开 MR）",
+     "text": "Lean 的适配文件是旧版（第 0 版，要第 2 版）",
+     "todo": "本机会话里也一样：改了 kit 文件（Lean 的文件、brain-kit 设置、检查规则）以后，它不会拦下工具调用。点「重装 kit 文件」",
      "fix": "kit",
      "repo": "/Users/alice/workplace/shop-tools",
      "raw": ".kiro/brain/lean-hook.py is an older adapter (version 0, needs 2): the team runner could not write runs/<KEY>/park.json, its only way to ask a person, before the Lean approvals; run `brain install` and commit it on main through an MR"
     }
    ],
    "fix": {
-    "agent": true,
+    "agent": false,
     "engine": false
    },
    "checked_at": 1794146360
@@ -150,7 +150,7 @@
   "me": {
    "user": "alice",
    "token": true,
-   "how": "GitLab token（有）；alice（你在这个仓库的名字）"
+   "how": "GitLab 令牌（有）；alice（你在这个仓库的名字）"
   },
   "team": {
    "enabled": false,
@@ -1292,7 +1292,7 @@
     {
      "key": "PAY-4",
      "id": "D-3",
-     "src": "aidlc-docs/261105-merchant-split/decisions.md#L11"
+     "src": "aidlc-docs/261105-merchant-split/decisions.md#L10"
     }
    ],
    "questions": {
@@ -1340,7 +1340,7 @@
       1,
       6
      ],
-     "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+     "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
     },
     {
      "id": "useful",
@@ -1377,14 +1377,28 @@
    "skipped": [
     {
      "key": "PAY-1",
-     "why": "runs/PAY-1/run.json 不是合法的 JSON：第 3 行"
+     "why": "它的开工记录读不了",
+     "raw": "runs/PAY-1/run.json is not valid JSON: line 3"
     }
    ],
    "notes": [
-    "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
-    "PAY-2：已知交付有问题，14 天还没满，先不算"
+    "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+    "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2"
    ],
-   "raw": ""
+   "raw": "",
+   "note_rows": [
+    {
+     "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+     "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+     "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+    },
+    {
+     "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+     "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+     "raw": ""
+    }
+   ],
+   "computing": false
   },
   "counts": {
    "claimed": 2,
@@ -1400,7 +1414,8 @@
   "errors": [
    {
     "repo": "r2",
-    "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+    "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
+    "raw": "/Users/alice/workplace/shop-web"
    }
   ],
   "cto": {
@@ -2789,7 +2804,7 @@
       {
        "key": "PAY-4",
        "id": "D-3",
-       "src": "aidlc-docs/261105-merchant-split/decisions.md#L11"
+       "src": "aidlc-docs/261105-merchant-split/decisions.md#L10"
       }
      ],
      "questions": {
@@ -2837,7 +2852,7 @@
         1,
         6
        ],
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -2874,14 +2889,28 @@
      "skipped": [
       {
        "key": "PAY-1",
-       "why": "runs/PAY-1/run.json 不是合法的 JSON：第 3 行"
+       "why": "它的开工记录读不了",
+       "raw": "runs/PAY-1/run.json is not valid JSON: line 3"
       }
      ],
      "notes": [
-      "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
-      "PAY-2：已知交付有问题，14 天还没满，先不算"
+      "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+      "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2"
      ],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 2,
@@ -2897,7 +2926,8 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
+      "raw": "/Users/alice/workplace/shop-web"
      }
     ],
     "cto": {
@@ -3710,7 +3740,7 @@
       {
        "key": "PAY-4",
        "id": "D-3",
-       "src": "aidlc-docs/261105-merchant-split/decisions.md#L11"
+       "src": "aidlc-docs/261105-merchant-split/decisions.md#L10"
       }
      ],
      "questions": {
@@ -3758,7 +3788,7 @@
         1,
         6
        ],
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -3795,14 +3825,28 @@
      "skipped": [
       {
        "key": "PAY-1",
-       "why": "runs/PAY-1/run.json 不是合法的 JSON：第 3 行"
+       "why": "它的开工记录读不了",
+       "raw": "runs/PAY-1/run.json is not valid JSON: line 3"
       }
      ],
      "notes": [
-      "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
-      "PAY-2：已知交付有问题，14 天还没满，先不算"
+      "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+      "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2"
      ],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 2,
@@ -4040,7 +4084,7 @@
        "id": "repeat_rate",
        "label": "重复纠正率",
        "value": null,
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -4064,7 +4108,20 @@
      "queue": [],
      "skipped": [],
      "notes": [],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 0,
@@ -4080,7 +4137,8 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
+      "raw": "/Users/alice/workplace/shop-web"
      }
     ],
     "cto": {
@@ -4785,7 +4843,7 @@
        "id": "repeat_rate",
        "label": "重复纠正率",
        "value": null,
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -4809,7 +4867,20 @@
      "queue": [],
      "skipped": [],
      "notes": [],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 0,
@@ -5177,7 +5248,7 @@
        "id": "repeat_rate",
        "label": "重复纠正率",
        "value": null,
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -5201,7 +5272,20 @@
      "queue": [],
      "skipped": [],
      "notes": [],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 0,
@@ -5347,7 +5431,7 @@
       "stage": null,
       "waits": {
        "who": "bridge",
-       "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "text": "签名服务在签接手合同",
        "line": null,
        "raw": "",
        "do": "none",
@@ -5402,8 +5486,8 @@
       },
       "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
       "waits": {
-       "who": "people",
-       "text": "等人在 MR 上回答 D-2（设计）",
+       "who": "product",
+       "text": "等产品在 MR 上回答 D-2（设计）",
        "line": null,
        "raw": "",
        "do": "answer",
@@ -5617,7 +5701,7 @@
        "id": "repeat_rate",
        "label": "重复纠正率",
        "value": null,
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -5650,7 +5734,20 @@
      ],
      "skipped": [],
      "notes": [],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 0,
@@ -6923,7 +7020,8 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
+      "raw": "/Users/alice/workplace/shop-web"
      }
     ],
     "cto": {
@@ -7777,7 +7875,8 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
+      "raw": "/Users/alice/workplace/shop-web"
      }
     ],
     "cto": {
@@ -8824,7 +8923,7 @@
       "stage": null,
       "waits": {
        "who": "bridge",
-       "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "text": "签名服务在签接手合同",
        "line": null,
        "raw": "",
        "do": "none",
@@ -8879,8 +8978,8 @@
       },
       "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
       "waits": {
-       "who": "people",
-       "text": "等人在 MR 上回答 D-2（设计）",
+       "who": "product",
+       "text": "等产品在 MR 上回答 D-2（设计）",
        "line": null,
        "raw": "",
        "do": "answer",
@@ -10116,7 +10215,7 @@
       "stage": null,
       "waits": {
        "who": "bridge",
-       "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "text": "签名服务在签接手合同",
        "line": null,
        "raw": "",
        "do": "none",
@@ -10171,8 +10270,8 @@
       },
       "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
       "waits": {
-       "who": "people",
-       "text": "等人在 MR 上回答 D-2（设计）",
+       "who": "product",
+       "text": "等产品在 MR 上回答 D-2（设计）",
        "line": null,
        "raw": "",
        "do": "answer",
@@ -10366,7 +10465,7 @@
       {
        "key": "PAY-4",
        "id": "D-3",
-       "src": "aidlc-docs/261105-merchant-split/decisions.md#L11"
+       "src": "aidlc-docs/261105-merchant-split/decisions.md#L10"
       }
      ],
      "questions": {
@@ -10414,7 +10513,7 @@
         1,
         6
        ],
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -10451,14 +10550,28 @@
      "skipped": [
       {
        "key": "PAY-1",
-       "why": "runs/PAY-1/run.json 不是合法的 JSON：第 3 行"
+       "why": "它的开工记录读不了",
+       "raw": "runs/PAY-1/run.json is not valid JSON: line 3"
       }
      ],
      "notes": [
-      "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
-      "PAY-2：已知交付有问题，14 天还没满，先不算"
+      "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+      "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2"
      ],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 2,
@@ -10474,7 +10587,8 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
+      "raw": "/Users/alice/workplace/shop-web"
      }
     ],
     "cto": {
@@ -11164,7 +11278,7 @@
       {
        "key": "PAY-4",
        "id": "D-3",
-       "src": "aidlc-docs/261105-merchant-split/decisions.md#L11"
+       "src": "aidlc-docs/261105-merchant-split/decisions.md#L10"
       }
      ],
      "questions": {
@@ -11212,7 +11326,7 @@
         1,
         6
        ],
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -11240,14 +11354,28 @@
      "skipped": [
       {
        "key": "PAY-1",
-       "why": "runs/PAY-1/run.json 不是合法的 JSON：第 3 行"
+       "why": "它的开工记录读不了",
+       "raw": "runs/PAY-1/run.json is not valid JSON: line 3"
       }
      ],
      "notes": [
-      "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
-      "PAY-2：已知交付有问题，14 天还没满，先不算"
+      "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+      "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2"
      ],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 2,
@@ -11485,7 +11613,7 @@
        "id": "repeat_rate",
        "label": "重复纠正率",
        "value": null,
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -11509,7 +11637,20 @@
      "queue": [],
      "skipped": [],
      "notes": [],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 0,
@@ -11525,7 +11666,8 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
+      "raw": "/Users/alice/workplace/shop-web"
      }
     ],
     "cto": {
@@ -12174,7 +12316,7 @@
        "id": "repeat_rate",
        "label": "重复纠正率",
        "value": null,
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -12198,7 +12340,20 @@
      "queue": [],
      "skipped": [],
      "notes": [],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 0,
@@ -12566,7 +12721,7 @@
        "id": "repeat_rate",
        "label": "重复纠正率",
        "value": null,
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -12590,7 +12745,20 @@
      "queue": [],
      "skipped": [],
      "notes": [],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 0,
@@ -12736,7 +12904,7 @@
       "stage": null,
       "waits": {
        "who": "bridge",
-       "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "text": "签名服务在签接手合同",
        "line": null,
        "raw": "",
        "do": "none",
@@ -12791,8 +12959,8 @@
       },
       "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
       "waits": {
-       "who": "people",
-       "text": "等人在 MR 上回答 D-2（设计）",
+       "who": "product",
+       "text": "等产品在 MR 上回答 D-2（设计）",
        "line": null,
        "raw": "",
        "do": "answer",
@@ -13006,7 +13174,7 @@
        "id": "repeat_rate",
        "label": "重复纠正率",
        "value": null,
-       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+       "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
        "id": "useful",
@@ -13039,7 +13207,20 @@
      ],
      "skipped": [],
      "notes": [],
-     "raw": ""
+     "raw": "",
+     "note_rows": [
+      {
+       "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+       "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+       "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+       "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+       "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+       "raw": ""
+      }
+     ],
+     "computing": false
     },
     "counts": {
      "claimed": 0,
@@ -14078,7 +14259,7 @@
       "stage": null,
       "waits": {
        "who": "bridge",
-       "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "text": "签名服务在签接手合同",
        "line": null,
        "raw": "",
        "do": "none",
@@ -14133,8 +14314,8 @@
       },
       "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
       "waits": {
-       "who": "people",
-       "text": "等人在 MR 上回答 D-2（设计）",
+       "who": "product",
+       "text": "等产品在 MR 上回答 D-2（设计）",
        "line": null,
        "raw": "",
        "do": "answer",
@@ -14361,7 +14542,8 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
+      "raw": "/Users/alice/workplace/shop-web"
      }
     ],
     "cto": {
@@ -15092,7 +15274,8 @@
     "errors": [
      {
       "repo": "r2",
-      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
+      "raw": "/Users/alice/workplace/shop-web"
      }
     ],
     "cto": {
@@ -16083,7 +16266,7 @@
       "stage": null,
       "waits": {
        "who": "bridge",
-       "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "text": "签名服务在签接手合同",
        "line": null,
        "raw": "",
        "do": "none",
@@ -16138,8 +16321,8 @@
       },
       "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
       "waits": {
-       "who": "people",
-       "text": "等人在 MR 上回答 D-2（设计）",
+       "who": "product",
+       "text": "等产品在 MR 上回答 D-2（设计）",
        "line": null,
        "raw": "",
        "do": "answer",
@@ -16467,6 +16650,8 @@
       "url": "/chat?sid=brain-PAY-3-7f3a"
      },
      "since": 1794146040.0,
+     "review": false,
+     "path": "aidlc-docs/261107-refund-export/construction/plans/refund-api-code-generation-plan.md",
      "kind": "lean_approval",
      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行"
     },
@@ -16513,6 +16698,8 @@
       "url": "/chat?sid=brain-PAY-3-7f3a"
      },
      "since": 1794146040.0,
+     "review": false,
+     "path": null,
      "kind": "clarify",
      "text": "AI 停下问你：可以在这里回答"
     },
@@ -16530,6 +16717,8 @@
       "url": "/chat?sid=brain-PAY-7-2b9f"
      },
      "since": 1794129840.0,
+     "review": false,
+     "path": null,
      "kind": "handoff_rejected",
      "text": "接手被拒：标签是 bob 打的，不是负责人 alice"
     },
@@ -16543,6 +16732,8 @@
      "question": null,
      "session": null,
      "since": 1794128400.0,
+     "review": false,
+     "path": null,
      "kind": "start",
      "text": "已认领，还没开工"
     },
@@ -16556,6 +16747,8 @@
      "question": null,
      "session": null,
      "since": 1794118440.0,
+     "review": false,
+     "path": null,
      "kind": "handoff_unlabelled",
      "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次"
     },
@@ -16573,6 +16766,8 @@
       "url": "/chat?sid=brain-PAY-1-3d8e"
      },
      "since": 1794133620.0,
+     "review": true,
+     "path": null,
      "kind": "reply",
      "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）"
     }
@@ -16595,6 +16790,8 @@
       "url": "/chat?sid=brain-PAY-3-7f3a"
      },
      "since": 1794146040.0,
+     "review": false,
+     "path": "aidlc-docs/261107-refund-export/construction/plans/refund-api-code-generation-plan.md",
      "kind": "lean_approval",
      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行"
     },
@@ -16641,6 +16838,8 @@
       "url": "/chat?sid=brain-PAY-3-7f3a"
      },
      "since": 1794146040.0,
+     "review": false,
+     "path": null,
      "kind": "clarify",
      "text": "AI 停下问你：可以在这里回答"
     },
@@ -16658,6 +16857,8 @@
       "url": "/chat?sid=brain-PAY-7-2b9f"
      },
      "since": 1794129840.0,
+     "review": false,
+     "path": null,
      "kind": "handoff_rejected",
      "text": "接手被拒：标签是 bob 打的，不是负责人 alice"
     },
@@ -16671,6 +16872,8 @@
      "question": null,
      "session": null,
      "since": 1794128400.0,
+     "review": false,
+     "path": null,
      "kind": "start",
      "text": "已认领，还没开工"
     },
@@ -16684,6 +16887,8 @@
      "question": null,
      "session": null,
      "since": 1794118440.0,
+     "review": false,
+     "path": null,
      "kind": "handoff_unlabelled",
      "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次"
     },
@@ -16701,6 +16906,8 @@
       "url": "/chat?sid=brain-PAY-1-3d8e"
      },
      "since": 1794133620.0,
+     "review": true,
+     "path": null,
      "kind": "reply",
      "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）"
     },
@@ -16709,13 +16916,15 @@
      "repo": "",
      "key": "",
      "title": "KiroCrew 检查",
-     "text": "没有 ~/.kiro/agents/brain-dev.json。点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的 hook 在 KiroCrew 里不会跑",
+     "text": "KiroCrew 里还没有 brain-dev。点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的拦截在 KiroCrew 里不会跑",
      "line": null,
      "approval": null,
      "mr_url": null,
      "question": null,
      "session": null,
-     "since": null
+     "since": null,
+     "review": false,
+     "path": null
     }
    ],
    "team": false
@@ -16736,6 +16945,8 @@
       "url": "/chat?sid=brain-PAY-3-7f3a"
      },
      "since": 1794146040.0,
+     "review": false,
+     "path": "aidlc-docs/261107-refund-export/construction/plans/refund-api-code-generation-plan.md",
      "kind": "lean_approval",
      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行"
     },
@@ -16782,6 +16993,8 @@
       "url": "/chat?sid=brain-PAY-3-7f3a"
      },
      "since": 1794146040.0,
+     "review": false,
+     "path": null,
      "kind": "clarify",
      "text": "AI 停下问你：可以在这里回答"
     },
@@ -16799,6 +17012,8 @@
       "url": "/chat?sid=brain-PAY-7-2b9f"
      },
      "since": 1794129840.0,
+     "review": false,
+     "path": null,
      "kind": "handoff_rejected",
      "text": "接手被拒：标签是 bob 打的，不是负责人 alice"
     },
@@ -16812,6 +17027,8 @@
      "question": null,
      "session": null,
      "since": 1794128400.0,
+     "review": false,
+     "path": null,
      "kind": "start",
      "text": "已认领，还没开工"
     },
@@ -16825,6 +17042,8 @@
      "question": null,
      "session": null,
      "since": 1794118440.0,
+     "review": false,
+     "path": null,
      "kind": "handoff_unlabelled",
      "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次"
     },
@@ -16842,6 +17061,8 @@
       "url": "/chat?sid=brain-PAY-1-3d8e"
      },
      "since": 1794133620.0,
+     "review": true,
+     "path": null,
      "kind": "reply",
      "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）"
     },
@@ -16873,8 +17094,10 @@
      },
      "session": null,
      "since": 1794135600.0,
+     "review": false,
+     "path": null,
      "kind": "question",
-     "text": "D-2 等人在 MR 上回答"
+     "text": "等产品在 MR 上回答 D-2（设计）"
     },
     {
      "repo": "runner",
@@ -16904,8 +17127,10 @@
      },
      "session": null,
      "since": 1794056400.0,
+     "review": false,
+     "path": null,
      "kind": "acceptance",
-     "text": "D-3 等产品在 MR 上验收"
+     "text": "等产品在 MR 上验收 D-3（approve / reject）"
     },
     {
      "repo": "runner",
@@ -16917,12 +17142,207 @@
      "question": null,
      "session": null,
      "since": 1794146160.0,
+     "review": false,
+     "path": null,
      "kind": "question",
      "text": "D-1 的回答签名服务不签：看运行机页的拒签原因"
     }
    ],
    "team": true
   }
+ },
+ "reflects": {
+  "r1/PAY-2": {
+   "repo": "r1",
+   "key": "PAY-2",
+   "source": "main:aidlc-docs/261102-refund-id/decisions.md",
+   "ops": [
+    {
+     "kind": "new",
+     "target": null,
+     "file": "TECH",
+     "type": "guideline",
+     "section": null,
+     "src": [
+      "D-1"
+     ],
+     "text": "PAY-2 学到的第 1 条：退款单号校验"
+    }
+   ],
+   "gaps": [],
+   "notes": [],
+   "warnings": [],
+   "problems": [
+    "TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
+   ],
+   "substantive": true,
+   "error": "",
+   "raw": [
+    "TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
+   ]
+  },
+  "r1/PAY-5": {
+   "repo": "r1",
+   "key": "PAY-5",
+   "source": "ai/alice/PAY-5-callback-retry:aidlc-docs/261104-callback-retry/decisions.md",
+   "ops": [
+    {
+     "kind": "new",
+     "target": null,
+     "file": "TECH",
+     "type": "guideline",
+     "section": null,
+     "src": [
+      "D-1"
+     ],
+     "text": "PAY-5 学到的第 1 条：退款回调失败重试"
+    }
+   ],
+   "gaps": [],
+   "notes": [],
+   "warnings": [],
+   "problems": [
+    "TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
+   ],
+   "substantive": true,
+   "error": "",
+   "raw": [
+    "TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"
+   ]
+  },
+  "r3/ORD-2": {
+   "repo": "r3",
+   "key": "ORD-2",
+   "source": "main:aidlc-docs/261001-order-2/decisions.md",
+   "ops": [
+    {
+     "kind": "new",
+     "target": null,
+     "file": "TECH",
+     "type": "guideline",
+     "section": null,
+     "src": [
+      "D-1"
+     ],
+     "text": "ORD-2 学到的第 1 条：优惠券叠加规则"
+    }
+   ],
+   "gaps": [],
+   "notes": [],
+   "warnings": [],
+   "problems": [],
+   "substantive": true,
+   "error": "",
+   "raw": []
+  },
+  "r3/ORD-4": {
+   "repo": "r3",
+   "key": "ORD-4",
+   "source": "main:aidlc-docs/261003-order-4/decisions.md",
+   "ops": [
+    {
+     "kind": "new",
+     "target": null,
+     "file": "TECH",
+     "type": "guideline",
+     "section": null,
+     "src": [
+      "D-1"
+     ],
+     "text": "ORD-4 学到的第 1 条：取消订单的退款入口"
+    }
+   ],
+   "gaps": [],
+   "notes": [],
+   "warnings": [],
+   "problems": [],
+   "substantive": true,
+   "error": "",
+   "raw": []
+  },
+  "r3/ORD-6": {
+   "repo": "r3",
+   "key": "ORD-6",
+   "source": "main:aidlc-docs/261005-order-6/decisions.md",
+   "ops": [
+    {
+     "kind": "new",
+     "target": null,
+     "file": "TECH",
+     "type": "guideline",
+     "section": null,
+     "src": [
+      "D-1"
+     ],
+     "text": "ORD-6 学到的第 1 条：订单备注长度"
+    }
+   ],
+   "gaps": [],
+   "notes": [],
+   "warnings": [],
+   "problems": [],
+   "substantive": true,
+   "error": "",
+   "raw": []
+  },
+  "r3/ORD-8": {
+   "repo": "r3",
+   "key": "ORD-8",
+   "source": "main:aidlc-docs/261007-order-8/decisions.md",
+   "ops": [
+    {
+     "kind": "new",
+     "target": null,
+     "file": "TECH",
+     "type": "guideline",
+     "section": null,
+     "src": [
+      "D-1"
+     ],
+     "text": "ORD-8 学到的第 1 条：拆单时运费分摊"
+    }
+   ],
+   "gaps": [],
+   "notes": [],
+   "warnings": [],
+   "problems": [],
+   "substantive": true,
+   "error": "",
+   "raw": []
+  },
+  "r3/ORD-9": {
+   "repo": "r3",
+   "key": "ORD-9",
+   "source": "main:aidlc-docs/261008-order-9/decisions.md",
+   "ops": [
+    {
+     "kind": "new",
+     "target": null,
+     "file": "TECH",
+     "type": "guideline",
+     "section": null,
+     "src": [
+      "D-1"
+     ],
+     "text": "ORD-9 学到的第 1 条：订单列表分页"
+    }
+   ],
+   "gaps": [],
+   "notes": [],
+   "warnings": [],
+   "problems": [],
+   "substantive": true,
+   "error": "",
+   "raw": []
+  }
+ },
+ "crew_missing": {
+  "level": "FAIL",
+  "text": "KiroCrew 里还没有 brain-dev",
+  "todo": "点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的拦截在 KiroCrew 里不会跑",
+  "fix": "agent",
+  "repo": null,
+  "raw": "没有 ~/.kiro/agents/brain-dev.json"
  },
  "boards": {
   "r1/PAY-2": {
@@ -17350,17 +17770,17 @@
       {
        "at": 1793639460.0,
        "kind": "accepted",
-       "title": "桥接手了 !37"
+       "title": "桥接手了（MR !37）"
       },
       {
        "at": 1793648040.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：澄清"
+       "title": "D-1 在 MR 上问你：澄清"
       },
       {
        "at": 1793656440.0,
        "kind": "question",
-       "title": "D-2 在 MR 上问人：验收"
+       "title": "D-2 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -17435,14 +17855,14 @@
       {
        "at": 1793647980.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：澄清",
-       "who": "people"
+       "doing": "停下问你：澄清",
+       "who": "you"
       },
       {
        "at": 1793648040.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：澄清（D-1）",
-       "who": "people"
+       "doing": "停下问你：澄清（D-1）",
+       "who": "you"
       },
       {
        "at": 1793650500.0,
@@ -17477,19 +17897,19 @@
       {
        "at": 1793655180,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1793655240.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1793656440.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-2）",
+       "doing": "停下问产品：验收（D-2）",
        "who": "product"
       },
       {
@@ -17562,12 +17982,12 @@
       {
        "at": 1793647980.0,
        "kind": "question",
-       "title": "停下问人：澄清"
+       "title": "停下问你：澄清"
       },
       {
        "at": 1793648040.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：澄清"
+       "title": "D-1 在 MR 上问你：澄清"
       },
       {
        "at": 1793650500.0,
@@ -17597,12 +18017,12 @@
       {
        "at": 1793655240.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1793656440.0,
        "kind": "question",
-       "title": "D-2 在 MR 上问人：验收"
+       "title": "D-2 在 MR 上问产品：验收"
       },
       {
        "at": 1793659440.0,
@@ -17707,7 +18127,7 @@
       {
        "at": 1793655180,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -17728,7 +18148,7 @@
       {
        "at": 1793655180,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       },
       {
        "at": 1793659500,
@@ -17748,9 +18168,9 @@
      "title": "回写 Brain",
      "sub": "合并后写回新知识",
      "icon": "brain",
-     "status": "done",
-     "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
-     "since": 1793715540.0,
+     "status": "merged",
+     "doing": "回写分支 brain/PAY-2-reflect-1 已合并",
+     "since": 1793834340,
      "history": [
       {
        "at": 1793661540.0,
@@ -17763,6 +18183,12 @@
        "status": "done",
        "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
        "who": null
+      },
+      {
+       "at": 1793834340,
+       "status": "merged",
+       "doing": "回写分支 brain/PAY-2-reflect-1 已合并",
+       "who": null
       }
      ],
      "spans": [],
@@ -17771,6 +18197,11 @@
        "at": 1793715540.0,
        "kind": "reflect",
        "title": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）"
+      },
+      {
+       "at": 1793834340,
+       "kind": "reflect",
+       "title": "回写分支 brain/PAY-2-reflect-1 已合并"
       }
      ],
      "facts": [
@@ -17833,7 +18264,7 @@
      "to": "person",
      "text": "认领 PAY-2：退款单号校验",
      "detail": false,
-     "src": "claim/PAY-2"
+     "src": "认领记录 claim/PAY-2"
     },
     {
      "seq": 2,
@@ -17843,7 +18274,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/PAY-2/run.json"
+     "src": "开工记录 runs/PAY-2/run.json"
     },
     {
      "seq": 3,
@@ -18031,7 +18462,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !37",
+     "text": "桥接手了（MR !37）",
      "detail": false,
      "src": null
     },
@@ -18101,7 +18532,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：澄清",
+     "text": "停下问你：澄清",
      "detail": false,
      "src": null
     },
@@ -18111,7 +18542,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-1 在 MR 上问人：澄清",
+     "text": "D-1 在 MR 上问你：澄清",
      "detail": false,
      "src": null
     },
@@ -18231,7 +18662,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -18241,7 +18672,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -18251,7 +18682,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-2 在 MR 上问人：验收",
+     "text": "D-2 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     },
@@ -18312,6 +18743,16 @@
      "from": "person",
      "to": "reflect",
      "text": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
+     "detail": false,
+     "src": null
+    },
+    {
+     "seq": 50,
+     "at": 1793834340,
+     "kind": "reflect",
+     "from": "person",
+     "to": "reflect",
+     "text": "回写分支 brain/PAY-2-reflect-1 已合并",
      "detail": false,
      "src": null
     }
@@ -18789,7 +19230,8 @@
      "vouchers": [
       "V-ec134a89e2"
      ],
-     "src": "aidlc-docs/261102-refund-id/decisions.md#L8"
+     "src": "aidlc-docs/261102-refund-id/decisions.md#L8",
+     "asked": []
     },
     {
      "id": "D-2",
@@ -18803,7 +19245,8 @@
       "T-12"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261102-refund-id/decisions.md#L9"
+     "src": "aidlc-docs/261102-refund-id/decisions.md#L9",
+     "asked": []
     },
     {
      "id": "D-3",
@@ -18817,7 +19260,8 @@
       "P-7"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261102-refund-id/decisions.md#L10"
+     "src": "aidlc-docs/261102-refund-id/decisions.md#L10",
+     "asked": []
     }
    ],
    "questions": [],
@@ -18864,7 +19308,7 @@
    ],
    "credits": {
     "total": 22.7,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -19491,7 +19935,7 @@
      "to": "person",
      "text": "认领 PAY-3：退款单导出 CSV",
      "detail": false,
-     "src": "claim/PAY-3"
+     "src": "认领记录 claim/PAY-3"
     },
     {
      "seq": 2,
@@ -19501,7 +19945,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/PAY-3/run.json"
+     "src": "开工记录 runs/PAY-3/run.json"
     },
     {
      "seq": 3,
@@ -20102,7 +20546,8 @@
       "P-PAY-2-1"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261107-refund-export/decisions.md#L8"
+     "src": "aidlc-docs/261107-refund-export/decisions.md#L8",
+     "asked": []
     },
     {
      "id": "D-2",
@@ -20117,7 +20562,8 @@
       "T-12"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261107-refund-export/decisions.md#L9"
+     "src": "aidlc-docs/261107-refund-export/decisions.md#L9",
+     "asked": []
     },
     {
      "id": "D-3",
@@ -20131,7 +20577,8 @@
      "vouchers": [
       "V-1a2b3c4d5e"
      ],
-     "src": "aidlc-docs/261107-refund-export/decisions.md#L10"
+     "src": "aidlc-docs/261107-refund-export/decisions.md#L10",
+     "asked": []
     },
     {
      "id": "D-4",
@@ -20143,7 +20590,8 @@
      "by": "unclassified",
      "cites": [],
      "vouchers": [],
-     "src": "aidlc-docs/261107-refund-export/decisions.md#L11"
+     "src": "aidlc-docs/261107-refund-export/decisions.md#L11",
+     "asked": []
     }
    ],
    "questions": [
@@ -20255,7 +20703,7 @@
    ],
    "credits": {
     "total": 12.4,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -20631,12 +21079,12 @@
       {
        "at": 1794123360.0,
        "kind": "accepted",
-       "title": "桥接手了 !41"
+       "title": "桥接手了（MR !41）"
       },
       {
        "at": 1794135600.0,
        "kind": "question",
-       "title": "D-2 在 MR 上问人：设计"
+       "title": "D-2 在 MR 上问产品：设计"
       }
      ],
      "facts": [
@@ -20701,14 +21149,14 @@
       {
        "at": 1794135480.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：设计",
-       "who": "people"
+       "doing": "停下问产品：设计",
+       "who": "product"
       },
       {
        "at": 1794135600.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：设计（D-2）",
-       "who": "people"
+       "doing": "停下问产品：设计（D-2）",
+       "who": "product"
       },
       {
        "at": 1794135600.0,
@@ -20738,12 +21186,12 @@
       {
        "at": 1794135480.0,
        "kind": "question",
-       "title": "停下问人：设计"
+       "title": "停下问产品：设计"
       },
       {
        "at": 1794135600.0,
        "kind": "question",
-       "title": "D-2 在 MR 上问人：设计"
+       "title": "D-2 在 MR 上问产品：设计"
       }
      ],
      "facts": [
@@ -20860,7 +21308,7 @@
      "to": "person",
      "text": "认领 PAY-4：对账单按商户拆分",
      "detail": false,
-     "src": "claim/PAY-4"
+     "src": "认领记录 claim/PAY-4"
     },
     {
      "seq": 2,
@@ -20870,7 +21318,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/PAY-4/run.json"
+     "src": "开工记录 runs/PAY-4/run.json"
     },
     {
      "seq": 3,
@@ -21028,7 +21476,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !41",
+     "text": "桥接手了（MR !41）",
      "detail": false,
      "src": null
     },
@@ -21068,7 +21516,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：设计",
+     "text": "停下问产品：设计",
      "detail": false,
      "src": null
     },
@@ -21078,7 +21526,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-2 在 MR 上问人：设计",
+     "text": "D-2 在 MR 上问产品：设计",
      "detail": false,
      "src": null
     }
@@ -21296,6 +21744,11 @@
       "id": "brain",
       "label": "照 Brain",
       "count": 1
+     },
+     {
+      "id": "unclassified",
+      "label": "没归类",
+      "count": 1
      }
     ],
     "checks": "目前 5 项都过 · 还剩 发布审批、自动检查",
@@ -21324,7 +21777,21 @@
       "T-12"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261105-merchant-split/decisions.md#L8"
+     "src": "aidlc-docs/261105-merchant-split/decisions.md#L8",
+     "asked": []
+    },
+    {
+     "id": "D-3",
+     "date": "2026-11-08",
+     "stage": "functional-design",
+     "text": "拆分任务按商户号排好再按日期写",
+     "why": "对账脚本按这个顺序读",
+     "who": "split-job 规划",
+     "by": "unclassified",
+     "cites": [],
+     "vouchers": [],
+     "src": "aidlc-docs/261105-merchant-split/decisions.md#L10",
+     "asked": []
     }
    ],
    "questions": [
@@ -21387,7 +21854,7 @@
    ],
    "credits": {
     "total": null,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -21763,12 +22230,12 @@
       {
        "at": 1793910660.0,
        "kind": "accepted",
-       "title": "桥接手了 !44"
+       "title": "桥接手了（MR !44）"
       },
       {
        "at": 1794056400.0,
        "kind": "question",
-       "title": "D-3 在 MR 上问人：验收"
+       "title": "D-3 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -21857,19 +22324,19 @@
       {
        "at": 1793920560,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1793920620.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1794056400.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-3）",
+       "doing": "停下问产品：验收（D-3）",
        "who": "product"
       },
       {
@@ -21910,12 +22377,12 @@
       {
        "at": 1793920620.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1794056400.0,
        "kind": "question",
-       "title": "D-3 在 MR 上问人：验收"
+       "title": "D-3 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -21987,7 +22454,7 @@
       {
        "at": 1793920560,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -22008,7 +22475,7 @@
       {
        "at": 1793920560,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       }
      ],
      "facts": [
@@ -22089,7 +22556,7 @@
      "to": "person",
      "text": "认领 PAY-5：退款回调失败重试",
      "detail": false,
-     "src": "claim/PAY-5"
+     "src": "认领记录 claim/PAY-5"
     },
     {
      "seq": 2,
@@ -22099,7 +22566,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/PAY-5/run.json"
+     "src": "开工记录 runs/PAY-5/run.json"
     },
     {
      "seq": 3,
@@ -22257,7 +22724,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !44",
+     "text": "桥接手了（MR !44）",
      "detail": false,
      "src": null
     },
@@ -22377,7 +22844,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -22387,7 +22854,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -22397,7 +22864,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-3 在 MR 上问人：验收",
+     "text": "D-3 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     }
@@ -22778,7 +23245,8 @@
      "vouchers": [
       "V-87b3e7b7ac"
      ],
-     "src": "aidlc-docs/261104-callback-retry/decisions.md#L8"
+     "src": "aidlc-docs/261104-callback-retry/decisions.md#L8",
+     "asked": []
     },
     {
      "id": "D-2",
@@ -22792,7 +23260,8 @@
       "T-PAY-2-1"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261104-callback-retry/decisions.md#L9"
+     "src": "aidlc-docs/261104-callback-retry/decisions.md#L9",
+     "asked": []
     }
    ],
    "questions": [
@@ -22844,7 +23313,7 @@
    ],
    "credits": {
     "total": 31.0,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -23412,7 +23881,7 @@
      "to": "person",
      "text": "认领 PAY-7：退款原因下拉框",
      "detail": false,
-     "src": "claim/PAY-7"
+     "src": "认领记录 claim/PAY-7"
     },
     {
      "seq": 2,
@@ -23422,7 +23891,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/PAY-7/run.json"
+     "src": "开工记录 runs/PAY-7/run.json"
     },
     {
      "seq": 3,
@@ -23830,7 +24299,8 @@
      "by": "agent",
      "cites": [],
      "vouchers": [],
-     "src": "aidlc-docs/261108-refund-reason/decisions.md#L8"
+     "src": "aidlc-docs/261108-refund-reason/decisions.md#L8",
+     "asked": []
     }
    ],
    "questions": [],
@@ -23862,7 +24332,7 @@
    ],
    "credits": {
     "total": 18.2,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -24157,7 +24627,7 @@
      "to": "person",
      "text": "认领 PAY-6：商户结算周报",
      "detail": false,
-     "src": "claim/PAY-6"
+     "src": "认领记录 claim/PAY-6"
     }
    ],
    "belt": [],
@@ -24259,7 +24729,7 @@
    "sessions": [],
    "credits": {
     "total": null,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "app",
    "error": "",
@@ -24549,7 +25019,7 @@
      "to": "person",
      "text": "认领 PAY-8：退款失败的提醒",
      "detail": false,
-     "src": "claim/PAY-8"
+     "src": "认领记录 claim/PAY-8"
     }
    ],
    "belt": [],
@@ -24651,7 +25121,7 @@
    "sessions": [],
    "credits": {
     "total": null,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "app",
    "error": "",
@@ -24977,10 +25447,16 @@
        "at": 1794118440.0,
        "status": "stalled",
        "doing": "推上去了，但 MR 上没有交接标签",
-       "who": null
+       "who": "you"
       }
      ],
-     "spans": [],
+     "spans": [
+      {
+       "a": 1794118440.0,
+       "b": null,
+       "kind": "wait"
+      }
+     ],
      "marks": [
       {
        "at": 1794118440.0,
@@ -25018,13 +25494,7 @@
        "who": null
       }
      ],
-     "spans": [
-      {
-       "a": 1794118440.0,
-       "b": null,
-       "kind": "work"
-      }
-     ],
+     "spans": [],
      "marks": [],
      "facts": [],
      "credits": null,
@@ -25180,7 +25650,7 @@
      "to": "person",
      "text": "认领 PAY-10：退款审批加二次确认",
      "detail": false,
-     "src": "claim/PAY-10"
+     "src": "认领记录 claim/PAY-10"
     },
     {
      "seq": 2,
@@ -25190,7 +25660,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/PAY-10/run.json"
+     "src": "开工记录 runs/PAY-10/run.json"
     },
     {
      "seq": 3,
@@ -25574,14 +26044,17 @@
      "date": "2026-11-08",
      "stage": "requirements",
      "text": "超过一万的退款要二次确认",
-     "why": "产品定的",
+     "why": "Q1 答\"按推荐\"（产品定的）",
      "who": "P-1A2B",
      "by": "person",
      "cites": [],
      "vouchers": [
       "V-d96efd81c5"
      ],
-     "src": "aidlc-docs/261108-refund-confirm/decisions.md#L8"
+     "src": "aidlc-docs/261108-refund-confirm/decisions.md#L8",
+     "asked": [
+      "Q1"
+     ]
     }
    ],
    "questions": [],
@@ -25597,7 +26070,7 @@
    "sessions": [],
    "credits": {
     "total": 12.6,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -26097,7 +26570,7 @@
      "to": "person",
      "text": "认领 PAY-1：退款原因统计",
      "detail": false,
-     "src": "claim/PAY-1"
+     "src": "认领记录 claim/PAY-1"
     },
     {
      "seq": 2,
@@ -26107,7 +26580,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/PAY-1/run.json"
+     "src": "开工记录 runs/PAY-1/run.json"
     },
     {
      "seq": 3,
@@ -26516,7 +26989,7 @@
    ],
    "credits": {
     "total": 9.8,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -26892,12 +27365,12 @@
       {
        "at": 1788269760.0,
        "kind": "accepted",
-       "title": "桥接手了 !10"
+       "title": "桥接手了（MR !10）"
       },
       {
        "at": 1788280920.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -26991,19 +27464,19 @@
       {
        "at": 1788279660,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1788279720.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1788280920.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-1）",
+       "doing": "停下问产品：验收（D-1）",
        "who": "product"
       },
       {
@@ -27066,12 +27539,12 @@
       {
        "at": 1788279720.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1788280920.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       },
       {
        "at": 1788283920.0,
@@ -27155,7 +27628,7 @@
       {
        "at": 1788279660,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -27176,7 +27649,7 @@
       {
        "at": 1788279660,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       },
       {
        "at": 1788283980,
@@ -27267,7 +27740,7 @@
      "to": "person",
      "text": "认领 ORD-1：下单页地址校验",
      "detail": false,
-     "src": "claim/ORD-1"
+     "src": "认领记录 claim/ORD-1"
     },
     {
      "seq": 2,
@@ -27277,7 +27750,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-1/run.json"
+     "src": "开工记录 runs/ORD-1/run.json"
     },
     {
      "seq": 3,
@@ -27435,7 +27908,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !10",
+     "text": "桥接手了（MR !10）",
      "detail": false,
      "src": null
     },
@@ -27555,7 +28028,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -27565,7 +28038,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -27575,7 +28048,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-1 在 MR 上问人：验收",
+     "text": "D-1 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     },
@@ -28009,7 +28482,7 @@
    "sessions": [],
    "credits": {
     "total": 14.2,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -28388,12 +28861,12 @@
       {
        "at": 1788870960.0,
        "kind": "accepted",
-       "title": "桥接手了 !11"
+       "title": "桥接手了（MR !11）"
       },
       {
        "at": 1788884040.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -28487,19 +28960,19 @@
       {
        "at": 1788882780,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1788882840.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1788884040.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-1）",
+       "doing": "停下问产品：验收（D-1）",
        "who": "product"
       },
       {
@@ -28567,12 +29040,12 @@
       {
        "at": 1788882840.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1788884040.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       },
       {
        "at": 1788887040.0,
@@ -28673,7 +29146,7 @@
       {
        "at": 1788882780,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -28694,7 +29167,7 @@
       {
        "at": 1788882780,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       },
       {
        "at": 1788887100,
@@ -28799,7 +29272,7 @@
      "to": "person",
      "text": "认领 ORD-2：优惠券叠加规则",
      "detail": false,
-     "src": "claim/ORD-2"
+     "src": "认领记录 claim/ORD-2"
     },
     {
      "seq": 2,
@@ -28809,7 +29282,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-2/run.json"
+     "src": "开工记录 runs/ORD-2/run.json"
     },
     {
      "seq": 3,
@@ -28967,7 +29440,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !11",
+     "text": "桥接手了（MR !11）",
      "detail": false,
      "src": null
     },
@@ -29107,7 +29580,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -29117,7 +29590,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -29127,7 +29600,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-1 在 MR 上问人：验收",
+     "text": "D-1 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     },
@@ -29600,7 +30073,7 @@
    "sessions": [],
    "credits": {
     "total": 21.9,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -30029,12 +30502,12 @@
       {
        "at": 1789647660.0,
        "kind": "accepted",
-       "title": "桥接手了 !12"
+       "title": "桥接手了（MR !12）"
       },
       {
        "at": 1789659420.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -30128,19 +30601,19 @@
       {
        "at": 1789658160,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1789658220.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1789659420.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-1）",
+       "doing": "停下问产品：验收（D-1）",
        "who": "product"
       },
       {
@@ -30208,12 +30681,12 @@
       {
        "at": 1789658220.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1789659420.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       },
       {
        "at": 1789662420.0,
@@ -30297,7 +30770,7 @@
       {
        "at": 1789658160,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -30318,7 +30791,7 @@
       {
        "at": 1789658160,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       },
       {
        "at": 1789662480,
@@ -30409,7 +30882,7 @@
      "to": "person",
      "text": "认领 ORD-3：订单导出加筛选",
      "detail": false,
-     "src": "claim/ORD-3"
+     "src": "认领记录 claim/ORD-3"
     },
     {
      "seq": 2,
@@ -30419,7 +30892,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-3/run.json"
+     "src": "开工记录 runs/ORD-3/run.json"
     },
     {
      "seq": 3,
@@ -30607,7 +31080,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !12",
+     "text": "桥接手了（MR !12）",
      "detail": false,
      "src": null
     },
@@ -30737,7 +31210,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -30747,7 +31220,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -30757,7 +31230,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-1 在 MR 上问人：验收",
+     "text": "D-1 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     },
@@ -31240,7 +31713,7 @@
    "sessions": [],
    "credits": {
     "total": 26.4,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -31619,12 +32092,12 @@
       {
        "at": 1790246160.0,
        "kind": "accepted",
-       "title": "桥接手了 !13"
+       "title": "桥接手了（MR !13）"
       },
       {
        "at": 1790257320.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -31718,19 +32191,19 @@
       {
        "at": 1790256060,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1790256120.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1790257320.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-1）",
+       "doing": "停下问产品：验收（D-1）",
        "who": "product"
       },
       {
@@ -31793,12 +32266,12 @@
       {
        "at": 1790256120.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1790257320.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       },
       {
        "at": 1790260320.0,
@@ -31882,7 +32355,7 @@
       {
        "at": 1790256060,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -31903,7 +32376,7 @@
       {
        "at": 1790256060,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       },
       {
        "at": 1790260380,
@@ -32008,7 +32481,7 @@
      "to": "person",
      "text": "认领 ORD-4：取消订单的退款入口",
      "detail": false,
-     "src": "claim/ORD-4"
+     "src": "认领记录 claim/ORD-4"
     },
     {
      "seq": 2,
@@ -32018,7 +32491,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-4/run.json"
+     "src": "开工记录 runs/ORD-4/run.json"
     },
     {
      "seq": 3,
@@ -32176,7 +32649,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !13",
+     "text": "桥接手了（MR !13）",
      "detail": false,
      "src": null
     },
@@ -32296,7 +32769,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -32306,7 +32779,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -32316,7 +32789,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-1 在 MR 上问人：验收",
+     "text": "D-1 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     },
@@ -32760,7 +33233,7 @@
    "sessions": [],
    "credits": {
     "total": 17.8,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -33325,7 +33798,7 @@
      "to": "person",
      "text": "认领 ORD-5：发票抬头保存",
      "detail": false,
-     "src": "claim/ORD-5"
+     "src": "认领记录 claim/ORD-5"
     },
     {
      "seq": 2,
@@ -33335,7 +33808,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-5/run.json"
+     "src": "开工记录 runs/ORD-5/run.json"
     },
     {
      "seq": 3,
@@ -33757,7 +34230,7 @@
    "sessions": [],
    "credits": {
     "total": 9.6,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -34183,12 +34656,12 @@
       {
        "at": 1791552060.0,
        "kind": "accepted",
-       "title": "桥接手了 !15"
+       "title": "桥接手了（MR !15）"
       },
       {
        "at": 1791565140.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -34282,19 +34755,19 @@
       {
        "at": 1791563880,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1791563940.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1791565140.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-1）",
+       "doing": "停下问产品：验收（D-1）",
        "who": "product"
       },
       {
@@ -34362,12 +34835,12 @@
       {
        "at": 1791563940.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1791565140.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       },
       {
        "at": 1791568140.0,
@@ -34468,7 +34941,7 @@
       {
        "at": 1791563880,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -34489,7 +34962,7 @@
       {
        "at": 1791563880,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       },
       {
        "at": 1791568200,
@@ -34594,7 +35067,7 @@
      "to": "person",
      "text": "认领 ORD-6：订单备注长度",
      "detail": false,
-     "src": "claim/ORD-6"
+     "src": "认领记录 claim/ORD-6"
     },
     {
      "seq": 2,
@@ -34604,7 +35077,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-6/run.json"
+     "src": "开工记录 runs/ORD-6/run.json"
     },
     {
      "seq": 3,
@@ -34792,7 +35265,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !15",
+     "text": "桥接手了（MR !15）",
      "detail": false,
      "src": null
     },
@@ -34932,7 +35405,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -34942,7 +35415,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -34952,7 +35425,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-1 在 MR 上问人：验收",
+     "text": "D-1 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     },
@@ -35443,7 +35916,7 @@
    "sessions": [],
    "credits": {
     "total": 11.3,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -35822,12 +36295,12 @@
       {
        "at": 1792236960.0,
        "kind": "accepted",
-       "title": "桥接手了 !16"
+       "title": "桥接手了（MR !16）"
       },
       {
        "at": 1792248120.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -35921,19 +36394,19 @@
       {
        "at": 1792246860,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1792246920.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1792248120.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-1）",
+       "doing": "停下问产品：验收（D-1）",
        "who": "product"
       },
       {
@@ -35996,12 +36469,12 @@
       {
        "at": 1792246920.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1792248120.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       },
       {
        "at": 1792251120.0,
@@ -36085,7 +36558,7 @@
       {
        "at": 1792246860,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -36106,7 +36579,7 @@
       {
        "at": 1792246860,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       },
       {
        "at": 1792251180,
@@ -36197,7 +36670,7 @@
      "to": "person",
      "text": "认领 ORD-7：物流单号回填",
      "detail": false,
-     "src": "claim/ORD-7"
+     "src": "认领记录 claim/ORD-7"
     },
     {
      "seq": 2,
@@ -36207,7 +36680,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-7/run.json"
+     "src": "开工记录 runs/ORD-7/run.json"
     },
     {
      "seq": 3,
@@ -36365,7 +36838,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !16",
+     "text": "桥接手了（MR !16）",
      "detail": false,
      "src": null
     },
@@ -36485,7 +36958,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -36495,7 +36968,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -36505,7 +36978,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-1 在 MR 上问人：验收",
+     "text": "D-1 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     },
@@ -36952,7 +37425,7 @@
    "sessions": [],
    "credits": {
     "total": 19.5,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -37331,17 +37804,17 @@
       {
        "at": 1793097360.0,
        "kind": "accepted",
-       "title": "桥接手了 !17"
+       "title": "桥接手了（MR !17）"
       },
       {
        "at": 1793105940.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：澄清"
+       "title": "D-1 在 MR 上问 dave：澄清"
       },
       {
        "at": 1793112060.0,
        "kind": "question",
-       "title": "D-2 在 MR 上问人：验收"
+       "title": "D-2 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -37416,13 +37889,13 @@
       {
        "at": 1793105880.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：澄清",
+       "doing": "停下问 dave：澄清",
        "who": "people"
       },
       {
        "at": 1793105940.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：澄清（D-1）",
+       "doing": "停下问 dave：澄清（D-1）",
        "who": "people"
       },
       {
@@ -37458,19 +37931,19 @@
       {
        "at": 1793110800,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1793110860.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1793112060.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-2）",
+       "doing": "停下问产品：验收（D-2）",
        "who": "product"
       },
       {
@@ -37543,12 +38016,12 @@
       {
        "at": 1793105880.0,
        "kind": "question",
-       "title": "停下问人：澄清"
+       "title": "停下问 dave：澄清"
       },
       {
        "at": 1793105940.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：澄清"
+       "title": "D-1 在 MR 上问 dave：澄清"
       },
       {
        "at": 1793108040.0,
@@ -37573,12 +38046,12 @@
       {
        "at": 1793110860.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1793112060.0,
        "kind": "question",
-       "title": "D-2 在 MR 上问人：验收"
+       "title": "D-2 在 MR 上问产品：验收"
       },
       {
        "at": 1793115060.0,
@@ -37662,7 +38135,7 @@
       {
        "at": 1793110800,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -37683,7 +38156,7 @@
       {
        "at": 1793110800,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       },
       {
        "at": 1793115120,
@@ -37788,7 +38261,7 @@
      "to": "person",
      "text": "认领 ORD-8：拆单时运费分摊",
      "detail": false,
-     "src": "claim/ORD-8"
+     "src": "认领记录 claim/ORD-8"
     },
     {
      "seq": 2,
@@ -37798,7 +38271,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-8/run.json"
+     "src": "开工记录 runs/ORD-8/run.json"
     },
     {
      "seq": 3,
@@ -37956,7 +38429,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !17",
+     "text": "桥接手了（MR !17）",
      "detail": false,
      "src": null
     },
@@ -38026,7 +38499,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：澄清",
+     "text": "停下问 dave：澄清",
      "detail": false,
      "src": null
     },
@@ -38036,7 +38509,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-1 在 MR 上问人：澄清",
+     "text": "D-1 在 MR 上问 dave：澄清",
      "detail": false,
      "src": null
     },
@@ -38136,7 +38609,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -38146,7 +38619,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -38156,7 +38629,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-2 在 MR 上问人：验收",
+     "text": "D-2 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     },
@@ -38636,7 +39109,7 @@
    "sessions": [],
    "credits": {
     "total": 33.7,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -39065,12 +39538,12 @@
       {
        "at": 1793888460.0,
        "kind": "accepted",
-       "title": "桥接手了 !18"
+       "title": "桥接手了（MR !18）"
       },
       {
        "at": 1793899620.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -39164,19 +39637,19 @@
       {
        "at": 1793898360,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1793898420.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1793899620.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-1）",
+       "doing": "停下问产品：验收（D-1）",
        "who": "product"
       },
       {
@@ -39239,12 +39712,12 @@
       {
        "at": 1793898420.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1793899620.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：验收"
+       "title": "D-1 在 MR 上问产品：验收"
       },
       {
        "at": 1793902620.0,
@@ -39328,7 +39801,7 @@
       {
        "at": 1793898360,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -39349,7 +39822,7 @@
       {
        "at": 1793898360,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       },
       {
        "at": 1793902680,
@@ -39442,7 +39915,7 @@
      "to": "person",
      "text": "认领 ORD-9：订单列表分页",
      "detail": false,
-     "src": "claim/ORD-9"
+     "src": "认领记录 claim/ORD-9"
     },
     {
      "seq": 2,
@@ -39452,7 +39925,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-9/run.json"
+     "src": "开工记录 runs/ORD-9/run.json"
     },
     {
      "seq": 3,
@@ -39640,7 +40113,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !18",
+     "text": "桥接手了（MR !18）",
      "detail": false,
      "src": null
     },
@@ -39760,7 +40233,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -39770,7 +40243,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -39780,7 +40253,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-1 在 MR 上问人：验收",
+     "text": "D-1 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     },
@@ -40245,7 +40718,7 @@
    "sessions": [],
    "credits": {
     "total": 15.1,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -40617,7 +41090,7 @@
       {
        "at": 1794125700.0,
        "kind": "accepted",
-       "title": "桥接手了 !19"
+       "title": "桥接手了（MR !19）"
       }
      ],
      "facts": [],
@@ -40815,7 +41288,7 @@
      "to": "person",
      "text": "认领 ORD-10：订单状态推送到企业微信",
      "detail": false,
-     "src": "claim/ORD-10"
+     "src": "认领记录 claim/ORD-10"
     },
     {
      "seq": 2,
@@ -40825,7 +41298,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-10/run.json"
+     "src": "开工记录 runs/ORD-10/run.json"
     },
     {
      "seq": 3,
@@ -40983,7 +41456,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !19",
+     "text": "桥接手了（MR !19）",
      "detail": false,
      "src": null
     },
@@ -41331,7 +41804,7 @@
    ],
    "credits": {
     "total": 7.4,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -41666,8 +42139,8 @@
     },
     {
      "key": "release",
-     "title": "发布验收",
-     "sub": "发布审批 · 验收",
+     "title": "发布审批",
+     "sub": "Lean 请人批发布",
      "icon": "release",
      "status": "waiting",
      "doing": "等 Lean 走到发布审批",
@@ -41753,7 +42226,7 @@
      "to": "person",
      "text": "认领 TOOL-1：价格表批量导入",
      "detail": false,
-     "src": "claim/TOOL-1"
+     "src": "认领记录 claim/TOOL-1"
     },
     {
      "seq": 2,
@@ -41763,7 +42236,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/TOOL-1/run.json"
+     "src": "开工记录 runs/TOOL-1/run.json"
     },
     {
      "seq": 3,
@@ -41897,8 +42370,8 @@
      {
       "id": "kit-0",
       "group": "brain",
-      "label": "kit",
-      "name": ".kiro/brain/lean-hook.py 是旧版（第 0 版，要第 2 版）",
+      "label": "适配",
+      "name": "Lean 的适配文件是旧版（第 0 版，要第 2 版）",
       "status": "not_needed",
       "at": null,
       "detail": "只在本机做，用不上：交给运行机时才要紧",
@@ -41965,7 +42438,7 @@
    ],
    "credits": {
     "total": 4.9,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -42002,7 +42475,7 @@
     "stage": null,
     "waits": {
      "who": "bridge",
-     "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+     "text": "签名服务在签接手合同",
      "line": null,
      "raw": "",
      "do": "none",
@@ -42036,7 +42509,7 @@
    "live": true,
    "person": {
     "status": "running",
-    "doing": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+    "doing": "签名服务在签接手合同",
     "owner": null,
     "me": false
    },
@@ -42120,13 +42593,13 @@
      "sub": "核对交接 · 转问题",
      "icon": "bridge",
      "status": "running",
-     "doing": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+     "doing": "签名服务在签接手合同",
      "since": 1794146400.0,
      "history": [
       {
        "at": 1794146400.0,
        "status": "running",
-       "doing": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "doing": "签名服务在签接手合同",
        "who": null
       }
      ],
@@ -42369,7 +42842,7 @@
    "sessions": [],
    "credits": {
     "total": null,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "app",
    "error": "",
@@ -42405,8 +42878,8 @@
     },
     "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
     "waits": {
-     "who": "people",
-     "text": "等人在 MR 上回答 D-2（设计）",
+     "who": "product",
+     "text": "等产品在 MR 上回答 D-2（设计）",
      "line": null,
      "raw": "",
      "do": "answer",
@@ -42442,7 +42915,7 @@
    "live": false,
    "person": {
     "status": "waiting",
-    "doing": "等人在 MR 上回答 D-2（设计）",
+    "doing": "等产品在 MR 上回答 D-2（设计）",
     "owner": "carol",
     "me": false
    },
@@ -42471,7 +42944,7 @@
       {
        "at": 1794115860,
        "status": "done",
-       "doing": "交给你批准需求",
+       "doing": "交给 carol 批准需求",
        "who": null
       },
       {
@@ -42495,7 +42968,7 @@
       {
        "at": 1794119760,
        "status": "done",
-       "doing": "交给你批准设计",
+       "doing": "交给 carol 批准设计",
        "who": null
       },
       {
@@ -42571,19 +43044,19 @@
      "sub": "Lean 请人批需求",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "carol 批准了 · 需求",
      "since": 1794117120,
      "history": [
       {
        "at": 1794115860,
        "status": "awaiting_approval",
-       "doing": "等你批准需求",
-       "who": "you"
+       "doing": "等 carol 批准需求",
+       "who": "people"
       },
       {
        "at": 1794117120,
        "status": "merged",
-       "doing": "你批准了 · 需求",
+       "doing": "carol 批准了 · 需求",
        "who": null
       }
      ],
@@ -42598,12 +43071,12 @@
       {
        "at": 1794115860,
        "kind": "request",
-       "title": "请你批准需求"
+       "title": "请 carol 批准需求"
       },
       {
        "at": 1794117120,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "carol 批准了需求"
       }
      ],
      "facts": [
@@ -42619,7 +43092,7 @@
      "sub": "设计 · 代码生成计划",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "carol 批准了 · 设计",
      "since": 1794121260,
      "history": [
       {
@@ -42631,13 +43104,13 @@
       {
        "at": 1794119760,
        "status": "awaiting_approval",
-       "doing": "等你批准设计",
-       "who": "you"
+       "doing": "等 carol 批准设计",
+       "who": "people"
       },
       {
        "at": 1794121260,
        "status": "merged",
-       "doing": "你批准了 · 设计",
+       "doing": "carol 批准了 · 设计",
        "who": null
       }
      ],
@@ -42652,12 +43125,12 @@
       {
        "at": 1794119760,
        "kind": "request",
-       "title": "请你批准设计"
+       "title": "请 carol 批准设计"
       },
       {
        "at": 1794121260,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "carol 批准了设计"
       }
      ],
      "facts": [
@@ -42738,12 +43211,12 @@
       {
        "at": 1794123360.0,
        "kind": "accepted",
-       "title": "桥接手了 !41"
+       "title": "桥接手了（MR !41）"
       },
       {
        "at": 1794135600.0,
        "kind": "question",
-       "title": "D-2 在 MR 上问人：设计"
+       "title": "D-2 在 MR 上问产品：设计"
       }
      ],
      "facts": [
@@ -42790,7 +43263,7 @@
      "sub": "brain-run · 无人值守",
      "icon": "runner",
      "status": "awaiting_approval",
-     "doing": "等人在 MR 上回答 D-2（设计）",
+     "doing": "等产品在 MR 上回答 D-2（设计）",
      "since": 1794135600.0,
      "history": [
       {
@@ -42808,20 +43281,20 @@
       {
        "at": 1794135480.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：设计",
-       "who": "people"
+       "doing": "停下问产品：设计",
+       "who": "product"
       },
       {
        "at": 1794135600.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：设计（D-2）",
-       "who": "people"
+       "doing": "停下问产品：设计（D-2）",
+       "who": "product"
       },
       {
        "at": 1794135600.0,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上回答 D-2（设计）",
-       "who": "people"
+       "doing": "等产品在 MR 上回答 D-2（设计）",
+       "who": "product"
       }
      ],
      "spans": [
@@ -42845,12 +43318,12 @@
       {
        "at": 1794135480.0,
        "kind": "question",
-       "title": "停下问人：设计"
+       "title": "停下问产品：设计"
       },
       {
        "at": 1794135600.0,
        "kind": "question",
-       "title": "D-2 在 MR 上问人：设计"
+       "title": "D-2 在 MR 上问产品：设计"
       }
      ],
      "facts": [
@@ -42967,7 +43440,7 @@
      "to": "person",
      "text": "认领 PAY-4：对账单按商户拆分",
      "detail": false,
-     "src": "claim/PAY-4"
+     "src": "认领记录 claim/PAY-4"
     },
     {
      "seq": 2,
@@ -42977,7 +43450,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/PAY-4/run.json"
+     "src": "开工记录 runs/PAY-4/run.json"
     },
     {
      "seq": 3,
@@ -43015,7 +43488,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求",
+     "text": "请 carol 批准需求",
      "detail": false,
      "src": null
     },
@@ -43025,7 +43498,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "carol 批准了需求",
      "detail": false,
      "src": null
     },
@@ -43075,7 +43548,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计",
+     "text": "请 carol 批准设计",
      "detail": false,
      "src": null
     },
@@ -43085,7 +43558,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "carol 批准了设计",
      "detail": false,
      "src": null
     },
@@ -43135,7 +43608,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !41",
+     "text": "桥接手了（MR !41）",
      "detail": false,
      "src": null
     },
@@ -43175,7 +43648,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：设计",
+     "text": "停下问产品：设计",
      "detail": false,
      "src": null
     },
@@ -43185,7 +43658,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-2 在 MR 上问人：设计",
+     "text": "D-2 在 MR 上问产品：设计",
      "detail": false,
      "src": null
     }
@@ -43315,7 +43788,7 @@
       "name": "需求审批",
       "status": "pass",
       "at": 1794117120,
-      "detail": "你批准了",
+      "detail": "carol 批准了",
       "actor": "req"
      },
      {
@@ -43325,7 +43798,7 @@
       "name": "设计审批",
       "status": "pass",
       "at": 1794121260,
-      "detail": "你批准了",
+      "detail": "carol 批准了",
       "actor": "design"
      },
      {
@@ -43393,7 +43866,7 @@
     "state": "not_yet",
     "step": {
      "text": "在 MR 上回答 D-2（选一个答案）：桥会把回答带回运行机",
-     "who": "别人",
+     "who": "产品",
      "line": null,
      "mr_url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
      "session_url": null
@@ -43402,6 +43875,11 @@
      {
       "id": "brain",
       "label": "照 Brain",
+      "count": 1
+     },
+     {
+      "id": "unclassified",
+      "label": "没归类",
       "count": 1
      }
     ],
@@ -43431,7 +43909,21 @@
       "T-12"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261105-merchant-split/decisions.md#L8"
+     "src": "aidlc-docs/261105-merchant-split/decisions.md#L8",
+     "asked": []
+    },
+    {
+     "id": "D-3",
+     "date": "2026-11-08",
+     "stage": "functional-design",
+     "text": "拆分任务按商户号排好再按日期写",
+     "why": "对账脚本按这个顺序读",
+     "who": "split-job 规划",
+     "by": "unclassified",
+     "cites": [],
+     "vouchers": [],
+     "src": "aidlc-docs/261105-merchant-split/decisions.md#L10",
+     "asked": []
     }
    ],
    "questions": [
@@ -43483,7 +43975,7 @@
    ],
    "credits": {
     "total": 6.1,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -43563,7 +44055,7 @@
     "status": "waiting",
     "doing": "等产品在 MR 上验收 D-3（approve / reject）",
     "owner": "alice",
-    "me": false
+    "me": true
    },
    "actors": [
     {
@@ -43857,12 +44349,12 @@
       {
        "at": 1793910660.0,
        "kind": "accepted",
-       "title": "桥接手了 !44"
+       "title": "桥接手了（MR !44）"
       },
       {
        "at": 1794056400.0,
        "kind": "question",
-       "title": "D-3 在 MR 上问人：验收"
+       "title": "D-3 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -43951,19 +44443,19 @@
       {
        "at": 1793920560,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1793920620.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1794056400.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-3）",
+       "doing": "停下问产品：验收（D-3）",
        "who": "product"
       },
       {
@@ -44004,12 +44496,12 @@
       {
        "at": 1793920620.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1794056400.0,
        "kind": "question",
-       "title": "D-3 在 MR 上问人：验收"
+       "title": "D-3 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -44081,7 +44573,7 @@
       {
        "at": 1793920560,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -44102,7 +44594,7 @@
       {
        "at": 1793920560,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       }
      ],
      "facts": [
@@ -44183,7 +44675,7 @@
      "to": "person",
      "text": "认领 PAY-5：退款回调失败重试",
      "detail": false,
-     "src": "claim/PAY-5"
+     "src": "认领记录 claim/PAY-5"
     },
     {
      "seq": 2,
@@ -44193,7 +44685,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/PAY-5/run.json"
+     "src": "开工记录 runs/PAY-5/run.json"
     },
     {
      "seq": 3,
@@ -44351,7 +44843,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !44",
+     "text": "桥接手了（MR !44）",
      "detail": false,
      "src": null
     },
@@ -44471,7 +44963,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -44481,7 +44973,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -44491,7 +44983,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-3 在 MR 上问人：验收",
+     "text": "D-3 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     }
@@ -44872,7 +45364,8 @@
      "vouchers": [
       "V-87b3e7b7ac"
      ],
-     "src": "aidlc-docs/261104-callback-retry/decisions.md#L8"
+     "src": "aidlc-docs/261104-callback-retry/decisions.md#L8",
+     "asked": []
     },
     {
      "id": "D-2",
@@ -44886,7 +45379,8 @@
       "T-PAY-2-1"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261104-callback-retry/decisions.md#L9"
+     "src": "aidlc-docs/261104-callback-retry/decisions.md#L9",
+     "asked": []
     }
    ],
    "questions": [
@@ -44938,7 +45432,7 @@
    ],
    "credits": {
     "total": 24.2,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -45012,7 +45506,7 @@
     "status": "merged",
     "doing": "已合并",
     "owner": "alice",
-    "me": false
+    "me": true
    },
    "actors": [
     {
@@ -45368,17 +45862,17 @@
       {
        "at": 1793639460.0,
        "kind": "accepted",
-       "title": "桥接手了 !37"
+       "title": "桥接手了（MR !37）"
       },
       {
        "at": 1793648040.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：澄清"
+       "title": "D-1 在 MR 上问你：澄清"
       },
       {
        "at": 1793656440.0,
        "kind": "question",
-       "title": "D-2 在 MR 上问人：验收"
+       "title": "D-2 在 MR 上问产品：验收"
       }
      ],
      "facts": [
@@ -45453,14 +45947,14 @@
       {
        "at": 1793647980.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：澄清",
-       "who": "people"
+       "doing": "停下问你：澄清",
+       "who": "you"
       },
       {
        "at": 1793648040.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：澄清（D-1）",
-       "who": "people"
+       "doing": "停下问你：澄清（D-1）",
+       "who": "you"
       },
       {
        "at": 1793650500.0,
@@ -45495,19 +45989,19 @@
       {
        "at": 1793655180,
        "status": "done",
-       "doing": "交给人批准发布",
+       "doing": "交给产品批准发布",
        "who": null
       },
       {
        "at": 1793655240.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收",
+       "doing": "停下问产品：验收",
        "who": "product"
       },
       {
        "at": 1793656440.0,
        "status": "awaiting_approval",
-       "doing": "停下问人：验收（D-2）",
+       "doing": "停下问产品：验收（D-2）",
        "who": "product"
       },
       {
@@ -45580,12 +46074,12 @@
       {
        "at": 1793647980.0,
        "kind": "question",
-       "title": "停下问人：澄清"
+       "title": "停下问你：澄清"
       },
       {
        "at": 1793648040.0,
        "kind": "question",
-       "title": "D-1 在 MR 上问人：澄清"
+       "title": "D-1 在 MR 上问你：澄清"
       },
       {
        "at": 1793650500.0,
@@ -45615,12 +46109,12 @@
       {
        "at": 1793655240.0,
        "kind": "question",
-       "title": "停下问人：验收"
+       "title": "停下问产品：验收"
       },
       {
        "at": 1793656440.0,
        "kind": "question",
-       "title": "D-2 在 MR 上问人：验收"
+       "title": "D-2 在 MR 上问产品：验收"
       },
       {
        "at": 1793659440.0,
@@ -45725,7 +46219,7 @@
       {
        "at": 1793655180,
        "status": "awaiting_approval",
-       "doing": "等人在 MR 上批准发布",
+       "doing": "等产品在 MR 上批准发布",
        "who": "product"
       },
       {
@@ -45746,7 +46240,7 @@
       {
        "at": 1793655180,
        "kind": "request",
-       "title": "请人在 MR 上批准发布"
+       "title": "请产品在 MR 上批准发布"
       },
       {
        "at": 1793659500,
@@ -45766,9 +46260,9 @@
      "title": "回写 Brain",
      "sub": "合并后写回新知识",
      "icon": "brain",
-     "status": "done",
-     "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
-     "since": 1793715540.0,
+     "status": "merged",
+     "doing": "回写分支 brain/PAY-2-reflect-1 已合并",
+     "since": 1793834340,
      "history": [
       {
        "at": 1793661540.0,
@@ -45781,6 +46275,12 @@
        "status": "done",
        "doing": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
        "who": null
+      },
+      {
+       "at": 1793834340,
+       "status": "merged",
+       "doing": "回写分支 brain/PAY-2-reflect-1 已合并",
+       "who": null
       }
      ],
      "spans": [],
@@ -45789,6 +46289,11 @@
        "at": 1793715540.0,
        "kind": "reflect",
        "title": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）"
+      },
+      {
+       "at": 1793834340,
+       "kind": "reflect",
+       "title": "回写分支 brain/PAY-2-reflect-1 已合并"
       }
      ],
      "facts": [
@@ -45851,7 +46356,7 @@
      "to": "person",
      "text": "认领 PAY-2：退款单号校验",
      "detail": false,
-     "src": "claim/PAY-2"
+     "src": "认领记录 claim/PAY-2"
     },
     {
      "seq": 2,
@@ -45861,7 +46366,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/PAY-2/run.json"
+     "src": "开工记录 runs/PAY-2/run.json"
     },
     {
      "seq": 3,
@@ -46049,7 +46554,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !37",
+     "text": "桥接手了（MR !37）",
      "detail": false,
      "src": null
     },
@@ -46119,7 +46624,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：澄清",
+     "text": "停下问你：澄清",
      "detail": false,
      "src": null
     },
@@ -46129,7 +46634,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-1 在 MR 上问人：澄清",
+     "text": "D-1 在 MR 上问你：澄清",
      "detail": false,
      "src": null
     },
@@ -46249,7 +46754,7 @@
      "kind": "request",
      "from": "runner",
      "to": "release",
-     "text": "请人在 MR 上批准发布",
+     "text": "请产品在 MR 上批准发布",
      "detail": false,
      "src": null
     },
@@ -46259,7 +46764,7 @@
      "kind": "question",
      "from": "runner",
      "to": "person",
-     "text": "停下问人：验收",
+     "text": "停下问产品：验收",
      "detail": false,
      "src": null
     },
@@ -46269,7 +46774,7 @@
      "kind": "question",
      "from": "bridge",
      "to": "person",
-     "text": "D-2 在 MR 上问人：验收",
+     "text": "D-2 在 MR 上问产品：验收",
      "detail": false,
      "src": null
     },
@@ -46330,6 +46835,16 @@
      "from": "person",
      "to": "reflect",
      "text": "回写 Brain：成功（回写分支 brain/PAY-2-reflect-1）",
+     "detail": false,
+     "src": null
+    },
+    {
+     "seq": 50,
+     "at": 1793834340,
+     "kind": "reflect",
+     "from": "person",
+     "to": "reflect",
+     "text": "回写分支 brain/PAY-2-reflect-1 已合并",
      "detail": false,
      "src": null
     }
@@ -46807,7 +47322,8 @@
      "vouchers": [
       "V-ec134a89e2"
      ],
-     "src": "aidlc-docs/261102-refund-id/decisions.md#L8"
+     "src": "aidlc-docs/261102-refund-id/decisions.md#L8",
+     "asked": []
     },
     {
      "id": "D-2",
@@ -46821,7 +47337,8 @@
       "T-12"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261102-refund-id/decisions.md#L9"
+     "src": "aidlc-docs/261102-refund-id/decisions.md#L9",
+     "asked": []
     },
     {
      "id": "D-3",
@@ -46835,7 +47352,8 @@
       "P-7"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261102-refund-id/decisions.md#L10"
+     "src": "aidlc-docs/261102-refund-id/decisions.md#L10",
+     "asked": []
     }
    ],
    "questions": [
@@ -46906,7 +47424,7 @@
    ],
    "credits": {
     "total": 14.4,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -47011,7 +47529,7 @@
       {
        "at": 1794119460,
        "status": "done",
-       "doing": "交给你批准需求",
+       "doing": "交给 erin 批准需求",
        "who": null
       },
       {
@@ -47035,7 +47553,7 @@
       {
        "at": 1794123360,
        "status": "done",
-       "doing": "交给你批准设计",
+       "doing": "交给 erin 批准设计",
        "who": null
       },
       {
@@ -47111,19 +47629,19 @@
      "sub": "Lean 请人批需求",
      "icon": "req",
      "status": "merged",
-     "doing": "你批准了 · 需求",
+     "doing": "erin 批准了 · 需求",
      "since": 1794120720,
      "history": [
       {
        "at": 1794119460,
        "status": "awaiting_approval",
-       "doing": "等你批准需求",
-       "who": "you"
+       "doing": "等 erin 批准需求",
+       "who": "people"
       },
       {
        "at": 1794120720,
        "status": "merged",
-       "doing": "你批准了 · 需求",
+       "doing": "erin 批准了 · 需求",
        "who": null
       }
      ],
@@ -47138,12 +47656,12 @@
       {
        "at": 1794119460,
        "kind": "request",
-       "title": "请你批准需求"
+       "title": "请 erin 批准需求"
       },
       {
        "at": 1794120720,
        "kind": "approved",
-       "title": "你批准了需求"
+       "title": "erin 批准了需求"
       }
      ],
      "facts": [
@@ -47159,7 +47677,7 @@
      "sub": "设计 · 代码生成计划",
      "icon": "design",
      "status": "merged",
-     "doing": "你批准了 · 设计",
+     "doing": "erin 批准了 · 设计",
      "since": 1794124860,
      "history": [
       {
@@ -47171,13 +47689,13 @@
       {
        "at": 1794123360,
        "status": "awaiting_approval",
-       "doing": "等你批准设计",
-       "who": "you"
+       "doing": "等 erin 批准设计",
+       "who": "people"
       },
       {
        "at": 1794124860,
        "status": "merged",
-       "doing": "你批准了 · 设计",
+       "doing": "erin 批准了 · 设计",
        "who": null
       }
      ],
@@ -47192,12 +47710,12 @@
       {
        "at": 1794123360,
        "kind": "request",
-       "title": "请你批准设计"
+       "title": "请 erin 批准设计"
       },
       {
        "at": 1794124860,
        "kind": "approved",
-       "title": "你批准了设计"
+       "title": "erin 批准了设计"
       }
      ],
      "facts": [
@@ -47278,7 +47796,7 @@
       {
        "at": 1794125700.0,
        "kind": "accepted",
-       "title": "桥接手了 !19"
+       "title": "桥接手了（MR !19）"
       },
       {
        "at": 1794139200.0,
@@ -47506,7 +48024,7 @@
      "to": "person",
      "text": "认领 ORD-10：订单状态推送到企业微信",
      "detail": false,
-     "src": "claim/ORD-10"
+     "src": "认领记录 claim/ORD-10"
     },
     {
      "seq": 2,
@@ -47516,7 +48034,7 @@
      "to": "local",
      "text": "开工：在它自己的工作目录里",
      "detail": false,
-     "src": "runs/ORD-10/run.json"
+     "src": "开工记录 runs/ORD-10/run.json"
     },
     {
      "seq": 3,
@@ -47554,7 +48072,7 @@
      "kind": "request",
      "from": "local",
      "to": "req",
-     "text": "请你批准需求",
+     "text": "请 erin 批准需求",
      "detail": false,
      "src": null
     },
@@ -47564,7 +48082,7 @@
      "kind": "approve",
      "from": "person",
      "to": "req",
-     "text": "你批准了需求",
+     "text": "erin 批准了需求",
      "detail": false,
      "src": null
     },
@@ -47614,7 +48132,7 @@
      "kind": "request",
      "from": "local",
      "to": "design",
-     "text": "请你批准设计",
+     "text": "请 erin 批准设计",
      "detail": false,
      "src": null
     },
@@ -47624,7 +48142,7 @@
      "kind": "approve",
      "from": "person",
      "to": "design",
-     "text": "你批准了设计",
+     "text": "erin 批准了设计",
      "detail": false,
      "src": null
     },
@@ -47674,7 +48192,7 @@
      "kind": "accepted",
      "from": "handover",
      "to": "bridge",
-     "text": "桥接手了 !19",
+     "text": "桥接手了（MR !19）",
      "detail": false,
      "src": null
     },
@@ -47906,7 +48424,7 @@
       "name": "需求审批",
       "status": "pass",
       "at": 1794120720,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "req"
      },
      {
@@ -47916,7 +48434,7 @@
       "name": "设计审批",
       "status": "pass",
       "at": 1794124860,
-      "detail": "你批准了",
+      "detail": "erin 批准了",
       "actor": "design"
      },
      {
@@ -48052,7 +48570,7 @@
    ],
    "credits": {
     "total": 7.4,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "source": "trace",
    "error": "",
@@ -48335,7 +48853,8 @@
       "P-PAY-2-1"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261107-refund-export/decisions.md#L8"
+     "src": "aidlc-docs/261107-refund-export/decisions.md#L8",
+     "asked": []
     },
     {
      "id": "D-2",
@@ -48350,7 +48869,8 @@
       "T-12"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261107-refund-export/decisions.md#L9"
+     "src": "aidlc-docs/261107-refund-export/decisions.md#L9",
+     "asked": []
     },
     {
      "id": "D-3",
@@ -48364,7 +48884,8 @@
      "vouchers": [
       "V-1a2b3c4d5e"
      ],
-     "src": "aidlc-docs/261107-refund-export/decisions.md#L10"
+     "src": "aidlc-docs/261107-refund-export/decisions.md#L10",
+     "asked": []
     },
     {
      "id": "D-4",
@@ -48376,7 +48897,8 @@
      "by": "unclassified",
      "cites": [],
      "vouchers": [],
-     "src": "aidlc-docs/261107-refund-export/decisions.md#L11"
+     "src": "aidlc-docs/261107-refund-export/decisions.md#L11",
+     "asked": []
     }
    ],
    "questions": [
@@ -48735,7 +49257,7 @@
     "stage": null,
     "waits": {
      "who": "bridge",
-     "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+     "text": "签名服务在签接手合同",
      "line": null,
      "raw": "",
      "do": "none",
@@ -48883,7 +49405,7 @@
    "sessions": [],
    "credits": {
     "total": null,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "brain": {
     "loaded": null,
@@ -48931,8 +49453,8 @@
     },
     "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
     "waits": {
-     "who": "people",
-     "text": "等人在 MR 上回答 D-2（设计）",
+     "who": "product",
+     "text": "等产品在 MR 上回答 D-2（设计）",
      "line": null,
      "raw": "",
      "do": "answer",
@@ -49120,7 +49642,21 @@
       "T-12"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261105-merchant-split/decisions.md#L8"
+     "src": "aidlc-docs/261105-merchant-split/decisions.md#L8",
+     "asked": []
+    },
+    {
+     "id": "D-3",
+     "date": "2026-11-08",
+     "stage": "functional-design",
+     "text": "拆分任务按商户号排好再按日期写",
+     "why": "对账脚本按这个顺序读",
+     "who": "split-job 规划",
+     "by": "unclassified",
+     "cites": [],
+     "vouchers": [],
+     "src": "aidlc-docs/261105-merchant-split/decisions.md#L10",
+     "asked": []
     }
    ],
    "questions": [
@@ -49319,7 +49855,7 @@
    ],
    "credits": {
     "total": 6.1,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "brain": {
     "loaded": 7,
@@ -49511,7 +50047,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "verify PASS：3 项",
+      "note": "3 项自动检查都过了",
       "at": 1793920020
      },
      {
@@ -49567,7 +50103,8 @@
      "vouchers": [
       "V-87b3e7b7ac"
      ],
-     "src": "aidlc-docs/261104-callback-retry/decisions.md#L8"
+     "src": "aidlc-docs/261104-callback-retry/decisions.md#L8",
+     "asked": []
     },
     {
      "id": "D-2",
@@ -49581,7 +50118,8 @@
       "T-PAY-2-1"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261104-callback-retry/decisions.md#L9"
+     "src": "aidlc-docs/261104-callback-retry/decisions.md#L9",
+     "asked": []
     }
    ],
    "questions": [
@@ -49772,7 +50310,7 @@
       "at": "2026-11-05T23:07:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "verify PASS：3 项",
+      "detail": "3 项自动检查都过了",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -49828,7 +50366,7 @@
    ],
    "credits": {
     "total": 24.2,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "brain": {
     "loaded": 7,
@@ -50013,7 +50551,7 @@
       "n": 10,
       "state": "done",
       "units": [],
-      "note": "verify PASS：3 项",
+      "note": "3 项自动检查都过了",
       "at": 1793654640
      },
      {
@@ -50022,7 +50560,7 @@
       "n": 11,
       "state": "done",
       "units": [],
-      "note": "发布批准了",
+      "note": "发布审批通过了",
       "at": 1793659560
      }
     ],
@@ -50069,7 +50607,8 @@
      "vouchers": [
       "V-ec134a89e2"
      ],
-     "src": "aidlc-docs/261102-refund-id/decisions.md#L8"
+     "src": "aidlc-docs/261102-refund-id/decisions.md#L8",
+     "asked": []
     },
     {
      "id": "D-2",
@@ -50083,7 +50622,8 @@
       "T-12"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261102-refund-id/decisions.md#L9"
+     "src": "aidlc-docs/261102-refund-id/decisions.md#L9",
+     "asked": []
     },
     {
      "id": "D-3",
@@ -50097,7 +50637,8 @@
       "P-7"
      ],
      "vouchers": [],
-     "src": "aidlc-docs/261102-refund-id/decisions.md#L10"
+     "src": "aidlc-docs/261102-refund-id/decisions.md#L10",
+     "asked": []
     }
    ],
    "questions": [
@@ -50194,7 +50735,7 @@
      {
       "at": "2026-11-02T15:58:00Z",
       "kind": "human",
-      "label": "驳回设计",
+      "label": "退回设计",
       "detail": null,
       "who": "P-1A2B",
       "src": null
@@ -50322,7 +50863,7 @@
      {
       "at": "2026-11-02T20:15:00Z",
       "kind": "human",
-      "label": "回答 ：",
+      "label": "回答了澄清问题",
       "detail": null,
       "who": "P-7C1D",
       "src": null
@@ -50379,7 +50920,7 @@
       "at": "2026-11-02T21:24:00Z",
       "kind": "stage",
       "label": "构建测试：完成",
-      "detail": "verify PASS：3 项",
+      "detail": "3 项自动检查都过了",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -50395,7 +50936,7 @@
       "at": "2026-11-02T22:44:00Z",
       "kind": "decision",
       "label": "D-2 回答了，桥签好送回运行机",
-      "detail": "approve",
+      "detail": "通过",
       "who": "P-9E3B",
       "src": null
      },
@@ -50419,7 +50960,7 @@
       "at": "2026-11-02T22:46:00Z",
       "kind": "stage",
       "label": "发布：完成",
-      "detail": "发布批准了",
+      "detail": "发布审批通过了",
       "who": null,
       "src": "aidlc-docs/audit/L-3F2A1C.jsonl"
      },
@@ -50459,7 +51000,7 @@
    ],
    "credits": {
     "total": 14.4,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "brain": {
     "loaded": 4,
@@ -50881,7 +51422,7 @@
    ],
    "credits": {
     "total": 7.4,
-    "note": "KiroCrew 只报 credits，input / output / cache token 都是 0"
+    "note": "KiroCrew 只报 credits，没有别的用量数"
    },
    "brain": {
     "loaded": 7,
@@ -50997,7 +51538,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1793654640
    },
    {
@@ -51006,7 +51547,7 @@
     "n": 11,
     "state": "done",
     "units": [],
-    "note": "发布批准了",
+    "note": "发布审批通过了",
     "at": 1793659560
    }
   ],
@@ -51346,7 +51887,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1793920020
    },
    {
@@ -51452,7 +51993,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：2 项",
+    "note": "2 项自动检查都过了",
     "at": 1794128100
    },
    {
@@ -51987,7 +52528,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1788279120
    },
    {
@@ -51996,7 +52537,7 @@
     "n": 11,
     "state": "done",
     "units": [],
-    "note": "发布批准了",
+    "note": "发布审批通过了",
     "at": 1788284040
    }
   ],
@@ -52093,7 +52634,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1788882240
    },
    {
@@ -52102,7 +52643,7 @@
     "n": 11,
     "state": "done",
     "units": [],
-    "note": "发布批准了",
+    "note": "发布审批通过了",
     "at": 1788887160
    }
   ],
@@ -52199,7 +52740,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1789657620
    },
    {
@@ -52208,7 +52749,7 @@
     "n": 11,
     "state": "done",
     "units": [],
-    "note": "发布批准了",
+    "note": "发布审批通过了",
     "at": 1789662540
    }
   ],
@@ -52305,7 +52846,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1790255520
    },
    {
@@ -52314,7 +52855,7 @@
     "n": 11,
     "state": "done",
     "units": [],
-    "note": "发布批准了",
+    "note": "发布审批通过了",
     "at": 1790260440
    }
   ],
@@ -52517,7 +53058,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1791563340
    },
    {
@@ -52526,7 +53067,7 @@
     "n": 11,
     "state": "done",
     "units": [],
-    "note": "发布批准了",
+    "note": "发布审批通过了",
     "at": 1791568260
    }
   ],
@@ -52623,7 +53164,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1792246320
    },
    {
@@ -52632,7 +53173,7 @@
     "n": 11,
     "state": "done",
     "units": [],
-    "note": "发布批准了",
+    "note": "发布审批通过了",
     "at": 1792251240
    }
   ],
@@ -52729,7 +53270,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1793110260
    },
    {
@@ -52738,7 +53279,7 @@
     "n": 11,
     "state": "done",
     "units": [],
-    "note": "发布批准了",
+    "note": "发布审批通过了",
     "at": 1793115180
    }
   ],
@@ -52835,7 +53376,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1793897820
    },
    {
@@ -52844,7 +53385,7 @@
     "n": 11,
     "state": "done",
     "units": [],
-    "note": "发布批准了",
+    "note": "发布审批通过了",
     "at": 1793902740
    }
   ],
@@ -53255,7 +53796,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1793920020
    },
    {
@@ -53361,7 +53902,7 @@
     "n": 10,
     "state": "done",
     "units": [],
-    "note": "verify PASS：3 项",
+    "note": "3 项自动检查都过了",
     "at": 1793654640
    },
    {
@@ -53370,7 +53911,7 @@
     "n": 11,
     "state": "done",
     "units": [],
-    "note": "发布批准了",
+    "note": "发布审批通过了",
     "at": 1793659560
    }
   ],
@@ -53679,8 +54220,8 @@
     "errors": [
      {
       "level": "FAIL",
-      "text": "brain/TECH.md 第 20 行：出处「见群聊」不是引用",
-      "todo": "出处写成查得到的引用：需求文档的段落、材料包、决定号、凭证号、运行号或条目号",
+      "text": "brain/TECH.md 第 20 行：来源「见群聊」不是引用",
+      "todo": "来源写成查得到的引用：需求文档的段落、材料、决定号、凭证号、运行号或条目号",
       "fix": null,
       "repo": "/Users/alice/workplace/shop-pay",
       "raw": "TECH.md:20: source '见群聊' is not a reference (D01#S003, PKG-…, D-3, V-<10 hex>, RUN-…, an entry id, an intent, a key)"

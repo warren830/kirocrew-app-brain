@@ -268,7 +268,8 @@
         "P-PAY-2-1"
       ],
       "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L8"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L8",
+      "asked": []
     },
     {
       "id": "D-2",
@@ -283,7 +284,8 @@
         "T-12"
       ],
       "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L9"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L9",
+      "asked": []
     },
     {
       "id": "D-3",
@@ -297,7 +299,8 @@
       "vouchers": [
         "V-1a2b3c4d5e"
       ],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L10"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L10",
+      "asked": []
     },
     {
       "id": "D-4",
@@ -309,7 +312,8 @@
       "by": "unclassified",
       "cites": [],
       "vouchers": [],
-      "src": "aidlc-docs/261107-refund-export/decisions.md#L11"
+      "src": "aidlc-docs/261107-refund-export/decisions.md#L11",
+      "asked": []
     }
   ],
   "questions": [

@@ -390,7 +390,7 @@
       {
         "key": "PAY-4",
         "id": "D-3",
-        "src": "aidlc-docs/261105-merchant-split/decisions.md#L11"
+        "src": "aidlc-docs/261105-merchant-split/decisions.md#L10"
       }
     ],
     "questions": {
@@ -438,7 +438,7 @@
           1,
           6
         ],
-        "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+        "rule": "同样的纠正又出现的次数 ÷ 全部纠正（越低越好）"
       },
       {
         "id": "useful",
@@ -475,14 +475,28 @@
     "skipped": [
       {
         "key": "PAY-1",
-        "why": "runs/PAY-1/run.json 不是合法的 JSON：第 3 行"
+        "why": "它的开工记录读不了",
+        "raw": "runs/PAY-1/run.json is not valid JSON: line 3"
       }
     ],
     "notes": [
-      "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
-      "PAY-2：已知交付有问题，14 天还没满，先不算"
+      "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+      "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2"
     ],
-    "raw": ""
+    "raw": "",
+    "note_rows": [
+      {
+        "text": "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个",
+        "todo": "在这个 app 里开会话做需求，花费就按需求分开记，下一次评估会算进来",
+        "raw": "--credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个（请按 run 号或需求号给）"
+      },
+      {
+        "text": "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-2",
+        "todo": "不用管：满 14 天会自动算进去；要看是什么问题，点开需求",
+        "raw": ""
+      }
+    ],
+    "computing": false
   },
   "counts": {
     "claimed": 1,
@@ -498,7 +512,8 @@
   "errors": [
     {
       "repo": "r2",
-      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
+      "raw": "/Users/alice/workplace/shop-web"
     }
   ],
   "cto": {
