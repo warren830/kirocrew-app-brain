@@ -32,6 +32,7 @@
       "line": "approve PLAN 5d1e7a90",
       "raw": "",
       "do": "approve",
+      "todo": "",
       "since": 1794146040.0,
       "where": "session",
       "review": false

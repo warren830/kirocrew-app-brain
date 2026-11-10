@@ -156,6 +156,8 @@
    "enabled": false,
    "ok": false,
    "error": "",
+   "error_todo": "",
+   "error_raw": "",
    "last_loop_at": null,
    "loop_error": "",
    "same_user": false,
@@ -204,6 +206,7 @@
      "line": "approve PLAN 5d1e7a90",
      "raw": "",
      "do": "approve",
+     "todo": "",
      "since": 1794146040.0,
      "where": "session",
      "review": false
@@ -260,6 +263,7 @@
      "line": null,
      "raw": "",
      "do": "answer",
+     "todo": "",
      "since": 1794135600.0,
      "where": "mr",
      "review": false
@@ -324,6 +328,7 @@
      "line": null,
      "raw": "",
      "do": "accept",
+     "todo": "",
      "since": 1794056400.0,
      "where": "mr",
      "review": false
@@ -385,6 +390,7 @@
      "line": null,
      "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
      "do": "redo_handoff",
+     "todo": "让 alice 自己交接（交接时会打标签）",
      "since": 1794129840.0,
      "where": "session",
      "review": false
@@ -442,6 +448,7 @@
      "line": null,
      "raw": "",
      "do": "start",
+     "todo": "",
      "since": 1793973600.0,
      "where": "app",
      "review": false
@@ -489,6 +496,7 @@
      "line": null,
      "raw": "",
      "do": "watch",
+     "todo": "",
      "since": 1793661540.0,
      "where": null,
      "review": false
@@ -548,6 +556,7 @@
      "line": null,
      "raw": "",
      "do": "start",
+     "todo": "",
      "since": 1794128400.0,
      "where": "app",
      "review": false
@@ -599,6 +608,7 @@
      "line": null,
      "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
      "do": "label_handoff",
+     "todo": "",
      "since": 1794118440.0,
      "where": "session",
      "review": false
@@ -656,6 +666,7 @@
      "line": null,
      "raw": "",
      "do": "reply",
+     "todo": "",
      "since": 1794133620.0,
      "where": "session",
      "review": true
@@ -705,6 +716,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1788286020.0,
      "where": null,
      "review": false
@@ -758,6 +770,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1788889140.0,
      "where": null,
      "review": false
@@ -811,6 +824,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1789664520.0,
      "where": null,
      "review": false
@@ -864,6 +878,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1790262420.0,
      "where": null,
      "review": false
@@ -917,6 +932,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1790954640.0,
      "where": null,
      "review": false
@@ -968,6 +984,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1791570240.0,
      "where": null,
      "review": false
@@ -1021,6 +1038,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1792253220.0,
      "where": null,
      "review": false
@@ -1074,6 +1092,7 @@
      "line": null,
      "raw": "",
      "do": "watch",
+     "todo": "",
      "since": 1793117160.0,
      "where": null,
      "review": false
@@ -1127,6 +1146,7 @@
      "line": null,
      "raw": "",
      "do": "write_back",
+     "todo": "",
      "since": 1793904720.0,
      "where": "app",
      "review": false
@@ -1184,6 +1204,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": null,
      "where": null,
      "review": false
@@ -1241,6 +1262,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": null,
      "where": null,
      "review": false
@@ -1391,7 +1413,8 @@
      "reasons": [
       "验收被退回 1 次",
       "判断点之外有人介入 2 次（交接后推代码）"
-     ]
+     ],
+     "todo": "打开需求看板看产品为什么退回；学到的在合并以后回写 Brain，下次就不会再犯；看看为什么要在判断点之外插手：能写进 Brain 或检查里的，下次就不用人插手"
     }
    ],
    "skipped": [
@@ -1435,7 +1458,9 @@
    {
     "repo": "r2",
     "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
-    "raw": "/Users/alice/workplace/shop-web"
+    "raw": "/Users/alice/workplace/shop-web",
+    "path": "/Users/alice/workplace/shop-web",
+    "name": "shop-web"
    }
   ],
   "cto": {
@@ -1736,6 +1761,7 @@
        "line": "approve PLAN 5d1e7a90",
        "raw": "",
        "do": "approve",
+       "todo": "",
        "since": 1794146040.0,
        "where": "session",
        "review": false
@@ -1792,6 +1818,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -1856,6 +1883,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -1917,6 +1945,7 @@
        "line": null,
        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
        "do": "redo_handoff",
+       "todo": "让 alice 自己交接（交接时会打标签）",
        "since": 1794129840.0,
        "where": "session",
        "review": false
@@ -1974,6 +2003,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1793973600.0,
        "where": "app",
        "review": false
@@ -2021,6 +2051,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793661540.0,
        "where": null,
        "review": false
@@ -2080,6 +2111,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1794128400.0,
        "where": "app",
        "review": false
@@ -2131,6 +2163,7 @@
        "line": null,
        "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
        "do": "label_handoff",
+       "todo": "",
        "since": 1794118440.0,
        "where": "session",
        "review": false
@@ -2188,6 +2221,7 @@
        "line": null,
        "raw": "",
        "do": "reply",
+       "todo": "",
        "since": 1794133620.0,
        "where": "session",
        "review": true
@@ -2237,6 +2271,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788286020.0,
        "where": null,
        "review": false
@@ -2290,6 +2325,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788889140.0,
        "where": null,
        "review": false
@@ -2343,6 +2379,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1789664520.0,
        "where": null,
        "review": false
@@ -2396,6 +2433,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790262420.0,
        "where": null,
        "review": false
@@ -2449,6 +2487,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790954640.0,
        "where": null,
        "review": false
@@ -2500,6 +2539,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1791570240.0,
        "where": null,
        "review": false
@@ -2553,6 +2593,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1792253220.0,
        "where": null,
        "review": false
@@ -2606,6 +2647,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793117160.0,
        "where": null,
        "review": false
@@ -2659,6 +2701,7 @@
        "line": null,
        "raw": "",
        "do": "write_back",
+       "todo": "",
        "since": 1793904720.0,
        "where": "app",
        "review": false
@@ -2716,6 +2759,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -2773,6 +2817,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -2923,7 +2968,8 @@
        "reasons": [
         "验收被退回 1 次",
         "判断点之外有人介入 2 次（交接后推代码）"
-       ]
+       ],
+       "todo": "打开需求看板看产品为什么退回；学到的在合并以后回写 Brain，下次就不会再犯；看看为什么要在判断点之外插手：能写进 Brain 或检查里的，下次就不用人插手"
       }
      ],
      "skipped": [
@@ -2967,7 +3013,9 @@
      {
       "repo": "r2",
       "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
-      "raw": "/Users/alice/workplace/shop-web"
+      "raw": "/Users/alice/workplace/shop-web",
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web"
      }
     ],
     "cto": {
@@ -3266,6 +3314,7 @@
        "line": "approve PLAN 5d1e7a90",
        "raw": "",
        "do": "approve",
+       "todo": "",
        "since": 1794146040.0,
        "where": "session",
        "review": false
@@ -3322,6 +3371,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -3386,6 +3436,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -3447,6 +3498,7 @@
        "line": null,
        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
        "do": "redo_handoff",
+       "todo": "让 alice 自己交接（交接时会打标签）",
        "since": 1794129840.0,
        "where": "session",
        "review": false
@@ -3504,6 +3556,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1793973600.0,
        "where": "app",
        "review": false
@@ -3551,6 +3604,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793661540.0,
        "where": null,
        "review": false
@@ -3610,6 +3664,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1794128400.0,
        "where": "app",
        "review": false
@@ -3661,6 +3716,7 @@
        "line": null,
        "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
        "do": "label_handoff",
+       "todo": "",
        "since": 1794118440.0,
        "where": "session",
        "review": false
@@ -3718,6 +3774,7 @@
        "line": null,
        "raw": "",
        "do": "reply",
+       "todo": "",
        "since": 1794133620.0,
        "where": "session",
        "review": true
@@ -3868,7 +3925,8 @@
        "reasons": [
         "验收被退回 1 次",
         "判断点之外有人介入 2 次（交接后推代码）"
-       ]
+       ],
+       "todo": "打开需求看板看产品为什么退回；学到的在合并以后回写 Brain，下次就不会再犯；看看为什么要在判断点之外插手：能写进 Brain 或检查里的，下次就不用人插手"
       }
      ],
      "skipped": [
@@ -4187,7 +4245,9 @@
      {
       "repo": "r2",
       "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
-      "raw": "/Users/alice/workplace/shop-web"
+      "raw": "/Users/alice/workplace/shop-web",
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web"
      }
     ],
     "cto": {
@@ -4322,6 +4382,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788286020.0,
        "where": null,
        "review": false
@@ -4375,6 +4436,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788889140.0,
        "where": null,
        "review": false
@@ -4428,6 +4490,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1789664520.0,
        "where": null,
        "review": false
@@ -4481,6 +4544,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790262420.0,
        "where": null,
        "review": false
@@ -4534,6 +4598,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790954640.0,
        "where": null,
        "review": false
@@ -4585,6 +4650,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1791570240.0,
        "where": null,
        "review": false
@@ -4638,6 +4704,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1792253220.0,
        "where": null,
        "review": false
@@ -4691,6 +4758,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793117160.0,
        "where": null,
        "review": false
@@ -4744,6 +4812,7 @@
        "line": null,
        "raw": "",
        "do": "write_back",
+       "todo": "",
        "since": 1793904720.0,
        "where": "app",
        "review": false
@@ -4801,6 +4870,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -5217,6 +5287,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -5496,6 +5567,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -5553,6 +5625,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -5612,6 +5685,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -5671,6 +5745,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": null,
        "where": "mr",
        "review": false
@@ -5793,7 +5868,8 @@
        "reasons": [
         "验收被退回 1 次",
         "判断点之外有人介入 2 次（交接后推代码）"
-       ]
+       ],
+       "todo": "打开需求看板看产品为什么退回；学到的在合并以后回写 Brain，下次就不会再犯；看看为什么要在判断点之外插手：能写进 Brain 或检查里的，下次就不用人插手"
       }
      ],
      "skipped": [],
@@ -5963,6 +6039,7 @@
        "line": "approve PLAN 5d1e7a90",
        "raw": "",
        "do": "approve",
+       "todo": "",
        "since": 1794146040.0,
        "where": "session",
        "review": false
@@ -6019,6 +6096,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -6083,6 +6161,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -6144,6 +6223,7 @@
        "line": null,
        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
        "do": "redo_handoff",
+       "todo": "让 alice 自己交接（交接时会打标签）",
        "since": 1794129840.0,
        "where": "session",
        "review": false
@@ -6201,6 +6281,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1793973600.0,
        "where": "app",
        "review": false
@@ -6248,6 +6329,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793661540.0,
        "where": null,
        "review": false
@@ -6307,6 +6389,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1794128400.0,
        "where": "app",
        "review": false
@@ -6358,6 +6441,7 @@
        "line": null,
        "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
        "do": "label_handoff",
+       "todo": "",
        "since": 1794118440.0,
        "where": "session",
        "review": false
@@ -6415,6 +6499,7 @@
        "line": null,
        "raw": "",
        "do": "reply",
+       "todo": "",
        "since": 1794133620.0,
        "where": "session",
        "review": true
@@ -6464,6 +6549,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788286020.0,
        "where": null,
        "review": false
@@ -6517,6 +6603,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788889140.0,
        "where": null,
        "review": false
@@ -6570,6 +6657,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1789664520.0,
        "where": null,
        "review": false
@@ -6623,6 +6711,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790262420.0,
        "where": null,
        "review": false
@@ -6676,6 +6765,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790954640.0,
        "where": null,
        "review": false
@@ -6727,6 +6817,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1791570240.0,
        "where": null,
        "review": false
@@ -6780,6 +6871,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1792253220.0,
        "where": null,
        "review": false
@@ -6833,6 +6925,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793117160.0,
        "where": null,
        "review": false
@@ -6886,6 +6979,7 @@
        "line": null,
        "raw": "",
        "do": "write_back",
+       "todo": "",
        "since": 1793904720.0,
        "where": "app",
        "review": false
@@ -6943,6 +7037,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -7000,6 +7095,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -7105,7 +7201,9 @@
      {
       "repo": "r2",
       "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
-      "raw": "/Users/alice/workplace/shop-web"
+      "raw": "/Users/alice/workplace/shop-web",
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web"
      }
     ],
     "cto": {
@@ -7244,6 +7342,7 @@
        "line": "approve PLAN 5d1e7a90",
        "raw": "",
        "do": "approve",
+       "todo": "",
        "since": 1794146040.0,
        "where": "session",
        "review": false
@@ -7300,6 +7399,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -7364,6 +7464,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -7425,6 +7526,7 @@
        "line": null,
        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
        "do": "redo_handoff",
+       "todo": "让 alice 自己交接（交接时会打标签）",
        "since": 1794129840.0,
        "where": "session",
        "review": false
@@ -7482,6 +7584,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1793973600.0,
        "where": "app",
        "review": false
@@ -7529,6 +7632,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793661540.0,
        "where": null,
        "review": false
@@ -7588,6 +7692,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1794128400.0,
        "where": "app",
        "review": false
@@ -7639,6 +7744,7 @@
        "line": null,
        "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
        "do": "label_handoff",
+       "todo": "",
        "since": 1794118440.0,
        "where": "session",
        "review": false
@@ -7696,6 +7802,7 @@
        "line": null,
        "raw": "",
        "do": "reply",
+       "todo": "",
        "since": 1794133620.0,
        "where": "session",
        "review": true
@@ -7969,7 +8076,9 @@
      {
       "repo": "r2",
       "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
-      "raw": "/Users/alice/workplace/shop-web"
+      "raw": "/Users/alice/workplace/shop-web",
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web"
      }
     ],
     "cto": {
@@ -8104,6 +8213,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788286020.0,
        "where": null,
        "review": false
@@ -8157,6 +8267,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788889140.0,
        "where": null,
        "review": false
@@ -8210,6 +8321,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1789664520.0,
        "where": null,
        "review": false
@@ -8263,6 +8375,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790262420.0,
        "where": null,
        "review": false
@@ -8316,6 +8429,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790954640.0,
        "where": null,
        "review": false
@@ -8367,6 +8481,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1791570240.0,
        "where": null,
        "review": false
@@ -8420,6 +8535,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1792253220.0,
        "where": null,
        "review": false
@@ -8473,6 +8589,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793117160.0,
        "where": null,
        "review": false
@@ -8526,6 +8643,7 @@
        "line": null,
        "raw": "",
        "do": "write_back",
+       "todo": "",
        "since": 1793904720.0,
        "where": "app",
        "review": false
@@ -8583,6 +8701,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -8809,6 +8928,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -9032,6 +9152,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -9089,6 +9210,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -9148,6 +9270,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -9207,6 +9330,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": null,
        "where": "mr",
        "review": false
@@ -9436,6 +9560,7 @@
        "line": "approve PLAN 5d1e7a90",
        "raw": "",
        "do": "approve",
+       "todo": "",
        "since": 1794146040.0,
        "where": "session",
        "review": false
@@ -9492,6 +9617,7 @@
        "line": null,
        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
        "do": "redo_handoff",
+       "todo": "让 alice 自己交接（交接时会打标签）",
        "since": 1794129840.0,
        "where": "session",
        "review": false
@@ -9549,6 +9675,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1793973600.0,
        "where": "app",
        "review": false
@@ -9596,6 +9723,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793661540.0,
        "where": null,
        "review": false
@@ -9655,6 +9783,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1794128400.0,
        "where": "app",
        "review": false
@@ -9706,6 +9835,7 @@
        "line": null,
        "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
        "do": "label_handoff",
+       "todo": "",
        "since": 1794118440.0,
        "where": "session",
        "review": false
@@ -9763,6 +9893,7 @@
        "line": null,
        "raw": "",
        "do": "reply",
+       "todo": "",
        "since": 1794133620.0,
        "where": "session",
        "review": true
@@ -9812,6 +9943,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788286020.0,
        "where": null,
        "review": false
@@ -9865,6 +9997,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788889140.0,
        "where": null,
        "review": false
@@ -9918,6 +10051,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1789664520.0,
        "where": null,
        "review": false
@@ -9971,6 +10105,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790262420.0,
        "where": null,
        "review": false
@@ -10024,6 +10159,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790954640.0,
        "where": null,
        "review": false
@@ -10075,6 +10211,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1791570240.0,
        "where": null,
        "review": false
@@ -10128,6 +10265,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1792253220.0,
        "where": null,
        "review": false
@@ -10181,6 +10319,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793117160.0,
        "where": null,
        "review": false
@@ -10234,6 +10373,7 @@
        "line": null,
        "raw": "",
        "do": "write_back",
+       "todo": "",
        "since": 1793904720.0,
        "where": "app",
        "review": false
@@ -10291,6 +10431,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -10345,6 +10486,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -10402,6 +10544,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -10461,6 +10604,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -10520,6 +10664,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": null,
        "where": "mr",
        "review": false
@@ -10673,7 +10818,8 @@
        "reasons": [
         "验收被退回 1 次",
         "判断点之外有人介入 2 次（交接后推代码）"
-       ]
+       ],
+       "todo": "打开需求看板看产品为什么退回；学到的在合并以后回写 Brain，下次就不会再犯；看看为什么要在判断点之外插手：能写进 Brain 或检查里的，下次就不用人插手"
       }
      ],
      "skipped": [
@@ -10717,7 +10863,9 @@
      {
       "repo": "r2",
       "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
-      "raw": "/Users/alice/workplace/shop-web"
+      "raw": "/Users/alice/workplace/shop-web",
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web"
      }
     ],
     "cto": {
@@ -11016,6 +11164,7 @@
        "line": "approve PLAN 5d1e7a90",
        "raw": "",
        "do": "approve",
+       "todo": "",
        "since": 1794146040.0,
        "where": "session",
        "review": false
@@ -11072,6 +11221,7 @@
        "line": null,
        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
        "do": "redo_handoff",
+       "todo": "让 alice 自己交接（交接时会打标签）",
        "since": 1794129840.0,
        "where": "session",
        "review": false
@@ -11129,6 +11279,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1793973600.0,
        "where": "app",
        "review": false
@@ -11176,6 +11327,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793661540.0,
        "where": null,
        "review": false
@@ -11235,6 +11387,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1794128400.0,
        "where": "app",
        "review": false
@@ -11286,6 +11439,7 @@
        "line": null,
        "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
        "do": "label_handoff",
+       "todo": "",
        "since": 1794118440.0,
        "where": "session",
        "review": false
@@ -11343,6 +11497,7 @@
        "line": null,
        "raw": "",
        "do": "reply",
+       "todo": "",
        "since": 1794133620.0,
        "where": "session",
        "review": true
@@ -11397,6 +11552,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -11454,6 +11610,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -11513,6 +11670,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -11668,7 +11826,8 @@
        "reasons": [
         "验收被退回 1 次",
         "判断点之外有人介入 2 次（交接后推代码）"
-       ]
+       ],
+       "todo": "打开需求看板看产品为什么退回；学到的在合并以后回写 Brain，下次就不会再犯；看看为什么要在判断点之外插手：能写进 Brain 或检查里的，下次就不用人插手"
       }
      ],
      "skipped": [
@@ -11987,7 +12146,9 @@
      {
       "repo": "r2",
       "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
-      "raw": "/Users/alice/workplace/shop-web"
+      "raw": "/Users/alice/workplace/shop-web",
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web"
      }
     ],
     "cto": {
@@ -12122,6 +12283,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788286020.0,
        "where": null,
        "review": false
@@ -12175,6 +12337,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788889140.0,
        "where": null,
        "review": false
@@ -12228,6 +12391,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1789664520.0,
        "where": null,
        "review": false
@@ -12281,6 +12445,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790262420.0,
        "where": null,
        "review": false
@@ -12334,6 +12499,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790954640.0,
        "where": null,
        "review": false
@@ -12385,6 +12551,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1791570240.0,
        "where": null,
        "review": false
@@ -12438,6 +12605,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1792253220.0,
        "where": null,
        "review": false
@@ -12491,6 +12659,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793117160.0,
        "where": null,
        "review": false
@@ -12544,6 +12713,7 @@
        "line": null,
        "raw": "",
        "do": "write_back",
+       "todo": "",
        "since": 1793904720.0,
        "where": "app",
        "review": false
@@ -12602,6 +12772,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": null,
        "where": "mr",
        "review": false
@@ -13017,6 +13188,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -13296,6 +13468,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -13353,6 +13526,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -13412,6 +13586,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -13471,6 +13646,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": null,
        "where": "mr",
        "review": false
@@ -13593,7 +13769,8 @@
        "reasons": [
         "验收被退回 1 次",
         "判断点之外有人介入 2 次（交接后推代码）"
-       ]
+       ],
+       "todo": "打开需求看板看产品为什么退回；学到的在合并以后回写 Brain，下次就不会再犯；看看为什么要在判断点之外插手：能写进 Brain 或检查里的，下次就不用人插手"
       }
      ],
      "skipped": [],
@@ -13763,6 +13940,7 @@
        "line": "approve PLAN 5d1e7a90",
        "raw": "",
        "do": "approve",
+       "todo": "",
        "since": 1794146040.0,
        "where": "session",
        "review": false
@@ -13819,6 +13997,7 @@
        "line": null,
        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
        "do": "redo_handoff",
+       "todo": "让 alice 自己交接（交接时会打标签）",
        "since": 1794129840.0,
        "where": "session",
        "review": false
@@ -13876,6 +14055,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1793973600.0,
        "where": "app",
        "review": false
@@ -13923,6 +14103,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793661540.0,
        "where": null,
        "review": false
@@ -13982,6 +14163,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1794128400.0,
        "where": "app",
        "review": false
@@ -14033,6 +14215,7 @@
        "line": null,
        "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
        "do": "label_handoff",
+       "todo": "",
        "since": 1794118440.0,
        "where": "session",
        "review": false
@@ -14090,6 +14273,7 @@
        "line": null,
        "raw": "",
        "do": "reply",
+       "todo": "",
        "since": 1794133620.0,
        "where": "session",
        "review": true
@@ -14139,6 +14323,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788286020.0,
        "where": null,
        "review": false
@@ -14192,6 +14377,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788889140.0,
        "where": null,
        "review": false
@@ -14245,6 +14431,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1789664520.0,
        "where": null,
        "review": false
@@ -14298,6 +14485,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790262420.0,
        "where": null,
        "review": false
@@ -14351,6 +14539,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790954640.0,
        "where": null,
        "review": false
@@ -14402,6 +14591,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1791570240.0,
        "where": null,
        "review": false
@@ -14455,6 +14645,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1792253220.0,
        "where": null,
        "review": false
@@ -14508,6 +14699,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793117160.0,
        "where": null,
        "review": false
@@ -14561,6 +14753,7 @@
        "line": null,
        "raw": "",
        "do": "write_back",
+       "todo": "",
        "since": 1793904720.0,
        "where": "app",
        "review": false
@@ -14618,6 +14811,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -14672,6 +14866,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -14729,6 +14924,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -14788,6 +14984,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -14847,6 +15044,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": null,
        "where": "mr",
        "review": false
@@ -14955,7 +15153,9 @@
      {
       "repo": "r2",
       "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
-      "raw": "/Users/alice/workplace/shop-web"
+      "raw": "/Users/alice/workplace/shop-web",
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web"
      }
     ],
     "cto": {
@@ -15094,6 +15294,7 @@
        "line": "approve PLAN 5d1e7a90",
        "raw": "",
        "do": "approve",
+       "todo": "",
        "since": 1794146040.0,
        "where": "session",
        "review": false
@@ -15150,6 +15351,7 @@
        "line": null,
        "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
        "do": "redo_handoff",
+       "todo": "让 alice 自己交接（交接时会打标签）",
        "since": 1794129840.0,
        "where": "session",
        "review": false
@@ -15207,6 +15409,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1793973600.0,
        "where": "app",
        "review": false
@@ -15254,6 +15457,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793661540.0,
        "where": null,
        "review": false
@@ -15313,6 +15517,7 @@
        "line": null,
        "raw": "",
        "do": "start",
+       "todo": "",
        "since": 1794128400.0,
        "where": "app",
        "review": false
@@ -15364,6 +15569,7 @@
        "line": null,
        "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
        "do": "label_handoff",
+       "todo": "",
        "since": 1794118440.0,
        "where": "session",
        "review": false
@@ -15421,6 +15627,7 @@
        "line": null,
        "raw": "",
        "do": "reply",
+       "todo": "",
        "since": 1794133620.0,
        "where": "session",
        "review": true
@@ -15475,6 +15682,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -15532,6 +15740,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -15591,6 +15800,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -15869,7 +16079,9 @@
      {
       "repo": "r2",
       "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用",
-      "raw": "/Users/alice/workplace/shop-web"
+      "raw": "/Users/alice/workplace/shop-web",
+      "path": "/Users/alice/workplace/shop-web",
+      "name": "shop-web"
      }
     ],
     "cto": {
@@ -16004,6 +16216,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788286020.0,
        "where": null,
        "review": false
@@ -16057,6 +16270,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1788889140.0,
        "where": null,
        "review": false
@@ -16110,6 +16324,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1789664520.0,
        "where": null,
        "review": false
@@ -16163,6 +16378,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790262420.0,
        "where": null,
        "review": false
@@ -16216,6 +16432,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1790954640.0,
        "where": null,
        "review": false
@@ -16267,6 +16484,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1791570240.0,
        "where": null,
        "review": false
@@ -16320,6 +16538,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": 1792253220.0,
        "where": null,
        "review": false
@@ -16373,6 +16592,7 @@
        "line": null,
        "raw": "",
        "do": "watch",
+       "todo": "",
        "since": 1793117160.0,
        "where": null,
        "review": false
@@ -16426,6 +16646,7 @@
        "line": null,
        "raw": "",
        "do": "write_back",
+       "todo": "",
        "since": 1793904720.0,
        "where": "app",
        "review": false
@@ -16484,6 +16705,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": null,
        "where": "mr",
        "review": false
@@ -16709,6 +16931,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -16932,6 +17155,7 @@
        "line": null,
        "raw": "",
        "do": "none",
+       "todo": "",
        "since": null,
        "where": null,
        "review": false
@@ -16989,6 +17213,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": 1794135600.0,
        "where": "mr",
        "review": false
@@ -17048,6 +17273,7 @@
        "line": null,
        "raw": "",
        "do": "accept",
+       "todo": "",
        "since": 1794056400.0,
        "where": "mr",
        "review": false
@@ -17107,6 +17333,7 @@
        "line": null,
        "raw": "",
        "do": "answer",
+       "todo": "",
        "since": null,
        "where": "mr",
        "review": false
@@ -17317,6 +17544,8 @@
      "since": 1794146040.0,
      "review": false,
      "path": "aidlc-docs/261107-refund-export/construction/plans/refund-api-code-generation-plan.md",
+     "todo": "",
+     "raw": "",
      "kind": "lean_approval",
      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行"
     },
@@ -17365,6 +17594,8 @@
      "since": 1794146040.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "clarify",
      "text": "AI 停下问你：可以在这里回答"
     },
@@ -17384,6 +17615,8 @@
      "since": 1794129840.0,
      "review": false,
      "path": null,
+     "todo": "让 alice 自己交接（交接时会打标签）",
+     "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
      "kind": "handoff_rejected",
      "text": "接手被拒：标签是 bob 打的，不是负责人 alice"
     },
@@ -17399,6 +17632,8 @@
      "since": 1794128400.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "start",
      "text": "已认领，还没开工"
     },
@@ -17414,6 +17649,8 @@
      "since": 1794118440.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
      "kind": "handoff_unlabelled",
      "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次"
     },
@@ -17433,6 +17670,8 @@
      "since": 1794133620.0,
      "review": true,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "reply",
      "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）"
     }
@@ -17457,6 +17696,8 @@
      "since": 1794146040.0,
      "review": false,
      "path": "aidlc-docs/261107-refund-export/construction/plans/refund-api-code-generation-plan.md",
+     "todo": "",
+     "raw": "",
      "kind": "lean_approval",
      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行"
     },
@@ -17505,6 +17746,8 @@
      "since": 1794146040.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "clarify",
      "text": "AI 停下问你：可以在这里回答"
     },
@@ -17524,6 +17767,8 @@
      "since": 1794129840.0,
      "review": false,
      "path": null,
+     "todo": "让 alice 自己交接（交接时会打标签）",
+     "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
      "kind": "handoff_rejected",
      "text": "接手被拒：标签是 bob 打的，不是负责人 alice"
     },
@@ -17539,6 +17784,8 @@
      "since": 1794128400.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "start",
      "text": "已认领，还没开工"
     },
@@ -17554,6 +17801,8 @@
      "since": 1794118440.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
      "kind": "handoff_unlabelled",
      "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次"
     },
@@ -17573,6 +17822,8 @@
      "since": 1794133620.0,
      "review": true,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "reply",
      "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）"
     },
@@ -17589,7 +17840,9 @@
      "session": null,
      "since": null,
      "review": false,
-     "path": null
+     "path": null,
+     "todo": "",
+     "raw": ""
     }
    ],
    "team": false
@@ -17612,6 +17865,8 @@
      "since": 1794146040.0,
      "review": false,
      "path": "aidlc-docs/261107-refund-export/construction/plans/refund-api-code-generation-plan.md",
+     "todo": "",
+     "raw": "",
      "kind": "lean_approval",
      "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行"
     },
@@ -17660,6 +17915,8 @@
      "since": 1794146040.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "clarify",
      "text": "AI 停下问你：可以在这里回答"
     },
@@ -17679,6 +17936,8 @@
      "since": 1794129840.0,
      "review": false,
      "path": null,
+     "todo": "让 alice 自己交接（交接时会打标签）",
+     "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
      "kind": "handoff_rejected",
      "text": "接手被拒：标签是 bob 打的，不是负责人 alice"
     },
@@ -17694,6 +17953,8 @@
      "since": 1794128400.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "start",
      "text": "已认领，还没开工"
     },
@@ -17709,6 +17970,8 @@
      "since": 1794118440.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
      "kind": "handoff_unlabelled",
      "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次"
     },
@@ -17728,6 +17991,8 @@
      "since": 1794133620.0,
      "review": true,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "reply",
      "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）"
     },
@@ -17761,6 +18026,8 @@
      "since": 1794135600.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "question",
      "text": "等产品在 MR 上回答 D-2（设计）"
     },
@@ -17794,6 +18061,8 @@
      "since": 1794056400.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "acceptance",
      "text": "等产品在 MR 上验收 D-3（approve / reject）"
     },
@@ -17809,6 +18078,8 @@
      "since": 1794146160.0,
      "review": false,
      "path": null,
+     "todo": "",
+     "raw": "",
      "kind": "question",
      "text": "D-1 的回答签名服务不签：看运行机页的拒签原因"
     }
@@ -18041,6 +18312,7 @@
      "line": null,
      "raw": "",
      "do": "watch",
+     "todo": "",
      "since": 1793661540.0,
      "where": null,
      "review": false
@@ -19999,6 +20271,7 @@
      "line": "approve PLAN 5d1e7a90",
      "raw": "",
      "do": "approve",
+     "todo": "",
      "since": 1794146040.0,
      "where": "session",
      "review": false
@@ -21392,6 +21665,7 @@
      "line": null,
      "raw": "",
      "do": "answer",
+     "todo": "",
      "since": 1794135600.0,
      "where": "mr",
      "review": false
@@ -22547,6 +22821,7 @@
      "line": null,
      "raw": "",
      "do": "accept",
+     "todo": "",
      "since": 1794056400.0,
      "where": "mr",
      "review": false
@@ -24007,6 +24282,7 @@
      "line": null,
      "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
      "do": "redo_handoff",
+     "todo": "让 alice 自己交接（交接时会打标签）",
      "since": 1794129840.0,
      "where": "session",
      "review": false
@@ -25027,6 +25303,7 @@
      "line": null,
      "raw": "",
      "do": "start",
+     "todo": "",
      "since": 1793973600.0,
      "where": "app",
      "review": false
@@ -25420,6 +25697,7 @@
      "line": null,
      "raw": "",
      "do": "start",
+     "todo": "",
      "since": 1794128400.0,
      "where": "app",
      "review": false
@@ -25813,6 +26091,7 @@
      "line": null,
      "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
      "do": "label_handoff",
+     "todo": "",
      "since": 1794118440.0,
      "where": "session",
      "review": false
@@ -26768,6 +27047,7 @@
      "line": null,
      "raw": "",
      "do": "reply",
+     "todo": "",
      "since": 1794133620.0,
      "where": "session",
      "review": true
@@ -27681,6 +27961,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1788286020.0,
      "where": null,
      "review": false
@@ -29178,6 +29459,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1788889140.0,
      "where": null,
      "review": false
@@ -30776,6 +31058,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1789664520.0,
      "where": null,
      "review": false
@@ -32417,6 +32700,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1790262420.0,
      "where": null,
      "review": false
@@ -33938,6 +34222,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1790954640.0,
      "where": null,
      "review": false
@@ -34933,6 +35218,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1791570240.0,
      "where": null,
      "review": false
@@ -36623,6 +36909,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": 1792253220.0,
      "where": null,
      "review": false
@@ -38133,6 +38420,7 @@
      "line": null,
      "raw": "",
      "do": "watch",
+     "todo": "",
      "since": 1793117160.0,
      "where": null,
      "review": false
@@ -39818,6 +40106,7 @@
      "line": null,
      "raw": "",
      "do": "write_back",
+     "todo": "",
      "since": 1793904720.0,
      "where": "app",
      "review": false
@@ -41432,6 +41721,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": null,
      "where": null,
      "review": false
@@ -42519,6 +42809,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": null,
      "where": null,
      "review": false
@@ -43150,6 +43441,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": null,
      "where": null,
      "review": false
@@ -43555,6 +43847,7 @@
      "line": null,
      "raw": "",
      "do": "answer",
+     "todo": "",
      "since": 1794135600.0,
      "where": "mr",
      "review": false
@@ -44694,6 +44987,7 @@
      "line": null,
      "raw": "",
      "do": "accept",
+     "todo": "",
      "since": 1794056400.0,
      "where": "mr",
      "review": false
@@ -46148,6 +46442,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": null,
      "where": null,
      "review": false
@@ -48124,6 +48419,7 @@
      "line": null,
      "raw": "",
      "do": "answer",
+     "todo": "",
      "since": null,
      "where": "mr",
      "review": false
@@ -49271,6 +49567,7 @@
      "line": "approve PLAN 5d1e7a90",
      "raw": "",
      "do": "approve",
+     "todo": "",
      "since": 1794146040.0,
      "where": "session",
      "review": false
@@ -49917,6 +50214,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": null,
      "where": null,
      "review": false
@@ -50115,6 +50413,7 @@
      "line": null,
      "raw": "",
      "do": "answer",
+     "todo": "",
      "since": 1794135600.0,
      "where": "mr",
      "review": false
@@ -50569,6 +50868,7 @@
      "line": null,
      "raw": "",
      "do": "accept",
+     "todo": "",
      "since": 1794056400.0,
      "where": "mr",
      "review": false
@@ -51076,6 +51376,7 @@
      "line": null,
      "raw": "",
      "do": "none",
+     "todo": "",
      "since": null,
      "where": null,
      "review": false
@@ -51716,6 +52017,7 @@
      "line": null,
      "raw": "",
      "do": "answer",
+     "todo": "",
      "since": null,
      "where": "mr",
      "review": false
