@@ -570,7 +570,7 @@ describe('交付总览', () => {
     await user.click(within(queue).getByRole('button', { name: 'PAY-4 ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-4', from: 'overview' })
     const skipped = within(batch).getByTestId('eval-skipped')
-    expect(skipped).toHaveTextContent('读不了，不算进数字：runs/PAY-1/run.json 不是合法的 JSON：第 3 行')
+    expect(skipped).toHaveTextContent('读不了，不算进数字：它的开工记录读不了')
     expect(skipped).toHaveTextContent('做什么：在它的分支上把这个文件改对')
     await user.click(within(skipped).getByRole('button', { name: 'PAY-1 ↗' }))
     expect(p.go).toHaveBeenLastCalledWith({ kind: 'item', repo: 'r1', key: 'PAY-1', from: 'overview' })

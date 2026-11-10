@@ -102,7 +102,7 @@ describe('设置', () => {
     await user.click(within(box).getByRole('button', { name: '先不推送' }))
     expect(p.reloadStatus).toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByTestId('push-box')).toBeNull())
-    expect(screen.getByRole('region', { name: 'KiroCrew' })).not.toHaveTextContent('lean-hook.py 是旧版')
+    expect(screen.getByRole('region', { name: 'KiroCrew' })).not.toHaveTextContent('适配文件是旧版')
     expect(apiCalls.some((c) => c.path === `${API}/import/push`)).toBe(false)
   })
 
@@ -204,7 +204,7 @@ describe('设置', () => {
     expect(me).toHaveTextContent('GitLab token 有')
     expect(me).not.toHaveTextContent('glpat')
     const crew = screen.getByRole('region', { name: 'KiroCrew' })
-    expect(crew).toHaveTextContent('brain-dev.json 缺 Lean 的 hook：调用工具前')
+    expect(crew).toHaveTextContent('brain-dev 的设置缺 Lean 的拦截：调用工具前')
     expect(within(crew).getByRole('img', { name: '1 正常，1 注意，1 有问题' })).toBeInTheDocument()
     expect(crew).toHaveClass('is-bad')
     await user.click(within(crew).getByRole('button', { name: '补上 Lean 的 hook' }))

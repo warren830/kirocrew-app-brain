@@ -90,6 +90,8 @@ describe('待办', () => {
   })
 
   test('without the path (an older backend) the approval card has no 要读的', async () => {
+    const items = fx.todo().items.filter((i) => i.kind === 'lean_approval').map((i) => ({ ...i, path: null }))
+    installFixtureRoutes({ [`GET ${API}/todo`]: (): Todo => ({ team: false, items }) })
     renderTodo()
     const card = within(await screen.findByRole('region', { name: 'Lean 审批' })).getByTestId('todo-item')
     expect(within(card).queryByTestId('todo-read')).toBeNull()
@@ -148,7 +150,7 @@ describe('待办', () => {
     const crew = group('KiroCrew 的问题')
     expect(within(crew).queryByRole('button', { name: /^PAY-/ })).toBeNull()
     expect(within(crew).queryByRole('button', { name: '需求看板' })).toBeNull()
-    expect(crew).toHaveTextContent('brain-dev.json 缺 Lean 的 hook')
+    expect(crew).toHaveTextContent('brain-dev 的设置缺 Lean 的拦截')
   })
 
   test('team mode says the runner’s questions are answered on GitLab, on their group only', async () => {
@@ -188,7 +190,7 @@ describe('待办', () => {
     renderTodo()
     await screen.findByRole('region', { name: '运行机上的问题' })
     const q = group('运行机上的问题')
-    expect(q).toHaveTextContent('D-2 等人在 MR 上回答')
+    expect(q).toHaveTextContent('等产品在 MR 上回答 D-2')
     expect(q).toHaveTextContent('对账单按商户拆分')     // the requirement's title, not its branch slug
     expect(q).toHaveTextContent('设计')                 // its kind in words
     expect(q).not.toHaveTextContent(/design|merchant split/)
@@ -257,7 +259,7 @@ describe('待办', () => {
     renderTodo()
     const crew = await screen.findByRole('region', { name: 'KiroCrew 的问题' })
     expect(within(crew).getAllByRole('listitem').map((li) => li.dataset.level)).toEqual(['FAIL'])
-    expect(crew).not.toHaveTextContent('lean-hook.py 是旧版')
+    expect(crew).not.toHaveTextContent('适配文件是旧版')
   })
 
   test('重装 kit 文件 in place on a team repo: its group stays while 推送 waits, even when the list no longer has the problem', async () => {
