@@ -158,3 +158,51 @@ def test_lean_approval_by_inception_answers_the_requirements_request(tmp_path, h
 
 def test_unused_imports_are_fine():
     assert lean and install_brain_dev
+
+
+def test_team_mode_lists_each_requirement_once_the_runners_facts_winning(tmp_path, home):
+    """Team mode: a requirement handed over is listed once, as the runner's; one the runner has only is the runner's;
+    a merge by both counts stays its repo's (the merge, the 14 days and the write-back are read there); 待办 too."""
+    from types import SimpleNamespace
+    repo = make_project(tmp_path, kit={"gitlab": {"base": "https://gitlab.example.com", "project": "shop/pay"}})
+    wt = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "refund", "refund", "退款")
+    intent = json.loads((wt / "runs" / "PAY-1" / "run.json").read_text())["intent"]
+    state = wt / "aidlc-docs" / intent / "aidlc-state.md"
+    state.write_text(state.read_text().replace("Status: Inception: starting", "Status: Construction step 2 of 4"))
+    sh("git", "-C", wt, "commit", "-qam", "notes")
+    brain(wt, "handoff", "--no-push")
+    wt2 = start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "done", "done", "做完了")
+    sh("git", "-C", repo, "merge", "-q", "--no-ff", "-m", "merge PAY-2", "ai/alice/PAY-2-done")
+    sh("git", "-C", repo, "worktree", "remove", "--force", wt2)
+    start_in_worktree(repo, home / "workplace" / "brain-app" / "pay" / "local", "local", "本地")
+    svc = make_service(tmp_path, [repo])
+    deliveries = __import__("appkit").mod("deliveries")
+
+    def runner_row(key, state, text):
+        row = deliveries.base_row("runner", {"key": key, "where": "runner"})
+        row.update(where="runner", state=state, state_label=deliveries.STATE_LABEL[state],
+                   waits=deliveries.waits("product" if state == "parked" else "nobody", "none", text))
+        return row, {"key": key, "project": "shop/pay", "decisions_text": None}, []
+
+    async def go():
+        await svc.start()
+        try:
+            svc.team = SimpleNamespace(host=object())
+            svc._team_rows = lambda snap: [runner_row("PAY-1", "parked", "等产品在 MR 上回答 D-1"),
+                                           runner_row("PAY-2", "merged", "MR 已合并，运行结束"),
+                                           runner_row("PAY-3", "running", "运行机在跑"),
+                                           runner_row("PAY-9", "running", "运行机在跑")]
+            return await svc.overview("all"), await svc.overview("r1"), await svc.overview("runner"), await svc.todo()
+        finally:
+            svc.team = None
+            await svc.stop()
+
+    every, r1, runner, todo = run(go())
+    ids = sorted((r["repo"], r["key"]) for r in every["rows"])
+    # PAY-1 handed over: the runner's; PAY-2 merged by both: r1's; PAY-3 never handed over here: r1's; PAY-9 the runner's
+    assert ids == [("r1", "PAY-2"), ("r1", "PAY-3"), ("runner", "PAY-1"), ("runner", "PAY-9")], ids
+    assert sorted(r["key"] for r in r1["rows"]) == ["PAY-2", "PAY-3"]
+    assert sorted(r["key"] for r in runner["rows"]) == ["PAY-1", "PAY-9"]
+    assert sum(every["counts"].values()) == len(every["rows"]) == len(r1["rows"]) + len(runner["rows"])
+    assert next(r for r in every["rows"] if r["key"] == "PAY-1")["state"] == "parked"
+    assert not any(i["key"] == "PAY-1" and i["repo"] == "r1" for i in todo["items"]), todo["items"]

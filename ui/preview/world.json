@@ -5492,58 +5492,6 @@
      },
      {
       "repo": "runner",
-      "key": "PAY-2",
-      "title": "退款单号校验",
-      "owner": "alice",
-      "source": "product",
-      "state": "merged",
-      "state_label": "已合并",
-      "where": "runner",
-      "branch": "ai/alice/PAY-2-refund-id",
-      "intent": "261102-refund-id",
-      "lean": {
-       "stage": "release",
-       "stage_label": "发布",
-       "stage_n": 11,
-       "stage_state": "done",
-       "done": 11,
-       "total": 11,
-       "done_n": 5,
-       "skipped_n": 6,
-       "next": null
-      },
-      "stage": "做完 5 · 跳过 6 · 全部做完",
-      "waits": {
-       "who": "nobody",
-       "text": "MR 已合并，运行结束",
-       "line": null,
-       "raw": "",
-       "do": "none",
-       "since": null,
-       "where": null,
-       "review": false
-      },
-      "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
-      "credits": 14.4,
-      "updated_at": 1793930400.0,
-      "mr": {
-       "iid": 37,
-       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/37",
-       "state": null
-      },
-      "worktree": "/home/runner/brain/runs/RUN-PAY-2-1",
-      "run_ids": [
-       "RUN-PAY-2-1"
-      ],
-      "sessions": 1,
-      "overlap": [],
-      "open_questions": [],
-      "expected_paths": [],
-      "local_only": false,
-      "session_url": null
-     },
-     {
-      "repo": "runner",
       "key": "ORD-10",
       "title": "订单状态推送到企业微信",
       "owner": "erin",
@@ -5712,20 +5660,20 @@
      "running": 0,
      "parked": 2,
      "acceptance": 1,
-     "merged": 1,
+     "merged": 0,
      "closed": 0
     },
     "errors": [],
     "cto": {
      "available": false,
-     "sentence": "有 credits 的 4 个需求，平均每个 13.0 credits。",
+     "sentence": "有 credits 的 3 个需求，平均每个 12.6 credits。",
      "ref": null,
      "unattended": null,
      "stepped_in": null,
      "credits": {
-      "per_req": 13.0,
-      "total": 52.1,
-      "reqs": 4
+      "per_req": 12.6,
+      "total": 37.7,
+      "reqs": 3
      },
      "runs": [],
      "weekly": [
@@ -5811,7 +5759,7 @@
        "unattended": 0,
        "people": 0,
        "local": 0,
-       "pending": 1
+       "pending": 0
       }
      ]
     }
@@ -9021,15 +8969,405 @@
      },
      {
       "repo": "runner",
+      "key": "ORD-10",
+      "title": "订单状态推送到企业微信",
+      "owner": "erin",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/erin/ORD-10-wecom-push",
+      "intent": "261106-wecom-push",
+      "lean": {
+       "stage": "code-generation",
+       "stage_label": "代码生成",
+       "stage_n": 9,
+       "stage_state": "started",
+       "done": 8,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 6,
+       "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+       }
+      },
+      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "waits": {
+       "who": "people",
+       "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": null,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "订单状态变化时推送到企业微信，失败自动重试。",
+      "credits": 7.4,
+      "updated_at": 1794146160.0,
+      "mr": {
+       "iid": 19,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/19",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-ORD-10-1",
+      "run_ids": [
+       "RUN-ORD-10-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     }
+    ],
+    "overlaps": [],
+    "funnel": {
+     "source": "app",
+     "total": 0,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 0
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 0
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 0
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 0
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 0
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 0
+      }
+     ],
+     "questions": {
+      "asked": 0,
+      "answered": 0,
+      "delivered": 0
+     },
+     "unclassified": []
+    },
+    "eval": {
+     "available": false,
+     "error": "这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit",
+     "raw": "",
+     "ref": null,
+     "metrics": [],
+     "queue": [],
+     "skipped": [],
+     "notes": []
+    },
+    "counts": {
+     "claimed": 0,
+     "local": 0,
+     "handed_over": 1,
+     "rejected": 0,
+     "running": 0,
+     "parked": 2,
+     "acceptance": 1,
+     "merged": 0,
+     "closed": 0
+    },
+    "errors": [],
+    "cto": {
+     "available": false,
+     "sentence": "有 credits 的 3 个需求，平均每个 12.6 credits。",
+     "ref": null,
+     "unattended": null,
+     "stepped_in": null,
+     "credits": {
+      "per_req": 12.6,
+      "total": 37.7,
+      "reqs": 3
+     },
+     "runs": [],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      }
+     ]
+    }
+   }
+  }
+ },
+ "overviews_team": {
+  "eval": {
+   "all": {
+    "at": 1794146400,
+    "rows": [
+     {
+      "repo": "r1",
+      "key": "PAY-3",
+      "title": "退款单导出 CSV",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/PAY-3-refund-export",
+      "intent": "261107-refund-export",
+      "lean": {
+       "stage": "code-generation",
+       "stage_label": "代码生成",
+       "stage_n": 9,
+       "stage_state": "started",
+       "done": 8,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 4,
+       "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+       }
+      },
+      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "waits": {
+       "who": "you",
+       "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
+       "line": "approve PLAN 5d1e7a90",
+       "raw": "",
+       "do": "approve",
+       "since": 1794146040.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款单可以导出成 CSV，给财务对账用（规模中）。",
+      "credits": 12.4,
+      "updated_at": 1794146040,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [
+       "PAY-4"
+      ],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/",
+       "src/export/csv.py"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-7",
+      "title": "退款原因下拉框",
+      "owner": "alice",
+      "source": "product",
+      "state": "rejected",
+      "state_label": "接手被拒",
+      "where": "branch",
+      "branch": "ai/alice/PAY-7-refund-reason",
+      "intent": "261106-refund-reason",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "接手被拒：标签是 bob 打的，不是负责人 alice",
+       "line": null,
+       "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
+       "do": "redo_handoff",
+       "since": 1794129840.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款时选原因，原因列表在后台维护。",
+      "credits": 18.2,
+      "updated_at": 1794128400,
+      "mr": {
+       "iid": 46,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/46",
+       "state": "opened"
+      },
+      "worktree": "/Users/alice/workplace/brain-app/PAY-7-refund-reason",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "web/refund/"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-6",
+      "title": "商户结算周报",
+      "owner": "carol",
+      "source": "product",
+      "state": "claimed",
+      "state_label": "已认领",
+      "where": "claim",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "people",
+       "text": "等 carol 开工",
+       "line": null,
+       "raw": "",
+       "do": "start",
+       "since": 1793973600.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": 1793973600,
+      "mr": null,
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
       "key": "PAY-2",
       "title": "退款单号校验",
       "owner": "alice",
       "source": "product",
       "state": "merged",
       "state_label": "已合并",
-      "where": "runner",
+      "where": "main",
       "branch": "ai/alice/PAY-2-refund-id",
-      "intent": "261102-refund-id",
+      "intent": "261101-refund-id",
       "lean": {
        "stage": "release",
        "stage_label": "发布",
@@ -9044,7 +9382,689 @@
       "stage": "做完 5 · 跳过 6 · 全部做完",
       "waits": {
        "who": "nobody",
-       "text": "MR 已合并，运行结束",
+       "text": "已合并，在观察合并后的 14 天（到 11-17）",
+       "line": null,
+       "raw": "",
+       "do": "watch",
+       "since": 1793661540.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
+      "credits": 22.7,
+      "updated_at": 1793663640,
+      "mr": {
+       "iid": 37,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/37",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-PAY-2-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/id.py"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-8",
+      "title": "退款失败的提醒",
+      "owner": "alice",
+      "source": "product",
+      "state": "claimed",
+      "state_label": "已认领",
+      "where": "claim",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "you",
+       "text": "已认领，还没开工",
+       "line": null,
+       "raw": "",
+       "do": "start",
+       "since": 1794128400.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": null,
+      "mr": null,
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-10",
+      "title": "退款审批加二次确认",
+      "owner": "alice",
+      "source": "product",
+      "state": "handed_over",
+      "state_label": "已交接",
+      "where": "branch",
+      "branch": "ai/alice/PAY-10-refund-confirm",
+      "intent": "261108-refund-confirm",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次",
+       "line": null,
+       "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
+       "do": "label_handoff",
+       "since": 1794118440.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款审批前弹一次二次确认，金额超过一万再要一次。",
+      "credits": 12.6,
+      "updated_at": 1794118440,
+      "mr": {
+       "iid": 52,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/52",
+       "state": "opened"
+      },
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "web/refund/"
+      ],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-1",
+      "title": "退款原因统计",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/PAY-1-refund-stats",
+      "intent": "261107-refund-stats",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）",
+       "line": null,
+       "raw": "",
+       "do": "reply",
+       "since": 1794133620.0,
+       "where": "session",
+       "review": true
+      },
+      "summary": "按退款原因汇总金额和笔数，给运营看哪类退款最多（规模小）。",
+      "credits": 9.8,
+      "updated_at": 1794133620,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/shop-pay/refund-stats",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/stats/"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-1",
+      "title": "下单页地址校验",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-1-order-1",
+      "intent": "261000-order-1",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1788286020.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "下单页地址校验：做完了，合并进 main。",
+      "credits": 14.2,
+      "updated_at": 1788288120,
+      "mr": {
+       "iid": 10,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/10",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-1-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-2",
+      "title": "优惠券叠加规则",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-2-order-2",
+      "intent": "261001-order-2",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1788889140.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "优惠券叠加规则：做完了，合并进 main。",
+      "credits": 21.9,
+      "updated_at": 1788891240,
+      "mr": {
+       "iid": 11,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/11",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-2-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-3",
+      "title": "订单导出加筛选",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-3-order-3",
+      "intent": "261002-order-3",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1789664520.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "订单导出加筛选：做完了，合并进 main。",
+      "credits": 26.4,
+      "updated_at": 1789666620,
+      "mr": {
+       "iid": 12,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/12",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-3-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-4",
+      "title": "取消订单的退款入口",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-4-order-4",
+      "intent": "261003-order-4",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1790262420.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "取消订单的退款入口：做完了，合并进 main。",
+      "credits": 17.8,
+      "updated_at": 1790264520,
+      "mr": {
+       "iid": 13,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/13",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-4-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-5",
+      "title": "发票抬头保存",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-5-order-5",
+      "intent": "261004-order-5",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1790954640.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "发票抬头保存：做完了，合并进 main。",
+      "credits": 9.6,
+      "updated_at": 1790956740,
+      "mr": {
+       "iid": 14,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/14",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-6",
+      "title": "订单备注长度",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-6-order-6",
+      "intent": "261005-order-6",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1791570240.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "订单备注长度：做完了，合并进 main。",
+      "credits": 11.3,
+      "updated_at": 1791572340,
+      "mr": {
+       "iid": 15,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/15",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-6-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-7",
+      "title": "物流单号回填",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-7-order-7",
+      "intent": "261006-order-7",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1792253220.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "物流单号回填：做完了，合并进 main。",
+      "credits": 19.5,
+      "updated_at": 1792255320,
+      "mr": {
+       "iid": 16,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/16",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-7-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-8",
+      "title": "拆单时运费分摊",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-8-order-8",
+      "intent": "261007-order-8",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并，在观察合并后的 14 天（到 11-11）",
+       "line": null,
+       "raw": "",
+       "do": "watch",
+       "since": 1793117160.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "拆单时运费分摊：做完了，合并进 main。",
+      "credits": 33.7,
+      "updated_at": 1793119260,
+      "mr": {
+       "iid": 17,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/17",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-8-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-9",
+      "title": "订单列表分页",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-9-order-9",
+      "intent": "261008-order-9",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "people",
+       "text": "已合并，有 1 条新知识等 erin 回写 Brain",
+       "line": null,
+       "raw": "",
+       "do": "write_back",
+       "since": 1793904720.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": "订单列表分页：做完了，合并进 main。",
+      "credits": 15.1,
+      "updated_at": 1793906820,
+      "mr": {
+       "iid": 18,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/18",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-9-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r4",
+      "key": "TOOL-1",
+      "title": "价格表批量导入",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/TOOL-1-price-import",
+      "intent": "261108-price-import",
+      "lean": {
+       "stage": "application-design",
+       "stage_label": "应用设计",
+       "stage_n": 4,
+       "stage_state": "started",
+       "done": 3,
+       "total": 11,
+       "done_n": 1,
+       "skipped_n": 2,
+       "next": {
+        "id": "application-design",
+        "label": "应用设计",
+        "n": 4
+       }
+      },
+      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "waits": {
+       "who": "agent",
+       "text": "AI 在做「应用设计」",
        "line": null,
        "raw": "",
        "do": "none",
@@ -9052,21 +10072,6156 @@
        "where": null,
        "review": false
       },
+      "summary": null,
+      "credits": 4.9,
+      "updated_at": 1794146340,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/shop-tools/price-import",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "tools/price"
+      ],
+      "local_only": true,
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-9",
+      "title": "PAY-9",
+      "owner": null,
+      "source": "product",
+      "state": "handed_over",
+      "state_label": "已交接",
+      "where": "runner",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "bridge",
+       "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": null,
+       "where": null,
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": 1794146340.0,
+      "mr": {
+       "iid": 53,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/53",
+       "state": null
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-PAY-9-1"
+      ],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-4",
+      "title": "对账单按商户拆分",
+      "owner": "carol",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/carol/PAY-4-merchant-split",
+      "intent": "261105-merchant-split",
+      "lean": {
+       "stage": "functional-design",
+       "stage_label": "功能设计",
+       "stage_n": 6,
+       "stage_state": "started",
+       "done": 5,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 3,
+       "next": {
+        "id": "functional-design",
+        "label": "功能设计",
+        "n": 6
+       }
+      },
+      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "waits": {
+       "who": "people",
+       "text": "等人在 MR 上回答 D-2（设计）",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": 1794135600.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "对账单按商户拆成一户一份，大商户按小时切。",
+      "credits": 6.1,
+      "updated_at": 1794135600.0,
+      "mr": {
+       "iid": 41,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-4-1",
+      "run_ids": [
+       "RUN-PAY-4-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-2"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-5",
+      "title": "退款回调失败重试",
+      "owner": "alice",
+      "source": "product",
+      "state": "acceptance",
+      "state_label": "等验收",
+      "where": "runner",
+      "branch": "ai/alice/PAY-5-callback-retry",
+      "intent": "261104-callback-retry",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "started",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "product",
+       "text": "等产品在 MR 上验收 D-3（approve / reject）",
+       "line": null,
+       "raw": "",
+       "do": "accept",
+       "since": 1794056400.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "退款回调失败自动重试，第 6 次转人工处理。",
+      "credits": 24.2,
+      "updated_at": 1794052800.0,
+      "mr": {
+       "iid": 44,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-5-1",
+      "run_ids": [
+       "RUN-PAY-5-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-3"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "ORD-10",
+      "title": "订单状态推送到企业微信",
+      "owner": "erin",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/erin/ORD-10-wecom-push",
+      "intent": "261106-wecom-push",
+      "lean": {
+       "stage": "code-generation",
+       "stage_label": "代码生成",
+       "stage_n": 9,
+       "stage_state": "started",
+       "done": 8,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 6,
+       "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+       }
+      },
+      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "waits": {
+       "who": "people",
+       "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": null,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "订单状态变化时推送到企业微信，失败自动重试。",
+      "credits": 7.4,
+      "updated_at": 1794146160.0,
+      "mr": {
+       "iid": 19,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/19",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-ORD-10-1",
+      "run_ids": [
+       "RUN-ORD-10-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     }
+    ],
+    "overlaps": [
+     {
+      "keys": [
+       "PAY-3",
+       "PAY-4"
+      ],
+      "paths": [
+       "src/refund/"
+      ]
+     }
+    ],
+    "funnel": {
+     "source": "evaluate",
+     "total": 15,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 4
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 5
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 3
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 1
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 1
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 1
+      }
+     ],
+     "unclassified": [
+      {
+       "key": "PAY-4",
+       "id": "D-3",
+       "src": "aidlc-docs/261105-merchant-split/decisions.md#L11"
+      }
+     ],
+     "questions": {
+      "asked": 4,
+      "answered": 3,
+      "delivered": 2
+     }
+    },
+    "eval": {
+     "available": true,
+     "error": "",
+     "ref": "各仓库远端的 main 分支",
+     "metrics": [
+      {
+       "id": "autonomy",
+       "label": "自主度",
+       "value": [
+        5,
+        8
+       ],
+       "rule": "交接之后，除了必经的审批（REQUIREMENTS / DESIGN / INCEPTION / PLAN / RELEASE、验收），没有人做过任何事，而且交付正确"
+      },
+      {
+       "id": "delivery",
+       "label": "交付正确率",
+       "value": [
+        3,
+        4
+       ],
+       "rule": "一次通过验收，合并后 14 天内没有回滚、修复提交或新缺陷认领"
+      },
+      {
+       "id": "judgment",
+       "label": "介入落在判断点",
+       "value": [
+        44,
+        45
+       ],
+       "rule": "判断点 = Lean 的审批口令和桥上的 park 问题"
+      },
+      {
+       "id": "repeat_rate",
+       "label": "重复纠正率",
+       "value": [
+        1,
+        6
+       ],
+       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+      },
+      {
+       "id": "useful",
+       "label": "知识有用率",
+       "value": [
+        12,
+        37
+       ],
+       "rule": "被引用过的条目 ÷ 现有条目"
+      },
+      {
+       "id": "staleness",
+       "label": "过时与冲突",
+       "value": 2,
+       "rule": "过时引用 + 同名术语 + 本期覆盖或撤回"
+      },
+      {
+       "id": "credits_per_success",
+       "label": "每个正确交付的 credits",
+       "value": null,
+       "rule": "完成的 run 花的 credits 合计 ÷ 正确交付数；只用来诊断，不设上限"
+      }
+     ],
+     "queue": [
+      {
+       "key": "PAY-4",
+       "intent": "261105-merchant-split",
+       "reasons": [
+        "验收被驳回 1 次",
+        "判断点之外有人介入 2 次（交接后推代码）"
+       ]
+      }
+     ],
+     "skipped": [
+      {
+       "key": "PAY-1",
+       "why": "runs/PAY-1/run.json 不是合法的 JSON：第 3 行"
+      }
+     ],
+     "notes": [
+      "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
+      "PAY-2：已知交付有问题，14 天还没满，先不算"
+     ],
+     "raw": ""
+    },
+    "counts": {
+     "claimed": 2,
+     "local": 3,
+     "handed_over": 2,
+     "rejected": 1,
+     "running": 0,
+     "parked": 2,
+     "acceptance": 1,
+     "merged": 10,
+     "closed": 0
+    },
+    "errors": [
+     {
+      "repo": "r2",
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+     }
+    ],
+    "cto": {
+     "available": true,
+     "sentence": "交给运行机的 8 个需求里，5 个交接以后没人插手就做完了。人介入了 45 次（本机做的也算），44 次落在判断点上。有 credits 的 18 个需求，平均每个 16.0 credits。",
+     "ref": "各仓库远端的 main 分支",
+     "unattended": [
+      5,
+      8
+     ],
+     "stepped_in": {
+      "at_points": 44,
+      "outside": 1,
+      "kinds": [
+       {
+        "label": "批准",
+        "n": 41,
+        "point": true
+       },
+       {
+        "label": "回答问题",
+        "n": 3,
+        "point": true
+       },
+       {
+        "label": "交接后推代码",
+        "n": 1,
+        "point": false
+       }
+      ]
+     },
+     "credits": {
+      "per_req": 16.0,
+      "total": 287.8,
+      "reqs": 18
+     },
+     "runs": [
+      {
+       "key": "PAY-2",
+       "repo": "r1",
+       "how": "people",
+       "beyond": [
+        "回答问题"
+       ],
+       "at_points": 5,
+       "outside": 0,
+       "credits": 22.7,
+       "merged_at": 1793661540
+      },
+      {
+       "key": "PAY-4",
+       "repo": "r1",
+       "how": "pending",
+       "beyond": [],
+       "at_points": 2,
+       "outside": 0,
+       "credits": null,
+       "merged_at": null
+      },
+      {
+       "key": "PAY-5",
+       "repo": "r1",
+       "how": "pending",
+       "beyond": [],
+       "at_points": 2,
+       "outside": 0,
+       "credits": 31.0,
+       "merged_at": null
+      },
+      {
+       "key": "ORD-1",
+       "repo": "r3",
+       "how": "unattended",
+       "beyond": [],
+       "at_points": 4,
+       "outside": 0,
+       "credits": 14.2,
+       "merged_at": 1788286020
+      },
+      {
+       "key": "ORD-2",
+       "repo": "r3",
+       "how": "unattended",
+       "beyond": [],
+       "at_points": 4,
+       "outside": 0,
+       "credits": 21.9,
+       "merged_at": 1788889140
+      },
+      {
+       "key": "ORD-3",
+       "repo": "r3",
+       "how": "people",
+       "beyond": [
+        "交接后推代码"
+       ],
+       "at_points": 5,
+       "outside": 1,
+       "credits": 26.4,
+       "merged_at": 1789664520
+      },
+      {
+       "key": "ORD-4",
+       "repo": "r3",
+       "how": "unattended",
+       "beyond": [],
+       "at_points": 4,
+       "outside": 0,
+       "credits": 17.8,
+       "merged_at": 1790262420
+      },
+      {
+       "key": "ORD-5",
+       "repo": "r3",
+       "how": "local",
+       "beyond": [],
+       "at_points": 3,
+       "outside": 0,
+       "credits": 9.6,
+       "merged_at": 1790954640
+      },
+      {
+       "key": "ORD-6",
+       "repo": "r3",
+       "how": "unattended",
+       "beyond": [],
+       "at_points": 5,
+       "outside": 0,
+       "credits": 11.3,
+       "merged_at": 1791570240
+      },
+      {
+       "key": "ORD-7",
+       "repo": "r3",
+       "how": "unattended",
+       "beyond": [],
+       "at_points": 4,
+       "outside": 0,
+       "credits": 19.5,
+       "merged_at": 1792253220
+      },
+      {
+       "key": "ORD-8",
+       "repo": "r3",
+       "how": "people",
+       "beyond": [
+        "回答问题"
+       ],
+       "at_points": 5,
+       "outside": 0,
+       "credits": 33.7,
+       "merged_at": 1793117160
+      },
+      {
+       "key": "ORD-9",
+       "repo": "r3",
+       "how": "pending",
+       "beyond": [],
+       "at_points": 5,
+       "outside": 0,
+       "credits": 15.1,
+       "merged_at": 1793904720
+      },
+      {
+       "key": "ORD-10",
+       "repo": "r3",
+       "how": "pending",
+       "beyond": [],
+       "at_points": 2,
+       "outside": 0,
+       "credits": 7.4,
+       "merged_at": null
+      }
+     ],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 1,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 1,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 1,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 1,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 1,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 1,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 1,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 1,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 1,
+       "local": 0,
+       "pending": 1
+      }
+     ]
+    }
+   },
+   "r1": {
+    "at": 1794146400,
+    "rows": [
+     {
+      "repo": "r1",
+      "key": "PAY-3",
+      "title": "退款单导出 CSV",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/PAY-3-refund-export",
+      "intent": "261107-refund-export",
+      "lean": {
+       "stage": "code-generation",
+       "stage_label": "代码生成",
+       "stage_n": 9,
+       "stage_state": "started",
+       "done": 8,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 4,
+       "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+       }
+      },
+      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "waits": {
+       "who": "you",
+       "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
+       "line": "approve PLAN 5d1e7a90",
+       "raw": "",
+       "do": "approve",
+       "since": 1794146040.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款单可以导出成 CSV，给财务对账用（规模中）。",
+      "credits": 12.4,
+      "updated_at": 1794146040,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [
+       "PAY-4"
+      ],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/",
+       "src/export/csv.py"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-7",
+      "title": "退款原因下拉框",
+      "owner": "alice",
+      "source": "product",
+      "state": "rejected",
+      "state_label": "接手被拒",
+      "where": "branch",
+      "branch": "ai/alice/PAY-7-refund-reason",
+      "intent": "261106-refund-reason",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "接手被拒：标签是 bob 打的，不是负责人 alice",
+       "line": null,
+       "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
+       "do": "redo_handoff",
+       "since": 1794129840.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款时选原因，原因列表在后台维护。",
+      "credits": 18.2,
+      "updated_at": 1794128400,
+      "mr": {
+       "iid": 46,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/46",
+       "state": "opened"
+      },
+      "worktree": "/Users/alice/workplace/brain-app/PAY-7-refund-reason",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "web/refund/"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-6",
+      "title": "商户结算周报",
+      "owner": "carol",
+      "source": "product",
+      "state": "claimed",
+      "state_label": "已认领",
+      "where": "claim",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "people",
+       "text": "等 carol 开工",
+       "line": null,
+       "raw": "",
+       "do": "start",
+       "since": 1793973600.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": 1793973600,
+      "mr": null,
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-2",
+      "title": "退款单号校验",
+      "owner": "alice",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/alice/PAY-2-refund-id",
+      "intent": "261101-refund-id",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并，在观察合并后的 14 天（到 11-17）",
+       "line": null,
+       "raw": "",
+       "do": "watch",
+       "since": 1793661540.0,
+       "where": null,
+       "review": false
+      },
       "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
-      "credits": 14.4,
-      "updated_at": 1793930400.0,
+      "credits": 22.7,
+      "updated_at": 1793663640,
       "mr": {
        "iid": 37,
        "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/37",
-       "state": null
+       "state": "merged"
       },
-      "worktree": "/home/runner/brain/runs/RUN-PAY-2-1",
+      "worktree": null,
       "run_ids": [
        "RUN-PAY-2-1"
       ],
       "sessions": 1,
       "overlap": [],
       "open_questions": [],
+      "expected_paths": [
+       "src/refund/id.py"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-8",
+      "title": "退款失败的提醒",
+      "owner": "alice",
+      "source": "product",
+      "state": "claimed",
+      "state_label": "已认领",
+      "where": "claim",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "you",
+       "text": "已认领，还没开工",
+       "line": null,
+       "raw": "",
+       "do": "start",
+       "since": 1794128400.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": null,
+      "mr": null,
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-10",
+      "title": "退款审批加二次确认",
+      "owner": "alice",
+      "source": "product",
+      "state": "handed_over",
+      "state_label": "已交接",
+      "where": "branch",
+      "branch": "ai/alice/PAY-10-refund-confirm",
+      "intent": "261108-refund-confirm",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次",
+       "line": null,
+       "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
+       "do": "label_handoff",
+       "since": 1794118440.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款审批前弹一次二次确认，金额超过一万再要一次。",
+      "credits": 12.6,
+      "updated_at": 1794118440,
+      "mr": {
+       "iid": 52,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/52",
+       "state": "opened"
+      },
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "web/refund/"
+      ],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-1",
+      "title": "退款原因统计",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/PAY-1-refund-stats",
+      "intent": "261107-refund-stats",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）",
+       "line": null,
+       "raw": "",
+       "do": "reply",
+       "since": 1794133620.0,
+       "where": "session",
+       "review": true
+      },
+      "summary": "按退款原因汇总金额和笔数，给运营看哪类退款最多（规模小）。",
+      "credits": 9.8,
+      "updated_at": 1794133620,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/shop-pay/refund-stats",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/stats/"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+     }
+    ],
+    "overlaps": [
+     {
+      "keys": [
+       "PAY-3",
+       "PAY-4"
+      ],
+      "paths": [
+       "src/refund/"
+      ]
+     }
+    ],
+    "funnel": {
+     "source": "evaluate",
+     "total": 15,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 4
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 5
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 3
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 1
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 1
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 1
+      }
+     ],
+     "unclassified": [
+      {
+       "key": "PAY-4",
+       "id": "D-3",
+       "src": "aidlc-docs/261105-merchant-split/decisions.md#L11"
+      }
+     ],
+     "questions": {
+      "asked": 4,
+      "answered": 3,
+      "delivered": 2
+     }
+    },
+    "eval": {
+     "available": true,
+     "error": "",
+     "ref": "远端的 main 分支",
+     "metrics": [
+      {
+       "id": "autonomy",
+       "label": "自主度",
+       "value": [
+        0,
+        1
+       ],
+       "rule": "交接之后，除了必经的审批（REQUIREMENTS / DESIGN / INCEPTION / PLAN / RELEASE、验收），没有人做过任何事，而且交付正确"
+      },
+      {
+       "id": "delivery",
+       "label": "交付正确率",
+       "value": [
+        3,
+        4
+       ],
+       "rule": "一次通过验收，合并后 14 天内没有回滚、修复提交或新缺陷认领"
+      },
+      {
+       "id": "judgment",
+       "label": "介入落在判断点",
+       "value": [
+        5,
+        5
+       ],
+       "rule": "判断点 = Lean 的审批口令和桥上的 park 问题"
+      },
+      {
+       "id": "repeat_rate",
+       "label": "重复纠正率",
+       "value": [
+        1,
+        6
+       ],
+       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+      },
+      {
+       "id": "useful",
+       "label": "知识有用率",
+       "value": [
+        12,
+        37
+       ],
+       "rule": "被引用过的条目 ÷ 现有条目"
+      },
+      {
+       "id": "staleness",
+       "label": "过时与冲突",
+       "value": 2,
+       "rule": "过时引用 + 同名术语 + 本期覆盖或撤回"
+      },
+      {
+       "id": "credits_per_success",
+       "label": "每个正确交付的 credits",
+       "value": null,
+       "rule": "完成的 run 花的 credits 合计 ÷ 正确交付数；只用来诊断，不设上限"
+      }
+     ],
+     "queue": [],
+     "skipped": [
+      {
+       "key": "PAY-1",
+       "why": "runs/PAY-1/run.json 不是合法的 JSON：第 3 行"
+      }
+     ],
+     "notes": [
+      "credits 只有一条记录，却有 6 个需求：不知道是谁的，没有算给任何一个",
+      "PAY-2：已知交付有问题，14 天还没满，先不算"
+     ],
+     "raw": ""
+    },
+    "counts": {
+     "claimed": 2,
+     "local": 2,
+     "handed_over": 1,
+     "rejected": 1,
+     "running": 0,
+     "parked": 0,
+     "acceptance": 0,
+     "merged": 1,
+     "closed": 0
+    },
+    "errors": [],
+    "cto": {
+     "available": true,
+     "sentence": "交给运行机的 1 个需求里，0 个交接以后没人插手就做完了。人介入了 5 次（本机做的也算），5 次落在判断点上。有 credits 的 5 个需求，平均每个 15.1 credits。",
+     "ref": "远端的 main 分支",
+     "unattended": [
+      0,
+      1
+     ],
+     "stepped_in": {
+      "at_points": 5,
+      "outside": 0,
+      "kinds": [
+       {
+        "label": "批准",
+        "n": 4,
+        "point": true
+       },
+       {
+        "label": "回答问题",
+        "n": 1,
+        "point": true
+       }
+      ]
+     },
+     "credits": {
+      "per_req": 15.1,
+      "total": 75.7,
+      "reqs": 5
+     },
+     "runs": [
+      {
+       "key": "PAY-2",
+       "repo": "r1",
+       "how": "people",
+       "beyond": [
+        "回答问题"
+       ],
+       "at_points": 5,
+       "outside": 0,
+       "credits": 22.7,
+       "merged_at": 1793661540
+      },
+      {
+       "key": "PAY-4",
+       "repo": "r1",
+       "how": "pending",
+       "beyond": [],
+       "at_points": 2,
+       "outside": 0,
+       "credits": null,
+       "merged_at": null
+      },
+      {
+       "key": "PAY-5",
+       "repo": "r1",
+       "how": "pending",
+       "beyond": [],
+       "at_points": 2,
+       "outside": 0,
+       "credits": 31.0,
+       "merged_at": null
+      }
+     ],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 1,
+       "local": 0,
+       "pending": 0
+      }
+     ]
+    }
+   },
+   "r2": {
+    "at": 1794146400,
+    "rows": [],
+    "overlaps": [],
+    "funnel": {
+     "source": "evaluate",
+     "total": 0,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 0
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 0
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 0
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 0
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 0
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 0
+      }
+     ],
+     "questions": {
+      "asked": 0,
+      "answered": 0,
+      "delivered": 0
+     },
+     "unclassified": []
+    },
+    "eval": {
+     "available": true,
+     "error": "",
+     "ref": null,
+     "metrics": [
+      {
+       "id": "autonomy",
+       "label": "自主度",
+       "value": null,
+       "rule": "交接之后，除了必经的审批（REQUIREMENTS / DESIGN / INCEPTION / PLAN / RELEASE、验收），没有人做过任何事，而且交付正确"
+      },
+      {
+       "id": "delivery",
+       "label": "交付正确率",
+       "value": null,
+       "rule": "一次通过验收，合并后 14 天内没有回滚、修复提交或新缺陷认领"
+      },
+      {
+       "id": "judgment",
+       "label": "介入落在判断点",
+       "value": null,
+       "rule": "判断点 = Lean 的审批口令和桥上的 park 问题"
+      },
+      {
+       "id": "repeat_rate",
+       "label": "重复纠正率",
+       "value": null,
+       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+      },
+      {
+       "id": "useful",
+       "label": "知识有用率",
+       "value": null,
+       "rule": "被引用过的条目 ÷ 现有条目"
+      },
+      {
+       "id": "staleness",
+       "label": "过时与冲突",
+       "value": null,
+       "rule": "过时引用 + 同名术语 + 本期覆盖或撤回"
+      },
+      {
+       "id": "credits_per_success",
+       "label": "每个正确交付的 credits",
+       "value": null,
+       "rule": "完成的 run 花的 credits 合计 ÷ 正确交付数；只用来诊断，不设上限"
+      }
+     ],
+     "queue": [],
+     "skipped": [],
+     "notes": [],
+     "raw": ""
+    },
+    "counts": {
+     "claimed": 0,
+     "local": 0,
+     "handed_over": 0,
+     "rejected": 0,
+     "running": 0,
+     "parked": 0,
+     "acceptance": 0,
+     "merged": 0,
+     "closed": 0
+    },
+    "errors": [
+     {
+      "repo": "r2",
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+     }
+    ],
+    "cto": {
+     "available": false,
+     "sentence": "还没有可以算的数：需求合并以后，这里会说它们是怎么交付的。",
+     "ref": null,
+     "unattended": null,
+     "stepped_in": null,
+     "credits": {
+      "per_req": null,
+      "total": null,
+      "reqs": 0
+     },
+     "runs": [],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      }
+     ]
+    }
+   },
+   "r3": {
+    "at": 1794146400,
+    "rows": [
+     {
+      "repo": "r3",
+      "key": "ORD-1",
+      "title": "下单页地址校验",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-1-order-1",
+      "intent": "261000-order-1",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1788286020.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "下单页地址校验：做完了，合并进 main。",
+      "credits": 14.2,
+      "updated_at": 1788288120,
+      "mr": {
+       "iid": 10,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/10",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-1-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-2",
+      "title": "优惠券叠加规则",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-2-order-2",
+      "intent": "261001-order-2",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1788889140.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "优惠券叠加规则：做完了，合并进 main。",
+      "credits": 21.9,
+      "updated_at": 1788891240,
+      "mr": {
+       "iid": 11,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/11",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-2-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-3",
+      "title": "订单导出加筛选",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-3-order-3",
+      "intent": "261002-order-3",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1789664520.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "订单导出加筛选：做完了，合并进 main。",
+      "credits": 26.4,
+      "updated_at": 1789666620,
+      "mr": {
+       "iid": 12,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/12",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-3-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-4",
+      "title": "取消订单的退款入口",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-4-order-4",
+      "intent": "261003-order-4",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1790262420.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "取消订单的退款入口：做完了，合并进 main。",
+      "credits": 17.8,
+      "updated_at": 1790264520,
+      "mr": {
+       "iid": 13,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/13",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-4-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-5",
+      "title": "发票抬头保存",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-5-order-5",
+      "intent": "261004-order-5",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1790954640.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "发票抬头保存：做完了，合并进 main。",
+      "credits": 9.6,
+      "updated_at": 1790956740,
+      "mr": {
+       "iid": 14,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/14",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-6",
+      "title": "订单备注长度",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-6-order-6",
+      "intent": "261005-order-6",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1791570240.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "订单备注长度：做完了，合并进 main。",
+      "credits": 11.3,
+      "updated_at": 1791572340,
+      "mr": {
+       "iid": 15,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/15",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-6-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-7",
+      "title": "物流单号回填",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-7-order-7",
+      "intent": "261006-order-7",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1792253220.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "物流单号回填：做完了，合并进 main。",
+      "credits": 19.5,
+      "updated_at": 1792255320,
+      "mr": {
+       "iid": 16,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/16",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-7-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-8",
+      "title": "拆单时运费分摊",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-8-order-8",
+      "intent": "261007-order-8",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并，在观察合并后的 14 天（到 11-11）",
+       "line": null,
+       "raw": "",
+       "do": "watch",
+       "since": 1793117160.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "拆单时运费分摊：做完了，合并进 main。",
+      "credits": 33.7,
+      "updated_at": 1793119260,
+      "mr": {
+       "iid": 17,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/17",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-8-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-9",
+      "title": "订单列表分页",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-9-order-9",
+      "intent": "261008-order-9",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "people",
+       "text": "已合并，有 1 条新知识等 erin 回写 Brain",
+       "line": null,
+       "raw": "",
+       "do": "write_back",
+       "since": 1793904720.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": "订单列表分页：做完了，合并进 main。",
+      "credits": 15.1,
+      "updated_at": 1793906820,
+      "mr": {
+       "iid": 18,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/18",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-9-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     }
+    ],
+    "overlaps": [],
+    "funnel": {
+     "source": "evaluate",
+     "total": 0,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 0
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 0
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 0
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 0
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 0
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 0
+      }
+     ],
+     "questions": {
+      "asked": 0,
+      "answered": 0,
+      "delivered": 0
+     },
+     "unclassified": []
+    },
+    "eval": {
+     "available": true,
+     "error": "",
+     "ref": "远端的 main 分支",
+     "metrics": [
+      {
+       "id": "autonomy",
+       "label": "自主度",
+       "value": [
+        5,
+        7
+       ],
+       "rule": "交接之后，除了必经的审批（REQUIREMENTS / DESIGN / INCEPTION / PLAN / RELEASE、验收），没有人做过任何事，而且交付正确"
+      },
+      {
+       "id": "delivery",
+       "label": "交付正确率",
+       "value": null,
+       "rule": "一次通过验收，合并后 14 天内没有回滚、修复提交或新缺陷认领"
+      },
+      {
+       "id": "judgment",
+       "label": "介入落在判断点",
+       "value": [
+        39,
+        40
+       ],
+       "rule": "判断点 = Lean 的审批口令和桥上的 park 问题"
+      },
+      {
+       "id": "repeat_rate",
+       "label": "重复纠正率",
+       "value": null,
+       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+      },
+      {
+       "id": "useful",
+       "label": "知识有用率",
+       "value": null,
+       "rule": "被引用过的条目 ÷ 现有条目"
+      },
+      {
+       "id": "staleness",
+       "label": "过时与冲突",
+       "value": null,
+       "rule": "过时引用 + 同名术语 + 本期覆盖或撤回"
+      },
+      {
+       "id": "credits_per_success",
+       "label": "每个正确交付的 credits",
+       "value": null,
+       "rule": "完成的 run 花的 credits 合计 ÷ 正确交付数；只用来诊断，不设上限"
+      }
+     ],
+     "queue": [],
+     "skipped": [],
+     "notes": [],
+     "raw": ""
+    },
+    "counts": {
+     "claimed": 0,
+     "local": 0,
+     "handed_over": 0,
+     "rejected": 0,
+     "running": 0,
+     "parked": 0,
+     "acceptance": 0,
+     "merged": 9,
+     "closed": 0
+    },
+    "errors": [],
+    "cto": {
+     "available": true,
+     "sentence": "交给运行机的 7 个需求里，5 个交接以后没人插手就做完了。人介入了 40 次（本机做的也算），39 次落在判断点上。有 credits 的 9 个需求，平均每个 18.8 credits。",
+     "ref": "远端的 main 分支",
+     "unattended": [
+      5,
+      7
+     ],
+     "stepped_in": {
+      "at_points": 39,
+      "outside": 1,
+      "kinds": [
+       {
+        "label": "批准",
+        "n": 37,
+        "point": true
+       },
+       {
+        "label": "回答问题",
+        "n": 2,
+        "point": true
+       },
+       {
+        "label": "交接后推代码",
+        "n": 1,
+        "point": false
+       }
+      ]
+     },
+     "credits": {
+      "per_req": 18.8,
+      "total": 169.5,
+      "reqs": 9
+     },
+     "runs": [
+      {
+       "key": "ORD-1",
+       "repo": "r3",
+       "how": "unattended",
+       "beyond": [],
+       "at_points": 4,
+       "outside": 0,
+       "credits": 14.2,
+       "merged_at": 1788286020
+      },
+      {
+       "key": "ORD-2",
+       "repo": "r3",
+       "how": "unattended",
+       "beyond": [],
+       "at_points": 4,
+       "outside": 0,
+       "credits": 21.9,
+       "merged_at": 1788889140
+      },
+      {
+       "key": "ORD-3",
+       "repo": "r3",
+       "how": "people",
+       "beyond": [
+        "交接后推代码"
+       ],
+       "at_points": 5,
+       "outside": 1,
+       "credits": 26.4,
+       "merged_at": 1789664520
+      },
+      {
+       "key": "ORD-4",
+       "repo": "r3",
+       "how": "unattended",
+       "beyond": [],
+       "at_points": 4,
+       "outside": 0,
+       "credits": 17.8,
+       "merged_at": 1790262420
+      },
+      {
+       "key": "ORD-5",
+       "repo": "r3",
+       "how": "local",
+       "beyond": [],
+       "at_points": 3,
+       "outside": 0,
+       "credits": 9.6,
+       "merged_at": 1790954640
+      },
+      {
+       "key": "ORD-6",
+       "repo": "r3",
+       "how": "unattended",
+       "beyond": [],
+       "at_points": 5,
+       "outside": 0,
+       "credits": 11.3,
+       "merged_at": 1791570240
+      },
+      {
+       "key": "ORD-7",
+       "repo": "r3",
+       "how": "unattended",
+       "beyond": [],
+       "at_points": 4,
+       "outside": 0,
+       "credits": 19.5,
+       "merged_at": 1792253220
+      },
+      {
+       "key": "ORD-8",
+       "repo": "r3",
+       "how": "people",
+       "beyond": [
+        "回答问题"
+       ],
+       "at_points": 5,
+       "outside": 0,
+       "credits": 33.7,
+       "merged_at": 1793117160
+      },
+      {
+       "key": "ORD-9",
+       "repo": "r3",
+       "how": "pending",
+       "beyond": [],
+       "at_points": 5,
+       "outside": 0,
+       "credits": 15.1,
+       "merged_at": 1793904720
+      },
+      {
+       "key": "ORD-10",
+       "repo": "r3",
+       "how": "pending",
+       "beyond": [],
+       "at_points": 2,
+       "outside": 0,
+       "credits": 7.4,
+       "merged_at": null
+      }
+     ],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 1,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 1,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 1,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 1,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 1,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 1,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 1,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 1,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      }
+     ]
+    }
+   },
+   "r4": {
+    "at": 1794146400,
+    "rows": [
+     {
+      "repo": "r4",
+      "key": "TOOL-1",
+      "title": "价格表批量导入",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/TOOL-1-price-import",
+      "intent": "261108-price-import",
+      "lean": {
+       "stage": "application-design",
+       "stage_label": "应用设计",
+       "stage_n": 4,
+       "stage_state": "started",
+       "done": 3,
+       "total": 11,
+       "done_n": 1,
+       "skipped_n": 2,
+       "next": {
+        "id": "application-design",
+        "label": "应用设计",
+        "n": 4
+       }
+      },
+      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "waits": {
+       "who": "agent",
+       "text": "AI 在做「应用设计」",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": null,
+       "where": null,
+       "review": false
+      },
+      "summary": null,
+      "credits": 4.9,
+      "updated_at": 1794146340,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/shop-tools/price-import",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "tools/price"
+      ],
+      "local_only": true,
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+     }
+    ],
+    "overlaps": [],
+    "funnel": {
+     "source": "evaluate",
+     "total": 0,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 0
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 0
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 0
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 0
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 0
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 0
+      }
+     ],
+     "questions": {
+      "asked": 0,
+      "answered": 0,
+      "delivered": 0
+     },
+     "unclassified": []
+    },
+    "eval": {
+     "available": true,
+     "error": "",
+     "ref": null,
+     "metrics": [
+      {
+       "id": "autonomy",
+       "label": "自主度",
+       "value": null,
+       "rule": "交接之后，除了必经的审批（REQUIREMENTS / DESIGN / INCEPTION / PLAN / RELEASE、验收），没有人做过任何事，而且交付正确"
+      },
+      {
+       "id": "delivery",
+       "label": "交付正确率",
+       "value": null,
+       "rule": "一次通过验收，合并后 14 天内没有回滚、修复提交或新缺陷认领"
+      },
+      {
+       "id": "judgment",
+       "label": "介入落在判断点",
+       "value": null,
+       "rule": "判断点 = Lean 的审批口令和桥上的 park 问题"
+      },
+      {
+       "id": "repeat_rate",
+       "label": "重复纠正率",
+       "value": null,
+       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+      },
+      {
+       "id": "useful",
+       "label": "知识有用率",
+       "value": null,
+       "rule": "被引用过的条目 ÷ 现有条目"
+      },
+      {
+       "id": "staleness",
+       "label": "过时与冲突",
+       "value": null,
+       "rule": "过时引用 + 同名术语 + 本期覆盖或撤回"
+      },
+      {
+       "id": "credits_per_success",
+       "label": "每个正确交付的 credits",
+       "value": null,
+       "rule": "完成的 run 花的 credits 合计 ÷ 正确交付数；只用来诊断，不设上限"
+      }
+     ],
+     "queue": [],
+     "skipped": [],
+     "notes": [],
+     "raw": ""
+    },
+    "counts": {
+     "claimed": 0,
+     "local": 1,
+     "handed_over": 0,
+     "rejected": 0,
+     "running": 0,
+     "parked": 0,
+     "acceptance": 0,
+     "merged": 0,
+     "closed": 0
+    },
+    "errors": [],
+    "cto": {
+     "available": false,
+     "sentence": "这个仓库只在本机做，不交给运行机。有 credits 的 1 个需求，平均每个 4.9 credits。",
+     "ref": null,
+     "unattended": null,
+     "stepped_in": null,
+     "credits": {
+      "per_req": 4.9,
+      "total": 4.9,
+      "reqs": 1
+     },
+     "runs": [],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      }
+     ]
+    }
+   },
+   "runner": {
+    "at": 1794146400,
+    "rows": [
+     {
+      "repo": "runner",
+      "key": "PAY-9",
+      "title": "PAY-9",
+      "owner": null,
+      "source": "product",
+      "state": "handed_over",
+      "state_label": "已交接",
+      "where": "runner",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "bridge",
+       "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": null,
+       "where": null,
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": 1794146340.0,
+      "mr": {
+       "iid": 53,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/53",
+       "state": null
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-PAY-9-1"
+      ],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-4",
+      "title": "对账单按商户拆分",
+      "owner": "carol",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/carol/PAY-4-merchant-split",
+      "intent": "261105-merchant-split",
+      "lean": {
+       "stage": "functional-design",
+       "stage_label": "功能设计",
+       "stage_n": 6,
+       "stage_state": "started",
+       "done": 5,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 3,
+       "next": {
+        "id": "functional-design",
+        "label": "功能设计",
+        "n": 6
+       }
+      },
+      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "waits": {
+       "who": "people",
+       "text": "等人在 MR 上回答 D-2（设计）",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": 1794135600.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "对账单按商户拆成一户一份，大商户按小时切。",
+      "credits": 6.1,
+      "updated_at": 1794135600.0,
+      "mr": {
+       "iid": 41,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-4-1",
+      "run_ids": [
+       "RUN-PAY-4-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-2"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-5",
+      "title": "退款回调失败重试",
+      "owner": "alice",
+      "source": "product",
+      "state": "acceptance",
+      "state_label": "等验收",
+      "where": "runner",
+      "branch": "ai/alice/PAY-5-callback-retry",
+      "intent": "261104-callback-retry",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "started",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "product",
+       "text": "等产品在 MR 上验收 D-3（approve / reject）",
+       "line": null,
+       "raw": "",
+       "do": "accept",
+       "since": 1794056400.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "退款回调失败自动重试，第 6 次转人工处理。",
+      "credits": 24.2,
+      "updated_at": 1794052800.0,
+      "mr": {
+       "iid": 44,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-5-1",
+      "run_ids": [
+       "RUN-PAY-5-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-3"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "ORD-10",
+      "title": "订单状态推送到企业微信",
+      "owner": "erin",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/erin/ORD-10-wecom-push",
+      "intent": "261106-wecom-push",
+      "lean": {
+       "stage": "code-generation",
+       "stage_label": "代码生成",
+       "stage_n": 9,
+       "stage_state": "started",
+       "done": 8,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 6,
+       "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+       }
+      },
+      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "waits": {
+       "who": "people",
+       "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": null,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "订单状态变化时推送到企业微信，失败自动重试。",
+      "credits": 7.4,
+      "updated_at": 1794146160.0,
+      "mr": {
+       "iid": 19,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/19",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-ORD-10-1",
+      "run_ids": [
+       "RUN-ORD-10-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     }
+    ],
+    "overlaps": [],
+    "funnel": {
+     "source": "evaluate",
+     "total": 0,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 0
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 0
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 0
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 0
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 0
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 0
+      }
+     ],
+     "questions": {
+      "asked": 0,
+      "answered": 0,
+      "delivered": 0
+     },
+     "unclassified": []
+    },
+    "eval": {
+     "available": true,
+     "error": "",
+     "ref": null,
+     "metrics": [
+      {
+       "id": "autonomy",
+       "label": "自主度",
+       "value": null,
+       "rule": "交接之后，除了必经的审批（REQUIREMENTS / DESIGN / INCEPTION / PLAN / RELEASE、验收），没有人做过任何事，而且交付正确"
+      },
+      {
+       "id": "delivery",
+       "label": "交付正确率",
+       "value": null,
+       "rule": "一次通过验收，合并后 14 天内没有回滚、修复提交或新缺陷认领"
+      },
+      {
+       "id": "judgment",
+       "label": "介入落在判断点",
+       "value": null,
+       "rule": "判断点 = Lean 的审批口令和桥上的 park 问题"
+      },
+      {
+       "id": "repeat_rate",
+       "label": "重复纠正率",
+       "value": null,
+       "rule": "correction 的重复次数 ÷ 全部纠正（越低越好）"
+      },
+      {
+       "id": "useful",
+       "label": "知识有用率",
+       "value": null,
+       "rule": "被引用过的条目 ÷ 现有条目"
+      },
+      {
+       "id": "staleness",
+       "label": "过时与冲突",
+       "value": null,
+       "rule": "过时引用 + 同名术语 + 本期覆盖或撤回"
+      },
+      {
+       "id": "credits_per_success",
+       "label": "每个正确交付的 credits",
+       "value": null,
+       "rule": "完成的 run 花的 credits 合计 ÷ 正确交付数；只用来诊断，不设上限"
+      }
+     ],
+     "queue": [
+      {
+       "key": "PAY-4",
+       "intent": "261105-merchant-split",
+       "reasons": [
+        "验收被驳回 1 次",
+        "判断点之外有人介入 2 次（交接后推代码）"
+       ]
+      }
+     ],
+     "skipped": [],
+     "notes": [],
+     "raw": ""
+    },
+    "counts": {
+     "claimed": 0,
+     "local": 0,
+     "handed_over": 1,
+     "rejected": 0,
+     "running": 0,
+     "parked": 2,
+     "acceptance": 1,
+     "merged": 0,
+     "closed": 0
+    },
+    "errors": [],
+    "cto": {
+     "available": false,
+     "sentence": "有 credits 的 3 个需求，平均每个 12.6 credits。",
+     "ref": null,
+     "unattended": null,
+     "stepped_in": null,
+     "credits": {
+      "per_req": 12.6,
+      "total": 37.7,
+      "reqs": 3
+     },
+     "runs": [],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      }
+     ]
+    }
+   }
+  },
+  "noeval": {
+   "all": {
+    "at": 1794146400,
+    "rows": [
+     {
+      "repo": "r1",
+      "key": "PAY-3",
+      "title": "退款单导出 CSV",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/PAY-3-refund-export",
+      "intent": "261107-refund-export",
+      "lean": {
+       "stage": "code-generation",
+       "stage_label": "代码生成",
+       "stage_n": 9,
+       "stage_state": "started",
+       "done": 8,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 4,
+       "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+       }
+      },
+      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "waits": {
+       "who": "you",
+       "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
+       "line": "approve PLAN 5d1e7a90",
+       "raw": "",
+       "do": "approve",
+       "since": 1794146040.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款单可以导出成 CSV，给财务对账用（规模中）。",
+      "credits": 12.4,
+      "updated_at": 1794146040,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [
+       "PAY-4"
+      ],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/",
+       "src/export/csv.py"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-7",
+      "title": "退款原因下拉框",
+      "owner": "alice",
+      "source": "product",
+      "state": "rejected",
+      "state_label": "接手被拒",
+      "where": "branch",
+      "branch": "ai/alice/PAY-7-refund-reason",
+      "intent": "261106-refund-reason",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "接手被拒：标签是 bob 打的，不是负责人 alice",
+       "line": null,
+       "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
+       "do": "redo_handoff",
+       "since": 1794129840.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款时选原因，原因列表在后台维护。",
+      "credits": 18.2,
+      "updated_at": 1794128400,
+      "mr": {
+       "iid": 46,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/46",
+       "state": "opened"
+      },
+      "worktree": "/Users/alice/workplace/brain-app/PAY-7-refund-reason",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "web/refund/"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-6",
+      "title": "商户结算周报",
+      "owner": "carol",
+      "source": "product",
+      "state": "claimed",
+      "state_label": "已认领",
+      "where": "claim",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "people",
+       "text": "等 carol 开工",
+       "line": null,
+       "raw": "",
+       "do": "start",
+       "since": 1793973600.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": 1793973600,
+      "mr": null,
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-2",
+      "title": "退款单号校验",
+      "owner": "alice",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/alice/PAY-2-refund-id",
+      "intent": "261101-refund-id",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并，在观察合并后的 14 天（到 11-17）",
+       "line": null,
+       "raw": "",
+       "do": "watch",
+       "since": 1793661540.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
+      "credits": 22.7,
+      "updated_at": 1793663640,
+      "mr": {
+       "iid": 37,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/37",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-PAY-2-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/id.py"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-8",
+      "title": "退款失败的提醒",
+      "owner": "alice",
+      "source": "product",
+      "state": "claimed",
+      "state_label": "已认领",
+      "where": "claim",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "you",
+       "text": "已认领，还没开工",
+       "line": null,
+       "raw": "",
+       "do": "start",
+       "since": 1794128400.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": null,
+      "mr": null,
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-10",
+      "title": "退款审批加二次确认",
+      "owner": "alice",
+      "source": "product",
+      "state": "handed_over",
+      "state_label": "已交接",
+      "where": "branch",
+      "branch": "ai/alice/PAY-10-refund-confirm",
+      "intent": "261108-refund-confirm",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次",
+       "line": null,
+       "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
+       "do": "label_handoff",
+       "since": 1794118440.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款审批前弹一次二次确认，金额超过一万再要一次。",
+      "credits": 12.6,
+      "updated_at": 1794118440,
+      "mr": {
+       "iid": 52,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/52",
+       "state": "opened"
+      },
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "web/refund/"
+      ],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-1",
+      "title": "退款原因统计",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/PAY-1-refund-stats",
+      "intent": "261107-refund-stats",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）",
+       "line": null,
+       "raw": "",
+       "do": "reply",
+       "since": 1794133620.0,
+       "where": "session",
+       "review": true
+      },
+      "summary": "按退款原因汇总金额和笔数，给运营看哪类退款最多（规模小）。",
+      "credits": 9.8,
+      "updated_at": 1794133620,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/shop-pay/refund-stats",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/stats/"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-1",
+      "title": "下单页地址校验",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-1-order-1",
+      "intent": "261000-order-1",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1788286020.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "下单页地址校验：做完了，合并进 main。",
+      "credits": 14.2,
+      "updated_at": 1788288120,
+      "mr": {
+       "iid": 10,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/10",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-1-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-2",
+      "title": "优惠券叠加规则",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-2-order-2",
+      "intent": "261001-order-2",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1788889140.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "优惠券叠加规则：做完了，合并进 main。",
+      "credits": 21.9,
+      "updated_at": 1788891240,
+      "mr": {
+       "iid": 11,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/11",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-2-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-3",
+      "title": "订单导出加筛选",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-3-order-3",
+      "intent": "261002-order-3",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1789664520.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "订单导出加筛选：做完了，合并进 main。",
+      "credits": 26.4,
+      "updated_at": 1789666620,
+      "mr": {
+       "iid": 12,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/12",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-3-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-4",
+      "title": "取消订单的退款入口",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-4-order-4",
+      "intent": "261003-order-4",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1790262420.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "取消订单的退款入口：做完了，合并进 main。",
+      "credits": 17.8,
+      "updated_at": 1790264520,
+      "mr": {
+       "iid": 13,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/13",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-4-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-5",
+      "title": "发票抬头保存",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-5-order-5",
+      "intent": "261004-order-5",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1790954640.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "发票抬头保存：做完了，合并进 main。",
+      "credits": 9.6,
+      "updated_at": 1790956740,
+      "mr": {
+       "iid": 14,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/14",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-6",
+      "title": "订单备注长度",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-6-order-6",
+      "intent": "261005-order-6",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1791570240.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "订单备注长度：做完了，合并进 main。",
+      "credits": 11.3,
+      "updated_at": 1791572340,
+      "mr": {
+       "iid": 15,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/15",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-6-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-7",
+      "title": "物流单号回填",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-7-order-7",
+      "intent": "261006-order-7",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1792253220.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "物流单号回填：做完了，合并进 main。",
+      "credits": 19.5,
+      "updated_at": 1792255320,
+      "mr": {
+       "iid": 16,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/16",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-7-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-8",
+      "title": "拆单时运费分摊",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-8-order-8",
+      "intent": "261007-order-8",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并，在观察合并后的 14 天（到 11-11）",
+       "line": null,
+       "raw": "",
+       "do": "watch",
+       "since": 1793117160.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "拆单时运费分摊：做完了，合并进 main。",
+      "credits": 33.7,
+      "updated_at": 1793119260,
+      "mr": {
+       "iid": 17,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/17",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-8-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-9",
+      "title": "订单列表分页",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-9-order-9",
+      "intent": "261008-order-9",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "people",
+       "text": "已合并，有 1 条新知识等 erin 回写 Brain",
+       "line": null,
+       "raw": "",
+       "do": "write_back",
+       "since": 1793904720.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": "订单列表分页：做完了，合并进 main。",
+      "credits": 15.1,
+      "updated_at": 1793906820,
+      "mr": {
+       "iid": 18,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/18",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-9-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r4",
+      "key": "TOOL-1",
+      "title": "价格表批量导入",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/TOOL-1-price-import",
+      "intent": "261108-price-import",
+      "lean": {
+       "stage": "application-design",
+       "stage_label": "应用设计",
+       "stage_n": 4,
+       "stage_state": "started",
+       "done": 3,
+       "total": 11,
+       "done_n": 1,
+       "skipped_n": 2,
+       "next": {
+        "id": "application-design",
+        "label": "应用设计",
+        "n": 4
+       }
+      },
+      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "waits": {
+       "who": "agent",
+       "text": "AI 在做「应用设计」",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": null,
+       "where": null,
+       "review": false
+      },
+      "summary": null,
+      "credits": 4.9,
+      "updated_at": 1794146340,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/shop-tools/price-import",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "tools/price"
+      ],
+      "local_only": true,
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-9",
+      "title": "PAY-9",
+      "owner": null,
+      "source": "product",
+      "state": "handed_over",
+      "state_label": "已交接",
+      "where": "runner",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "bridge",
+       "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": null,
+       "where": null,
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": 1794146340.0,
+      "mr": {
+       "iid": 53,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/53",
+       "state": null
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-PAY-9-1"
+      ],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-4",
+      "title": "对账单按商户拆分",
+      "owner": "carol",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/carol/PAY-4-merchant-split",
+      "intent": "261105-merchant-split",
+      "lean": {
+       "stage": "functional-design",
+       "stage_label": "功能设计",
+       "stage_n": 6,
+       "stage_state": "started",
+       "done": 5,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 3,
+       "next": {
+        "id": "functional-design",
+        "label": "功能设计",
+        "n": 6
+       }
+      },
+      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "waits": {
+       "who": "people",
+       "text": "等人在 MR 上回答 D-2（设计）",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": 1794135600.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "对账单按商户拆成一户一份，大商户按小时切。",
+      "credits": 6.1,
+      "updated_at": 1794135600.0,
+      "mr": {
+       "iid": 41,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-4-1",
+      "run_ids": [
+       "RUN-PAY-4-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-2"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-5",
+      "title": "退款回调失败重试",
+      "owner": "alice",
+      "source": "product",
+      "state": "acceptance",
+      "state_label": "等验收",
+      "where": "runner",
+      "branch": "ai/alice/PAY-5-callback-retry",
+      "intent": "261104-callback-retry",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "started",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "product",
+       "text": "等产品在 MR 上验收 D-3（approve / reject）",
+       "line": null,
+       "raw": "",
+       "do": "accept",
+       "since": 1794056400.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "退款回调失败自动重试，第 6 次转人工处理。",
+      "credits": 24.2,
+      "updated_at": 1794052800.0,
+      "mr": {
+       "iid": 44,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-5-1",
+      "run_ids": [
+       "RUN-PAY-5-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-3"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "ORD-10",
+      "title": "订单状态推送到企业微信",
+      "owner": "erin",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/erin/ORD-10-wecom-push",
+      "intent": "261106-wecom-push",
+      "lean": {
+       "stage": "code-generation",
+       "stage_label": "代码生成",
+       "stage_n": 9,
+       "stage_state": "started",
+       "done": 8,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 6,
+       "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+       }
+      },
+      "stage": "做完 2 · 跳过 6 · 下一步：代码生成",
+      "waits": {
+       "who": "people",
+       "text": "D-1 的回答签名服务不签：看运行机页的拒签原因",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": null,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "订单状态变化时推送到企业微信，失败自动重试。",
+      "credits": 7.4,
+      "updated_at": 1794146160.0,
+      "mr": {
+       "iid": 19,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/19",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-ORD-10-1",
+      "run_ids": [
+       "RUN-ORD-10-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     }
+    ],
+    "overlaps": [
+     {
+      "keys": [
+       "PAY-3",
+       "PAY-4"
+      ],
+      "paths": [
+       "src/refund/"
+      ]
+     }
+    ],
+    "funnel": {
+     "source": "app",
+     "total": 4,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 1
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 0
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 2
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 0
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 0
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 1
+      }
+     ],
+     "questions": {
+      "asked": 0,
+      "answered": 0,
+      "delivered": 0
+     },
+     "unclassified": [
+      {
+       "key": "PAY-3",
+       "id": "D-4",
+       "src": "aidlc-docs/261107-refund-export/decisions.md#L11"
+      }
+     ]
+    },
+    "eval": {
+     "available": false,
+     "error": "这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit",
+     "raw": "",
+     "ref": null,
+     "metrics": [],
+     "queue": [],
+     "skipped": [],
+     "notes": []
+    },
+    "counts": {
+     "claimed": 2,
+     "local": 3,
+     "handed_over": 2,
+     "rejected": 1,
+     "running": 0,
+     "parked": 2,
+     "acceptance": 1,
+     "merged": 10,
+     "closed": 0
+    },
+    "errors": [
+     {
+      "repo": "r2",
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+     }
+    ],
+    "cto": {
+     "available": false,
+     "sentence": "有 credits 的 18 个需求，平均每个 16.0 credits。",
+     "ref": null,
+     "unattended": null,
+     "stepped_in": null,
+     "credits": {
+      "per_req": 16.0,
+      "total": 287.8,
+      "reqs": 18
+     },
+     "runs": [],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 2
+      }
+     ]
+    }
+   },
+   "r1": {
+    "at": 1794146400,
+    "rows": [
+     {
+      "repo": "r1",
+      "key": "PAY-3",
+      "title": "退款单导出 CSV",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/PAY-3-refund-export",
+      "intent": "261107-refund-export",
+      "lean": {
+       "stage": "code-generation",
+       "stage_label": "代码生成",
+       "stage_n": 9,
+       "stage_state": "started",
+       "done": 8,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 4,
+       "next": {
+        "id": "code-generation",
+        "label": "代码生成",
+        "n": 9
+       }
+      },
+      "stage": "做完 4 · 跳过 4 · 下一步：代码生成",
+      "waits": {
+       "who": "you",
+       "text": "等你批准 refund-api 的代码生成计划：读完再在会话里自己打那一行",
+       "line": "approve PLAN 5d1e7a90",
+       "raw": "",
+       "do": "approve",
+       "since": 1794146040.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款单可以导出成 CSV，给财务对账用（规模中）。",
+      "credits": 12.4,
+      "updated_at": 1794146040,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/PAY-3-refund-export",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [
+       "PAY-4"
+      ],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/",
+       "src/export/csv.py"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-7",
+      "title": "退款原因下拉框",
+      "owner": "alice",
+      "source": "product",
+      "state": "rejected",
+      "state_label": "接手被拒",
+      "where": "branch",
+      "branch": "ai/alice/PAY-7-refund-reason",
+      "intent": "261106-refund-reason",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "接手被拒：标签是 bob 打的，不是负责人 alice",
+       "line": null,
+       "raw": "label 'ai-handoff' was added by bob, not by the branch owner alice",
+       "do": "redo_handoff",
+       "since": 1794129840.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款时选原因，原因列表在后台维护。",
+      "credits": 18.2,
+      "updated_at": 1794128400,
+      "mr": {
+       "iid": 46,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/46",
+       "state": "opened"
+      },
+      "worktree": "/Users/alice/workplace/brain-app/PAY-7-refund-reason",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "web/refund/"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-6",
+      "title": "商户结算周报",
+      "owner": "carol",
+      "source": "product",
+      "state": "claimed",
+      "state_label": "已认领",
+      "where": "claim",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "people",
+       "text": "等 carol 开工",
+       "line": null,
+       "raw": "",
+       "do": "start",
+       "since": 1793973600.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": 1793973600,
+      "mr": null,
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-2",
+      "title": "退款单号校验",
+      "owner": "alice",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/alice/PAY-2-refund-id",
+      "intent": "261101-refund-id",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并，在观察合并后的 14 天（到 11-17）",
+       "line": null,
+       "raw": "",
+       "do": "watch",
+       "since": 1793661540.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "退款单号加上校验位，重复和非法单号在入口就拒掉。",
+      "credits": 22.7,
+      "updated_at": 1793663640,
+      "mr": {
+       "iid": 37,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/37",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-PAY-2-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/id.py"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-8",
+      "title": "退款失败的提醒",
+      "owner": "alice",
+      "source": "product",
+      "state": "claimed",
+      "state_label": "已认领",
+      "where": "claim",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "you",
+       "text": "已认领，还没开工",
+       "line": null,
+       "raw": "",
+       "do": "start",
+       "since": 1794128400.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": null,
+      "mr": null,
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-10",
+      "title": "退款审批加二次确认",
+      "owner": "alice",
+      "source": "product",
+      "state": "handed_over",
+      "state_label": "已交接",
+      "where": "branch",
+      "branch": "ai/alice/PAY-10-refund-confirm",
+      "intent": "261108-refund-confirm",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次",
+       "line": null,
+       "raw": "MR 上要有标签 ai-handoff。再交接一次：在这个需求的分支上跑 brain handoff（它会提交交接、推送、打标签）",
+       "do": "label_handoff",
+       "since": 1794118440.0,
+       "where": "session",
+       "review": false
+      },
+      "summary": "退款审批前弹一次二次确认，金额超过一万再要一次。",
+      "credits": 12.6,
+      "updated_at": 1794118440,
+      "mr": {
+       "iid": 52,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/52",
+       "state": "opened"
+      },
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "web/refund/"
+      ],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r1",
+      "key": "PAY-1",
+      "title": "退款原因统计",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/PAY-1-refund-stats",
+      "intent": "261107-refund-stats",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "todo",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "you",
+       "text": "构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）",
+       "line": null,
+       "raw": "",
+       "do": "reply",
+       "since": 1794133620.0,
+       "where": "session",
+       "review": true
+      },
+      "summary": "按退款原因汇总金额和笔数，给运营看哪类退款最多（规模小）。",
+      "credits": 9.8,
+      "updated_at": 1794133620,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/shop-pay/refund-stats",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "src/refund/stats/"
+      ],
+      "local_only": false,
+      "session_url": "/chat?sid=brain-PAY-1-3d8e"
+     }
+    ],
+    "overlaps": [
+     {
+      "keys": [
+       "PAY-3",
+       "PAY-4"
+      ],
+      "paths": [
+       "src/refund/"
+      ]
+     }
+    ],
+    "funnel": {
+     "source": "app",
+     "total": 4,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 1
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 0
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 2
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 0
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 0
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 1
+      }
+     ],
+     "questions": {
+      "asked": 0,
+      "answered": 0,
+      "delivered": 0
+     },
+     "unclassified": [
+      {
+       "key": "PAY-3",
+       "id": "D-4",
+       "src": "aidlc-docs/261107-refund-export/decisions.md#L11"
+      }
+     ]
+    },
+    "eval": {
+     "available": false,
+     "error": "这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit",
+     "raw": "",
+     "ref": null,
+     "metrics": [],
+     "queue": [],
+     "skipped": [],
+     "notes": []
+    },
+    "counts": {
+     "claimed": 2,
+     "local": 2,
+     "handed_over": 1,
+     "rejected": 1,
+     "running": 0,
+     "parked": 0,
+     "acceptance": 0,
+     "merged": 1,
+     "closed": 0
+    },
+    "errors": [],
+    "cto": {
+     "available": false,
+     "sentence": "有 credits 的 5 个需求，平均每个 15.1 credits。",
+     "ref": null,
+     "unattended": null,
+     "stepped_in": null,
+     "credits": {
+      "per_req": 15.1,
+      "total": 75.7,
+      "reqs": 5
+     },
+     "runs": [],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      }
+     ]
+    }
+   },
+   "r2": {
+    "at": 1794146400,
+    "rows": [],
+    "overlaps": [],
+    "funnel": {
+     "source": "app",
+     "total": 0,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 0
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 0
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 0
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 0
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 0
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 0
+      }
+     ],
+     "questions": {
+      "asked": 0,
+      "answered": 0,
+      "delivered": 0
+     },
+     "unclassified": []
+    },
+    "eval": {
+     "available": false,
+     "error": "这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit",
+     "raw": "",
+     "ref": null,
+     "metrics": [],
+     "queue": [],
+     "skipped": [],
+     "notes": []
+    },
+    "counts": {
+     "claimed": 0,
+     "local": 0,
+     "handed_over": 0,
+     "rejected": 0,
+     "running": 0,
+     "parked": 0,
+     "acceptance": 0,
+     "merged": 0,
+     "closed": 0
+    },
+    "errors": [
+     {
+      "repo": "r2",
+      "error": "还没装 brain-kit：在「导入仓库」里检查它，装上就能用"
+     }
+    ],
+    "cto": {
+     "available": false,
+     "sentence": "还没有可以算的数：需求合并以后，这里会说它们是怎么交付的。",
+     "ref": null,
+     "unattended": null,
+     "stepped_in": null,
+     "credits": {
+      "per_req": null,
+      "total": null,
+      "reqs": 0
+     },
+     "runs": [],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      }
+     ]
+    }
+   },
+   "r3": {
+    "at": 1794146400,
+    "rows": [
+     {
+      "repo": "r3",
+      "key": "ORD-1",
+      "title": "下单页地址校验",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-1-order-1",
+      "intent": "261000-order-1",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1788286020.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "下单页地址校验：做完了，合并进 main。",
+      "credits": 14.2,
+      "updated_at": 1788288120,
+      "mr": {
+       "iid": 10,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/10",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-1-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-2",
+      "title": "优惠券叠加规则",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-2-order-2",
+      "intent": "261001-order-2",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1788889140.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "优惠券叠加规则：做完了，合并进 main。",
+      "credits": 21.9,
+      "updated_at": 1788891240,
+      "mr": {
+       "iid": 11,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/11",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-2-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-3",
+      "title": "订单导出加筛选",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-3-order-3",
+      "intent": "261002-order-3",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1789664520.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "订单导出加筛选：做完了，合并进 main。",
+      "credits": 26.4,
+      "updated_at": 1789666620,
+      "mr": {
+       "iid": 12,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/12",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-3-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-4",
+      "title": "取消订单的退款入口",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-4-order-4",
+      "intent": "261003-order-4",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1790262420.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "取消订单的退款入口：做完了，合并进 main。",
+      "credits": 17.8,
+      "updated_at": 1790264520,
+      "mr": {
+       "iid": 13,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/13",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-4-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-5",
+      "title": "发票抬头保存",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-5-order-5",
+      "intent": "261004-order-5",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1790954640.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "发票抬头保存：做完了，合并进 main。",
+      "credits": 9.6,
+      "updated_at": 1790956740,
+      "mr": {
+       "iid": 14,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/14",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-6",
+      "title": "订单备注长度",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-6-order-6",
+      "intent": "261005-order-6",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1791570240.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "订单备注长度：做完了，合并进 main。",
+      "credits": 11.3,
+      "updated_at": 1791572340,
+      "mr": {
+       "iid": 15,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/15",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-6-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-7",
+      "title": "物流单号回填",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-7-order-7",
+      "intent": "261006-order-7",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": 1792253220.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "物流单号回填：做完了，合并进 main。",
+      "credits": 19.5,
+      "updated_at": 1792255320,
+      "mr": {
+       "iid": 16,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/16",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-7-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-8",
+      "title": "拆单时运费分摊",
+      "owner": "dave",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/dave/ORD-8-order-8",
+      "intent": "261007-order-8",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "nobody",
+       "text": "已合并，在观察合并后的 14 天（到 11-11）",
+       "line": null,
+       "raw": "",
+       "do": "watch",
+       "since": 1793117160.0,
+       "where": null,
+       "review": false
+      },
+      "summary": "拆单时运费分摊：做完了，合并进 main。",
+      "credits": 33.7,
+      "updated_at": 1793119260,
+      "mr": {
+       "iid": 17,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/17",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-8-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "r3",
+      "key": "ORD-9",
+      "title": "订单列表分页",
+      "owner": "erin",
+      "source": "product",
+      "state": "merged",
+      "state_label": "已合并",
+      "where": "main",
+      "branch": "ai/erin/ORD-9-order-9",
+      "intent": "261008-order-9",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "done",
+       "done": 11,
+       "total": 11,
+       "done_n": 5,
+       "skipped_n": 6,
+       "next": null
+      },
+      "stage": "做完 5 · 跳过 6 · 全部做完",
+      "waits": {
+       "who": "people",
+       "text": "已合并，有 1 条新知识等 erin 回写 Brain",
+       "line": null,
+       "raw": "",
+       "do": "write_back",
+       "since": 1793904720.0,
+       "where": "app",
+       "review": false
+      },
+      "summary": "订单列表分页：做完了，合并进 main。",
+      "credits": 15.1,
+      "updated_at": 1793906820,
+      "mr": {
+       "iid": 18,
+       "url": "https://gitlab.example.com/shop/shop-order/-/merge_requests/18",
+       "state": "merged"
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-ORD-9-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     }
+    ],
+    "overlaps": [],
+    "funnel": {
+     "source": "app",
+     "total": 0,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 0
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 0
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 0
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 0
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 0
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 0
+      }
+     ],
+     "questions": {
+      "asked": 0,
+      "answered": 0,
+      "delivered": 0
+     },
+     "unclassified": []
+    },
+    "eval": {
+     "available": false,
+     "error": "这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit",
+     "raw": "",
+     "ref": null,
+     "metrics": [],
+     "queue": [],
+     "skipped": [],
+     "notes": []
+    },
+    "counts": {
+     "claimed": 0,
+     "local": 0,
+     "handed_over": 0,
+     "rejected": 0,
+     "running": 0,
+     "parked": 0,
+     "acceptance": 0,
+     "merged": 9,
+     "closed": 0
+    },
+    "errors": [],
+    "cto": {
+     "available": false,
+     "sentence": "有 credits 的 9 个需求，平均每个 18.8 credits。",
+     "ref": null,
+     "unattended": null,
+     "stepped_in": null,
+     "credits": {
+      "per_req": 18.8,
+      "total": 169.5,
+      "reqs": 9
+     },
+     "runs": [],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 1
+      }
+     ]
+    }
+   },
+   "r4": {
+    "at": 1794146400,
+    "rows": [
+     {
+      "repo": "r4",
+      "key": "TOOL-1",
+      "title": "价格表批量导入",
+      "owner": "alice",
+      "source": "product",
+      "state": "local",
+      "state_label": "本地开发中",
+      "where": "worktree",
+      "branch": "ai/alice/TOOL-1-price-import",
+      "intent": "261108-price-import",
+      "lean": {
+       "stage": "application-design",
+       "stage_label": "应用设计",
+       "stage_n": 4,
+       "stage_state": "started",
+       "done": 3,
+       "total": 11,
+       "done_n": 1,
+       "skipped_n": 2,
+       "next": {
+        "id": "application-design",
+        "label": "应用设计",
+        "n": 4
+       }
+      },
+      "stage": "做完 1 · 跳过 2 · 下一步：应用设计",
+      "waits": {
+       "who": "agent",
+       "text": "AI 在做「应用设计」",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": null,
+       "where": null,
+       "review": false
+      },
+      "summary": null,
+      "credits": 4.9,
+      "updated_at": 1794146340,
+      "mr": null,
+      "worktree": "/Users/alice/workplace/brain-app/shop-tools/price-import",
+      "run_ids": [],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [
+       "tools/price"
+      ],
+      "local_only": true,
+      "session_url": "/chat?sid=brain-TOOL-1-5a2c"
+     }
+    ],
+    "overlaps": [],
+    "funnel": {
+     "source": "app",
+     "total": 0,
+     "rows": [
+      {
+       "id": "person",
+       "label": "人",
+       "count": 0
+      },
+      {
+       "id": "check",
+       "label": "检查定的",
+       "count": 0
+      },
+      {
+       "id": "brain",
+       "label": "照 Brain",
+       "count": 0
+      },
+      {
+       "id": "agent",
+       "label": "AI 自己定的",
+       "count": 0
+      },
+      {
+       "id": "unknown",
+       "label": "看不出是谁定的",
+       "count": 0
+      },
+      {
+       "id": "unclassified",
+       "label": "没归类",
+       "count": 0
+      }
+     ],
+     "questions": {
+      "asked": 0,
+      "answered": 0,
+      "delivered": 0
+     },
+     "unclassified": []
+    },
+    "eval": {
+     "available": false,
+     "error": "这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit",
+     "raw": "",
+     "ref": null,
+     "metrics": [],
+     "queue": [],
+     "skipped": [],
+     "notes": []
+    },
+    "counts": {
+     "claimed": 0,
+     "local": 1,
+     "handed_over": 0,
+     "rejected": 0,
+     "running": 0,
+     "parked": 0,
+     "acceptance": 0,
+     "merged": 0,
+     "closed": 0
+    },
+    "errors": [],
+    "cto": {
+     "available": false,
+     "sentence": "这个仓库只在本机做，不交给运行机。有 credits 的 1 个需求，平均每个 4.9 credits。",
+     "ref": null,
+     "unattended": null,
+     "stepped_in": null,
+     "credits": {
+      "per_req": 4.9,
+      "total": 4.9,
+      "reqs": 1
+     },
+     "runs": [],
+     "weekly": [
+      {
+       "week": "2026-08-17",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-24",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-08-31",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-07",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-14",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-21",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-09-28",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-05",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-12",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-19",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-10-26",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      },
+      {
+       "week": "2026-11-02",
+       "unattended": 0,
+       "people": 0,
+       "local": 0,
+       "pending": 0
+      }
+     ]
+    }
+   },
+   "runner": {
+    "at": 1794146400,
+    "rows": [
+     {
+      "repo": "runner",
+      "key": "PAY-9",
+      "title": "PAY-9",
+      "owner": null,
+      "source": "product",
+      "state": "handed_over",
+      "state_label": "已交接",
+      "where": "runner",
+      "branch": null,
+      "intent": null,
+      "lean": {
+       "stage": null,
+       "stage_label": null,
+       "stage_n": null,
+       "stage_state": null,
+       "done": 0,
+       "total": 11,
+       "done_n": 0,
+       "skipped_n": 0,
+       "next": {
+        "id": "reverse-engineering",
+        "label": "逆向工程",
+        "n": 1
+       }
+      },
+      "stage": null,
+      "waits": {
+       "who": "bridge",
+       "text": "签名服务在签接手合同（RUN-PAY-9-1 先占着）",
+       "line": null,
+       "raw": "",
+       "do": "none",
+       "since": null,
+       "where": null,
+       "review": false
+      },
+      "summary": null,
+      "credits": null,
+      "updated_at": 1794146340.0,
+      "mr": {
+       "iid": 53,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/53",
+       "state": null
+      },
+      "worktree": null,
+      "run_ids": [
+       "RUN-PAY-9-1"
+      ],
+      "sessions": 0,
+      "overlap": [],
+      "open_questions": [],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-4",
+      "title": "对账单按商户拆分",
+      "owner": "carol",
+      "source": "product",
+      "state": "parked",
+      "state_label": "停下等回答",
+      "where": "runner",
+      "branch": "ai/carol/PAY-4-merchant-split",
+      "intent": "261105-merchant-split",
+      "lean": {
+       "stage": "functional-design",
+       "stage_label": "功能设计",
+       "stage_n": 6,
+       "stage_state": "started",
+       "done": 5,
+       "total": 11,
+       "done_n": 2,
+       "skipped_n": 3,
+       "next": {
+        "id": "functional-design",
+        "label": "功能设计",
+        "n": 6
+       }
+      },
+      "stage": "做完 2 · 跳过 3 · 下一步：功能设计",
+      "waits": {
+       "who": "people",
+       "text": "等人在 MR 上回答 D-2（设计）",
+       "line": null,
+       "raw": "",
+       "do": "answer",
+       "since": 1794135600.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "对账单按商户拆成一户一份，大商户按小时切。",
+      "credits": 6.1,
+      "updated_at": 1794135600.0,
+      "mr": {
+       "iid": 41,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/41",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-4-1",
+      "run_ids": [
+       "RUN-PAY-4-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-2"
+      ],
+      "expected_paths": [],
+      "local_only": false,
+      "session_url": null
+     },
+     {
+      "repo": "runner",
+      "key": "PAY-5",
+      "title": "退款回调失败重试",
+      "owner": "alice",
+      "source": "product",
+      "state": "acceptance",
+      "state_label": "等验收",
+      "where": "runner",
+      "branch": "ai/alice/PAY-5-callback-retry",
+      "intent": "261104-callback-retry",
+      "lean": {
+       "stage": "release",
+       "stage_label": "发布",
+       "stage_n": 11,
+       "stage_state": "started",
+       "done": 10,
+       "total": 11,
+       "done_n": 4,
+       "skipped_n": 6,
+       "next": {
+        "id": "release",
+        "label": "发布",
+        "n": 11
+       }
+      },
+      "stage": "做完 4 · 跳过 6 · 下一步：发布",
+      "waits": {
+       "who": "product",
+       "text": "等产品在 MR 上验收 D-3（approve / reject）",
+       "line": null,
+       "raw": "",
+       "do": "accept",
+       "since": 1794056400.0,
+       "where": "mr",
+       "review": false
+      },
+      "summary": "退款回调失败自动重试，第 6 次转人工处理。",
+      "credits": 24.2,
+      "updated_at": 1794052800.0,
+      "mr": {
+       "iid": 44,
+       "url": "https://gitlab.example.com/shop/shop-pay/-/merge_requests/44",
+       "state": null
+      },
+      "worktree": "/home/runner/brain/runs/RUN-PAY-5-1",
+      "run_ids": [
+       "RUN-PAY-5-1"
+      ],
+      "sessions": 1,
+      "overlap": [],
+      "open_questions": [
+       "D-3"
+      ],
       "expected_paths": [],
       "local_only": false,
       "session_url": null
@@ -9189,20 +16344,20 @@
      "running": 0,
      "parked": 2,
      "acceptance": 1,
-     "merged": 1,
+     "merged": 0,
      "closed": 0
     },
     "errors": [],
     "cto": {
      "available": false,
-     "sentence": "有 credits 的 4 个需求，平均每个 13.0 credits。",
+     "sentence": "有 credits 的 3 个需求，平均每个 12.6 credits。",
      "ref": null,
      "unattended": null,
      "stepped_in": null,
      "credits": {
-      "per_req": 13.0,
-      "total": 52.1,
-      "reqs": 4
+      "per_req": 12.6,
+      "total": 37.7,
+      "reqs": 3
      },
      "runs": [],
      "weekly": [
@@ -9288,7 +16443,7 @@
        "unattended": 0,
        "people": 0,
        "local": 0,
-       "pending": 1
+       "pending": 0
       }
      ]
     }

@@ -420,7 +420,8 @@ class Service:
         out = []
         for key, r in sorted(latest.items()):
             facts = {"key": key, "claim": None, "where": "runner", "branch": None, "owner": r.get("owner"),
-                     "worktree": None, "stages": [], "events": [], "approvals": [], "run": None, "park": None}
+                     "worktree": None, "stages": [], "events": [], "approvals": [], "run": None, "park": None,
+                     "project": r.get("project")}
             path = r.get("path")
             if path and os.path.isdir(path):
                 g = Git(path)
@@ -443,6 +444,29 @@ class Service:
             out.append((row, facts, decs))
         return out
 
+    def _team_split(self, mine: list[tuple[str, dict[str, Any], dict[str, Any]]], snap: dict[str, Any]
+                    ) -> tuple[list[tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]], set[tuple[str, str]]]:
+        """Team mode, one row per requirement: the runner's requirements listed as its own (_team_rows'), and the
+        (repo id, key) of this machine's rows (*mine*: repo id, facts, row) they stand for (deliveries.runner_takes)."""
+        team = self._team_rows(snap)
+        rid_of: dict[str, str] = {}
+        for rid, repo in self.repos.items():
+            if self._gitlab_of(repo)[1]:
+                rid_of.setdefault(self._gitlab_of(repo)[1], rid)
+        by ={(rid, f["key"]): (f, row) for rid, f, row in mine}
+        keep, taken = [], set()
+        for t in team:
+            rid = rid_of.get(str(t[1].get("project") or ""))
+            f, row = by.get((rid, t[0]["key"]), (None, None)) if rid else (None, None)
+            if deliveries.runner_takes(f, row, t[0]):
+                keep.append(t)
+                if f is not None:
+                    taken.add((rid, t[0]["key"]))
+        return keep, taken
+
+    def _team_on(self) -> bool:
+        return self.team is not None and self.team.host is not None
+
     def _runner_desc(self, facts: dict[str, Any], key: str, row: dict[str, Any]):
         path = facts.get("worktree")
         if not path:
@@ -455,31 +479,39 @@ class Service:
 
     def _overview_sync(self, which: str, snap: dict[str, Any]) -> dict[str, Any]:
         rows, errors, all_decisions, q_counts = [], [], [], {"asked": 0, "answered": 0, "delivered": 0}
+        team = self._team_on()
+        mine = []
         for rid, repo in self.repos.items():
-            if which not in ("all", rid):
+            if which not in ("all", rid) and not team:   # team mode: every repo's rows, to list each requirement once
                 continue
             try:
                 facts = repo.scan()
             except Exception as exc:  # noqa: BLE001
-                errors.append({"repo": rid, "error": str(exc)[:300]})
+                if which in ("all", rid):
+                    errors.append({"repo": rid, "error": str(exc)[:300]})
                 continue
+            mine += [(rid, f, self._row(repo, f, snap)) for f in facts]
+        runner, taken = self._team_split(mine, snap) if team else ([], set())
+        for rid, f, row in mine:
+            if which not in ("all", rid) or (rid, f["key"]) in taken:
+                continue
+            repo = self.repos[rid]
             base, project = self._gitlab_of(repo)
-            for f in facts:
-                row = self._row(repo, f, snap)
-                rows.append(row)
-                mr = self.mr.get(project, f["branch"]) if base and project and f.get("branch") else None
-                for k, n in deliveries.questions_asked(f, mr).items():
-                    q_counts[k] += n
-                intent = (f.get("run") or {}).get("intent")
-                all_decisions += [dict(d, key=f["key"]) for d in detail.decisions(
-                    f.get("decisions_text"), "aidlc-docs/%s/decisions.md" % intent if intent else "decisions.md",
-                    repo.cfg.get("bot_users") or [])]
+            rows.append(row)
+            mr = self.mr.get(project, f["branch"]) if base and project and f.get("branch") else None
+            for k, n in deliveries.questions_asked(f, mr).items():
+                q_counts[k] += n
+            intent = (f.get("run") or {}).get("intent")
+            all_decisions += [dict(d, key=f["key"]) for d in detail.decisions(
+                f.get("decisions_text"), "aidlc-docs/%s/decisions.md" % intent if intent else "decisions.md",
+                repo.cfg.get("bot_users") or [])]
         for rid, (path, err) in self.repo_errors.items():
             if which in ("all", rid):
                 errors.append({"repo": rid, "error": "%s：%s" % (path, err)})
         if which in ("all", "runner"):
-            for row, _, decs in self._team_rows(snap):
+            for row, f, decs in runner:
                 rows.append(row)
+                all_decisions += [dict(d, key=row["key"]) for d in detail.decisions(f.get("decisions_text"), "decisions.md", [])]
                 for d in decs:
                     if d.get("state") == "invalid" or d.get("state") in deliveries.NOT_POSTED:   # not on the MR (yet)
                         continue
@@ -994,29 +1026,33 @@ class Service:
     # ---- 待办 ----------------------------------------------------------------------------------------- #
 
     def _todo_sync(self, snap: dict[str, Any]) -> dict[str, Any]:
-        entries = []
+        entries, mine = [], []
         token = self._token_present()
         for rid, repo in self.repos.items():
             try:
                 facts = repo.scan()
             except Exception:  # noqa: BLE001
                 continue
+            mine += [(rid, f, self._row(repo, f, snap)) for f in facts]
+        runner, taken = self._team_split(mine, snap) if self._team_on() else ([], set())
+        for rid, f, row in mine:
+            repo = self.repos[rid]
             base, project = self._gitlab_of(repo)
             me = self.me_in(repo)
-            for f in facts:
-                row = self._row(repo, f, snap)
-                if row["state"] == "closed" or (row["state"] == "merged" and row["waits"]["who"] != "you"):
-                    continue    # a merge waits for nobody, unless its write-back waits for you
-                live = self._live(snap["by"].get(scope_of(rid, f["key"]), []))
-                own = bool(me) and me == f.get("owner")
-                entries.append({"row": row, "facts": f, "own": own, "has_session": bool(live),
-                                "can_post": own and bool(base and project) and token,
-                                "mr": self.mr.get(project, f.get("branch") or "") if base and project else None,
-                                "session": {"slot": live["slot"], "title": live["title"], "url": live["url"]} if live else None})
+            if (rid, f["key"]) in taken:
+                continue    # listed as the runner's
+            if row["state"] == "closed" or (row["state"] == "merged" and row["waits"]["who"] != "you"):
+                continue    # a merge waits for nobody, unless its write-back waits for you
+            live = self._live(snap["by"].get(scope_of(rid, f["key"]), []))
+            own = bool(me) and me == f.get("owner")
+            entries.append({"row": row, "facts": f, "own": own, "has_session": bool(live),
+                            "can_post": own and bool(base and project) and token,
+                            "mr": self.mr.get(project, f.get("branch") or "") if base and project else None,
+                            "session": {"slot": live["slot"], "title": live["title"], "url": live["url"]} if live else None})
         out = todo_mod.build(entries, team=False, crew_rows=self.crew["rows"])
-        if self.team is not None and self.team.host is not None:
+        if self._team_on():
             team_entries = [{"row": row, "decisions": decs, "mr_url": (row.get("mr") or {}).get("url")}
-                            for row, _, decs in self._team_rows(snap)]
+                            for row, _, decs in runner]
             t = todo_mod.build(team_entries, team=True, crew_rows=[])
             out["items"] += t["items"]
             out["team"] = True

@@ -902,13 +902,16 @@ def main() -> None:
     local = {"r4"}      # no GitLab: done only on this machine (shop-web, r2, is not loaded)
 
     runner_rows: list[dict] = []     # the team runner's rows (service._team_rows), made below with team mode's 待办
+    taken: set[tuple[str, str]] = set()     # team mode: the repos' rows the runner's stand for (service._team_split)
 
-    def overview_of(repo: str, evaluated: bool) -> dict:
+    def overview_of(repo: str, evaluated: bool, team: bool = False) -> dict:
         """交付总览 for 全部 or one repo, as service._overview_sync makes it: its rows, its repos' numbers; without
-        brainkit.evaluate the funnel is the app's own count and every merge is still 还没评."""
+        brainkit.evaluate the funnel is the app's own count and every merge is still 还没评. *team*: on the team
+        runner's machine, where each requirement is listed once (a handed-over one as the runner's)."""
         ids = [x for x in ("r1", "r3", "r4") if repo in ("all", x)]
         o = copy.deepcopy(ov)
-        o["rows"] = [r_ for r_ in all_rows if r_["repo"] in ids] + (copy.deepcopy(runner_rows) if repo == "runner" else [])
+        o["rows"] = [r_ for r_ in all_rows if r_["repo"] in ids and not (team and (r_["repo"], r_["key"]) in taken)] + (
+            copy.deepcopy(runner_rows) if team and repo in ("all", "runner") else [])
         o["overlaps"] = [x for x in ov["overlaps"] if any(r_["key"] == x["keys"][0] for r_ in o["rows"])]
         o["counts"] = deliveries.counts(o["rows"])
         o["errors"] = [e for e in ov["errors"] if repo in ("all", e["repo"])]
@@ -991,8 +994,14 @@ def main() -> None:
         row_t.update(run_ids=[run_id], credits=round(sum(x.get("credits") or 0 for x in sess), 3) or None, sessions=len(sess),
                      mr={"iid": int(rr["iid"]), "url": url, "state": None}, updated_at=lean_view.epoch(rr.get("updated")),
                      summary=mrdesc_view.plain_line((kw.get("mr_desc") or {}).get("first")) if f.get("run") else None)
-        team_entries.append({"row": row_t, "decisions": decs, "mr_url": url})
-        runner_rows.append(row_t)
+        rid = {"shop/shop-pay": "r1", "shop/shop-order": "r3"}.get(rr["project"])
+        mine = next((r_ for r_ in all_rows if (r_["repo"], r_["key"]) == (rid, key)), None)
+        own = next((x for x in reqs.get(rid, []) if x.key == key), None)
+        if deliveries.runner_takes(own.facts() if own and mine else None, mine, row_t):
+            team_entries.append({"row": row_t, "decisions": decs, "mr_url": url})
+            runner_rows.append(row_t)
+            if mine is not None:
+                taken.add((rid, key))
         brain_t = boards[bid]["brain"] if path and bid in boards else no_trace_brain(Req("r1", key, "", "", "", ""))
         b = snapshot(q, row_t, brain=brain_t, park=park, facts=f, team_decisions=decs, sessions=sess, me=None,
                      decisions=kw.get("decisions") or [], reflect=kw.get("reflect") or [],
@@ -1019,10 +1028,13 @@ def main() -> None:
             "sessions": [{k: x.get(k) for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                                  "last_activity", "opened_at", "project", "url", "error")} for x in sess],
             "credits": {"total": row_t["credits"], "note": detail.NO_TOKENS}, "brain": brain_t, "mr_desc": b["mr_desc"]}
-    world_todo["team"] = {"items": world_todo["ok"]["items"] + todo.build(team_entries, team=True, crew_rows=[])["items"],
+    team_items = todo.build(team_entries, team=True, crew_rows=[])["items"]
+    world_todo["team"] = {"items": [i for i in world_todo["ok"]["items"] if (i["repo"], i["key"]) not in taken] + team_items,
                           "team": True}
-    for e in ("eval", "noeval"):   # 交付总览 of 运行机 (team mode's 全部 is the repos' and these together)
-        overviews[e]["runner"] = overview_of("runner", e == "eval")
+    for e in ("eval", "noeval"):   # 交付总览 of 运行机, and team mode's 全部 and repos (each requirement once)
+        overviews[e]["runner"] = overview_of("runner", e == "eval", team=True)
+    overviews_team = {e: {x: overview_of(x, e == "eval", team=True) for x in ("all", "r1", "r2", "r3", "r4", "runner")}
+                      for e in ("eval", "noeval")}
     world_status = copy.deepcopy(status)
     world_status["repos"] = status["repos"] + [
         {"id": "r3", "path": "/Users/alice/workplace/shop-order", "name": "shop-order", "ok": True, "error": "", "pending": None,
@@ -1042,7 +1054,7 @@ def main() -> None:
     for r_ in world_status["repos"]:
         r_["remote"] = r_["id"] not in local and r_["id"] != "r2"
     world = {"note": "made by scripts/preview_world.py: do not edit by hand", "at": T0, "status": world_status, "overview": world_ov,
-             "overviews": overviews, "todo": world_todo, "boards": boards, "details": details, "stages": STAGES,
+             "overviews": overviews, "overviews_team": overviews_team, "todo": world_todo, "boards": boards, "details": details, "stages": STAGES,
              "brains": brains}
     (ROOT / "ui" / "preview" / "world.json").write_text(json.dumps(world, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     # the contract fixtures the UI tests read: the overview's numbers for its own rows, one live board and one merged
@@ -1053,7 +1065,7 @@ def main() -> None:
     # 待办's fixture: one item of every kind, each as todo.build made it in the world (team mode's runner questions, and
     # the KiroCrew item of the fixture's own /status rows, included), in the order the UI tests read them
     mine = world_todo["ok"]["items"]
-    pool = mine + world_todo["team"]["items"][len(mine):] + todo.build([], team=False, crew_rows=status["crew"]["rows"])["items"]
+    pool = mine + team_items + todo.build([], team=False, crew_rows=status["crew"]["rows"])["items"]
     tj = {"items": [next(i for i in pool if i["kind"] == k) for k in TODO_KINDS], "team": False}
     (FIX / "todo.json").write_text(json.dumps(tj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     st = json.loads((FIX / "status.json").read_text(encoding="utf-8"))   # as read: the world changed its crew rows

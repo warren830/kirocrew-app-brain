@@ -282,6 +282,20 @@ def team_classify(row: dict[str, Any], run_row: dict[str, Any], decisions: list[
     return put("running", "runner", "none", "运行机在跑")
 
 
+def runner_takes(f: dict[str, Any] | None, row: dict[str, Any] | None, runner_row: dict[str, Any]) -> bool:
+    """Team mode lists each requirement once. One the runner's ledger has a run of is the runner's (its facts win:
+    this machine's row is what it saw last), unless this machine's run of it was never handed over (taken back), or
+    its run is over by both counts (merged or closed): then its repo's row reads the merge, the 14 days after it and
+    the write-back into the Brain, which the ledger does not."""
+    if f is None or row is None:
+        return True
+    run = f.get("run") or {}
+    if run and not run.get("handoff"):
+        return False
+    ended = ("merged", "closed")
+    return not (runner_row["state"] in ended and row["state"] in ended)
+
+
 def overlaps(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Open requirements whose expected paths overlap (same path, or one inside the other), as the bridge warns."""
     live = [r for r in rows if r["state"] in OPEN_STATES and r["expected_paths"]]
