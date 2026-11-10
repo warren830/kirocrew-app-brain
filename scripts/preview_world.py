@@ -773,13 +773,15 @@ def main() -> None:
     p7.stage(t + 81 * M, "build-and-test", "done", note="verify PASS: 2 checks on code fingerprint %s" % sha("PAY-7", "fp")[:8])
     p7.handoff(t + 85 * M)
     reqs["r1"].append(p7)
-    why, raw = problems.reasons_text(["label 'ai-handoff' was added by bob, not by the branch owner alice"])
+    p7_why = ["label 'ai-handoff' was added by bob, not by the branch owner alice"]
+    why, raw = problems.reasons_text(p7_why)
     p7_refused = p7.hand_at + 25 * M        # the bridge's next round after the hand-over
     p7.rejected(p7_refused, why)
     p7_sess = dict(det["sessions"][0], slot="brain-PAY-7-2b9f", url="/chat?sid=brain-PAY-7-2b9f", title="PAY-7 退款原因下拉框",
                    credits=18.2, turns=27, busy=False, awaiting=False, last_activity=T0 - 5 * H)
     row = classified(p7, rows["PAY-7"], slot=p7_sess, mr={"state": "opened", "labels": ["ai-handoff-rejected"], "questions": [],
                                                           "rejected_reason": why, "rejected_raw": raw,
+                                                          "rejected_todo": problems.reasons_todo(p7_why),
                                                           "rejected_at": iso(p7_refused)})
     board_later(p7, row, decisions=decisions(p7, [("requirements", "原因列表在后台维护，页面只读", "运营要自己加原因", None, "agent", [])]),
                                   mr_desc=mrdesc(p7, first["PAY-7"]), credits=18.2,

@@ -38,7 +38,9 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
         base = {"repo": row["repo"], "key": row["key"], "title": row["title"], "line": None, "approval": None,
                 "mr_url": (row.get("mr") or {}).get("url"), "question": None, "session": e.get("session"),
                 "since": w.get("since") if w.get("since") is not None else row.get("updated_at"),
-                "review": bool(w.get("review")), "path": None}
+                "review": bool(w.get("review")), "path": None, "todo": "", "raw": ""}
+        # a refused or unlabelled hand-over: what to do (the bridge's reasons' own 做什么) and its words (细节)
+        said = {"todo": str(w.get("todo") or ""), "raw": str(w.get("raw") or "")}
         if team:
             if row["state"] == "parked" and (row.get("waits") or {}).get("who") == "people" and \
                     not any(d.get("state") == "open" for d in e.get("decisions") or []):
@@ -53,7 +55,7 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
                               "text": said or ("%s 等人在 MR 上回答" % d["id"] if kind == "question" else
                                                "%s 等产品在 MR 上验收" % d["id"])})
             if row["state"] == "rejected":
-                items.append({**base, "kind": "handoff_rejected", "text": row["waits"]["text"]})
+                items.append({**base, **said, "kind": "handoff_rejected", "text": row["waits"]["text"]})
             continue
         if w.get("who") != "you":
             continue
@@ -84,9 +86,9 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
                                                         for i in items):
                 items.append({**base, "kind": "acceptance", "text": "等产品在 MR 上验收"})
             if row["state"] == "handed_over" and (row.get("waits") or {}).get("who") == "you":
-                items.append({**base, "kind": "handoff_unlabelled", "text": row["waits"]["text"]})
+                items.append({**base, **said, "kind": "handoff_unlabelled", "text": row["waits"]["text"]})
         elif row["state"] == "rejected":
-            items.append({**base, "kind": "handoff_rejected", "text": row["waits"]["text"]})
+            items.append({**base, **said, "kind": "handoff_rejected", "text": row["waits"]["text"]})
         if len(items) == listed and DO_KIND.get(str(w.get("do"))):   # nothing more specific: the step itself
             items.append({**base, "kind": DO_KIND[str(w["do"])], "text": w.get("text") or "", "line": w.get("line")})
     for r in crew_rows:   # a FAIL only: a WARN (e.g. a runner-only check of a local-only repo) is a reminder, no 待办
@@ -97,5 +99,5 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
                           "title": "KiroCrew 检查" + (" · %s" % os.path.basename(os.path.normpath(repo)) if repo else ""),
                           "text": "%s。%s" % (r["text"], todo) if todo else r["text"], "line": None,
                           "approval": None, "mr_url": None, "question": None, "session": None, "since": None,
-                          "review": False, "path": None})
+                          "review": False, "path": None, "todo": "", "raw": ""})
     return {"items": items, "team": team}

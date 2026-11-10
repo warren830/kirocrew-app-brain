@@ -637,6 +637,12 @@ def reason(raw: Any, *, repo: str | None = None) -> dict[str, Any]:
     return fallback("FAIL", s, repo=repo, todo="看下面的原话")
 
 
+def reasons_todo(raws: Iterable[Any], limit: int = 300) -> str:
+    """What to do about the reasons of one refused hand-over, each rule's own 做什么 once, joined by 「；」."""
+    rs = [reason(r) for r in raws if str(r or "").strip()]
+    return "；".join(dict.fromkeys(r["todo"] for r in rs if r["todo"]))[:limit]
+
+
 def reasons_text(raws: Iterable[Any], limit: int = 200) -> tuple[str, str]:
     """(the reasons in short Chinese joined by 「；」, the raw ones joined by 「; 」) for one text field."""
     rs = [reason(r) for r in raws if str(r or "").strip()]

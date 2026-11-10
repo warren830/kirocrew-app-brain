@@ -68,10 +68,11 @@ def spaced(*parts: str) -> str:
 
 
 def waits(who: str, do: str, text: str, *, where: str | None = None, since: float | None = None,
-          line: str | None = None, raw: str = "", review: bool = False) -> dict[str, Any]:
+          line: str | None = None, raw: str = "", review: bool = False, todo: str = "") -> dict[str, Any]:
     """A row's ``waits`` (ui/src/types.ts Waits): who, the step (WaitDo), where it is taken, since when; *review*: the
-    reply is the review in a new session (开审查会话), not a turn in the one that wrote the code."""
-    return {"who": who, "text": text, "line": line, "raw": raw, "do": do,
+    reply is the review in a new session (开审查会话), not a turn in the one that wrote the code; *todo*: what to do,
+    in words, when the step alone does not say it (a refused hand-over: each reason's own 做什么)."""
+    return {"who": who, "text": text, "line": line, "raw": raw, "do": do, "todo": todo,
             "since": float(since) if isinstance(since, (int, float)) and not isinstance(since, bool) else None,
             "where": where, "review": bool(review)}
 
@@ -195,6 +196,7 @@ def classify(row: dict[str, Any], f: dict[str, Any], *, mr: dict[str, Any] | Non
         return put("rejected", you, "redo_handoff",
                    "接手被拒：" + (str((mr or {}).get("rejected_reason") or "看 MR 上的说明")[:200]), where="session",
                    raw=str((mr or {}).get("rejected_raw") or "")[:2000],   # the bridge's own words (problems.reason)
+                   todo=str((mr or {}).get("rejected_todo") or ""),
                    since=lean_view.epoch((mr or {}).get("rejected_at")) or f.get("tip_at"))
     open_q = [q for q in (mr or {}).get("questions") or [] if q.get("state") == "open"]
     if park_waiting(park) or open_q:

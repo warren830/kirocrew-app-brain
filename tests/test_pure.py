@@ -76,6 +76,7 @@ def test_the_bridges_mr_comments_are_read_back(decisions):
     only = mrinfo.parse_notes(notes[:1])
     assert only["rejected_reason"] == "标签是 bob 打的，不是负责人 alice"          # the bridge's reason in short Chinese ...
     assert only["rejected_raw"] == "label 'ai-handoff' was added by bob, not by the branch owner alice"   # ... and as it wrote it
+    assert only["rejected_todo"] == "让 alice 自己交接（交接时会打标签）"                 # ... and what to do: the rule's own
     fake = mrinfo.parse_notes([note(1, ask(decisions, "D-9", clarify, ["mallory"], "clarify"), "mallory")],
                               bridge_user="brain-bridge")
     assert fake["questions"] == []  # with the bridge's account known, nobody else's comment reads as a question
@@ -489,6 +490,26 @@ def test_todo_lists_what_waits_for_you_the_way_the_rows_say_it():
     assert [(i["kind"], i["key"], i["text"]) for i in got["items"]] == [("reply", "PAY-1", "下一步是发布"),
                                                                       ("start", "PAY-2", "已认领，还没开工")]
     assert got["items"][0]["session"] == sess and got["items"][0]["since"] == 9.0 and got["items"][1]["since"] == 5.0
+
+
+def test_a_refused_hand_over_in_todo_says_the_reasons_own_todo_and_keeps_the_bridges_words():
+    """REST-12: a 接手被拒 card says each reason's own 做什么 (problems.REASON_RULES), not only a generic line, and the
+    bridge's words (with the 做法) are on the item for its 细节, as the board has them."""
+    todo = mod("todo")
+    raws = ["label 'ai-handoff' was added by bob, not by the branch owner alice", "brain_commit 0123456789ab does not exist"]
+    why, raw = mod("problems").reasons_text(raws)
+    mr = {"state": "opened", "labels": ["ai-handoff-rejected"], "questions": [], "rejected_reason": why, "rejected_raw": raw,
+          "rejected_todo": mod("problems").reasons_todo(raws), "rejected_at": "2026-11-09T02:00:00Z"}
+    f = {"key": "PAY-7", "owner": "alice", "claim": {"owner": "alice", "title": "t"}, "approvals": [], "park": None,
+         "run": {"intent": "i", "branch": "ai/alice/PAY-7-x", "handoff": {"local_head": "a" * 40}}, "stages": []}
+    row = deliveries.base_row("r1", f)
+    deliveries.classify(row, f, cfg={"rejected_label": "ai-handoff-rejected"}, me="alice", now=1794186500.0, mr=mr, slot=None)
+    assert row["state"] == "rejected" and row["waits"]["todo"] == "让 alice 自己交接（交接时会打标签）；让这个分支跟上默认分支的最新版，再交接一次"
+    (item,) = todo.build([{"row": row, "facts": f, "own": True, "has_session": False, "can_post": False, "mr": mr,
+                           "session": None}], team=False, crew_rows=[])["items"]
+    assert item["kind"] == "handoff_rejected" and item["todo"] == row["waits"]["todo"]
+    assert item["raw"].startswith("label 'ai-handoff' was added by bob") and "做法：git rebase <默认分支>" in item["raw"]
+    assert not re.search(r"label|brain_commit|rebase|ai-handoff|git ", item["text"] + item["todo"]), item
 
 
 def test_team_todo_says_a_runner_question_as_the_detail_does_its_kind_in_words():
