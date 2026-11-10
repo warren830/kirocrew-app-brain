@@ -179,8 +179,9 @@ class Req:
     def rejected(self, at: float, reason: str) -> None:
         self.hands.append({"at": iso(at), "kind": "bridge rejected", "run_id": None, "mr_iid": None, "reason": reason})
 
-    def question_park(self, at: float, status: str, kind: str) -> None:
-        self.park.append({"at": iso(at), "status": status, "kind": kind})
+    def question_park(self, at: float, status: str, kind: str, ask: str | None = None) -> None:
+        """park.json's question as the run wrote it: whom it asks (brain-kit's ask: owner, product, …) when it says."""
+        self.park.append(dict({"at": iso(at), "status": status, "kind": kind}, **({"ask": ask} if ask else {})))
 
     def ask(self, did: str, kind: str, asked: float, answered: float | None = None, choice: str | None = None,
             state: str = "open", who: str = "P-7C1D") -> None:
@@ -489,9 +490,9 @@ def runner_half(r: Req, t: float, *, iid: int, question: tuple[str, str, float, 
         r.commit(c, "bot", "%s：%s（%s）" % (r.key, subj, u), files=3 + i)
     if question:
         did, kind, wait, choice = question
-        r.question_park(c + 2 * M, "waiting", kind)
+        r.question_park(c + 2 * M, "waiting", kind, "owner" if kind == "clarify" else "product")
         r.ask(did, kind, c + 3 * M, c + 3 * M + wait, choice, state="delivered")
-        r.question_park(c + 4 * M + wait, "answered", kind)
+        r.question_park(c + 4 * M + wait, "answered", kind, "owner" if kind == "clarify" else "product")
         c = c + 6 * M + wait
         r.commit(c + 18 * M, "bot", "%s：按 %s 的回答改" % (r.key, did), files=2)
         c += 18 * M
@@ -509,7 +510,7 @@ def runner_half(r: Req, t: float, *, iid: int, question: tuple[str, str, float, 
     r.stage(c + 16 * M, "build-and-test", "done", note="verify PASS: %d checks on code fingerprint %s" % (len(checks), sha(r.key, "fp")[:8]))
     r.stage(c + 17 * M, "release", "started")
     h = r.request(c + 25 * M, "RELEASE")
-    r.question_park(c + 26 * M, "waiting", "acceptance")
+    r.question_park(c + 26 * M, "waiting", "acceptance", "product")
     return c + 26 * M + accept_after, h
 
 
@@ -688,7 +689,7 @@ def main() -> None:
     p3.turn(T0 - 5 * H)                                         # the next morning: alice tells it to go on
     p3.stage(T0 - 5 * H + 2 * M, "code-generation", "started", unit="refund-api")
     p3.commit(T0 - 40 * M, "person", "PAY-3：refund-api 的代码计划", files=1, records=True)
-    p3.question_park(T0 - 20 * M, "waiting", "clarify")
+    p3.question_park(T0 - 20 * M, "waiting", "clarify", "owner")
     p3.request(T0 - 6 * M, "PLAN", unit="refund-api", sha8="5d1e7a90")
     reqs["r1"].append(p3)
     q3 = det["questions"][0]
@@ -714,7 +715,7 @@ def main() -> None:
     p4.accepted(t + 32 * M, 41, "RUN-PAY-4-1")
     p4.stage(t + 35 * M, "functional-design", "started", unit="split-job")
     p4.commit(t + 2 * H, "bot", "PAY-4：拆分任务的骨架（split-job）", files=5)
-    p4.question_park(T0 - 3 * H - 2 * M, "waiting", "design")
+    p4.question_park(T0 - 3 * H - 2 * M, "waiting", "design", "product")
     p4.ask("D-2", "design", T0 - 3 * H)
     p4_park = {"status": "waiting", "kind": "design", "ask": "product"}
     reqs["r1"].append(p4)
@@ -1098,7 +1099,8 @@ def main() -> None:
     for r_ in world_status["repos"]:
         r_["remote"] = r_["id"] not in local and r_["id"] != "r2"
     world = {"note": "made by scripts/preview_world.py: do not edit by hand", "at": T0, "status": world_status, "overview": world_ov,
-             "overviews": overviews, "overviews_team": overviews_team, "todo": world_todo, "reflects": reflects, "boards": boards, "details": details, "stages": STAGES,
+             "overviews": overviews, "overviews_team": overviews_team, "todo": world_todo, "reflects": reflects,
+             "crew_missing": crew_fail, "boards": boards, "details": details, "stages": STAGES,
              "brains": brains}
     (ROOT / "ui" / "preview" / "world.json").write_text(json.dumps(world, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     # the contract fixtures the UI tests read: the overview's numbers for its own rows, one live board and one merged

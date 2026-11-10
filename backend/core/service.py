@@ -954,8 +954,10 @@ class Service:
         try:
             await asyncio.to_thread(self.mr.post_answer, base, project, mr["iid"], q["id"], choice, note,
                                     transport=self.transport)
-        except Exception as exc:  # noqa: BLE001
-            raise AppError("发不到 MR 上：%s" % str(exc).split("\n", 1)[0][:200], "post_failed", 502)
+        except Exception as exc:  # noqa: BLE001 - GitLab's own words go to the log
+            self.log.warning("brain: posting the answer to %s on MR !%s failed: %s", q["id"], mr["iid"], exc)
+            raise AppError("没发到 MR 上：GitLab 没收下。看看网络和你的 GitLab 令牌，再点一次；或者直接去 MR 上回答",
+                           "post_failed", 502)
         await asyncio.to_thread(self.store.append, scope, "app", "在 MR 上回答了 %s：%s" % (q["id"], choice), None)
         return {"ok": True, "via": "mr", "text": "已经以你的 GitLab 身份发在 MR 上：桥核对后送回运行机"}
 

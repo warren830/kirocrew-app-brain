@@ -394,7 +394,7 @@ REPEAT_RULE = "同样的纠正又出现的次数 ÷ 全部纠正（越低越好�
 METRIC_RULE = {
     "autonomy": "交接以后没有人插手就合并的需求 ÷ 交接过、已经合并的需求（批准、验收这些必经的审批不算插手）",
     "delivery": "一次通过验收、合并后 14 天里没有回滚也没有修补的需求 ÷ 合并满 14 天的需求",
-    "judgment": "人做的事里落在判断点的（批准、驳回、回答停下来问的问题）÷ 人做的全部",
+    "judgment": "人做的事里落在判断点的（批准、退回、回答停下来问的问题）÷ 人做的全部",
     "credits_per_success": "做完的需求花的 credits 合计 ÷ 正确交付的需求数（只用来看，不设上限）",
 }
 
@@ -570,7 +570,7 @@ def eval_notes(cost_note: Any, wrong_open: list[str], unmerged: list[str]) -> li
         out.append(eval_note("已知有问题、14 天还没满（满了再算进交付正确率）：%s" % "、".join(wrong_open[:20]),
                              "不用管：满 14 天会自动算进去；要看是什么问题，点开需求"))
     if unmerged:
-        out.append(eval_note("已知有问题、还没合并（验收被驳回过；合并满 14 天才算进自主度）：%s" % "、".join(unmerged[:20]),
+        out.append(eval_note("已知有问题、还没合并（验收被退回过；合并满 14 天才算进自主度）：%s" % "、".join(unmerged[:20]),
                              "改好再请产品验收；合并满 14 天会自动算进来"))
     return out
 

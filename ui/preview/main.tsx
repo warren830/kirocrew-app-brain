@@ -72,6 +72,10 @@ let crewFixed = false
 const W = world as unknown as {
   status: Status; overview: Overview; boards: Record<string, ReqBoard>; details: Record<string, RequirementDetail>
   overviews: Record<'eval' | 'noeval', Record<string, Overview>>; todo: Record<'ok' | 'crewfail' | 'team', Todo>
+  /** team mode's 交付总览 (the team runner's machine): each requirement once, a handed-over one as the runner's */
+  overviews_team?: Record<'eval' | 'noeval', Record<string, Overview>>
+  /** KiroCrew's row when brain-dev.json is not there at all (problems.agent_missing) */
+  crew_missing?: CheckRow
   stages: Record<string, RequirementDetail['lean']['stages']>; brains: Record<string, BrainView>
   /** brainview.preview of a reflectable run, by repo/key, when the world recorded it */
   reflects?: Record<string, ReflectPreview>
@@ -85,10 +89,7 @@ function crewRows(): CheckRow[] {
   const listed = new Set(repos.map((r) => r.path))
   const rows = clone(W.status.crew.rows).filter((r) => !r.repo || listed.has(r.repo))
   if (!flags.has('crewfail') || crewFixed) return rows
-  return rows.map((r) => (/^brain-dev\.json/.test(r.text) ? {
-    level: 'FAIL' as const, text: '没有 ~/.kiro/agents/brain-dev.json', todo: '点「装上 brain-dev」：装上 brain-kit 带的那一份；没有它，Lean 的 hook 在 KiroCrew 里不会跑',
-    fix: 'agent' as const, repo: null, raw: 'KiroCrew: ~/.kiro/agents/brain-dev.json missing',
-  } : r))
+  return rows.map((r) => (!r.repo && /^brain-dev/.test(r.text) && W.crew_missing ? clone(W.crew_missing) : r))
 }
 
 /** The listed repos as the backend reads them: without brain-kit none of them can be read (backend/core/service.py). */
@@ -200,7 +201,7 @@ function rebucket(o: Overview): Overview {
 function overview(path: string): Overview {
   const repo = new URL(path, location.origin).searchParams.get('repo') ?? 'all'
   const usable = new Set(listedRepos().filter((r) => r.ok).map((r) => r.id))
-  const byRepo = W.overviews?.[flags.has('noeval') ? 'noeval' : 'eval']
+  const byRepo = (flags.has('team') && W.overviews_team ? W.overviews_team : W.overviews)?.[flags.has('noeval') ? 'noeval' : 'eval']
   // nothing readable (no brain-kit): the backend's answer for a repo it has no rows of, shop-web's (not installed)
   const own = usable.size === 0 && repos.some((r) => r.ok) ? byRepo?.r2 : byRepo?.[repo]
   const o = clone(own ?? W.overview)
@@ -214,8 +215,6 @@ function overview(path: string): Overview {
     o.eval = { available: false, error: '这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
     o.cto = { ...o.cto, available: false, unattended: null, stepped_in: null, runs: [], sentence: o.cto.credits.per_req !== null ? `每个需求平均 ${o.cto.credits.per_req} credits。` : o.cto.sentence }
   }
-  // team mode: 全部 also lists the runner's runs, as the backend's overview does
-  if (flags.has('team') && repo === 'all' && byRepo?.runner) o.rows = [...o.rows, ...clone(byRepo.runner.rows)]
   return o
 }
 
@@ -257,15 +256,13 @@ function reflectPreview(repo: string, key: string): ReflectPreview {
     raw: lines.map(([n, id]) => `proposal at line ${n}: already in the Brain as ${id}, skipped`) }
 }
 
-/** GET /team: the ledger's run counts from its own runs table (the backend reads both from one table); a refusal says
- * why as backend/core/problems.py says the bridge's words. */
+/** GET /team: the ledger's run counts from its own runs table (the backend reads both from one table); its refusal is
+ * the fixture's, said as backend/core/problems.py says the bridge's words. */
 function team(): TeamView {
   const t = fx.team()
   const runs: Record<string, number> = {}
   for (const r of t.runs) runs[r.state] = (runs[r.state] ?? 0) + 1
   t.ledger.runs = runs
-  t.signer.refused = t.signer.refused.map((x) => ({ ...x, reasons: ['交接标签是 bob 打的，不是负责人 alice'],
-    raw: ["label 'ai-handoff' was added by bob, not by the branch owner alice"] }))
   return t
 }
 
@@ -368,7 +365,7 @@ setApiRoutes({
   },
   [`POST ${API}/crew/fix`]: (body) => {
     crewFixed = true
-    return { ok: true, text: `预览：${(body as CrewFixBody).what === 'agent' ? '装好了 ~/.kiro/agents/brain-dev.json' : '引擎换成了 kas'}（没有真的改）`, rows: status().crew.rows }
+    return { ok: true, text: `预览：${(body as CrewFixBody).what === 'agent' ? '装好了 brain-dev（brain-kit 带的那一份）' : '引擎设成了 kas'}（没有真的改）`, rows: status().crew.rows }
   },
   [`POST ${API}/brain/reflect/preview`]: (body) => {
     const b = body as { repo: string; key: string }

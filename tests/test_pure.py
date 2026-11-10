@@ -372,7 +372,7 @@ def test_evaluate_notes_say_which_runs_wait_for_their_merge():
             mods["evaluate"] = saved
     assert view["available"] is True
     assert "已知有问题、14 天还没满（满了再算进交付正确率）：PAY-4" in view["notes"]
-    assert "已知有问题、还没合并（验收被驳回过；合并满 14 天才算进自主度）：PAY-3" in view["notes"]
+    assert "已知有问题、还没合并（验收被退回过；合并满 14 天才算进自主度）：PAY-3" in view["notes"]
     # OVERVIEW-20: every note says what to do, brain-kit's own words under 细节
     assert view["notes"] == [x["text"] for x in view["note_rows"]] and all(x["todo"] for x in view["note_rows"])
     assert view["note_rows"][0]["text"] == "花费只有一个总数，却有 6 个需求：分不出是谁的，没有算给任何一个"
