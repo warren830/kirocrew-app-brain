@@ -253,8 +253,10 @@ describe('设置', () => {
     expect(runner.querySelector('details pre')).toHaveTextContent('poll: HTTPError 502 Bad Gateway')
     expect(runner.querySelector('details')).not.toHaveAttribute('open')
     const who = screen.getByRole('region', { name: '你是谁' })
-    expect(who).toHaveTextContent('导入仓库时会问你的名字')
-    expect(within(who).getByTestId('cmd-line')).toHaveTextContent('git config --global brain.user 你的用户名复制')
+    expect(who).toHaveTextContent('导入仓库时会问你的名字，在那里填上，点「保存」。')
+    const cmd = within(who).getByTestId('cmd-line')                                       // the command, folded under 细节
+    expect(cmd).toHaveTextContent('git config --global brain.user 你的用户名复制')
+    expect(cmd.closest('details')).not.toHaveAttribute('open')
   })
   test('你是谁 per repo: the login name without GitLab; 「你的 GitLab 用户名」 where brain-kit would not know, saved into that repo', async () => {
     const user = userEvent.setup()

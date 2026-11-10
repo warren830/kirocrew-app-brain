@@ -230,8 +230,11 @@ function StatCards({ status: s, onTeam }: { status: Status; onTeam: () => void }
         {asks > 0 && <p className="br-warn-text br-small">{asks} 个仓库里 brain-kit 还不知道你是谁：在下面「仓库」那一行看一眼名字，点「保存」</p>}
         {!user && !s.repos.some((r) => r.me) && (
           <div className="st-ask">
-            <p className="br-warn-text br-small">导入仓库时会问你的名字；也可以在终端里一次设好（把最后的名字换成你的 GitLab 用户名）：</p>
-            <CommandLine cmd="git config --global brain.user 你的用户名" />
+            <p className="br-warn-text br-small">导入仓库时会问你的名字，在那里填上，点「保存」。</p>
+            <details className="br-raw">
+              <summary>细节：在终端里一次设好（把最后的名字换成你的 GitLab 用户名）</summary>
+              <CommandLine cmd="git config --global brain.user 你的用户名" />
+            </details>
           </div>
         )}
         <div className="st-mods">

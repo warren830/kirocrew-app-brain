@@ -566,8 +566,8 @@ function CheckResult({ c, stale }: { c: IntakeCheck; stale: boolean }) {
       )}
       {(raw.length > 0 || c.package) && (
         <details className="br-raw nr-raw">
-          <summary>细节：brain-kit 的原话{c.package ? `（文档包 ${c.package}）` : ''}</summary>
-          <pre data-testid="findings">{raw.join('\n')}</pre>
+          <summary>细节：brain-kit 的原话</summary>
+          <pre data-testid="findings">{[...(c.package ? [`文档包 ${c.package}`] : []), ...raw].join('\n')}</pre>
         </details>
       )}
     </div>
