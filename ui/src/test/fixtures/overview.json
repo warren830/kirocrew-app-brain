@@ -54,7 +54,8 @@
         "src/export/csv.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-3-7f3a"
+      "session_url": "/chat?sid=brain-PAY-3-7f3a",
+      "family": null
     },
     {
       "repo": "r1",
@@ -117,7 +118,8 @@
         "src/statement/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "family": null
     },
     {
       "repo": "r1",
@@ -177,7 +179,8 @@
         "src/callback/"
       ],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "family": null
     },
     {
       "repo": "r1",
@@ -233,7 +236,8 @@
         "web/refund/"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-7-2b9f"
+      "session_url": "/chat?sid=brain-PAY-7-2b9f",
+      "family": null
     },
     {
       "repo": "r1",
@@ -283,7 +287,8 @@
       "open_questions": [],
       "expected_paths": [],
       "local_only": false,
-      "session_url": null
+      "session_url": null,
+      "family": null
     },
     {
       "repo": "r1",
@@ -337,7 +342,8 @@
         "src/refund/id.py"
       ],
       "local_only": false,
-      "session_url": "/chat?sid=brain-PAY-2-1c4e"
+      "session_url": "/chat?sid=brain-PAY-2-1c4e",
+      "family": null
     }
   ],
   "overlaps": [
@@ -496,7 +502,8 @@
         "raw": ""
       }
     ],
-    "computing": false
+    "computing": false,
+    "families": []
   },
   "counts": {
     "claimed": 1,
@@ -507,7 +514,9 @@
     "parked": 1,
     "acceptance": 1,
     "merged": 1,
-    "closed": 0
+    "closed": 0,
+    "unclaimed": 0,
+    "merged_into_parent": 0
   },
   "errors": [
     {
@@ -556,7 +565,13 @@
         "at_points": 5,
         "outside": 0,
         "credits": 22.7,
-        "merged_at": 1793661540
+        "merged_at": 1793661540,
+        "state": null,
+        "state_label": "",
+        "stuck": null,
+        "delivery": null,
+        "delivery_label": "",
+        "parent": null
       },
       {
         "key": "PAY-4",
@@ -566,7 +581,13 @@
         "at_points": 2,
         "outside": 0,
         "credits": null,
-        "merged_at": null
+        "merged_at": null,
+        "state": null,
+        "state_label": "",
+        "stuck": null,
+        "delivery": null,
+        "delivery_label": "",
+        "parent": null
       },
       {
         "key": "PAY-5",
@@ -576,7 +597,45 @@
         "at_points": 2,
         "outside": 0,
         "credits": 31.0,
-        "merged_at": null
+        "merged_at": null,
+        "state": null,
+        "state_label": "",
+        "stuck": null,
+        "delivery": null,
+        "delivery_label": "",
+        "parent": null
+      },
+      {
+        "key": "PAY-12",
+        "repo": "r1",
+        "how": "local",
+        "beyond": [],
+        "at_points": 1,
+        "outside": 0,
+        "credits": 6.2,
+        "merged_at": null,
+        "state": "merged_into_parent",
+        "state_label": "已合进大需求",
+        "stuck": false,
+        "delivery": "open",
+        "delivery_label": "还没合并",
+        "parent": "PAY-11"
+      },
+      {
+        "key": "PAY-13",
+        "repo": "r1",
+        "how": "pending",
+        "beyond": [],
+        "at_points": 0,
+        "outside": 0,
+        "credits": 3.2,
+        "merged_at": null,
+        "state": "open",
+        "state_label": "进行中",
+        "stuck": false,
+        "delivery": "open",
+        "delivery_label": "还没合并",
+        "parent": "PAY-11"
       }
     ],
     "weekly": [

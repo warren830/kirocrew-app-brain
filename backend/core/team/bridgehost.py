@@ -41,12 +41,31 @@ from collections import deque
 from datetime import timedelta
 from typing import Any
 
-from .. import bk
+from .. import bk, problems
 from .crewadapter import KiroCrewAdapter
 
 REQ_RE = re.compile(r"^[a-z]+-[A-Za-z0-9-]{1,80}-[0-9a-f]{12}\.json$")
 MAX_SPOOL_FILE = 64 * 1024
 PENDING_WINDOW_S = 3600   # brain-kit's Ledger.pending_voucher(newer_than=3600): older ones are not asked for again
+LEDGER_TABLES = ("runs", "decisions", "handoffs", "outbox", "notices")
+# what the page shows of bridge.json and runnerd.json (brain-kit 0d52e97 reads each where it is used; a value that is
+# not a positive number falls back to its default, sign.seconds): (key, default, unit, one plain line)
+BRIDGE_KEYS = (
+    ("interval", 60, "s", "桥每隔这么久跑一轮"),
+    ("send_give_up_minutes", 60, "min", "接手消息送了 3 次都没进运行机的会话，过了这么久就算这次运行没能开始（回答和通知一直送，不放弃）"),
+    ("runnerd_wait_minutes", 90, "min", "运行机这么久没准备好工作区、也没报错，就在 MR 上说一声（桥接着等）"),
+    ("acceptance_ci_wait_minutes", 60, "min", "验收问题等流水线通过才发：流水线这么久还没跑完，就在 MR 上说一声"),
+    ("edit_check_rounds", 3, "n", "查不到回复有没有被别人改过：连着这么多轮，就在 MR 上说一声（回答先等着，不算也不丢）"),
+    ("edit_check_wait_minutes", 30, "min", "……或者从第一次查不到起过了这么久"),
+)
+RUNNERD_KEYS = (
+    ("kit_dir", "app 用的这份 brain-kit", "path", "运行机用哪份 brain-kit 的 kit/：每建一个工作区前查一次，它带的 Lean 适配文件要是第 3 版"),
+    ("agent_spec", "不查", "path", "brain-run 的设置：查它带着运行机那份 Lean 适配文件的三个拦截（调用工具前那个的匹配要是 *）"),
+    ("hook_path", "/usr/bin:/bin", "path", "运行机上 Lean 的拦截找 git 和 ssh-keygen 用的 PATH"),
+    ("git_timeout", 300, "s", "每次 fetch（和拉 brain-intake）最多等这么久"),
+    ("clone_timeout", 3600, "s", "第一次克隆最多等这么久"),
+    ("tries", 3, "n", "建工作区失败了，最多试这么多次"),
+)
 
 
 def load_config(path: str) -> dict[str, Any]:
@@ -235,9 +254,10 @@ class TeamRuntime:
     # ---- what the page reads -------------------------------------------------------------------------- #
 
     def ledger(self) -> dict[str, Any]:
-        """{runs: [...], decisions: [...], handoffs: [...]}: read from the bridge's own Ledger (any thread), under its
-        lock so the three tables are one moment's."""
-        out: dict[str, Any] = {"runs": [], "decisions": [], "handoffs": []}
+        """{runs, decisions, handoffs, outbox, notices}: read from the bridge's own Ledger (any thread), under its
+        lock so the tables are one moment's. outbox and notices are brain-kit 0d52e97's (QA rounds 3 and 4: every
+        message into a run's session, and what the bridge told an MR once); [] with an older brain-kit."""
+        out: dict[str, Any] = {k: [] for k in LEDGER_TABLES}
         host = self.host
         if host is None:
             return out
@@ -257,9 +277,55 @@ class TeamRuntime:
                     out["handoffs"] = [dict(r) for r in led.db.execute(
                         "SELECT project, iid, sha, state, run_id, voucher_id, reason, created, updated FROM handoffs "
                         "ORDER BY updated")]
+                if "outbox" in tables:     # the messages themselves are not read (they are the run's)
+                    out["outbox"] = [dict(r) for r in led.db.execute(
+                        "SELECT send_id, run_id, slot, what, state, tries, created, updated FROM outbox ORDER BY created")]
+                if "notices" in tables:
+                    out["notices"] = [dict(r) for r in led.db.execute(
+                        "SELECT key, run_id, project, iid, state, count, created, updated FROM notices ORDER BY created")]
         except sqlite3.Error:  # closed by stop() meanwhile
-            return {"runs": [], "decisions": [], "handoffs": []}
+            return {k: [] for k in LEDGER_TABLES}
         return out
+
+    def hook_rows(self) -> list[dict[str, Any]]:
+        """The runner's Lean hooks as brain-runnerd checks them before each workspace (brain-kit 0d52e97's
+        cli.runner_hook_problems for runnerd.json's kit_dir and agent_spec), as CheckRows; [] with an older brain-kit
+        or without runnerd.json."""
+        fn = getattr(bk.m("cli"), "runner_hook_problems", None) if bk.ok() else None
+        if fn is None or not self.runnerd_cfg:
+            return []
+        try:
+            probs = fn(self.runnerd_cfg.get("kit_dir") or None, self.runnerd_cfg.get("agent_spec") or None)
+        except Exception as exc:  # noqa: BLE001 - said on the page, nothing stops
+            return [problems.fallback("WARN", str(exc)[:300], todo="看下面的原话")]
+        if not probs:
+            return [problems.mk("OK", "运行机上 Lean 的拦截没问题：brain-kit 带的 %s是第 %s 版%s" % (
+                problems.ADAPTER, getattr(bk.m("cli"), "CREW_HOOK_VERSION", "?"),
+                "，brain-run 的三个拦截都对" if self.runnerd_cfg.get("agent_spec") else "（brain-run 的设置没让查）"))]
+        return [problems.row("FAIL", str(x)) for x in probs][:20]
+
+    def config_view(self) -> list[dict[str, Any]]:
+        """The bridge.json and runnerd.json settings the page shows (TeamConfigRow): each key brain-kit reads, its value
+        (or its default, said so) and one plain line. Only these keys: no token, no secret, no path of a key."""
+        sec = getattr(bk.m("sign"), "seconds", None) if bk.ok() else None
+        rows = []
+        for file, cfg, specs in (("bridge.json", self.cfg or {}, BRIDGE_KEYS), ("runnerd.json", self.runnerd_cfg, RUNNERD_KEYS)):
+            if cfg is None:
+                continue
+            for key, default, unit, text in specs:
+                raw = cfg.get(key)
+                if unit in ("min", "s", "n"):
+                    v = sec(raw, None) if sec is not None else (raw if isinstance(raw, (int, float)) and not
+                                                                isinstance(raw, bool) and raw > 0 else None)
+                    shown = v if v is not None else default
+                    value = "%g" % shown if isinstance(shown, (int, float)) else str(shown)
+                    value += {"min": " 分钟", "s": " 秒", "n": ""}[unit] if isinstance(shown, (int, float)) else ""
+                    is_default = v is None
+                else:
+                    is_default = not (isinstance(raw, str) and raw.strip())
+                    value = str(raw).strip()[:300] if not is_default else str(default)
+                rows.append({"file": file, "key": key, "value": value, "default": is_default, "text": text})
+        return rows
 
     def pending(self, window_s: float = PENDING_WINDOW_S) -> list[dict[str, Any]]:
         """Vouchers the bridge asked the signer for in an earlier round and got no answer to (brain-kit's
@@ -292,7 +358,7 @@ class TeamRuntime:
         return out
 
     def counts(self, rows: dict[str, Any]) -> dict[str, dict[str, int]]:
-        out: dict[str, dict[str, int]] = {"runs": {}, "decisions": {}, "handoffs": {}}
+        out: dict[str, dict[str, int]] = {"runs": {}, "decisions": {}, "handoffs": {}, "outbox": {}}
         for k in out:
             for r in rows.get(k) or []:
                 out[k][str(r.get("state"))] = out[k].get(str(r.get("state")), 0) + 1

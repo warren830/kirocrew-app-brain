@@ -11,12 +11,19 @@
  * Click an actor anywhere to look at that actor only; 跟随 scrolls to the one that moved last; Esc lets go. 回放
  * (Replay.tsx) plays the requirement again from the same snapshot (timeline.ts); while it plays nothing can be done.
  * Reduced motion: nothing flies or pulses, states still change.
+ *
+ * A big requirement split into small ones (row.family, views/Family.tsx): a small one names its big one in the crumb
+ * and the top bar; a big one's small ones are lanes with the roll-up and the trace's family numbers. Either family card
+ * (a small one's: its dependencies, paths, 认领 / 开工 / 同步) sits under the conveyor, before the requirement's own
+ * lanes, so the graph stays the hero; a big one not split yet says what comes next under the counters. Before a small one is started the board
+ * introduces its way. The family's answers live here (useFamily), so a card that moves keeps them.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { VIEW_NAME, type BoardEntry } from '../nav'
 import type { ReqBoard, WaitDo } from '../types'
 import { LoadState } from '../ui'
+import { FamilyPanel, useFamily } from '../views/Family'
 import { QuestionCard } from '../views/Question'
 import type { ViewProps } from '../views/props'
 import { NotFound, OnRunner, ReqSwitch, useOnRunner } from '../views/ReqSwitch'
@@ -79,7 +86,7 @@ export function boardProblem(b: ReqBoard): { text: string; todo: string; raw: st
   return { text: '这个需求的运行记录没读全：图上只画了 Lean 的记录和仓库里看得到的', todo: '到需求详情看细节；一直这样的话，到设置里看 brain-kit 能不能用', raw: b.error }
 }
 
-export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, status, pollMs }: {
+export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, status, pollMs, reloadStatus }: {
   entry: BoardEntry
   onBack?: () => void
   /** 切换需求: open another requirement's board here (default: a move to it) */
@@ -108,6 +115,10 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
   useEffect(() => {
     if (gone || live.board) onMissing?.(gone)
   }, [gone, !!live.board]) // eslint-disable-line react-hooks/exhaustive-deps
+  const family = useFamily(entry.repo, entry.key, () => {
+    live.reload()
+    reloadStatus()
+  })
   const rp = useReplay(live.board, animate)
   replaying.current = rp.on
   const board = rp.board ?? live.board
@@ -182,6 +193,7 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
   const me = status?.repos.find((r) => r.id === entry.repo)?.me?.name ?? null
   const startable = !!board && entry.repo !== 'runner' && (board.person.me || !board.person.owner || !me)
   const toStart = () => go({ kind: 'new', repo: entry.repo, key: entry.key, ...(board?.row.title ? { title: board.row.title } : {}) })
+  const toBoard = (key: string) => go({ kind: 'board', repo: entry.repo, key })
   // a node that waits for the person: the session for what is said or approved there, the step strip for the rest (a
   // review is not said in the session that wrote the code: the strip has 开审查会话)
   const onAct = useCallback((key: string, d: WaitDo) => {
@@ -199,6 +211,14 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
   const waiter = !board || board.row.waits.who === 'you' ? null : PERSON.has(board.row.waits.who) ? boardWho(board) : '等人' 
   const acceptTop = !!board && board.accept.state !== 'not_yet'
   const problem = board ? boardProblem(board) : null
+  const fam = board?.row.family ?? null
+  // a small one is started from its family card (brain start --key), not from 开需求
+  const onStart = startable && fam?.role !== 'child' ? toStart : undefined
+  const notStarted = !!board && (board.row.state === 'claimed' || board.row.state === 'unclaimed') && !rp.on
+  const famCard = board && fam && (
+    <FamilyPanel f={fam} repo={entry.repo} reqKey={entry.key} ctl={family} look="board" go={go} rollup={board.rollup} quiet={quiet} />
+  )
+  const toFamily = () => rootRef.current?.querySelector('[data-testid="fam-panel"]')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
 
   return (
     <main ref={rootRef} className={`kt-root br-view br-board${board?.live && !quiet ? ' is-live' : ''}`} data-testid="br-board" data-motion={reducedMotion ? 'reduce' : undefined}>
@@ -208,6 +228,12 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
           <nav className="kit-crumb kt-where" aria-label="位置" data-testid="kt-where">
             <button type="button" onClick={onBack ?? (() => go({ kind: 'overview' }))}>{fromName}</button>
             <span aria-hidden="true">›</span>
+            {fam?.role === 'child' && (
+              <>
+                <button type="button" onClick={() => toBoard(fam.parent)} title={`大需求 ${fam.parent} 的需求看板`}>{fam.parent}</button>
+                <span aria-hidden="true">›</span>
+              </>
+            )}
             <button type="button" onClick={toDetail} title="需求详情">{entry.key}</button>
             <span aria-hidden="true">›</span>
             <b>需求看板{focus && board ? ` · ${board.actors.find((a) => a.key === focus)?.title ?? ''}` : ''}{rp.on ? ' · 回放' : ''}</b>
@@ -225,7 +251,7 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
         {board && lay && (
           <>
             <TopBar board={board} replaying={rp.on} follow={follow} onReplay={() => rp.start()} onFollow={() => setFollow((v) => !v)} onDetail={toDetail}
-              onSession={(url) => navigate(url)} onStart={startable ? toStart : undefined} />
+              onSession={(url) => navigate(url)} onStart={onStart} onParent={toBoard} onFamily={toFamily} />
             <ReplayBar rp={rp} />
             {problem && (
               <div className="kt-banner br-problem" role="status" data-testid="br-board-problem">
@@ -234,13 +260,17 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
                 {problem.raw && <details className="br-raw"><summary>细节</summary><pre>{problem.raw}</pre></details>}
               </div>
             )}
-            {board.row.state === 'claimed' && !rp.on ? (
-              <Intro board={board} onStart={startable ? toStart : undefined} />
+            {notStarted ? (
+              <>
+                {famCard}
+                <Intro board={board} onStart={onStart} />
+              </>
             ) : (
               <>
                 {!quiet && <NextStep board={board} repo={entry.repo} reqKey={entry.key} onAnswered={live.reload} onBrain={toBrain} onDetail={toDetail} />}
                 <Kpis key={`${rp.on ? 'replay' : 'live'}`} board={board} reducedMotion={reducedMotion} onActor={onActor} replaying={rp.on} />
                 {acceptTop && <Accept board={board} onDetail={toDetail} quiet={quiet} />}
+                {fam?.role === 'big' && famCard}
                 <div className="kt-body">
                   <div className="kt-col">
                     <div ref={graphBox}>
@@ -249,6 +279,7 @@ export function BoardPage({ entry, onBack, onSwitch, onMissing, go, replace, sta
                     </div>
                     {focus && <FocusBar board={board} focus={focus} onClear={() => setFocus(null)} />}
                     <Conveyor board={board} fresh={fx.belt} focus={focus} onActor={onActor} />
+                    {(fam?.role === 'parent' || fam?.role === 'child') && famCard}
                     <Lanes board={board} focus={focus} bumps={fx.bumps} onActor={onActor} quiet={quiet} />
                     {!acceptTop && <Accept board={board} onDetail={toDetail} quiet={quiet} />}
                   </div>

@@ -201,9 +201,11 @@ def keypair(d):
 
 
 def handoff_unlabelled(wt) -> None:
-    """`brain handoff --no-label`: pushed, nothing handed over. brain-kit R1-26 (0829fe0) exits 1 for it, older ones 0."""
+    """`brain handoff --no-label`: pushed, nothing handed over (the test labels the MR itself). brain-kit R1-26 (0829fe0,
+    1238919) exits 1 for a hand-over pushed but not labelled, as its docs 4.3 say; older ones exit 0."""
     p = brain(wt, "handoff", "--no-label", check=False)
     assert p.returncode in (0, 1) and "NOT labelled" in p.stdout + p.stderr, p.stdout + p.stderr
+
 
 def make_world(tmp_path, home, monkeypatch, *, bridge_user="brain-bridge", signer_cfg=None):
     kit = {"gitlab": {"base": "https://gl.example", "project": P}, "bot_users": ["brain-bot"],

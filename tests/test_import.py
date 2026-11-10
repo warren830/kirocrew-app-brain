@@ -616,7 +616,7 @@ def test_the_routes_refuse_bad_paths_before_anything_runs(tmp_path, home):
 
 
 def test_pure_helpers():
-    assert importer.gitlab_of("git@gitlab.example:grp/sub/pay.git") == {"base": "https://gitlab.example", "project": "grp/sub/pay"}
+    assert importer.gitlab_of("git@gitlab.example.com:grp/sub/pay.git") == {"base": "https://gitlab.example.com", "project": "grp/sub/pay"}
     assert importer.gitlab_of("https://gitlab.example.com:8443/grp/pay") == {"base": "https://gitlab.example.com:8443",
                                                                           "project": "grp/pay"}
     assert importer.gitlab_of("git@github.com:a/b.git") == {"base": "", "project": ""}

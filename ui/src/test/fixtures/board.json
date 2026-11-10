@@ -53,7 +53,8 @@
       "src/export/csv.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-3-7f3a"
+    "session_url": "/chat?sid=brain-PAY-3-7f3a",
+    "family": null
   },
   "branch": "ai/alice/PAY-3-refund-export",
   "base": "main",
@@ -1388,5 +1389,6 @@
   "error": "",
   "missing": [
     "CI 流水线：在 GitLab 上，这里读不到"
-  ]
+  ],
+  "rollup": null
 }

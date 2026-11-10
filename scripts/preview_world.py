@@ -16,7 +16,9 @@ The world (times relative to 2026-11-08 14:00 UTC, the fixtures' `at`; the previ
   shop-pay (r1, GitLab shop/shop-pay): PAY-3 本机 · waits for its PLAN approval; PAY-1 本机 · its session idle, the
       release next (a review in a new session first); PAY-4 on the runner · parked on D-2 for the product; PAY-5 waits
       for its acceptance (D-3); PAY-7 hand-over refused; PAY-6 carol's claim, PAY-8 alice's, neither started; PAY-2
-      merged, with a whole trace for 回放 (a rejection, a question, a red verify, the acceptance, the write-back).
+      merged, with a whole trace for 回放 (a rejection, a question, a red verify, the acceptance, the write-back);
+      PAY-11 退款大需求 split into three small ones (大需求拆成小需求): PAY-12 api merged into its branch, PAY-13 web
+      bob builds, PAY-14 jobs 待认领 (it waits for web).
   shop-web (r2): brain-kit not installed yet.
   shop-order (r3, GitLab shop/shop-order): ORD-1 … ORD-9 merged over ten weeks (most unattended), ORD-10 running now.
   shop-tools (r4, no GitLab: local only): TOOL-1, the AI at work on this machine; its hook adapter is the old one
@@ -50,6 +52,7 @@ detail = importlib.import_module("_brainapp_backend.core.detail")
 lean_view = importlib.import_module("_brainapp_backend.core.lean_view")
 deliveries = importlib.import_module("_brainapp_backend.core.deliveries")
 identity = importlib.import_module("_brainapp_backend.core.identity")
+family_mod = importlib.import_module("_brainapp_backend.core.family")
 service = importlib.import_module("_brainapp_backend.core.service")
 bk = importlib.import_module("_brainapp_backend.core.bk")
 brainview = importlib.import_module("_brainapp_backend.core.brainview")
@@ -225,7 +228,7 @@ class Req:
                 "decisions_text": "```brain-proposal\n```\n" * self.proposals, "events": self.events, "approvals": approvals,
                 "stages": lean_view.stages(self.events)}
 
-    def trace(self, brain: dict) -> dict:
+    def trace(self, brain: dict, family: dict | None = None) -> dict:
         stages = []
         seen: dict[str, dict] = {}
         for e in self.events:
@@ -236,7 +239,7 @@ class Req:
                 row.update(state=lean_view.STAGE_STATE[e["event"]], at=e["ts"], note=d.get("note") or d.get("reason"), src="aidlc-docs/audit/L-3F2A1C.jsonl")
         stages = sorted(seen.values(), key=lambda r: r["first_at"])
         verify = [{"at": e["ts"], "ok": e["data"]["ok"], "src": "aidlc-docs/audit/L-3F2A1C.jsonl"} for e in self.events if e["event"] == "VERIFY"]
-        return {"stages": stages, "humans": self.humans, "brain": brain, "missing": TRACE_MISSING,
+        out = {"stages": stages, "humans": self.humans, "brain": brain, "missing": TRACE_MISSING,
                 "actions": {"commits": self.commits, "handovers": self.hands, "questions": self.park, "blocked": [
                     {"at": e["ts"], "gate": e["data"]["gate"], "path": e["data"]["path"], "tool": "fs_write", "src": "aidlc-docs/audit/L-3F2A1C.jsonl"}
                     for e in self.events if e["event"] == "BLOCKED"]},
@@ -245,6 +248,9 @@ class Req:
                             "merged_at": {"value": iso(self.merged_at) if self.merged_at else None, "how": self.merge_how,
                                           "commit": sha(self.key, "merge") if self.merged_at else None, "src": "git", "note": None},
                             "reverted_or_hotfixed_within_14d": self.after14 or {"value": None, "window_closed": None, "window_end": None, "evidence": []}}}
+        if family:
+            out["family"] = family
+        return out
 
 
 def crew_rows() -> list[dict]:
@@ -528,13 +534,16 @@ STAGES: dict[str, list] = {}   # each requirement's Lean stages as lean_view rea
 
 
 def classified(r: Req, row: dict, *, park: dict | None = None, mr: dict | None = None, slot: dict | None = None,
-               local_only: bool = False, reflected: bool = False, at_handover: bool = False) -> dict:
+               local_only: bool = False, reflected: bool = False, at_handover: bool = False,
+               facts: dict | None = None) -> dict:
     """*row* with what the backend works out of *r*'s records (service._row: deliveries.base_row and classify): its
-    state, Lean progress and what it waits on. The rest of *row* (title, summary, credits, the MR link) stays."""
-    f = r.facts(park)
+    state, Lean progress and what it waits on. The rest of *row* (title, summary, credits, the MR link) stays.
+    *facts*: what it is read from when they are not *r*'s own records as made here (a small requirement's claim)."""
+    f = facts or r.facts(park)
     got = deliveries.base_row(r.repo, f, local_only=local_only)
     deliveries.classify(got, f, mr=mr, slot=slot, cfg=CFG, me=ME, reflected=reflected, now=T0, at_handover=at_handover)
     row.update({k: got[k] for k in ("state", "state_label", "lean", "stage", "waits", "local_only")})
+    row.setdefault("family", None)     # service._row: family.families' (none for a requirement outside a family)
     row["session_url"] = slot["url"] if slot else None
     row["summary"] = mrdesc_view.plain_line(row.get("summary"))     # what service._row shows of the 变更说明
     return row
@@ -552,12 +561,13 @@ def snapshot(r: Req, row: dict, *, brain: dict, park: dict | None = None, sessio
              decisions: list | None = None, local_only: bool = False, kit_rows: list | None = None, reflect: list | None = None,
              mr: dict | None = None, me: str | None = "alice", mr_desc: dict | None = None, questions: list | None = None,
              credits: float | None = None, facts: dict | None = None, team_decisions: list | None = None,
-             bid: str | None = None) -> dict:
+             bid: str | None = None, family: dict | None = None) -> dict:
     """The board snapshot the backend answers (service._board_sync), built the same way. *facts*: what the board is
-    folded from when they are not *r*'s own records as this machine reads them (the team runner's workspace)."""
+    folded from when they are not *r*'s own records as this machine reads them (the team runner's workspace).
+    *family*: a big requirement's trace family (brain-kit 0d52e97's roll-up of its small ones)."""
     f = facts or r.facts(park)
     STAGES[bid or "%s/%s" % (r.repo, r.key)] = f["stages"]
-    t = r.trace(brain) if f.get("run") else None
+    t = r.trace(brain, family) if f.get("run") else None
     subjects = {c["sha"]: c["subject"] for c in r.commits}
     sessions = sessions or []
     g = board.build(f, row, t, mr=mr, sessions=sessions, app_events=r.app, team_decisions=team_decisions or [], subjects=subjects,
@@ -573,7 +583,120 @@ def snapshot(r: Req, row: dict, *, brain: dict, park: dict | None = None, sessio
             "mr_desc": mr_desc or {"available": True, "text": "", "first": None, "source": None, "path": None, "ref": None,
                                    "error": "还没开工：开工以后才有变更说明"},
             "sessions": sessions, "credits": {"total": credits, "note": detail.NO_TOKENS},
-            "source": "trace" if t else "app", "error": "", "missing": g["missing"]}
+            "source": "trace" if t else "app", "error": "", "missing": g["missing"], "rollup": board.rollup(t)}
+
+
+U = {"api": "services/api/**", "web": "web/**", "jobs": "jobs/**"}
+
+
+def split_family(tmpl: dict, det: dict, mrdesc, decisions) -> tuple[list, list, list]:
+    """PAY-11 退款大需求 (alice), its DESIGN approved with three units and split (brain split): PAY-12 api merged into
+    the big one's branch, PAY-13 web (depends on api) bob builds, PAY-14 jobs (depends on web) nobody has claimed yet.
+    Each row is what the backend works out of its records (classified: deliveries.classify), then its family from
+    the backend's own family.families / classify over brain-kit's listing as `brain intent list --all --json` gives
+    it; its boards from board.py (the big one's trace with its family roll-up), made with the others (board_later)."""
+    branch, intent = "ai/alice/PAY-11-big", "261106-refund-big"
+    split = {"intent": intent, "branch": branch, "commit": sha("PAY-11", "split"), "design_sha256": sha("design"),
+             "units_sha256": sha("units")}
+    kid = lambda key, unit, title, owner, state, deps, blocked: {
+        "schema": 1, "key": key, "owner": owner, "title": "%s · %s" % (unit, title), "created_at": iso(T0 - 2 * D + 3 * H),
+        "status": "started" if state in ("in_progress", "merged") else "open", "state": state, "source": "split",
+        "parent": "PAY-11", "unit": unit, "expected_paths": [U[unit]], "depends_on": deps, "contracts": [], "split": split,
+        "filed_by": "alice", "blocked_by": blocked}
+    docs = [{"schema": 1, "key": "PAY-11", "owner": "alice", "title": "退款大需求", "created_at": iso(T0 - 3 * D), "status": "started",
+             "state": "in_progress", "source": "product", "children": ["PAY-12", "PAY-13", "PAY-14"],
+             "progress": {"merged": 1, "total": 3, "unclaimed": 1, "claimed": 0, "in_progress": 1, "closed": 0, "text": "1/3 merged"},
+             "family_state": "in_progress", "released": False},
+            kid("PAY-12", "api", "通过接口提交退款", "alice", "merged", [], []),
+            kid("PAY-13", "web", "在订单页看到退款状态", "bob", "in_progress", ["PAY-12"], []),
+            kid("PAY-14", "jobs", "每晚自动对账", None, "unclaimed", ["PAY-13"], ["PAY-13"])]
+    # the big one: Inception with its unit split, DESIGN approved, split; one of its small ones merged in so far
+    p11 = Req("r1", "PAY-11", "退款大需求", "alice", "big", intent, project="shop/shop-pay")
+    p11.claim_at = T0 - 3 * D - 1 * H
+    t = standard(p11, T0 - 3 * D)
+    p11.events = [e for e in p11.events if not (e["event"] == "STAGE_SKIPPED" and e["data"].get("stage") == "units")]
+    p11.stage(t, "units", "started")
+    p11.commit(t + 20 * M, "person", "PAY-11：拆成三个单元（unit-of-work.md）", files=1, records=True)
+    p11.stage(t + 22 * M, "units", "done", note="api、web、jobs")
+    h = p11.request(t + 25 * M, "DESIGN")
+    p11.approve(t + 40 * M, "DESIGN", h)
+    p11.app.append(app_event(t + 45 * M, "拆成小需求：PAY-12、PAY-13、PAY-14", branch))
+    p11.commit(T0 - 9 * H, "person", "Merge PAY-12 (unit api) into %s" % branch, files=6)
+    nums = lambda **kw: dict({k: 0 for k in board.NUMBERS}, **kw)
+    fam_trace = {"role": "parent", "children": [
+        {"key": "PAY-12", "unit": "api", "merged_into_parent": {"value": True, "ref": "refs/remotes/origin/" + branch, "src": ""},
+         "numbers": nums(stages_done=2, verify_rounds=2, verify_failed=1, commits_person=4, human_at_judgment=1, decisions=2, credits=6.2)},
+        {"key": "PAY-13", "unit": "web", "merged_into_parent": {"value": False, "ref": "refs/remotes/origin/" + branch, "src": ""},
+         "numbers": nums(stages_done=1, verify_rounds=1, commits_person=3, decisions=1, credits=3.2)}],
+        "rollup": {"own": nums(stages_done=5, commits_person=3, human_at_judgment=3, decisions=4, credits=None),
+                   "total": nums(stages_done=8, verify_rounds=3, verify_failed=1, commits_person=10, human_at_judgment=4,
+                                 decisions=7, credits=9.4),
+                   "unknown": ["PAY-11 credits"], "last_activity": {"at": iso(T0 - 25 * M), "key": "PAY-13", "src": ""}}}
+    # the small ones
+    p12 = Req("r1", "PAY-12", "api · 通过接口提交退款", "alice", "api", intent, project="shop/shop-pay")
+    p12.claim_at, p12.start_at = T0 - 2 * D + 4 * H, T0 - 2 * D + 5 * H
+    p12.stage(p12.start_at + 5 * M, "code-generation", "started", unit="api")
+    p12.commit(p12.start_at + 70 * M, "person", "PAY-12：退款接口（api）", files=4)
+    p12.verify(p12.start_at + 95 * M, [("pytest -q", 1), ("ruff check .", 0)])
+    p12.commit(p12.start_at + 120 * M, "person", "PAY-12：修好接口的两个用例", files=2)
+    p12.verify(p12.start_at + 135 * M, [("pytest -q", 0), ("ruff check .", 0)])
+    p12.stage(p12.start_at + 136 * M, "code-generation", "done", unit="api", note="unit api built")
+    p12.commit(p12.start_at + 140 * M, "person", "PAY-12: ready to merge into %s (unit api of PAY-11)" % branch, files=2,
+               records=True)
+    p13 = Req("r1", "PAY-13", "web · 在订单页看到退款状态", "bob", "web", intent, project="shop/shop-pay")
+    p13.claim_at, p13.start_at = T0 - 8 * H, T0 - 7 * H
+    p13.stage(p13.start_at + 4 * M, "code-generation", "started", unit="web")
+    p13.commit(p13.start_at + 50 * M, "person", "PAY-13：订单页的退款状态（web）", files=3)
+    p13.commit(T0 - 25 * M, "person", "PAY-13：状态轮询和空状态", files=2)
+    p14 = Req("r1", "PAY-14", "jobs · 每晚自动对账", "", "jobs", "", project="shop/shop-pay")
+    p14.claim_at = T0 - 2 * D + 3 * H
+
+    def facts_of(r: Req, **kw) -> dict:
+        f = r.facts()
+        f.update(kw)
+        return f
+    run12 = dict(p12.facts()["run"], parent="PAY-11", unit="api", target_branch=branch,
+                 mr={"requested_at": iso(p12.start_at + 140 * M), "by": "alice"})
+    facts = {"PAY-11": facts_of(p11, claim={**docs[0]}, worktree="/Users/alice/workplace/brain-app/shop-pay/big", branch=branch),
+             "PAY-12": facts_of(p12, claim=docs[1], run=run12, where="branch"),
+             "PAY-13": facts_of(p13, claim=docs[2], where="branch"),
+             "PAY-14": facts_of(p14, claim=docs[3], owner=None, where="claim")}
+    fams = family_mod.families(list(facts.values()), docs, me=ME, cfg={"tracker": "none"}, can_split=True, big=set(),
+                               at=T0 - 2 * M)
+    p11_sess = dict(det["sessions"][0], slot="brain-PAY-11-6d1e", url="/chat?sid=brain-PAY-11-6d1e", title="PAY-11 退款大需求",
+                    credits=12.6, turns=9, busy=False, awaiting=False, last_activity=T0 - 9 * H)
+    spec = {"PAY-11": (p11, "big", 12.6, "退款大需求拆成接口、订单页、对账三块，小需求合进来以后一起评审、发布", p11_sess),
+            "PAY-12": (p12, "api", 6.2, "退款接口：14 天内的订单建退款单，超期的拒掉", None),
+            "PAY-13": (p13, "web", 3.2, None, None),
+            "PAY-14": (p14, "jobs", None, None, None)}
+    out_rows, runs = [], []
+    for key, (r, slug, credits, summary, sess) in spec.items():
+        f = facts[key]
+        row = copy.deepcopy(tmpl)
+        row.update(repo="r1", key=key, title=docs[[d["key"] for d in docs].index(key)]["title"], owner=f.get("owner") or None,
+                   branch=f.get("branch"), intent=intent if key != "PAY-14" else None, where=f.get("where") or "claim",
+                   credits=credits, summary=summary, mr=None, run_ids=[], open_questions=[], overlap=[],
+                   expected_paths=[U[slug]] if key != "PAY-11" else [], worktree=f.get("worktree"),
+                   updated_at={"PAY-11": T0 - 9 * H, "PAY-12": p12.start_at + 140 * M, "PAY-13": T0 - 25 * M,
+                               "PAY-14": p14.claim_at}[key], sessions=1 if sess else 0)
+        classified(r, row, slot=sess, facts=f)
+        row["family"] = fams.get(key)
+        family_mod.classify(row, row["family"], f, ME)
+        out_rows.append(row)
+        board_later(r, row, credits=credits, facts=f, family=fam_trace if key == "PAY-11" else None,
+                    mr_desc=mrdesc(r, summary) if summary else None, sessions=[sess] if sess else [],
+                    decisions=decisions(r, [("application-design", "拆成 api、web、jobs 三个单元，web 依赖 api，jobs 依赖 web",
+                                             "三块各有负责人，可以并行做", "P-1A2B", "person", [])]) if key == "PAY-11" else [])
+        if key in ("PAY-12", "PAY-13"):
+            runs.append({"key": key, "repo": "r1", "how": "local" if key == "PAY-12" else "pending", "beyond": [],
+                         "at_points": 1 if key == "PAY-12" else 0, "outside": 0,
+                         "credits": credits, "merged_at": None, "state": "merged_into_parent" if key == "PAY-12" else "open",
+                         "state_label": deliveries.state_label("merged_into_parent" if key == "PAY-12" else "open"), "stuck": False,
+                         "delivery": "open", "delivery_label": deliveries.delivery_label("open"), "parent": "PAY-11"})
+    fam_eval = [{"key": "PAY-11", "repo": "r1", "children": ["PAY-12", "PAY-13", "PAY-14"], "merged": 1, "total": 3,
+                 "not_started": ["PAY-14"], "closed": [], "state": "in_progress",
+                 "state_label": deliveries.state_label("in_progress"), "at_points": 4, "outside": 0, "questions": 0, "credits": 9.4}]
+    return out_rows, runs, fam_eval
 
 
 def main() -> None:
@@ -601,6 +724,12 @@ def main() -> None:
             e["error"] = NO_KIT
     for e in ov["errors"]:      # service._overview_sync: what the app said, and its path (or the exception) for 细节
         e["raw"] = e.get("raw") or "/Users/alice/workplace/shop-web"
+    # brain-kit 0d52e97 trace's other_runs (rule H0): PAY-3's first run, on a branch since closed, in detail's words
+    det["timeline"]["other_runs"] = detail.other_runs({"other_runs": [
+        {"run_id": "RUN-PAY-3-1", "branch": "ai/alice/PAY-3-refund-export-old", "state": "closed", "src": "ledger"}]})
+    ov["eval"].setdefault("families", [])             # the fixture's eval is shop-pay's before the split (none)
+    for r_ in ov["rows"]:
+        r_.setdefault("family", None)
     for d_ in det["decisions"]:     # detail.decisions: the in-session questions each records the answer of
         d_["asked"] = detail.asked_in(d_["text"], d_["why"])
     # each row's 变更说明 first line (service._row: mrdesc_view.plain_line of it): the requirement's own
@@ -839,6 +968,10 @@ def main() -> None:
     extra_rows.append(classified(p1, row, slot=p1_sess))
     board_later(p1, row, sessions=[p1_sess], credits=9.8, mr_desc=mrdesc(p1, row["summary"]))
 
+    # ---------------------------------------------------------------- shop-pay: a big requirement split into three small ones
+    fam_rows, fam_runs, fam_eval = split_family(tmpl, det, mrdesc, decisions)
+    runs.extend(fam_runs)
+
     # ---------------------------------------------------------------- shop-order: ten weeks of deliveries, and one running now
     order_rows = []
     hist = [("ORD-1", "下单页地址校验", 68, "unattended", 14.2), ("ORD-2", "优惠券叠加规则", 61, "unattended", 21.9),
@@ -931,7 +1064,11 @@ def main() -> None:
                                    mr_desc={"available": True, "text": "", "first": None, "source": None, "path": None, "ref": None, "error": "还没有提交：做完第一步以后才有变更说明"})
 
     # ---------------------------------------------------------------- the overview of the world, and its numbers
-    all_rows = list(rows.values()) + extra_rows + order_rows + tool_rows
+    for x in runs:          # brain-kit 0d52e97's batch facts of each run (none known for these: older batches)
+        for k, v in (("state", None), ("state_label", ""), ("stuck", None), ("delivery", None), ("delivery_label", ""),
+                     ("parent", None)):
+            x.setdefault(k, v)
+    all_rows = list(rows.values()) + extra_rows + fam_rows + order_rows + tool_rows
     parts = [("r1", {"runs": [x for x in runs if x["repo"] == "r1"], "unattended": None, "judgment": None, "kinds": [], "ref": "origin/main"}),
              ("r3", {"runs": [x for x in runs if x["repo"] == "r3"], "unattended": None, "judgment": None, "kinds": [], "ref": "origin/main"})]
     judged = [x for x in runs if x["how"] in ("unattended", "people")]
@@ -968,10 +1105,11 @@ def main() -> None:
             o["eval"]["notes"] = []
             o["funnel"] = dict(deliveries.funnel_app([], {"asked": 0, "answered": 0, "delivered": 0}), source="evaluate")
         o["eval"]["queue"] = [q for q in o["eval"]["queue"] if q["key"] in keys]
+        o["eval"]["families"] = [x for x in fam_eval if x["repo"] in ids]     # brain-kit 0d52e97's, shop-pay's here
         o["eval"]["skipped"] = [x for x in o["eval"]["skipped"] if x["key"] in keys]
         if not evaluated:
             o["eval"] = {"available": False, "error": deliveries.NO_EVALUATE, "raw": "", "ref": None, "metrics": [],
-                         "queue": [], "skipped": [], "notes": []}
+                         "queue": [], "skipped": [], "notes": [], "note_rows": [], "families": []}
             o["funnel"] = deliveries.funnel_app([dict(d_, key="PAY-3") for d_ in det["decisions"]] if "r1" in ids else [],
                                                 {"asked": 0, "answered": 0, "delivered": 0})
             return o
@@ -1068,7 +1206,8 @@ def main() -> None:
                      **lean_view.notes(f.get("state_text"))},
             "decisions": b["decisions"], "questions": b["questions"],
             "timeline": {"source": "trace" if path else "app", "items": sorted(items, key=lambda x: (x["at"] or "", x["kind"])),
-                         "error": "", "missing": board.missing_sources(TRACE_MISSING if path else [], local_only=False, handed=True)},
+                         "error": "", "missing": board.missing_sources(TRACE_MISSING if path else [], local_only=False, handed=True),
+                         "other_runs": []},
             "sessions": [{k: x.get(k) for k in ("slot", "title", "agent", "kind", "credits", "turns", "busy", "awaiting",
                                                  "last_activity", "opened_at", "project", "url", "error")} for x in sess],
             "credits": {"total": row_t["credits"], "note": detail.NO_TOKENS}, "brain": brain_t, "mr_desc": b["mr_desc"]}

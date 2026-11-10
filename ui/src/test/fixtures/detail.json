@@ -52,7 +52,8 @@
       "src/export/csv.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-3-7f3a"
+    "session_url": "/chat?sid=brain-PAY-3-7f3a",
+    "family": null
   },
   "where_label": "本机的工作目录",
   "run": {
@@ -596,7 +597,10 @@
     "missing": [
       "CI 流水线：在 GitLab 上，这里读不到"
     ],
-    "error": ""
+    "error": "",
+    "other_runs": [
+      "PAY-3 的第 1 次运行（分支 ai/alice/PAY-3-refund-export-old，已关闭）"
+    ]
   },
   "sessions": [
     {

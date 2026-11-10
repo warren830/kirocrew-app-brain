@@ -52,7 +52,8 @@
       "src/refund/id.py"
     ],
     "local_only": false,
-    "session_url": "/chat?sid=brain-PAY-2-1c4e"
+    "session_url": "/chat?sid=brain-PAY-2-1c4e",
+    "family": null
   },
   "branch": "ai/alice/PAY-2-refund-id",
   "base": "main",
@@ -1949,5 +1950,6 @@
     "签名凭证：这台机器上读不到，看不到签名服务签了什么",
     "推送记录：git 不记推送，交接以后人的提交当作推送",
     "CI 流水线：在 GitLab 上，这里读不到"
-  ]
+  ],
+  "rollup": null
 }

@@ -10,6 +10,11 @@
  *
  * Polls GET /requirements/{repo}/{key} every 5 s, and the board's snapshot (GET /board/{repo}/{key}) for the value
  * stream (its actors' spans), the checks and the step; without a board the cards that need it say so.
+ *
+ * A requirement of a family (row.family: a big one split into small ones, one of those, or a big one not split yet)
+ * has its family panel under the four numbers (Family.tsx): the small ones as lanes with the roll-up, or the big one
+ * and its dependencies, with 认领 / 放弃认领 / 开工 / 同步 / 拆成小需求 as brain-kit offers them. A small one not started
+ * yet has it under its facts: it is claimed and started there, not in 开需求.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
@@ -26,9 +31,11 @@ import type {
 } from '../types'
 import { APPROVAL_META, Icon, LoadState, MrLink, STAGE_META, StateChip, TYPE_IT_YOURSELF, isOpenQuestion } from '../ui'
 import {
-  ACT, CHECK_GROUP_NAME, DECIDED_BY, DO_NAME, WHERE_NAME, approvalName, leanProgress, missingSourceName, sourceName, stageName,
+  ACT, CHECK_GROUP_NAME, CHILD_STATE_NAME, DECIDED_BY, DO_NAME, FAMILY_ACT, WHERE_NAME, approvalName, leanProgress, missingSourceName,
+  sourceName, stageName,
 } from '../vocab'
 import { Inline } from './Markdown'
+import { FamilyPanel, useFamily, type FamilyCtl } from './Family'
 import type { ViewProps } from './props'
 import { EntryChip, MrDescCard, QuestionCard, ReviewButton, ReviewSay, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
@@ -277,6 +284,10 @@ export function DetailView({ entry, onBack, onSwitch, onMissing, ...props }: {
     d.reload()
     props.reloadStatus()
   }
+  const family = useFamily(entry.repo, entry.key, () => {
+    after()
+    b.reload()
+  })
   const x = d.data
   const board = b.data
   const missing = !x && d.status === 404
@@ -311,13 +322,13 @@ export function DetailView({ entry, onBack, onSwitch, onMissing, ...props }: {
       {missing ? !onRunner && <NotFound repoName={repoInfo?.name ?? null} reqKey={entry.key} backName={back.name} onBack={back.go} testId="detail-missing" /> : <LoadState loading={d.loading} error={d.error} has={!!x} />}
       {x && (
         <Page x={x} board={board} live={live} entry={entry} props={props} opened={opened} localOnly={x.row.local_only ?? repoInfo?.remote === false}
-          onOpened={(r) => { setOpened(r); after() }} after={after} toBoard={toBoard} />
+          onOpened={(r) => { setOpened(r); after() }} after={after} toBoard={toBoard} family={family} />
       )}
     </main>
   )
 }
 
-function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after, toBoard }: {
+function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after, toBoard, family }: {
   x: RequirementDetail
   board: ReqBoard | null
   live: SessionRow | null
@@ -328,18 +339,24 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
   onOpened: (r: OpenSessionResult) => void
   after: () => void
   toBoard: (more?: Partial<BoardEntry>) => void
+  /** the family actions (认领, 开工, 同步, 拆成小需求), the page's */
+  family: FamilyCtl
 }) {
   const at = board?.at ?? Date.now() / 1000
   const now = nowOf(x, board, live)
-  const started = x.row.state !== 'claimed' && !(x.row.state === 'closed' && !x.run)
+  const started = x.row.state !== 'claimed' && x.row.state !== 'unclaimed' && !(x.row.state === 'closed' && !x.run)
   const onStart = () => props.go({ kind: 'new', repo: entry.repo, key: entry.key, title: x.row.title })
+  const familyPanel = x.row.family && <FamilyPanel f={x.row.family} repo={entry.repo} reqKey={entry.key} ctl={family} look="detail" go={props.go} />
   if (!started) {
     return (
-      <section className="br-detail-head" aria-label="需求">
-        <Header x={x} localOnly={localOnly} />
-        <Claimed x={x} now={now} at={at} onStart={onStart} />
-        <Facts x={x} start={null} localOnly={localOnly} />
-      </section>
+      <>
+        <section className="br-detail-head" aria-label="需求">
+          <Header x={x} localOnly={localOnly} />
+          <Claimed x={x} now={now} at={at} onStart={onStart} />
+          <Facts x={x} start={null} localOnly={localOnly} />
+        </section>
+        {familyPanel}
+      </>
     )
   }
   const canOpen = x.row.state === 'local' && !live
@@ -359,6 +376,7 @@ function Page({ x, board, live, entry, props, opened, localOnly, onOpened, after
         <Facts x={x} start={startOf(x, board)} localOnly={localOnly} />
       </section>
       <Cards x={x} board={board} at={at} localOnly={localOnly} replying={now.do === 'reply'} onBoard={toBoard} onSessions={() => scrollTo('会话')} />
+      {familyPanel}
       <StreamCard board={board} at={at} onAt={toAt} />
       <LeanCard x={x} sessionUrl={now.sessionUrl} mrUrl={now.mrUrl} waiter={waiter} />
       <DecisionsCard decisions={x.decisions} stages={x.lean.stages} repo={entry.repo} owner={x.row.owner} me={board?.person.me ?? false} go={props.go} onAt={toAt}
@@ -463,9 +481,20 @@ function Facts({ x, start, localOnly }: { x: RequirementDetail; start: number | 
 
 /** A requirement only claimed: one sentence, and 开工 for the person whose claim it is. */
 function Claimed({ x, now, at, onStart }: { x: RequirementDetail; now: Now; at: number; onStart: () => void }) {
-  const mine = now.who === 'you'
-  const owner = x.row.owner ?? x.claim?.owner ?? '认领的人'
+  // a small one of a big requirement: claimed and started on its family panel below (from the big one's branch)
+  const child = x.row.family?.role === 'child' ? x.row.family : null
+  const mine = now.who === 'you' || (!!child?.acts.release)
+  const owner = child?.owner ?? x.row.owner ?? x.claim?.owner ?? '认领的人'
   const span = now.since ? fmtSpan(at - now.since) : null
+  if (child && x.row.state !== 'closed' && (child.state === 'unclaimed' || !child.owner)) {
+    return (
+      <section className="cto-card br-now" aria-label="此刻" data-testid="detail-waits">
+        <div className="cto-eyebrow">此刻</div>
+        <p className="br-claimed-text">{CHILD_STATE_NAME.unclaimed}，谁都能{FAMILY_ACT.claim}</p>
+        <p className="cto-desc">{child.parent} 的小需求{child.unit ? `，单元 ${child.unit}` : ''}。{FAMILY_ACT.claim}、{ACT.start}都在下面「{child.parent} 的小需求」里。</p>
+      </section>
+    )
+  }
   if (x.row.state === 'closed') {
     return (
       <section className="cto-card br-now" aria-label="此刻" data-testid="detail-waits">
@@ -484,7 +513,8 @@ function Claimed({ x, now, at, onStart }: { x: RequirementDetail; now: Now; at: 
           ? '开工会在这台机器上建它的工作目录和分支，再开一个 brain-dev 会话。还没开工，所以没有周期、时间、成本、检查和记录。'
           : `${owner} 认领了${span ? ` ${span}` : ''}，还没开工。开工以后，这里有周期、时间、成本、检查和 Lean 的 11 个阶段。`}
       </p>
-      {mine && (
+      {mine && child && <p className="br-hint">{ACT.start}在下面「{child.parent} 的小需求」里：从大需求的分支开</p>}
+      {mine && !child && (
         <div className="br-row br-now-act">
           <button type="button" className="kt-btn is-primary" onClick={onStart}>{ACT.start}</button>
           <span className="br-hint">在「开需求」里开工，需求号和标题已经带过去了</span>
@@ -1228,6 +1258,9 @@ function TimelineCard({ x, showMissing }: { x: RequirementDetail; showMissing: b
           时间线里缺这些记录：{missing.join('；')}
           {english.length > 0 && <details className="br-raw"><summary>细节</summary><pre>{english.join('\n')}</pre></details>}
         </div>
+      )}
+      {(t.other_runs ?? []).length > 0 && (
+        <div className="br-note br-small br-tlmissing" data-testid="tl-other-runs">它在别的分支上也跑过，没算进这条时间线：{t.other_runs.join('；')}</div>
       )}
     </section>
   )

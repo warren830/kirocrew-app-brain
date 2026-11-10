@@ -12,9 +12,13 @@
  *   question            a question on the MR (the team runner's)                    去 MR 上回答
  *   acceptance          the product accepts on the MR                               去 MR 上验收
  *   start               claimed by you, not started                                 去开工 (开需求 with its key)
+ *   child_start         a small requirement you claimed, its dependencies merged    开工 here (brain start --key, then
+ *                                                                                  its session; the answer stays)
+ *   parent_release      a big requirement whose small ones all merged              需求看板 (review and release it)
  *   write_back          merged, its new knowledge not written back yet               回写 Brain (Brain's 回写, on it)
  *   handoff_rejected    the hand-over was refused: why, and what to say to the AI   打开会话 · 看 MR
  *   handoff_unlabelled  pushed, but the MR has no hand-over label                   补上交接标签 · 看 MR
+ *   closed_leftover     closed with brain intent close, its run branch or MR left   看 MR (delete it, close it)
  *   stuck               a run on the runner that no answer can move any more        看 MR
  *   crew                KiroCrew's failing checks, with their fix buttons
  *
@@ -22,12 +26,13 @@
  * from /status (the app shell), read again when they disagree with this list.
  */
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { useNavigate } from '@kirocrew/app-sdk'
-import { paths, usePoll } from '../api'
+import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
+import { paths, useAction, usePoll } from '../api'
 import { fmtWaited } from '../format'
-import type { Todo, TodoItem } from '../types'
+import type { ChildStartBody, ChildStartResult, Todo, TodoItem } from '../types'
 import { CheckRows, EmptyHero, ExtLink, Icon, LoadState, RoleIcon, TypeLine, type FlowStep } from '../ui'
 import { ACT, DO_NAME, REVIEW_WAIT, approvalName } from '../vocab'
+import { ChildStartOut, FAMILY_CSS } from './Family'
 import { QuestionCard, ReviewButton } from './Question'
 import type { ViewProps } from './props'
 
@@ -46,9 +51,12 @@ const GROUPS: Group[] = [
   { key: 'question', heading: '运行机上的问题', icon: 'question', tone: 'wait', hint: '在 MR 上回答' },
   { key: 'acceptance', heading: '等验收', icon: 'release', tone: 'wait', hint: '在 MR 上验收' },
   { key: 'start', heading: '认领了还没开工', icon: 'new', tone: 'wait', hint: '去开需求开工' },
+  { key: 'child_start', heading: '可以开工的小需求', icon: 'deploy', tone: 'wait', hint: '你认领了，依赖都合进来了' },
+  { key: 'parent_release', heading: '等评审、发布的大需求', icon: 'release', tone: 'wait', hint: '小需求都合并了' },
   { key: 'write_back', heading: '等回写 Brain', icon: 'brain', tone: 'wait', hint: '合并了：把学到的写回 Brain' },
   { key: 'handoff_rejected', heading: '接手被拒', icon: 'handover', tone: 'bad', hint: '改好再交接' },
   { key: 'handoff_unlabelled', heading: '没交出去的交接', icon: 'handover', tone: 'warn', hint: 'MR 上没有交接标签' },
+  { key: 'closed_leftover', heading: '关了的需求还留着分支或 MR', icon: 'settings', tone: 'warn', hint: '用不着就删掉、关掉' },
   { key: 'stuck', heading: '卡住了的运行', icon: 'blocked', tone: 'bad', hint: '这一步答不了了：找负责人' },
   { key: 'crew', heading: 'KiroCrew 的问题', icon: 'settings', tone: 'bad', hint: '修好了才能开工' },
 ]
@@ -83,8 +91,18 @@ export function TodoView(props: ViewProps) {
   const now = Date.now() / 1000
   const rootRef = useRef<HTMLElement | null>(null)
   const [holding, setHolding] = useState(false)   // a kit fix runs or waits for the person: its group stays
-  const groups = x ? GROUPS.map((g) => ({ ...g, items: x.items.filter((i) => groupOf(i) === g.key) }))
-    .filter((g) => g.items.length > 0 || (g.key === 'crew' && holding)) : []
+  // small ones started here: their answers (the session to open) stay after the list no longer has them
+  const [started, setStarted] = useState<Record<string, { it: TodoItem; r: ChildStartResult }>>({})
+  const idOf = (it: TodoItem) => `${it.repo}/${it.key}`
+  const groups = x ? GROUPS.map((g) => {
+    const items = x.items.filter((i) => groupOf(i) === g.key)
+    const kept = g.key === 'child_start' ? Object.values(started).filter((s) => !items.some((i) => idOf(i) === idOf(s.it))).map((s) => s.it) : []
+    return { ...g, items, kept }
+  }).filter((g) => g.items.length > 0 || g.kept.length > 0 || (g.key === 'crew' && holding)) : []
+  const onStarted = (it: TodoItem, r: ChildStartResult) => {
+    setStarted((s) => ({ ...s, [idOf(it)]: { it, r } }))
+    after()
+  }
   const jump = (key: GroupKey) => rootRef.current?.querySelector(`[data-testid="todo-${key}"]`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
   // the tab's count and the sidebar badge are /status's count of this very list: read it again when they differ
   const listed = x?.items.length
@@ -95,6 +113,7 @@ export function TodoView(props: ViewProps) {
   return (
     <main className="kt-root br-view td-root" data-testid="br-todo" ref={rootRef}>
       <style>{TD_CSS}</style>
+      <style>{FAMILY_CSS}</style>
       <header className="td-top">
         <RoleIcon role="todo" size={26} className="td-top-icon" />
         <div className="br-view-head">
@@ -103,11 +122,11 @@ export function TodoView(props: ViewProps) {
         </div>
       </header>
       <LoadState loading={t.loading} error={t.error} has={!!x} />
-      {x && x.items.length === 0 && !holding && (
+      {x && x.items.length === 0 && !holding && Object.keys(started).length === 0 && (
         <EmptyHero
           testid="todo-empty"
           title="现在没有等你做的事"
-          text={['需求走到要你动手的地方，就会出现在这里，按种类分好：会话等你回话、等你开会话审查、Lean 的审批、会话问你的澄清、认领了还没开工、交接被拒、MR 上的问题和验收，还有 KiroCrew 这边要修的。']}
+          text={['需求走到要你动手的地方，就会出现在这里，按种类分好：会话等你回话、等你开会话审查、Lean 的审批、会话问你的澄清、认领了还没开工、交接被拒、MR 上的问题和验收，还有 KiroCrew 这边要修的；拆成小需求的，能开工的小需求、能发布的大需求，还有关了却留着分支的需求，也在这里。']}
           punch="这一页空着，就是没有谁在等你。"
           flow={WAITS_FLOW}
         >
@@ -149,7 +168,10 @@ export function TodoView(props: ViewProps) {
             </article>
           ) : (
             <div className="td-items">
-              {g.items.map((it, i) => <Item key={`${it.key}-${i}`} it={it} group={g} now={now} {...props} onAnswered={after} />)}
+              {[...g.items, ...g.kept].map((it, i) => (
+                <Item key={`${idOf(it)}-${i}`} it={it} group={g} now={now} {...props} onAnswered={after}
+                  started={started[idOf(it)]?.r ?? null} onStarted={(r) => onStarted(it, r)} />
+              ))}
             </div>
           )}
         </section>
@@ -179,8 +201,18 @@ function ToRead({ path }: { path: string }) {
 /** What a refused hand-over asks the person to say to the AI in their session (they type it themselves). */
 const redoLine = (why: string) => `交接被拒了：${why.replace(/^(接手被拒|交接被拒)[：:]\s*/, '')}。请按这个原因改好，再交接一次。`
 
-function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; now: number; onAnswered: () => void } & ViewProps) {
+function Item({ it, group, now, go, onAnswered, started, onStarted }: {
+  it: TodoItem
+  group: Group
+  now: number
+  onAnswered: () => void
+  /** child_start: the start made here, and its report */
+  started: ChildStartResult | null
+  onStarted: (r: ChildStartResult) => void
+} & ViewProps) {
   const navigate = useNavigate()
+  const api = useAppApi()
+  const start = useAction((b: ChildStartBody) => api.post<ChildStartResult>(paths.childStart(it.repo, it.key), b))
   const icon = it.kind === 'lean_approval' ? approvalIcon(it.approval) : group.icon
   const session = it.session?.url ?? null
   const line = it.kind === 'handoff_rejected' && session ? redoLine(it.text) : it.line
@@ -189,6 +221,11 @@ function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; 
   const mrAct = group.key === 'question' ? ACT.answerOnMr : group.key === 'acceptance' ? ACT.acceptOnMr
     : group.key === 'handoff_unlabelled' ? DO_NAME.label_handoff : ACT.viewMr
   const mrFirst = group.key === 'question' || group.key === 'acceptance' || group.key === 'handoff_unlabelled' || group.key === 'stuck'
+  const doStart = async () => {
+    const r = await start.run({ open_session: true })
+    if (r) onStarted(r)
+  }
+  const canStart = it.kind === 'child_start' && !started?.ok
   return (
     <article className={`td-item is-${group.tone}`} data-testid="todo-item" data-kind={it.kind} aria-label={`${group.heading} ${it.key || it.title}`}>
       <div className="td-item-top">
@@ -207,7 +244,15 @@ function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; 
       {/* a Lean approval's text is its waits.text, which says the person types the line (deliveries.lean_wait_text) */}
       {line && (it.kind === 'lean_approval' || it.kind === 'reply' || it.kind === 'handoff_rejected') && <TypeLine line={line} sessionUrl={session} said={it.kind === 'lean_approval'} />}
       {asked && <QuestionCard q={it.question!} repo={it.repo} reqKey={it.key} mrUrl={null} onAnswered={onAnswered} />}
+      {it.kind === 'child_start' && started && <ChildStartOut r={started} onOpen={navigate} />}
+      {start.error && <p className="br-error" role="alert">{start.error}</p>}
       <div className="td-acts">
+        {canStart && (
+          <button type="button" className="br-btn is-small is-primary" disabled={start.busy} onClick={() => void doStart()}
+            title="从大需求的分支开它的工作目录，再开一个 brain-dev 会话">
+            <RoleIcon role="deploy" size={14} />{start.busy ? '正在开工…' : ACT.start}
+          </button>
+        )}
         {it.kind === 'start' && it.key && (
           <button type="button" className="br-btn is-small is-primary" onClick={() => go({ kind: 'new', repo: it.repo, key: it.key, title: it.title })}>
             <RoleIcon role="new" size={14} />{DO_NAME.start}
@@ -228,7 +273,9 @@ function Item({ it, group, now, go, onAnswered }: { it: TodoItem; group: Group; 
         {mr && !mrFirst && <ExtLink href={mr} className="br-btn is-small">{ACT.viewMr}</ExtLink>}
         <span className="br-grow" />
         {it.key && (
-          <button type="button" className="br-btn is-small" title="在需求看板上看它走到哪了" onClick={() => go({ kind: 'board', repo: it.repo, key: it.key, from: 'todo' })}>
+          <button type="button" className={`br-btn is-small${it.kind === 'parent_release' ? ' is-primary' : ''}`}
+            title={it.kind === 'parent_release' ? '在大需求的需求看板上评审、发布' : '在需求看板上看它走到哪了'}
+            onClick={() => go({ kind: 'board', repo: it.repo, key: it.key, from: 'todo' })}>
             <Icon name="LayoutDashboard" size={13} />{ACT.openBoard}
           </button>
         )}

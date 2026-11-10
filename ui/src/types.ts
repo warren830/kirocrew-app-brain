@@ -50,6 +50,8 @@ export type ReqState =
   | 'acceptance' // 等验收：parked on an acceptance question (Lean RELEASE)
   | 'merged' // 已合并：run.json is on the default branch
   | 'closed' // 已关闭：the claim was closed (duplicate, dropped)
+  | 'unclaimed' // 待认领：a small requirement `brain split` filed for others: nobody has it yet
+  | 'merged_into_parent' // 已合进大需求：a small requirement merged into its big requirement's branch (main comes with it)
 
 export const STATE_LABEL: Record<ReqState, string> = {
   claimed: '已认领',
@@ -61,6 +63,8 @@ export const STATE_LABEL: Record<ReqState, string> = {
   acceptance: '等验收',
   merged: '已合并',
   closed: '已关闭',
+  unclaimed: '待认领',
+  merged_into_parent: '已合进大需求',
 }
 
 /** Who the requirement waits on right now. */
@@ -166,6 +170,210 @@ export interface Requirement {
   /** its brain-dev session on this machine (KiroCrew's chat URL: 打开会话), null when there is none. The backend always
    * sends it */
   session_url?: string | null
+  /** a big requirement split into small ones (brain split), one of those, or one opened as a big one: null otherwise */
+  family: ReqFamily | null
+}
+
+// ---------------------------------------------------------------- 大需求拆成小需求 (brain-kit's split, phase 1)
+
+/** A small requirement's state, brain-kit's (intents.STATES): unclaimed 待认领, claimed, in_progress (its owner's run
+ * branch is there), merged (into the big requirement's branch, or main), closed. */
+export type ChildState = 'unclaimed' | 'claimed' | 'in_progress' | 'merged' | 'closed'
+/** A big requirement's family, brain-kit's (split.families): in_progress; ready_to_release (every small one merged:
+ * the owner reviews and releases); done (released, every small one merged); closed. */
+export type FamilyState = 'in_progress' | 'ready_to_release' | 'done' | 'closed'
+
+export interface FamilyProgress {
+  merged: number
+  /** the small requirements that are not closed */
+  total: number
+  unclaimed: number
+  claimed: number
+  in_progress: number
+  closed: number
+  /** brain-kit's own words, e.g. 「1/3 merged」 */
+  text: string
+}
+
+/** A dependency of a small requirement, and how far it is. */
+export interface FamilyDep {
+  key: string
+  unit: string | null
+  state: ChildState | null
+  owner: string | null
+  /** merged into the big requirement's branch: it blocks nothing any more */
+  merged: boolean
+  /** one plain line: 「PAY-2（api，alice 在做）」 */
+  text: string
+}
+
+/** A big requirement's small one, in short (its parent's card, board and 交付清单). */
+export interface FamilyChild {
+  key: string
+  unit: string | null
+  title: string
+  state: ChildState
+  /** its words: 待认领, alice 认领了, alice 在做, 已合并, 已关闭 */
+  state_label: string
+  owner: string | null
+  depends_on: string[]
+  /** its dependencies not merged into the big requirement's branch yet */
+  blocked_by: string[]
+}
+
+/** What this person can do on it here and now: null when it is not offered, else whether it can be done and why not. */
+export interface FamilyAct {
+  ok: boolean
+  /** why not, one plain line ('' when ok) */
+  why: string
+}
+export interface FamilyActs {
+  /** 拆成小需求 (a big or split requirement of yours, its worktree on this machine, DESIGN approved): preview first */
+  split: FamilyAct | null
+  /** 认领 (a small requirement nobody has) */
+  claim: FamilyAct | null
+  /** 放弃认领 (yours, not started) */
+  release: FamilyAct | null
+  /** 开工 (nobody's or yours, not started): not ok while a dependency has not merged, naming it */
+  start: FamilyAct | null
+  /** 「在 <DEP> 的分支上先做」 (`brain start --on DEP`): the one dependency it may be built on, only when brain-kit
+   * allows it (its only unmerged dependency, and that one's owner has a run branch); null otherwise */
+  start_on: string | null
+  /** 同步 (`brain sync`: yours, started, its worktree on this machine) */
+  sync: FamilyAct | null
+}
+
+/**
+ * A big requirement split into small ones others claim and build in parallel (brain-kit's `brain split`, docs/安装和使用.md
+ * §4.7), one of those, or a requirement opened as a big one that is not split yet. From brain-kit's own listing (`brain
+ * intent list --all --json`, docs/intents.md §2.5, run in the background), else from this machine's refs (source
+ * 'local': the claims as last fetched, before brain-kit answered).
+ */
+export interface ReqFamily {
+  /** big: opened as a big one (or its unit-of-work.md lists units), not split yet; parent: split; child: a small one */
+  role: 'big' | 'parent' | 'child'
+  /** the big requirement's key (the parent's own) */
+  parent: string
+  /** the big requirement's title */
+  parent_title: string
+  /** the big requirement's run branch: where its small ones start from and where their MRs go */
+  branch: string | null
+  /** child: its unit in unit-of-work.md */
+  unit: string | null
+  /** child: brain-kit's state of it */
+  state: ChildState | null
+  /** child: 待认领, alice 认领了, alice 在做, 已合并, 已关闭 */
+  state_label: string
+  /** child: who has it (null: nobody, 待认领) */
+  owner: string | null
+  /** child: the small requirements it depends on, each with how far it is */
+  depends_on: FamilyDep[]
+  /** child: those not merged into the big requirement's branch yet (keys): it cannot start before (or --on one) */
+  blocked_by: string[]
+  /** child: its unit's paths and contracts (unit-of-work.md) */
+  paths: string[]
+  contracts: string[]
+  /** parent: its small requirements, in filing order */
+  children: FamilyChild[]
+  /** parent: the roll-up; null for a child, or before brain-kit answered */
+  progress: FamilyProgress | null
+  /** parent: the family's state (null for a child) */
+  family_state: FamilyState | null
+  /** its words: 小需求在做, 都合并了：等大需求评审和发布, 发布了、小需求都合并了, 已关闭 */
+  family_label: string
+  /** parent: Lean's RELEASE is approved for it */
+  released: boolean
+  acts: FamilyActs
+  source: 'brainkit' | 'local'
+  /** when brain-kit's listing was read (epoch s); null for local */
+  at: number | null
+}
+
+// POST /requirements/{repo}/{key}/split {apply}: `brain split <KEY> --dry-run --json` (apply false: the preview, nothing
+// written), then `brain split <KEY> --json` (apply true) in the big requirement's worktree on this machine
+export interface SplitBody { apply: boolean }
+export interface SplitAction {
+  unit: string
+  /** brain-kit's kind: new | same | update | changed | close | removed | close_duplicate | duplicate | raced */
+  kind: string
+  /** its words: 新登记（待认领）, 没变, 拆分变了，但已经有人认领或开工：没改 … */
+  kind_label: string
+  /** the small requirement's key (null: a new one in a preview, its key comes with the split) */
+  key: string | null
+  title: string
+  paths: string[]
+  /** what it depends on: keys, or 「api（新）」 for a new one in a preview */
+  depends_on: string[]
+  contracts: string[]
+  /** why, in brain-kit's words (the kinds that need a word with whoever has it) */
+  why: string[]
+  /** say it to whoever has it: the split changed under a claimed or started one */
+  attention: boolean
+}
+export interface SplitResult {
+  ok: boolean
+  dry_run: boolean
+  parent: string
+  /** the big requirement's run branch (pushed by the split) */
+  branch: string | null
+  /** unit-of-work.md and the DESIGN approval, 8 hex each */
+  units_sha: string | null
+  design_sha: string | null
+  actions: SplitAction[]
+  /** brain-kit's warnings, as check rows (short Chinese, its words in raw) */
+  warnings: CheckRow[]
+  /** one plain sentence: what it would do, did, or why not */
+  text: string
+  /** why it was refused, each as a check row with 做什么 */
+  problems: CheckRow[]
+  /** brain split's output, verbatim (shown folded) */
+  output: string
+}
+
+// POST /requirements/{repo}/{key}/claim {release}: `brain claim <KEY>` (first one wins) / `brain claim --release <KEY>`
+export interface ClaimBody { release?: boolean }
+export interface ClaimResult {
+  ok: boolean
+  /** 「认领了 PAY-3」, 「PAY-3 已经是你的了」, 「晚了一步：PAY-3 已经被 alice 认领了」, 「放回去了：PAY-3 又是待认领」 */
+  text: string
+  /** who has it now (the one who was first, when it was not you) */
+  owner: string | null
+  problem: CheckRow | null
+  output: string
+}
+
+// POST /requirements/{repo}/{key}/start {on?, open_session?, trust?}: `brain start --key <KEY> [--on <DEP>] --worktree
+// <work_root>/<repo>/<key>-<unit>` (it claims it on the way), then its brain-dev session in that worktree
+export interface ChildStartBody { on?: string; open_session?: boolean; trust?: boolean }
+export interface ChildStartResult {
+  ok: boolean
+  key: string
+  branch: string | null
+  worktree: string | null
+  /** --on: the dependency it was started on */
+  on: string | null
+  text: string
+  /** refused for its dependencies: each, with who has it */
+  blocked: FamilyDep[]
+  /** it may be started on this dependency's branch instead (brain-kit allows it) */
+  can_on: string | null
+  problem: CheckRow | null
+  output: string
+  slot: string | null
+  url: string | null
+  session_error: string
+}
+
+// POST /requirements/{repo}/{key}/sync: `brain sync` in the small requirement's worktree (the big one's branch merged in;
+// Lean's own files resolved)
+export interface SyncResult {
+  ok: boolean
+  result: 'merged' | 'up_to_date' | 'conflicts' | 'refused'
+  text: string
+  /** the files left with conflicts (resolve, git add, git commit) */
+  conflicts: string[]
+  problem: CheckRow | null
+  output: string
 }
 
 // ---------------------------------------------------------------- GET /status
@@ -226,8 +434,8 @@ export interface Status {
     ok: boolean
     version: string | null
     error: string
-    /** optional brain-kit modules: true when importable */
-    modules: { trace: boolean; evaluate: boolean; golden: boolean; intents: boolean; mrdesc: boolean }
+    /** optional brain-kit modules: true when importable (split: brain split, claim, start --key, sync; 0d52e97) */
+    modules: { trace: boolean; evaluate: boolean; golden: boolean; intents: boolean; mrdesc: boolean; split: boolean }
   }
   repos: RepoInfo[]
   crew: { rows: CheckRow[]; fix: { agent: boolean; engine: boolean }; checked_at: number | null }
@@ -559,6 +767,30 @@ export interface EvalView {
   computing?: boolean
   /** brain-kit's own words behind error (for 细节); '' when none. The backend always sends it */
   raw?: string
+  /** brain-kit's families (0d52e97): one row per big requirement of the batch split into small ones; [] without */
+  families: EvalFamily[]
+}
+
+/** One big requirement in brain-kit's eval (`families`): its small ones, n/m merged into its branch, its state, a
+ * person's acts at the judgment points and outside them, questions and credits over the family. */
+export interface EvalFamily {
+  key: string
+  repo: string
+  children: string[]
+  merged: number
+  /** the small ones not closed, those not started included (brain-kit 1238919, as `brain intent list` counts) */
+  total: number
+  /** of them, those nobody started yet; [] before brain-kit 1238919 */
+  not_started?: string[]
+  /** the small ones whose claim was closed: not counted in total */
+  closed?: string[]
+  /** brain-kit's: in_progress | ready_to_release, or the big requirement's own (merged, closed, failed …) */
+  state: string
+  state_label: string
+  at_points: number
+  outside: number
+  questions: number
+  credits: number | null
 }
 
 /**
@@ -653,8 +885,9 @@ export interface Question {
   lean_request: string | null
   refs: string[]
   /** park.json: waiting | answered; on the MR / in brain-kit's ledger: posting | asking (a bridge is posting it right
-   * now) | open | answered | delivered | delivery_unknown | refused (the signer would not sign it) | stale (a new push)
-   * | void (not bound to its push and park.json) | invalid | closed */
+   * now) | open | held (0d52e97: a reply waits until GitLab can say whether it was edited; nobody answers again) |
+   * answered | delivered | delivery_unknown | refused (the signer would not sign it) | stale (a new push) | void (not
+   * bound to its push and park.json) | invalid | closed */
   state: string
   answer: string | null
   answerer: string | null
@@ -742,7 +975,8 @@ export interface RequirementDetail {
   }
   decisions: Decision[]
   questions: Question[]
-  timeline: { source: 'trace' | 'app'; items: TimelineItem[]; missing: string[]; error: string }
+  /** other_runs (brain-kit 0d52e97, rule H0): this requirement's runs on another branch, not read into this trace, in words */
+  timeline: { source: 'trace' | 'app'; items: TimelineItem[]; missing: string[]; error: string; other_runs: string[] }
   sessions: SessionRow[]
   credits: { total: number | null; note: string }
   brain: { loaded: number | null; cited: string[]; stale: string[]; unknown: string[]; proposals: number | null }
@@ -781,6 +1015,8 @@ export interface IntakeNext {
   /** brain-kit is on the default branch in this checkout only, not on origin, where `brain start` branches from (an
    * in-place install not pushed yet): 推送 first. null: nothing waits */
   push?: { branch: string; remote_url: string } | null
+  /** 「大需求：先拆成小需求」 can be chosen here (tracker none, a brain-kit with brain split), and why not */
+  big: { ok: boolean; why: string }
 }
 
 export interface IntakeBody {
@@ -833,6 +1069,9 @@ export interface StartBody extends IntakeBody {
   paths: string[] | string
   open_session: boolean
   trust: boolean
+  /** 「大需求：先拆成小需求」: Lean's requirements and design as usual, the design with the unit split (unit-of-work.md,
+   * brain-kit's skill brain-split); the DESIGN approval approves the split; then 拆成小需求 */
+  big?: boolean
 }
 
 export interface StartResult {
@@ -938,10 +1177,14 @@ export interface ReflectApplyResult {
 
 /** handoff_unlabelled: pushed, but its MR carries no hand-over label (nothing was handed over) */
 /** reply: a local session idle, your turn to talk (opens it); start: claimed by you, no run yet (开工) */
+/** child_start: a small requirement you claimed whose dependencies have all merged (开工 now); parent_release: a big
+ * requirement whose small ones have all merged (review and release it); closed_leftover: your requirement closed with
+ * `brain intent close` whose run branch or MR is still there (delete it, close it) */
 export type TodoKind = 'lean_approval' | 'question' | 'clarify' | 'acceptance' | 'handoff_rejected' | 'handoff_unlabelled' | 'crew'
   | 'reply' | 'start'
   /** write_back: merged, its Brain proposals not written back yet (回写 Brain) */
   | 'write_back'
+  | 'child_start' | 'parent_release' | 'closed_leftover'
 export interface TodoItem {
   kind: TodoKind
   repo: string
@@ -974,8 +1217,10 @@ export type RunState =
   | 'spooled' // waiting for its workspace
   | 'ready' // workspace made, not sent to a session yet
   | 'dispatched' // sent to its brain-run session
-  | 'send_unknown' // sending it to the session failed in a way that does not say whether it arrived
-  | 'failed' // the workspace could not be made
+  | 'send_unknown' // sending it to the session failed in a way that does not say whether it arrived (the bridge looks
+  //                  at the session each round; through this app's KiroCrew adapter it sees a send that landed, never
+  //                  one that did not: a person looks)
+  | 'failed' // it could not start: the workspace could not be made, or (0d52e97) KiroCrew never took the hand-over
   | 'merged'
   | 'closed'
 
@@ -989,7 +1234,15 @@ export interface TeamRun {
   slot: string | null
   mr_url: string | null
   updated: string | null
+  /** what brain-kit's bridge holds about it (0d52e97): the acceptance question held until the pipeline is green,
+   * runnerd silent, sends that keep failing, queued; messages into its session not known to have landed */
+  notes: TeamNote[]
 }
+/** One thing the bridge's ledger says about a run (its notices and outbox, brain-kit 0d52e97), in plain Chinese. */
+export interface TeamNote { kind: string; text: string; at: number | null }
+/** A bridge.json or runnerd.json setting brain-kit reads (0d52e97's new ones among them): its value, or its default
+ * (default true), and one plain line. Never a token or a key. */
+export interface TeamConfigRow { file: 'bridge.json' | 'runnerd.json'; key: string; value: string; default: boolean; text: string }
 /**
  * What brain-kit's bridge said about one MR with the hand-over label in the last round (Bridge.process): accepted,
  * rejected, seen (that head and label event were checked before), unlabelled (the newest label event takes the label
@@ -1014,8 +1267,9 @@ export interface TeamHandover {
 export interface TeamView {
   status: TeamStatus
   /** state → count: runs by RunState, decisions by question state (open, answered, delivered, refused, void …),
-   * hand-overs by checking / accepted / rejected */
-  ledger: { runs: Record<string, number>; decisions: Record<string, number>; handoffs: Record<string, number> }
+   * hand-overs by checking / accepted / rejected, and (0d52e97) the messages into the runs' sessions by outbox state
+   * (sending, interrupted, sent, unknown, dropped) */
+  ledger: { runs: Record<string, number>; decisions: Record<string, number>; handoffs: Record<string, number>; outbox: Record<string, number> }
   runs: TeamRun[]
   /** the labelled MRs of the last round (none before the first round) */
   handovers: TeamHandover[]
@@ -1031,6 +1285,11 @@ export interface TeamView {
      * one-hour reuse window) */
     waiting: { ref: string; kind: string; run_id: string; since: string | null }[]
   }
+  /** bridge.json and runnerd.json, the keys brain-kit reads ([] before team mode started) */
+  config: TeamConfigRow[]
+  /** the runner's Lean hooks as brain-runnerd checks them before each workspace (cli.runner_hook_problems, 0d52e97:
+   * the hook adapter version 3, brain-run's three hooks); [] with an older brain-kit or without runnerd.json */
+  hooks: CheckRow[]
 }
 export interface TeamLoopResult { ok: boolean; summary: Record<string, number>; error: string }
 
@@ -1216,6 +1475,32 @@ export interface ReqBoard {
   source: 'trace' | 'app'
   missing: string[]
   error: string
+  /** a big requirement split into small ones: the family's numbers from its trace (brain-kit 0d52e97 trace family
+   * rollup: itself and every small one added up), and each small one's; null otherwise */
+  rollup: FamilyRollup | null
+}
+
+/** A trace's numbers of one run (brain-kit trace family numbers): null when not known. */
+export interface FamilyNumbers {
+  stages_done: number | null
+  verify_rounds: number | null
+  verify_failed: number | null
+  commits_bot: number | null
+  commits_person: number | null
+  blocked: number | null
+  human_at_judgment: number | null
+  human_outside_judgment: number | null
+  decisions: number | null
+  questions: number | null
+  credits: number | null
+}
+export interface FamilyRollup {
+  /** the big requirement's own, and with every small one added */
+  own: FamilyNumbers | null
+  total: FamilyNumbers | null
+  /** the numbers nobody knows (「PAY-1 credits」) */
+  unknown: string[]
+  children: { key: string; unit: string | null; merged: boolean; numbers: FamilyNumbers | null }[]
 }
 
 // ---------------------------------------------------------------- GET /overview: the 交付总览 numbers (the CTO 视图's)
@@ -1227,8 +1512,9 @@ export interface CtoRun {
   /** unattended: handed over, nobody acted after the hand-over beyond the required approvals, delivered correctly;
    * people: handed over, a person stepped in beyond them (or it was not delivered correctly); pending: not judged yet
    * (its 14 days after the merge are not over, or it is not merged); local: never handed over (the person did it with
-   * the AI on their machine) */
-  how: 'unattended' | 'people' | 'pending' | 'local'
+   * the AI on their machine); ended (brain-kit 0d52e97): handed over and ended without a delivery (the runner could not
+   * start it, or its MR was closed unmerged): never unattended, and left out of autonomy's count */
+  how: 'unattended' | 'people' | 'pending' | 'local' | 'ended'
   /** what the person did beyond the required approvals (brain-kit's words for the kinds, in Chinese) */
   beyond: string[]
   /** a person's acts at the judgment points, and outside them */
@@ -1237,6 +1523,17 @@ export interface CtoRun {
   credits: number | null
   /** merged into the default branch (epoch s) */
   merged_at: number | null
+  /** brain-kit's eval state of it (0d52e97's batch: merged, merged_into_parent, waiting, answered, failed, closed …)
+   * and its words; null before 0d52e97 */
+  state: string | null
+  state_label: string
+  /** it has had nothing new for brain-kit's stuck_hours */
+  stuck: boolean | null
+  /** brain-kit's delivery (correct, wrong, pending, wrong_open, unknown, open, closed, merged_not_here) and its words */
+  delivery: string | null
+  delivery_label: string
+  /** a small requirement: its big one's key */
+  parent: string | null
 }
 
 export interface CtoNumbers {

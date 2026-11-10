@@ -8,6 +8,7 @@ import { parseView, searchOf } from '../nav'
 import type { CheckRow, CrewChecks, IntakeCheck, RepoMe, Status } from '../types'
 import { NAME_RULE } from '../ui'
 import { CHECK_HINT, CREW_OK, GATE4, GATE5, HERO_LOCAL, HERO_TEXT, NO_CONFIDENTIAL, NO_SECRET, NewView, REVIEW_HINT, STARTED_NEXT, slugFrom } from './NewReq'
+import { BIG_HINT } from './Family'
 
 /** KiroCrew with nothing that stops a session (the fixtures' status has a ✗ row: the tests of it bring their own). */
 function calmCrew(): CrewChecks {
@@ -565,4 +566,55 @@ describe('开需求', () => {
     const who = screen.getByTestId('start-who')
     expect(within(who).getByRole('textbox', { name: '你的名字' })).toHaveValue('alice')
   })
+
+  // ---------------------------------------------------------------- 大需求：先拆成小需求
+
+  const BIG = '大需求：先拆成小需求'
+  const startBody = () => apiCalls.find((c) => c.method === 'POST' && c.path === `${API}/intake/start`)?.body as Record<string, unknown>
+
+  test('「大需求：先拆成小需求」 says how it goes; chosen, the hero shows the extra step, the start sends big: true, the answer says what comes next', async () => {
+    const { user } = setup()
+    await fillBasics(user)
+    const choice = within(screen.getByTestId('new-big'))
+    expect(choice.getByText(BIG_HINT)).toBeInTheDocument()
+    const box = screen.getByLabelText(BIG)
+    expect(box).toBeEnabled()
+    expect(box).not.toBeChecked()
+    const titles = () => within(screen.getByRole('list', { name: '开需求的步骤' })).getAllByRole('listitem').map((li) => li.querySelector('b')?.textContent?.replace(/^[0-9✓]+/, ''))
+    expect(titles()).toEqual(['认领', '文档过五关', '开工', 'Lean 推进', '交给运行机'])
+    await user.click(box)
+    expect(box).toBeChecked()
+    expect(box.closest('label')).toHaveClass('is-on')
+    expect(titles()).toEqual(['认领', '文档过五关', '开工', 'Lean 推进', '拆成小需求', '交给运行机'])
+    expect(screen.getByRole('list', { name: '开需求的步骤' })).toHaveTextContent('需求和设计由你批准，设计里拆单元')
+    expect(startBtn()).toBeEnabled()   // the choice is not part of the gates: no check needed
+    await user.click(startBtn())
+    const out = await screen.findByTestId('start-result')
+    expect(startBody()).toMatchObject({ big: true, open_session: true })
+    expect(within(out).getByTestId('start-big')).toHaveTextContent('批完设计，在需求看板上点「拆成小需求」')
+  })
+
+  test('not chosen: the start sends no big', async () => {
+    const { user } = setup()
+    await fillBasics(user)
+    await user.click(startBtn())
+    const out = await screen.findByTestId('start-result')
+    expect(startBody()).not.toHaveProperty('big')
+    expect(within(out).queryByTestId('start-big')).toBeNull()
+  })
+
+  test('off with brain-kit’s why where it cannot be (a Jira repo, a brain-kit without brain split)', async () => {
+    const why = '这个仓库用 Jira：拆成小需求只适用于 tracker: none'
+    const { user } = setup({ [`GET ${API}/intake/next*`]: () => ({ ...fx.intakeNext(), big: { ok: false, why } }) })
+    await fillBasics(user)
+    const box = screen.getByLabelText(BIG)
+    expect(box).toBeDisabled()
+    expect(box.closest('label')).toHaveClass('is-disabled')
+    expect(screen.getByTestId('new-big-why')).toHaveTextContent(why)
+    expect(box).toHaveAccessibleDescription(`${BIG_HINT} ${why}`)
+    await user.click(startBtn())
+    await screen.findByTestId('start-result')
+    expect(startBody()).not.toHaveProperty('big')
+  })
 })
+

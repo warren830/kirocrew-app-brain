@@ -1,7 +1,8 @@
 """What brain-kit (and the app's own checks) say, as a person reads it: plain short Chinese, one 做什么 line, the
 one-click fix when the app has one, and brain-kit's own words kept (``raw``: the page shows them folded, for
 debugging). Pure: no I/O, no brain-kit import; the patterns are brain-kit 48b6b97's and d46765f's strings (and
-91e2fee's words for who the person is).
+91e2fee's words for who the person is; 0d52e97's hook adapter version 3: cli.runner_hook_problems and the adapter's
+``[brain-kit] blocked (kit file…)`` refusals).
 
 A CheckRow is ``{"level", "text", "todo", "fix", "repo", "raw"}``:
 
@@ -136,11 +137,23 @@ OLDER_REFUSES = "改了 kit 文件（Lean 的文件、brain-kit 设置、检查�
 
 def _older_adapter(g: dict[str, str]) -> str:
     """What an older hook adapter cannot do (brain-kit cli.crew_hook_problem): before version 2 the run on the team
-    runner cannot stop to ask a person before the Lean approvals; before 3 it lets tool calls on after the kit's own
-    files were changed."""
-    if int(g.get("have") or 0) < 2:
-        return "运行机上的 AI 在 Lean 审批之前没法停下来问人"
-    return OLDER_REFUSES
+    runner cannot stop to ask a person before the Lean approvals; before 3 (0d52e97, wanted by a brain-kit that needs
+    3) it lets tool calls on after the kit's own files were changed."""
+    have, need = int(g.get("have") or 0), int(g.get("need") or 0)
+    lacks = [OLDER_REFUSES] if need >= 3 or have >= 2 else []
+    if have < 2:
+        lacks.append("运行机上的 AI 在 Lean 审批之前没法停下来问人")
+    return "；".join(lacks)
+
+
+HOOK_WHY = (("cannot be read", "命令读不懂"), ("does not name its Python by an absolute path", "Python 没写绝对路径"),
+            ("does not run Python isolated", "Python 没带 -I"),
+            ("does not run the installed brain-kit's adapter", "跑的不是运行机装的那份适配文件（工作区里的那份运行时能被改）"),
+            ("is not `", "参数不对：要带上运行机的设置和事件"), ("has matcher", "匹配不是 *：有的工具调用绕过了 Lean"))
+
+
+def _hook_why(why: str) -> str:
+    return next((cn for en, cn in HOOK_WHY if why.startswith(en)), why[:80])
 
 
 def _hook_names(raw: str) -> str:
@@ -149,13 +162,46 @@ def _hook_names(raw: str) -> str:
     return "、".join(TRIGGER_NAMES.get(n, TRIGGER_NAMES.get(EVENT_TRIGGER.get(n, ""), n)) for n in names)
 
 
+# how the runner's brain-run hooks are written, for 细节 (brain-kit's remote/agents/brain-run.json)
+RUNNER_HOOK = ("照 brain-kit 的 remote/agents/brain-run.json 写：<python 绝对路径> -I <运行机装的 lean-hook.py> --runner "
+               "<runnerd.json> <事件>")
+
+
 RULES: list[Rule] = [
-    # cli.runner_kit_problems / doctor_checks (d46765f): the hook adapter is too old for the team runner
+    # cli.runner_kit_problems / doctor_checks (d46765f, 0d52e97: version 3): the hook adapter is too old for the runner
     Rule(r"^(?P<path>\S+) is an older adapter \(version (?P<have>\d+), needs (?P<need>\d+)\)",
          ADAPTER + "是旧版（第 {have} 版，要第 {need} 版）",
          lambda g, lv: _older_adapter(g) + "。" + REINSTALL, "kit", runner=True,
          # this machine's KiroCrew sessions run the same adapter: what every older version lacks here too
          local=lambda g, lv: "本机会话里也一样：%s。点「%s」" % (OLDER_REFUSES, FIX_BUTTON["kit"])),
+    # cli.runner_hook_problems (0d52e97): what the team runner's sessions need from the brain-kit installed there
+    Rule(r"^the installed brain-kit \((?P<kit>[^)]*)\) has no hook adapter (?P<a>\S+?):", "运行机装的 brain-kit 里没有 " + ADAPTER,
+         "在运行机上装一份完整的 brain-kit，或者在运行机的设置里把 brain-kit 的位置写对：在那之前运行机不建工作区",
+         how="装带 kit/ 目录的 brain-kit，或者改 runnerd.json 的 kit_dir"),
+    Rule(r"^the installed brain-kit's hook adapter (?P<a>\S+) is version (?P<have>\d+), needs (?P<need>\d+)",
+         "运行机的 brain-kit 带的 " + ADAPTER + "是旧版（第 {have} 版，要第 {need} 版）",
+         "在运行机上更新 brain-kit：在那之前运行机不建工作区"),
+    Rule(r"^the runner's agent spec (?P<spec>\S+) cannot be read", "读不了运行机上 brain-run 的设置",
+         "看看运行机的设置里 brain-run 设置的位置写对没有、文件在不在", how="改 runnerd.json 的 agent_spec"),
+    Rule(r"^(?P<spec>\S+) has no (?P<t>\w+) hook running Lean's (?P<ev>\w+)",
+         lambda g, lv: "运行机上 brain-run 的设置缺 Lean 的拦截：%s" % TRIGGER_NAMES.get(g["t"], g["t"]),
+         "照 brain-kit 带的那份 brain-run 设置补上，用运行机装的那份 " + ADAPTER, how=RUNNER_HOOK),
+    Rule(r"^(?P<spec>\S+): the (?P<t>\w+) hook `(?P<cmd>[^`]*)` (?P<why>.+)$",
+         lambda g, lv: "运行机上 brain-run 的设置里「%s」的拦截不对：%s" % (TRIGGER_NAMES.get(g["t"], g["t"]),
+                                                                    _hook_why(g["why"])),
+         "照 brain-kit 带的那份 brain-run 设置改好", how=RUNNER_HOOK),
+    # kit/.kiro/brain/lean-hook.py (0d52e97, version 3): the adapter's refusals in a session
+    Rule(r"^\[brain-kit\] blocked \(kit file\): the target of this tool call could not be checked",
+         "Lean 的拦截挡下了一次工具调用：看不清它要改哪个文件", "不用管：只拦这一次；一直这样就问维护 brain-kit 的人"),
+    Rule(r"^\[brain-kit\] blocked \(kit file\): (?P<path>\S+) is one of the kit's own files",
+         "Lean 的拦截挡下了一次改 kit 文件的调用（{path}）", "不用管：会话不能改 kit 自己的文件；真要改，由人开 MR 合进默认分支"),
+    Rule(r"^\[brain-kit\] blocked \(kit files changed\): the kit's own files are not those of (?P<ref>.+?): (?P<what>.+?)\. "
+         r"They decide", "会话被锁住了：kit 自己的文件和 {ref} 不一样（{what}）",
+         "要人来恢复：把改了的 kit 文件改回去，删掉新加的；是人故意改的就提交。改好之前每次工具调用都被拦，会话里的批准也记不进 Lean",
+         how="git checkout HEAD -- <path>"),
+    Rule(r"^\[brain-kit\] blocked \(kit files not checked\): the kit's own files could not be checked: (?P<why>.+?)\. "
+         r"Until they can", "会话被锁住了：查不了 kit 自己的文件",
+         "要人看一下下面的原因：查得了之前每次工具调用都被拦，会话里的批准也记不进 Lean"),
     # cli.runner_kit_problems: Lean / the adapter only on this disk, not in git (worktrees are made from main)
     Rule(r"^(?P<path>\S+) is not committed: AI-DLC Lean;", "AI-DLC Lean 没提交到 git",
          "app 的工作目录从默认分支建，没提交的 Lean 不在里面。" + REINSTALL, "kit"),

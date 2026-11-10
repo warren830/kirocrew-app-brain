@@ -4,7 +4,9 @@
  *
  *   1 认领      repo, title, 英文短名 (suggested from the title), key (prefilled from GET /intake/next), the paths it is
  *              expected to change: a grid. Opened for a requirement claimed already (?key=&title=): its key is fixed and
- *              its title filled; 开工 starts that claim (`brain start --key`).
+ *              its title filled; 开工 starts that claim (`brain start --key`). And 「大需求：先拆成小需求」 (StartBody.big;
+ *              off with IntakeNext.big.why when this repo cannot): Lean's requirements and design as usual, the design
+ *              with the unit split, then 拆成小需求 on its 需求看板.
  *   2 文档过五关  the documents and the files left out, then the five gates as five cards whose state shows (green:
  *              done, magenta: waits for you, red: stopped, the check's or this repo's rule). Without documents they are
  *              one line. Gate 2 says up front when the repo takes no confidential material (kit.json
@@ -29,7 +31,8 @@ import { KEY_RE, type NewEntry } from '../nav'
 import type { Tone } from '../styles'
 import { CLASS_LABEL, type CheckRow, type Classification, type CrewChecks, type IntakeBody, type IntakeCheck, type IntakeNext, type MeNameResult, type StartBody, type StartResult } from '../types'
 import { CheckRows, Flow, Icon, ImportCta, MeLine, PendingRepo, PushBox, RoleIcon, brainkitProblem, repoLabel, type FlowStep } from '../ui'
-import { ACT, CLASS_NAME } from '../vocab'
+import { ACT, CLASS_NAME, FAMILY_ACT } from '../vocab'
+import { BIG_HINT } from './Family'
 import type { ViewProps } from './props'
 
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,39}$/
@@ -122,6 +125,8 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
   const [exclude, setExclude] = useState('')
   const [openSession, setOpenSession] = useState(true)
   const [trust, setTrust] = useState(true)
+  const [big, setBig] = useState(false)
+  const [sentBig, setSentBig] = useState(false)   // the start that was sent asked for a big one
 
   const info = next.data && next.data.repo === repo ? next.data : null
   const nextKey = info?.key ?? ''
@@ -131,6 +136,9 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
   // an older backend does not say: brain-kit's own rule only (绝密)
   const allowConfidential = info?.allow_confidential !== false
   const refusedClasses = CLASSES.filter((k) => classRefusal(k, allowConfidential))
+  // 「大需求：先拆成小需求」: this repo's say (tracker none, a brain-kit with brain split)
+  const bigInfo = info?.big ?? null
+  const bigOn = big && !!bigInfo?.ok
 
   const body: IntakeBody = {
     repo, key: keyValue.trim(), slug: slugValue.trim(), title: title.trim(), docs: lines(docs), consent, classification, business, exclude: lines(exclude),
@@ -154,7 +162,8 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
     else setFailedAt(at)
   }
   const runStart = async () => {
-    const r = await start.run({ ...body, paths: splitPaths(expected), open_session: openSession, trust })
+    setSentBig(bigOn)
+    const r = await start.run({ ...body, paths: splitPaths(expected), open_session: openSession, trust, ...(bigOn ? { big: true } : {}) })
     if (r) props.reloadStatus()
   }
 
@@ -225,8 +234,10 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
       state: noDocs ? 'off' : ok || passed ? 'done' : docsBad ? 'bad' : basicsOk ? 'now' : undefined,
     },
     { icon: 'laptop', title: '开工', text: '在它自己的工作目录里开 AI 开发会话', state: ok ? 'done' : started ? 'bad' : canStart ? 'now' : undefined },
-    { icon: 'req', title: 'Lean 推进', text: '需求和设计由你批准', state: ok ? 'now' : undefined },
-    localOnly ? { icon: 'runner', title: '交给运行机', text: '这次不需要：这个仓库只在本机做', state: 'off' } : { icon: 'runner', title: '交给运行机', text: '团队仓库：交接以后它接着做' },
+    { icon: 'req', title: 'Lean 推进', text: bigOn ? '需求和设计由你批准，设计里拆单元' : '需求和设计由你批准', state: ok ? 'now' : undefined },
+    ...(bigOn ? [{ icon: 'scope', title: FAMILY_ACT.split, text: '批了设计再拆，大家认领、并行做' }] : []),
+    localOnly ? { icon: 'runner', title: '交给运行机', text: '这次不需要：这个仓库只在本机做', state: 'off' }
+      : { icon: 'runner', title: '交给运行机', text: bigOn ? '小需求都合并以后' : '团队仓库：交接以后它接着做' },
   ]
   const stepOf = (i: number) => flow[i].state
 
@@ -363,6 +374,19 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
               <textarea id="new-paths" rows={2} value={expected} placeholder="src/refund/" onChange={(e) => setExpected(e.target.value)} />
               <p className="br-hint">别的需求也改到这里时会提醒你。</p>
             </div>
+            {bigInfo && (
+              <div className="br-field is-full nr-big" data-testid="new-big">
+                <label className={`nr-toggle${bigOn ? ' is-on' : ''}${bigInfo.ok ? '' : ' is-disabled'}`}>
+                  <input type="checkbox" checked={bigOn} disabled={!bigInfo.ok} aria-describedby="new-big-hint" onChange={(e) => setBig(e.target.checked)} />
+                  <RoleIcon role="scope" size={18} />
+                  <span>大需求：先拆成小需求</span>
+                </label>
+                <p className="br-hint" id="new-big-hint">
+                  {BIG_HINT}
+                  {!bigInfo.ok && bigInfo.why && <span className="nr-big-why" data-testid="new-big-why"><i aria-hidden="true">✋</i>{bigInfo.why}</span>}
+                </p>
+              </div>
+            )}
             {picked && me && (
               <div className="br-field is-full" data-testid="new-me">
                 {!me.ask && <span className="br-label">认领人</span>}
@@ -470,7 +494,7 @@ export function NewView({ entry, ...props }: { entry: NewEntry } & ViewProps) {
           </div>
           {start.error && <p className="br-error" role="alert">{start.error}</p>}
           {started && (
-            <StartOut r={started} onOpen={navigate} path={picked?.path ?? ''} onMe={(x) => props.setStatus(x.status)}
+            <StartOut r={started} big={sentBig} onOpen={navigate} path={picked?.path ?? ''} onMe={(x) => props.setStatus(x.status)}
               onBoard={(k) => props.go({ kind: 'board', repo, key: k })}
               onItem={(k) => props.go({ kind: 'item', repo, key: k })} />
           )}
@@ -583,8 +607,10 @@ function Cell({ n, label, tone }: { n: number; label: string; tone?: 'ok' | 'bad
   )
 }
 
-function StartOut({ r, path, onOpen, onBoard, onItem, onMe }: {
+function StartOut({ r, big = false, path, onOpen, onBoard, onItem, onMe }: {
   r: StartResult
+  /** opened as a big one: what comes next */
+  big?: boolean
   path: string
   onOpen: (url: string) => void
   onBoard: (key: string) => void
@@ -606,6 +632,9 @@ function StartOut({ r, path, onOpen, onBoard, onItem, onMe }: {
           <div><dt>分支</dt><dd>{r.branch ?? '—'}</dd></div>
           <div className="is-wide"><dt>工作目录</dt><dd>{r.worktree ?? '—'}</dd></div>
         </dl>
+      )}
+      {r.ok && big && (
+        <p className="nr-big-next" data-testid="start-big"><RoleIcon role="scope" size={16} /><span><b>大需求：</b>在会话里做需求和设计，设计里拆单元（unit-of-work.md）；批完设计，在需求看板上点「{FAMILY_ACT.split}」。</span></p>
       )}
       <div className="br-row">
         {r.url && (
@@ -789,4 +818,16 @@ const NR_CSS = `
 .nr-facts dt { font-size: .82em; color: var(--muted); font-weight: 700; }
 .nr-facts dd { margin: 2px 0 0; font-family: var(--mono, ui-monospace, monospace); font-size: .95em; color: var(--text-strong); word-break: break-all; }
 .nr-out pre { max-height: 16em; overflow: auto; }
+
+/* 大需求：先拆成小需求 */
+.nr-big { display: grid; gap: 6px; }
+.nr-big .nr-toggle { justify-self: start; }
+.nr-big .br-hint { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.nr-big-why { display: inline-flex; align-items: center; gap: 6px; padding: 2px 11px; border-radius: 999px; font-weight: 700;
+  color: var(--kt-approve); background: color-mix(in srgb, var(--kt-approve) 11%, transparent); border: 1px solid color-mix(in srgb, var(--kt-approve) 42%, transparent); }
+.nr-big-why i { font-style: normal; }
+.nr-big-next { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 9px 12px; border-radius: 10px; color: var(--text);
+  border: 1px dashed color-mix(in srgb, var(--kt-info) 50%, var(--border)); background: color-mix(in srgb, var(--kt-info) 6%, transparent); }
+.nr-big-next .kt-role-icon { flex: none; margin-top: 2px; color: var(--kt-info); }
+.nr-big-next b { color: var(--text-strong); }
 `

@@ -22,9 +22,10 @@ export const md = (iso: string) => iso.slice(5)
 export const slash = (iso: string) => md(iso).replace(/^0/, '').replace('-0', '-').replace('-', '/')
 
 /** How a requirement was delivered: the colours and words the cards, the weekly chart and the ledger share. */
-export const HOW: CtoRun['how'][] = ['unattended', 'people', 'local', 'pending']
-export const HOW_LABEL: Record<CtoRun['how'], string> = { unattended: '无人值守', people: '有人插手', local: '只在本机', pending: '还没评' }
-export const HOW_VAR: Record<CtoRun['how'], string> = { unattended: 'var(--s4)', people: 'var(--s2)', local: 'var(--s1)', pending: 'var(--s3)' }
+/** the weekly merges by how (a run that ended without a delivery is never merged) */
+export const HOW: Exclude<CtoRun['how'], 'ended'>[] = ['unattended', 'people', 'local', 'pending']
+export const HOW_LABEL: Record<CtoRun['how'], string> = { unattended: '无人值守', people: '有人插手', local: '只在本机', pending: '还没评', ended: '没交付就结束' }
+export const HOW_VAR: Record<CtoRun['how'], string> = { unattended: 'var(--s4)', people: 'var(--s2)', local: 'var(--s1)', pending: 'var(--s3)', ended: 'var(--kt-bad)' }
 
 export function useWidth(fallback = 600): [React.RefObject<HTMLDivElement>, number] {
   const ref = useRef<HTMLDivElement>(null)
@@ -124,11 +125,13 @@ function StackRow({ y0, bh, L, pw, max, segs, total, label, strong, onTip, tipLa
 }
 
 /** 无人值守: every requirement brain-kit looked at, one stacked bar by how it was delivered (unattended, a person stepped
- * in, not judged yet, only on this machine); the legend under it names and counts them. */
+ * in, not judged yet, only on this machine, and when there are any the hand-overs that ended without a delivery:
+ * brain-kit counts them in neither side of 无人值守); the legend under it names and counts them. */
 export function MiniUnattended({ c }: { c: CtoNumbers }) {
   const count = (h: CtoRun['how']) => c.runs.filter((r) => r.how === h).length
   const bh = 22, H = bh + 6, R = 50
-  const segs = HOW.map((h) => ({ key: h, n: count(h), fill: HOW_VAR[h], name: HOW_LABEL[h] }))
+  const hows: CtoRun['how'][] = [...HOW, ...(count('ended') ? ['ended' as const] : [])]
+  const segs = hows.map((h) => ({ key: h, n: count(h), fill: HOW_VAR[h], name: HOW_LABEL[h] }))
   const total = segs.reduce((a, x) => a + x.n, 0)
   return (
     <Mini label={`评估过的需求，按交付方式：${segs.map((x) => `${x.name} ${x.n}`).join('，')}`} height={H}>

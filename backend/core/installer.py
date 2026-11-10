@@ -482,8 +482,11 @@ def commit_failure(p: Any, where: str, purpose: str = "install") -> tuple[bool, 
                        "这里不替你填），再点「再提交一次」")
     if "nothing to commit" in low or "nothing added to commit" in low or "no changes added to commit" in low:
         return False, (UP_TO_DATE if purpose == "upgrade" else "没有可提交的改动：安装什么也没写？看看 %s" % where)
-    return True, "提交被拦下了（多半是提交时跑的 git 检查），它说：\n%s\n\n改动还在 %s 里：处理好以后点「再提交一次」。" % (
-        last_lines(tail(p), 15) or "（什么也没说，退出码 %d）" % p.returncode, where)
+    # brain-kit 0d52e97's hook adapter (version 3) refuses every tool call while the kit's own files differ from the
+    # commit: until this commit goes through, a brain-dev session in this checkout is locked
+    lock = "\n没提交之前，在这个目录里开的 brain-dev 会话每次调用工具都会被拦下（kit 文件和提交的不一样）。" if purpose == "upgrade" else ""
+    return True, "提交被拦下了（多半是提交时跑的 git 检查），它说：\n%s\n\n改动还在 %s 里：处理好以后点「再提交一次」。%s" % (
+        last_lines(tail(p), 15) or "（什么也没说，退出码 %d）" % p.returncode, where, lock)
 
 
 def commit(top: str, records: Records, step: Callable[..., None] | None = None, *,

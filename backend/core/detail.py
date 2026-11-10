@@ -50,6 +50,9 @@ MERGE_NOTE = (
     (re.compile(r"^the bridge ledger says the MR was merged"), lambda m: None),
 )
 CHOICE_SAID = {"approve": "通过", "reject": "退回"}   # an answer on the MR without options
+# a bridge run's state (the ledger's), as 运行机 says it (Team.tsx RUN_STATE)
+RUN_STATE = {"signing": "签名中", "spooled": "排队等工作区", "ready": "工作区好了", "dispatched": "已派给会话",
+             "send_unknown": "送没送到不清楚", "failed": "没能开始", "merged": "已合并", "closed": "已关闭"}
 
 
 def _ref_said(ref: str) -> str:
@@ -224,7 +227,10 @@ HANDOVER_LABEL = {"requested": "交接", "voucher": "签名服务签了接手合
                   "bridge rejected": "桥拒绝接手"}
 DECISION_SAID = {"open": "%s 在 MR 上问人", "posting": "%s 等桥贴到 MR 上", "asking": "%s 等桥贴到 MR 上",
                  "answered": "%s 回答了", "delivered": "%s 回答了，桥签好送回运行机", "delivery_unknown": "%s 回答了，送没送到不清楚",
-                 "refused": "%s 的回答签名服务不签", "void": "%s 作废了", "invalid": "%s 发不出去"}
+                 "refused": "%s 的回答签名服务不签", "void": "%s 作废了", "invalid": "%s 发不出去",
+                 # brain-kit 0d52e97: a reply held until GitLab can say whether it was edited; a new push; closed
+                 "held": "%s 有了回复，先等着（GitLab 能查回复有没有被改过以后再核对）", "stale": "%s 过期了（分支有了新推送）",
+                 "closed": "%s 关了"}
 
 
 def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
@@ -269,9 +275,15 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
                       "src": q.get("src")})
     for d in t.get("decisions") or []:
         if d.get("source") == "bridge":
+            # 0d52e97: sha, the MR head the bridge asked it at
+            st = str(d.get("state") or "")
+            detail = " · ".join(x for x in (str(CHOICE_SAID.get(str(d.get("choice")), d.get("choice")) or ""),
+                                             "问在提交 %s" % str(d["sha"])[:12] if d.get("sha") else "") if x)
             items.append({"at": d.get("at") or d.get("asked_at"), "kind": "decision",
-                          "label": DECISION_SAID.get(str(d.get("state")), "%s 在 MR 上问人") % d.get("id"),
-                          "detail": CHOICE_SAID.get(str(d.get("choice")), d.get("choice")),
+                          # a state brain-kit adds later: as it is
+                          "label": DECISION_SAID[st] % d.get("id") if st in DECISION_SAID else
+                          "%s %s" % (d.get("id"), st) if st else "%s 在 MR 上问人" % d.get("id"),
+                          "detail": detail or None,
                           "who": d.get("who"), "src": ", ".join(d.get("src") or [])[:200] or None})
     for r in (t.get("checks") or {}).get("verify") or []:
         items.append({"at": r.get("at"), "kind": "verify", "label": "自动检查%s" % ("通过" if r.get("ok") else "没过"),
@@ -291,6 +303,26 @@ def trace_timeline(t: dict[str, Any]) -> list[dict[str, Any]]:
     return items
 
 
+def run_said(run_id: str) -> str:
+    """RUN-PAY-3-1 as 「PAY-3 的第 1 次运行」 (a run in words, as 运行机 says it); another id as it is."""
+    m = re.match(r"^RUN-(.+)-([0-9]+)$", run_id)
+    return "%s 的第 %s 次运行" % m.groups() if m else run_id
+
+
+def other_runs(t: dict[str, Any]) -> list[str]:
+    """brain-kit 0d52e97 trace's other_runs (docs/eval.md rule H0): this requirement's runs on another branch (its
+    first MR closed, started again on a new branch), not read into this trace, in words: 「PAY-3 的第 1 次运行（分支 …，
+    已关闭）」."""
+    out = []
+    for o in t.get("other_runs") or []:
+        if isinstance(o, dict) and o.get("run_id"):
+            st = str(o.get("state") or "")
+            out.append("%s（%s，%s）" % (run_said(str(o["run_id"])[:80]),
+                                       "分支 %s" % str(o["branch"])[:200] if o.get("branch") else "分支认不出",
+                                       RUN_STATE.get(st, st) if st else "桥上没有它的状态"))
+    return out[:20]
+
+
 def _iso_minute(ts: Any) -> str:
     """2026-11-09T02:05:33Z -> 2026-11-09 02:05Z (UTC, as brain-kit writes it)."""
     m = re.match(r"^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2})", str(ts or ""))
@@ -302,15 +334,16 @@ def timeline(repo_path: str, cfg: dict[str, Any], key: str, *, ref: str | None, 
              allowed_signers: str | None = None, app_events: list[dict[str, Any]] | None = None,
              has_run: bool = True) -> dict[str, Any]:
     """The timeline: brainkit.trace's record, else the Lean ledger's. A requirement only claimed has no run to trace
-    (nothing recorded yet is not an error)."""
-    out = {"source": "app", "items": [], "missing": [], "error": "", "brain": None, "cost": None, "trace": None}
+    (nothing recorded yet is not an error). other_runs: this requirement's runs on another branch (brain-kit 0d52e97)."""
+    out = {"source": "app", "items": [], "missing": [], "error": "", "brain": None, "cost": None, "trace": None,
+           "other_runs": []}
     if has_run and bk.has("trace"):
         try:
             from .deliveries import _call
             t = _call(bk.m("trace").build, repo_path, cfg, key, ref=ref, ledger_path=ledger_path,
                       vouchers_dir=vouchers_dir, credits=credits, allowed_signers=allowed_signers)
             out.update(source="trace", items=trace_timeline(t), missing=[str(x)[:200] for x in t.get("missing") or []],
-                       brain=t.get("brain"), cost=t.get("cost"), trace=t)
+                       brain=t.get("brain"), cost=t.get("cost"), trace=t, other_runs=other_runs(t))
         except Exception as exc:  # noqa: BLE001 - the Lean ledger's items stand in; brain-kit's words for 细节
             out["error"] = "brain-kit 读不出这个需求的完整记录：这里只有 Lean 自己记下的事。brain-kit 的原话：%s" % (
                 str(exc).split("\n", 1)[0][:300])

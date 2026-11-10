@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from appkit import mod
+from appkit import BRAINKIT, mod
 from brainfix import FakeGateway, brain, install_brain_dev, make_project, make_service, needs_brainkit, run, sh
 
 pytestmark = needs_brainkit
@@ -46,8 +46,11 @@ def test_the_dry_run_lists_every_finding_verbatim_and_what_would_stop_the_start(
 
     (tmp_path / "b").mkdir(), (tmp_path / "c").mkdir(), (tmp_path / "d").mkdir()
     nxt, first, fixed, unsure, no_consent = run(go())
+    big = nxt.pop("big")     # 「大需求：先拆成小需求」: only with a brain-kit that has brain split (0d52e97)
     assert nxt == {"repo": "r1", "key": "PAY-1", "tracker": "none", "prefix": "PAY", "error": "",
                    "allow_confidential": False, "push": None}
+    assert big == ({"ok": True, "why": ""} if (BRAINKIT / "brainkit" / "split.py").is_file() else
+                   {"ok": False, "why": "这个 brain-kit 还不会拆小需求：在设置里换新一点的 brain-kit"})
     # what stops it is said as what to do on the page; brain-kit's words (its CLI flags) only in blocking_raw
     assert first["ok"] is False and first["blocking"][0].startswith("第 3 关：找到金额")
     assert "在第 3 关选「原样保留」或「换成占位符」" in first["blocking"][0] and "--business" not in first["blocking"][0]
@@ -178,7 +181,7 @@ def test_no_session_without_brain_dev_carrying_leans_hooks(tmp_path, home):
             await svc.stop()
 
     out = run(go())
-    assert out["ok"] and out["slot"] is None and "hook" in out["session_error"]
+    assert out["ok"] and out["slot"] is None and "Lean 的拦截" in out["session_error"]
     assert not gw.slot_rows
 
 

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { apiCalls, badges, navigations } from '../test/stubs/app-sdk'
 import { fx } from '../test/data'
 import { API, installFixtureRoutes } from '../test/routes'
-import type { Status, Todo, TodoItem } from '../types'
+import type { ChildStartResult, Status, Todo, TodoItem } from '../types'
 import { TYPE_IT_YOURSELF } from '../ui'
 import type { ViewProps } from './props'
 import { TEAM_SENTENCE, TodoView } from './Todo'
@@ -300,4 +300,112 @@ describe('待办', () => {
     fireEvent.click(within(hero).getByRole('button', { name: '看交付总览' }))
     expect(go).toHaveBeenCalledWith({ kind: 'overview' })
   })
+
+  // ---------------------------------------------------------------- 大需求拆成小需求
+
+  const SINCE = fx.overview().at - 600
+  const item = (over: Partial<TodoItem>): TodoItem => ({
+    kind: 'child_start', repo: 'r1', key: 'PAY-3', title: '在订单页看到退款状态', text: 'PAY-1 的单元 web：你认领了，依赖都合进来了：可以开工',
+    line: null, approval: null, mr_url: null, question: null, session: null, since: SINCE, ...over,
+  })
+  const CHILD = item({})
+  const PARENT = item({ kind: 'parent_release', key: 'PAY-1', title: '退款大需求', text: 'PAY-1 的 3 个小需求都合并了：评审、发布（lean verify、lean release，再批 RELEASE）' })
+  const withFamily = (): Todo => {
+    const t = fx.todo()
+    t.items = [...t.items, CHILD, PARENT]
+    return t
+  }
+  test('a closed requirement whose branch or MR is still there: its own group, yellow, after 没交出去的交接', async () => {
+    const left = item({ kind: 'closed_leftover', key: 'PAY-9', title: '旧的退款导出',
+      text: '需求关了，分支 ai/alice/PAY-9-x 还在：用不着就删掉分支（本地 git branch -D ai/alice/PAY-9-x；远端 git push origin --delete ai/alice/PAY-9-x）' })
+    installFixtureRoutes({ [`GET ${API}/todo`]: () => { const t = fx.todo(); t.items = [...t.items, left]; return t } })
+    renderTodo()
+    await screen.findByRole('region', { name: '关了的需求还留着分支或 MR' })
+    const names = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+    expect(names.indexOf('关了的需求还留着分支或 MR')).toBe(names.indexOf('没交出去的交接') + 1)
+    const g = group('关了的需求还留着分支或 MR')
+    expect(g).toHaveTextContent('git branch -D ai/alice/PAY-9-x')
+    expect(within(g).getByTestId('todo-item')).toHaveClass('is-warn')
+  })
+
+  const STARTED: ChildStartResult = {
+    ok: true, key: 'PAY-3', branch: 'ai/alice/PAY-3-web', worktree: '/Users/alice/.brain/worktrees/shop-pay/PAY-3', on: null, text: '开工了：PAY-3',
+    blocked: [], can_on: null, problem: null, output: 'Started PAY-3', slot: 'brain-PAY-3-a1b2', url: '/chat?sid=brain-PAY-3-a1b2', session_error: '',
+  }
+
+  test('two family groups in the waiting ones: 可以开工的小需求 and 等评审、发布的大需求; the counter card and its jumps count them', async () => {
+    installFixtureRoutes({ [`GET ${API}/todo`]: () => withFamily() })
+    const { go } = renderTodo()
+    await screen.findByRole('region', { name: '可以开工的小需求' })
+    // the two family groups come after 认领了还没开工 (the other start) and before the refused hand-overs
+    const names = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+    const at = (n: string) => names.indexOf(n)
+    expect(at('可以开工的小需求')).toBeGreaterThan(at('等验收'))
+    expect(at('等评审、发布的大需求')).toBe(at('可以开工的小需求') + 1)
+    expect(at('接手被拒')).toBeGreaterThan(at('等评审、发布的大需求'))
+    const count = screen.getByTestId('todo-count')
+    const n = fx.todo().items.length + 2
+    expect(count).toHaveTextContent(`${n}件`)
+    const cells = Array.from(count.querySelectorAll('.td-cells i'))
+    expect(cells).toHaveLength(n)
+    expect(cells.filter((i) => /大需求|小需求/.test(i.getAttribute('title') ?? '')).map((i) => i.className)).toEqual(['is-wait', 'is-wait'])
+    const jumps = within(screen.getByRole('navigation', { name: '待办的种类' })).getAllByRole('button')
+    expect(jumps.map((b) => b.textContent)).toContain('可以开工的小需求 1')
+    const scroll = vi.mocked(HTMLElement.prototype.scrollIntoView)
+    scroll.mockClear()
+    fireEvent.click(within(screen.getByRole('navigation', { name: '待办的种类' })).getByRole('button', { name: '等评审、发布的大需求 1' }))
+    expect(scroll.mock.contexts[0]).toBe(group('等评审、发布的大需求'))
+
+    const kid = group('可以开工的小需求')
+    expect(kid).toHaveTextContent('你认领了，依赖都合进来了')
+    expect(within(kid).getByTestId('todo-item')).toHaveClass('is-wait')
+    expect(within(kid).getByRole('button', { name: '开工' })).toHaveClass('is-primary')
+    const big = group('等评审、发布的大需求')
+    expect(big).toHaveTextContent('PAY-1 的 3 个小需求都合并了：评审、发布')
+    expect(within(big).queryByRole('button', { name: '开工' })).toBeNull()
+    const board = within(big).getByRole('button', { name: '需求看板' })
+    expect(board).toHaveClass('is-primary')
+    fireEvent.click(board)
+    expect(go).toHaveBeenLastCalledWith({ kind: 'board', repo: 'r1', key: 'PAY-1', from: 'todo' })
+  })
+
+  test('开工 posts start with its session; the answer (打开会话) stays when the list no longer has the item', async () => {
+    const user = userEvent.setup()
+    let started = false
+    installFixtureRoutes({
+      [`GET ${API}/todo`]: () => (started ? fx.todo() : withFamily()),
+      [`POST ${API}/requirements/r1/PAY-3/start`]: () => { started = true; return STARTED },
+    })
+    const { reloadStatus } = renderTodo()
+    const kid = await screen.findByRole('region', { name: '可以开工的小需求' })
+    await user.click(within(kid).getByRole('button', { name: '开工' }))
+    expect(await within(group('可以开工的小需求')).findByTestId('fam-start-result')).toHaveTextContent('开工了：PAY-3')
+    expect(apiCalls.filter((c) => c.method === 'POST')).toEqual([{ method: 'POST', path: `${API}/requirements/r1/PAY-3/start`, body: { open_session: true } }])
+    expect(reloadStatus).toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('region', { name: '等评审、发布的大需求' })).toBeNull())   // the list was read again
+    const out = within(group('可以开工的小需求')).getByTestId('fam-start-result')
+    expect(out).toHaveTextContent('ai/alice/PAY-3-web')
+    expect(within(group('可以开工的小需求')).queryByRole('button', { name: '开工' })).toBeNull()
+    expect(screen.getByTestId('todo-count')).toHaveTextContent(`${fx.todo().items.length}件`)   // it no longer waits on you
+    await user.click(within(out).getByRole('button', { name: '打开会话' }))
+    expect(navigations).toEqual(['/chat?sid=brain-PAY-3-a1b2'])
+  })
+
+  test('a start brain-kit refused says why, with brain start’s output; 开工 stays', async () => {
+    const user = userEvent.setup()
+    installFixtureRoutes({
+      [`GET ${API}/todo`]: () => withFamily(),
+      [`POST ${API}/requirements/r1/PAY-3/start`]: () => ({ ...STARTED, ok: false, branch: null, worktree: null, url: null, slot: null, text: '没开成',
+        problem: { level: 'FAIL', text: '设了 AIDLC_LEAN_TEAM，和单元对不上', todo: '先 unset AIDLC_LEAN_TEAM' }, output: 'AIDLC_LEAN_TEAM=api does not match unit web' }),
+    })
+    renderTodo()
+    const kid = await screen.findByRole('region', { name: '可以开工的小需求' })
+    await user.click(within(kid).getByRole('button', { name: '开工' }))
+    const out = await within(group('可以开工的小需求')).findByTestId('fam-start-result')
+    expect(out).toHaveClass('is-bad')
+    expect(within(out).getByTestId('check-rows')).toHaveTextContent('设了 AIDLC_LEAN_TEAM，和单元对不上做什么先 unset AIDLC_LEAN_TEAM')
+    expect(within(out).getByText('细节：开工时 brain-kit 的原话')).toBeInTheDocument()
+    expect(within(group('可以开工的小需求')).getByRole('button', { name: '开工' })).toBeEnabled()
+  })
 })
+

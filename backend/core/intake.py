@@ -57,8 +57,12 @@ def next_key(repo: Repo) -> dict[str, Any]:
     brain-kit in this checkout only, not on origin, where `brain start` makes the requirement's branch from (an in-place
     install not pushed yet): {branch, remote_url} for 「推送」, None when nothing waits."""
     cfg = repo.cfg
+    from .family import JIRA_REPO, NO_SPLIT
+    big = {"ok": False, "why": JIRA_REPO} if cfg["tracker"] != "none" else \
+        {"ok": True, "why": ""} if bk.has("split") else {"ok": False, "why": NO_SPLIT}
     out = {"repo": repo.id, "key": None, "tracker": cfg["tracker"], "prefix": cfg["req_prefix"], "error": "",
-           "allow_confidential": bool((cfg.get("intake") or {}).get("allow_confidential")), "push": unpushed(repo)}
+           "allow_confidential": bool((cfg.get("intake") or {}).get("allow_confidential")), "push": unpushed(repo),
+           "big": big}
     if cfg["tracker"] != "none":
         return out
     rx = re.compile(r"^refs/(?:heads|remotes/origin)/claim/%s-([1-9][0-9]*)$" % re.escape(cfg["req_prefix"]))

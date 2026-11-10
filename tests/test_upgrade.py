@@ -20,11 +20,14 @@ installer = mod("installer")
 service = mod("service")
 AppError = mod("httpkit").AppError
 ADAPTER = ".kiro/brain/lean-hook.py"
-NEED = re.search(r"^CREW_HOOK_VERSION = (\d+)", (BRAINKIT / "brainkit" / "cli.py").read_text(encoding="utf-8"), re.M).group(1)
 GITLAB = {"base": "https://gitlab.example.com", "project": "grp/pay"}
 HAS_VERSION_CHECK = "def crew_hook_problem" in (BRAINKIT / "brainkit" / "cli.py").read_text(encoding="utf-8") \
     if (BRAINKIT / "brainkit" / "cli.py").is_file() else False
 needs_d4 = pytest.mark.skipif(not HAS_VERSION_CHECK, reason="this brain-kit has no crew_hook_problem (older than d46765f)")
+# the hook adapter version the brain-kit under test needs (cli.CREW_HOOK_VERSION: 2 at d46765f, 3 at 0d52e97)
+_m = re.search(r"^CREW_HOOK_VERSION = ([0-9]+)", (BRAINKIT / "brainkit" / "cli.py").read_text(encoding="utf-8"), re.M) \
+    if (BRAINKIT / "brainkit" / "cli.py").is_file() else None
+NEED = int(_m.group(1)) if _m else 2
 
 
 def older_kit(tmp_path, *, origin=True, kit=None, adapter=None, runs=True, name="pay"):
@@ -140,7 +143,7 @@ def test_the_kit_fix_reinstalls_on_a_new_branch_and_never_touches_the_checkout(t
     if HAS_VERSION_CHECK:
         shipped = (BRAINKIT / "kit" / ".kiro" / "brain" / "lean-hook.py").read_text(encoding="utf-8")
         assert sh("git", "-C", repo, "show", "brain/upgrade-kit:" + ADAPTER).stdout == shipped
-        assert "\nADAPTER_VERSION = %s" % NEED in shipped
+        assert "\nADAPTER_VERSION = %s" % NEED in shipped        # the kit fix installs the adapter brain-kit needs
     c = r["commit"]
     assert c["ok"] and not c["blocked"] and "Alice Example <alice@example.com>" in c["text"]
     log = sh("git", "-C", repo, "log", "-1", "--format=%an <%ae>|%cn <%ce>|%s|%P", "brain/upgrade-kit").stdout.strip()

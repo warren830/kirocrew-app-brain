@@ -3,7 +3,8 @@
  * runner ran unattended end to end, how many times a person stepped in at the judgment points and outside them,
  * credits per requirement) and who settled the decisions, each with its small SVG chart (cto/charts.tsx); 轮到你 (what
  * waits on the person, with its one step); the weekly merges; 需求流动 (cto/Flow.tsx: the kanban of what is in
- * progress); the 交付清单 (every requirement); brain-kit's eval batch. Every card and row opens the requirement's board
+ * progress); the 交付清单 (every requirement, a big requirement's small ones folded under it); brain-kit's eval batch
+ * (its big requirements split into small ones among its rows). Every card and row opens the requirement's board
  * (需求看板). Polls GET /overview (Overview.cto has the numbers, from brainkit.evaluate). The repo pills and the
  * ledger's state filter are in the URL; a big number, a legend entry, a week, a column, a lane or 「+N 个」 filters the
  * ledger once more (a LedgerPick, with its ✕) and scrolls to it.
@@ -14,15 +15,15 @@
  *
  * Without any repo it is one big way in: 导入仓库. A repo without requirements shows only its way in: 开需求.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppApi, useNavigate } from '@kirocrew/app-sdk'
 import { POLL_MS, paths, useAction, usePoll } from '../api'
 import { RoleIcon } from '../board/RoleIcon'
 import { HOW, HOW_LABEL, HOW_VAR, MiniCredits, MiniPeople, MiniUnattended, MiniWho, WHO_VAR, WeeklyChart, fmt, slash } from '../cto/charts'
-import { COL_NAME, Flow, LANE_NAME, StepButton, colOf, laneOf, stepOf, waitedText, type Col, type Lane } from '../cto/Flow'
+import { COL_NAME, Flow, LANE_NAME, StepButton, blockText, blockersOf, colOf, familyProgress, laneOf, stepOf, waitedText, type Col, type Lane } from '../cto/Flow'
 import { ago, fmtCredits } from '../format'
 import type { OverviewEntry, View } from '../nav'
-import type { CtoNumbers, CtoRun, EvalMetric, EvalView, Funnel, Overview, RefreshResult, ReqState, RepoInfo, Requirement } from '../types'
+import type { CtoNumbers, CtoRun, EvalFamily, EvalMetric, EvalView, Funnel, Overview, RefreshResult, ReqFamily, ReqState, RepoInfo, Requirement } from '../types'
 import { STATE_LABEL } from '../types'
 import { ACT, DECIDED_BY, leanProgress, waitName } from '../vocab'
 import { EmptyHero, Icon, ImportCta, LeanCell, LoadState, MrLink, PendingRepo, STATE_TONE, StateChip } from '../ui'
@@ -122,6 +123,34 @@ export const OV_CSS = `
 .br-ov .br-eval-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
 .br-ov .br-eval-list li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 
+/* 大需求 and 小需求: nobody's yet is dashed (as the board's idle chips); its big one, dependencies and what blocks it */
+.br-ov .cto-kcard.br-kfree { border-style: dashed; border-color: var(--border-strong); }
+.br-ov .cto-lane.br-lane-free .kt-role-icon { color: var(--muted); }
+.br-ov .br-kfam { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.br-ov .br-kdeps { display: flex; flex-wrap: wrap; gap: 0 6px; font-size: 12px; color: var(--muted); }
+.br-ov .br-kdeps span { font-family: var(--mono, ui-monospace, monospace); color: var(--text); }
+.br-ov .br-kdeps span.is-merged { color: var(--kt-ok); }
+.br-ov .br-kblock { font-size: 12px; line-height: 1.4; color: var(--kt-warn); font-weight: 650; }
+.br-ov .br-fam { display: grid; gap: 4px; margin: 3px 0 1px; }
+.br-ov .br-fam-bar { display: flex; align-items: center; gap: 8px; }
+.br-ov .br-fam-bar .kt-segs { flex: 1; margin: 0; }
+.br-ov .br-fam-bar .kt-segs i { height: 7px; }
+.br-ov .br-fam-bar b { font-size: 12px; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.br-ov .br-segs i.is-claimed { background: color-mix(in srgb, var(--kt-info) 45%, transparent); }
+.br-ov .br-fkids { display: flex; flex-wrap: wrap; gap: 1px 9px; font-size: 12px; color: var(--text); }
+.br-ov .br-fkid { display: inline-flex; align-items: baseline; gap: 3px; white-space: nowrap; }
+.br-ov .br-fkid i { font-style: normal; font-size: 11px; color: var(--br-tone); }
+.br-ov .br-fkid-unit { color: var(--muted); }
+.br-ov .br-ledger tr.br-kid td { background: color-mix(in srgb, var(--text) 2.5%, transparent); }
+.br-ov .br-ledger tr.br-kid.cto-row-pick:hover td { background: var(--cto-glass); }
+.br-ov .br-ledger tr.br-kid td:first-child { padding-left: 14px; }
+.br-ov .br-tree { color: var(--muted); font-family: var(--mono, ui-monospace, monospace); width: 1.1em; flex: none; }
+.br-ov .br-fam-toggle { font-variant-numeric: tabular-nums; cursor: pointer; }
+.br-ov .br-fam-toggle[aria-expanded="false"] { border-style: dashed; }
+.br-ov .br-how-cell { display: grid; gap: 1px; justify-items: start; }
+.br-ov .br-how .br-chip { padding: 0 7px; font-size: 11.5px; }
+.br-ov .br-eval-list .br-tag b { margin-left: 4px; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+
 @container brov (max-width: 1180px) {
   .br-ov .cto-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .br-ov .br-ledger { font-size: 13px; }
@@ -139,8 +168,10 @@ export const OV_CSS = `
 type LedgerPick = { id: string; label: string; keep: (r: Requirement, run: CtoRun | undefined) => boolean }
 type RepoCount = { open: number; you: number }
 
-const isOpen = (r: Requirement) => r.state !== 'merged' && r.state !== 'closed'
+const isOpen = (r: Requirement) => r.state !== 'merged' && r.state !== 'merged_into_parent' && r.state !== 'closed'
 const idOf = (r: { repo: string; key: string }) => `${r.repo}/${r.key}`
+type Group = { r: Requirement; kids: Requirement[] }
+type Tree = 'mid' | 'last'
 
 /** A repo pill's counts: its requirements in progress, and those that wait on you (a merge to write back into the
  * Brain too, as 轮到你 lists them); 'all' among *ids*: every row. */
@@ -174,6 +205,22 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
     () => (data ? sortRows(data.rows.filter((r) => (!state || r.state === state) && (!pick || pick.keep(r, runsBy.get(idOf(r)))))) : []),
     [data, state, pick, runsBy],
   )
+  // a big requirement's small ones in the list come right under it, folded with its 小需求 n/m
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
+  const groups = useMemo(() => ledgerGroups(rows), [rows])
+  const fold = (id: string) => setFolded((s) => {
+    const next = new Set(s)
+    if (!next.delete(id)) next.add(id)
+    return next
+  })
+  const size = (g: Group) => 1 + (folded.has(idOf(g.r)) ? 0 : g.kids.length)
+  const listed = groups.reduce((a, g) => a + size(g), 0)
+  const shown: Group[] = []
+  for (let n = 0, i = 0; i < groups.length && n < limit; i++) {
+    shown.push(groups[i])
+    n += size(groups[i])
+  }
+  const shownN = shown.reduce((a, g) => a + size(g), 0)
   useEffect(() => {
     if (!data) return
     const counts = repoCounts(data.rows, repo === 'all' ? ['all', ...repos.filter((x) => x.ok).map((x) => x.id)] : [repo])
@@ -324,7 +371,7 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
             onAll={() => filterTo(cellPick(undefined, 'you'))} />}
 
           <section className="cto-cards" data-testid="ov-cards">
-            <UnattendedCard c={c} localOnly={localOnly} computing={computing} pick={pick} onPick={filterTo} />
+            <UnattendedCard c={c} localOnly={localOnly} computing={computing} pick={pick} onPick={filterTo} onKey={(r) => (r.repo ? toBoard(r) : openKey(r.key))} />
             <PeopleCard c={c} computing={computing} onPick={filterTo} />
             <article className="cto-card" aria-label="每个需求的 credits" data-anchor="credits">
               <div className="cto-eyebrow">每个需求的 credits</div>
@@ -372,17 +419,29 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
                       <button type="button" className="br-link" onClick={() => { setPick(null); pickState(undefined) }}>看全部</button>
                     </td></tr>
                   )}
-                  {rows.slice(0, limit).map((r) => (
-                    <Row key={idOf(r)} r={r} at={data.at} run={runsBy.get(idOf(r))} ev={data.eval} repoName={manyRepos ? repoName(r.repo) : undefined}
-                      onOpen={() => toBoard(r)} onItem={() => toItem(r)} onReplay={() => toBoard(r, true)} onGo={go} />
-                  ))}
+                  {shown.map((g) => {
+                    const id = idOf(g.r)
+                    const open = !folded.has(id)
+                    const row = (r: Requirement, tree?: Tree) => (
+                      <Row key={idOf(r)} r={r} at={data.at} run={runsBy.get(idOf(r))} ev={data.eval} repoName={manyRepos && !tree ? repoName(r.repo) : undefined} tree={tree}
+                        fold={r === g.r && g.kids.length ? { open, onFold: () => fold(id) } : undefined}
+                        onOpen={() => toBoard(r)} onItem={() => toItem(r)} onReplay={() => toBoard(r, true)} onGo={go} />
+                    )
+                    return (
+                      <Fragment key={id}>
+                        {row(g.r)}
+                        {open && g.kids.map((k, i) => row(k, i === g.kids.length - 1 ? 'last' : 'mid'))}
+                      </Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
-            {rows.length > limit && <button type="button" className="kt-btn is-small" style={{ marginTop: 10 }} onClick={() => setLimit((n) => n + 30)}>显示更多（还有 {rows.length - limit} 个）</button>}
+            {listed > shownN && <button type="button" className="kt-btn is-small" style={{ marginTop: 10 }} onClick={() => setLimit((n) => n + 30)}>显示更多（还有 {listed - shownN} 个）</button>}
           </section>
 
-          <EvalCard ev={data.eval} noModule={status?.brainkit.modules.evaluate === false} onBoard={(k) => openKey(k)} onItem={(k) => openKey(k, true)} onSettings={() => go({ kind: 'settings' })} />
+          <EvalCard ev={data.eval} noModule={status?.brainkit.modules.evaluate === false} onBoard={(k) => openKey(k)} onItem={(k) => openKey(k, true)} onSettings={() => go({ kind: 'settings' })}
+            onFamily={(f) => (f.repo ? toBoard(f) : openKey(f.key))} />
         </>
       )}
 
@@ -396,6 +455,8 @@ export function OverviewView({ entry, status, go, replace, reloadStatus, pollMs 
             <li>决定 · 谁定的：<WhoSyntax />。每个决定只算一次，写了别的就算「没归类」，列出在哪一行，不猜是谁。还在分支上、没合并的需求也算；评估里的「知识有用率」只看默认分支上的引用，所以两个数的范围不一样。</li>
             <li>每周合并：合并进默认分支的那一周（周一起）；交付方式同上，没评估过的合并算「还没评」。</li>
             <li>轮到你、等别人：按每个需求此刻等谁；「已等」从它开始这样等的那一刻算起。</li>
+            <li>没交付就结束：交给运行机以后，运行机没能开始，或 MR 关了没合并。它不算无人值守，也不算进分母。</li>
+            <li>大需求：拆成小需求的需求。已合并 = 合进大需求分支的小需求；评估里大需求那一行的介入、问题和 credits 是大需求和它的小需求加起来的。待认领：拆出来、还没人认领的小需求。</li>
           </ul>
         </details>
       )}
@@ -423,10 +484,31 @@ function weekOf(r: Requirement, run: CtoRun | undefined): string | null {
   return `${m.getUTCFullYear()}-${String(m.getUTCMonth() + 1).padStart(2, '0')}-${String(m.getUTCDate()).padStart(2, '0')}`
 }
 
-/** Open requirements first (the newest activity first), then the merged ones, then the closed. */
+/** Open requirements first (the newest activity first), then the merged ones (into main, or a small one into its big
+ * one's branch), then the closed. */
 function sortRows(rows: Requirement[]): Requirement[] {
-  const rank = (r: Requirement) => (r.state === 'merged' ? 1 : r.state === 'closed' ? 2 : 0)
+  const rank = (r: Requirement) => (r.state === 'merged' || r.state === 'merged_into_parent' ? 1 : r.state === 'closed' ? 2 : 0)
   return rows.slice().sort((a, b) => rank(a) - rank(b) || (b.updated_at ?? 0) - (a.updated_at ?? 0))
+}
+
+/** The ledger's rows as groups: a big requirement split into small ones, with those of them in the list right after it
+ * (in its filing order); a small one whose big one is not in the list stands alone, where its own order puts it. */
+function ledgerGroups(rows: Requirement[]): Group[] {
+  const parents = new Set(rows.filter((r) => r.family?.role === 'parent').map(idOf))
+  const parentOf = (r: Requirement) => {
+    const f = r.family
+    return f?.role === 'child' && f.parent !== r.key && parents.has(idOf({ repo: r.repo, key: f.parent })) ? idOf({ repo: r.repo, key: f.parent }) : null
+  }
+  const kids = new Map<string, Requirement[]>()
+  for (const r of rows) {
+    const p = parentOf(r)
+    if (p) kids.set(p, [...(kids.get(p) ?? []), r])
+  }
+  return rows.filter((r) => !parentOf(r)).map((r) => {
+    const order = (r.family?.children ?? []).map((c) => c.key)
+    const at = (k: string) => (order.includes(k) ? order.indexOf(k) : order.length)
+    return { r, kids: (kids.get(idOf(r)) ?? []).sort((a, b) => at(a.key) - at(b.key)) }
+  })
 }
 
 /** 轮到你: every requirement that waits on the person, the longest wait first, each with its one step. */
@@ -500,9 +582,12 @@ function NotYet({ testid, why, computing = false }: { testid: string; why: strin
   )
 }
 
-function UnattendedCard({ c, localOnly, computing, pick, onPick }: { c: CtoNumbers; localOnly: boolean; computing: boolean; pick: LedgerPick | null; onPick: (p: LedgerPick) => void }) {
+function UnattendedCard({ c, localOnly, computing, pick, onPick, onKey }: {
+  c: CtoNumbers; localOnly: boolean; computing: boolean; pick: LedgerPick | null; onPick: (p: LedgerPick) => void; onKey: (r: CtoRun) => void
+}) {
   const u = c.unattended
   const count = (h: CtoRun['how']) => c.runs.filter((r) => r.how === h).length
+  const ended = c.runs.filter((r) => r.how === 'ended')
   const howPick = (hs: CtoRun['how'][], label: string): LedgerPick => ({ id: `how:${hs.join(',')}`, label, keep: (_r, run) => !!run && hs.includes(run.how) })
   const judged = !!u && u[1] > 0 && !localOnly
   return (
@@ -527,11 +612,19 @@ function UnattendedCard({ c, localOnly, computing, pick, onPick }: { c: CtoNumbe
       )}
       {c.runs.length > 0 && !localOnly && (
         <div className="cto-legend">
-          {HOW.filter((h) => count(h) > 0).map((h) => (
-            <button type="button" key={h} aria-pressed={pick?.id === `how:${h}`} title={`在交付清单里看「${HOW_LABEL[h]}」的需求`} onClick={() => onPick(howPick([h], `交付方式：${HOW_LABEL[h]}`))}>
+          {([...HOW, 'ended'] as CtoRun['how'][]).filter((h) => count(h) > 0).map((h) => (
+            <button type="button" key={h} data-how={h} aria-pressed={pick?.id === `how:${h}`} title={h === 'ended' ? HOW_ENDED : `在交付清单里看「${HOW_LABEL[h]}」的需求`}
+              onClick={() => onPick(howPick([h], `交付方式：${HOW_LABEL[h]}`))}>
               <i className="cto-sw" style={{ background: HOW_VAR[h] }} />{HOW_LABEL[h]}<b>{count(h)}</b>
             </button>
           ))}
+        </div>
+      )}
+      {ended.length > 0 && !localOnly && (
+        <div className="cto-foot" data-testid="ov-ended">
+          <span>没交付就结束：{ended.slice(0, 3).map((r, i) => (
+            <span key={idOf(r)}>{i > 0 && '、'}<button type="button" className="br-link" onClick={() => onKey(r)}>{r.key}</button>{endedWhy(r) && `（${endedWhy(r)}）`}</span>
+          ))}{ended.length > 3 && ` 等 ${ended.length} 个`}</span>
         </div>
       )}
     </article>
@@ -673,20 +766,87 @@ function LeanProgress({ r }: { r: Requirement }) {
   )
 }
 
-function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
-  r: Requirement; at: number; run?: CtoRun; ev: EvalView; repoName?: string; onOpen: () => void; onItem: () => void; onReplay: () => void; onGo: (v: View) => void
+/** The tone of how far a family is: its family_state, or brain-kit's eval state of the big requirement. */
+const FAMILY_TONE: Record<string, string> = { in_progress: 'info', ready_to_release: 'wait', done: 'ok', merged: 'ok', closed: 'idle', failed: 'bad', unknown: 'warn', merged_not_here: 'warn' }
+
+/** A row's family, in its 需求 cell: a big one's 小需求 n/m (the toggle of its small ones' rows when they are in the
+ * list); a small one's unit, its big one (when it is not right above), what blocks it (unless 在等 says it already). */
+function FamilyBits({ r, f, nested, fold }: { r: Requirement; f: ReqFamily; nested: boolean; fold?: { open: boolean; onFold: () => void } }) {
+  if (f.role === 'big') return <span className="br-chip tone-info" title={f.family_label || undefined}>大需求</span>
+  if (f.role === 'parent') {
+    const { merged, total } = familyProgress(f)
+    const tone = FAMILY_TONE[f.family_state ?? ''] ?? 'info'
+    const title = f.family_label || undefined
+    if (!fold) return <span className={`br-chip tone-${tone}`} title={title}>小需求 {merged}/{total}</span>
+    return (
+      <button type="button" className={`br-chip tone-${tone} br-fam-toggle`} aria-expanded={fold.open} title={`${fold.open ? '收起' : '展开'}它的小需求${title ? `（${title}）` : ''}`}
+        onClick={(e) => { e.stopPropagation(); fold.onFold() }}>小需求 {merged}/{total} {fold.open ? '▾' : '▸'}</button>
+    )
+  }
+  const blocks = blockersOf(f).filter((d) => !r.waits.text.includes(d.key))
+  return (
+    <>
+      {f.unit && <span className="br-tag" title="单元（unit-of-work.md）">{f.unit}</span>}
+      {!nested && <span className="cto-was">{f.parent} 的小需求</span>}
+      {blocks.length > 0 && <span className="br-chip tone-warn" title={blocks.map(blockText).join('；')}>等 {blocks.map((d) => d.key).join('、')} 合进大需求</span>}
+    </>
+  )
+}
+
+/** The eval states the how already says (a merge, still open): their words add nothing beside it. */
+const HOW_SAYS = new Set(['merged', 'open'])
+const HOW_ENDED = '没交付就结束：运行机没能开始，或 MR 关了没合并'
+/** Why a run ended without a delivery: brain-kit's words for it (its beyond), else its state's. */
+const endedWhy = (r: CtoRun) => r.beyond.join('、') || r.state_label
+
+/** 交付方式: how it was delivered and a person's acts; for one that ended without a delivery, why; the run's state when
+ * it says more than the how (有了回答、运行机没接着做, 已合进大需求 …); 停住了 when nothing new came for a long time; its
+ * delivery in the title. One done only here and not merged yet is 只在本机（还没合并）. */
+function HowCell({ r, run }: { r: Requirement; run?: CtoRun }) {
+  if (!run) return <span className="cto-was">—</span>
+  const ended = run.how === 'ended'
+  const why = ended ? endedWhy(run) : ''
+  const said = !!run.state_label && !HOW_SAYS.has(run.state ?? '') && run.state_label !== why && !(ended && run.beyond.length)
+  const title = [ended ? HOW_ENDED : '', run.delivery_label ? `交付：${run.delivery_label}` : '', !ended && run.beyond.length ? `判断点之外：${run.beyond.join('、')}` : '']
+    .filter(Boolean).join(' · ')
+  return (
+    <span className="br-how-cell" data-how={run.how} title={title || undefined}>
+      {run.how === 'pending' && r.local_only ? (
+        <span className="br-how" title="只在这台机器上做，不交给运行机：合并以后算「只在本机」"><i style={{ background: HOW_VAR.local }} />{HOW_LABEL.local}（还没合并）</span>
+      ) : (
+        <span className="br-how">
+          <i style={{ background: HOW_VAR[run.how] }} />{HOW_LABEL[run.how]}
+          {run.stuck && <span className="br-chip tone-warn" title="好久没有新动静了（brain-kit 的 stuck_hours）">停住了</span>}
+        </span>
+      )}
+      {(run.at_points || run.outside) ? (
+        <span className="cto-was"><span className="br-nw">人介入 {run.at_points + run.outside} 次</span>{run.outside ? <span className="br-nw">（判断点外 {run.outside}）</span> : null}</span>
+      ) : null}
+      {why && <span className="cto-was" data-testid="how-why">{why}</span>}
+      {said && <span className="cto-was" data-testid="how-state">{run.state_label}</span>}
+    </span>
+  )
+}
+
+function Row({ r, at, run, ev, repoName, tree, fold, onOpen, onItem, onReplay, onGo }: {
+  r: Requirement; at: number; run?: CtoRun; ev: EvalView; repoName?: string; tree?: Tree; fold?: { open: boolean; onFold: () => void }
+  onOpen: () => void; onItem: () => void; onReplay: () => void; onGo: (v: View) => void
 }) {
+  const f = r.family
+  const done = r.state === 'merged' || r.state === 'merged_into_parent'
   const step = stepOf(r)
   const waited = r.waits.who === 'you' || (r.waits.who !== 'nobody' && isOpen(r)) ? waitedText(r, at) : ''
   const review = ev.queue.find((q) => q.key === r.key)
   const skipped = ev.skipped.find((x) => x.key === r.key)
   return (
-    <tr data-key={r.key} className={`cto-row-pick${r.state === 'merged' ? ' is-merged' : ''}`} onClick={onOpen} title={`打开它的${ACT.openBoard}`} tabIndex={0}
+    <tr data-key={r.key} data-role={f?.role ?? undefined} className={`cto-row-pick${done ? ' is-merged' : ''}${tree ? ' br-kid' : ''}`} onClick={onOpen} title={`打开它的${ACT.openBoard}`} tabIndex={0}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (e.preventDefault(), onOpen())}>
       <td className="br-col-req">
         <div className="br-row" style={{ gap: 6 }}>
+          {tree && <span className="br-tree" aria-hidden="true">{tree === 'last' ? '└' : '├'}</span>}
           <b className="br-key">{r.key}</b>
           <span>{r.title}</span>
+          {f && <FamilyBits r={r} f={f} nested={!!tree} fold={fold} />}
           {repoName && <span className="cto-was">{repoName}</span>}
           {r.open_questions.map((q) => <span key={q} className="br-chip tone-wait" title="还没回答的问题">{q} 待答</span>)}
           {r.overlap.length > 0 && <span className="br-chip tone-warn" title="和这些需求要改同一处">和 {r.overlap.join('、')} 重叠</span>}
@@ -706,20 +866,7 @@ function Row({ r, at, run, ev, repoName, onOpen, onItem, onReplay, onGo }: {
         {r.waits.line && <LineCopy line={r.waits.line} sessionUrl={r.session_url} />}
         {step && <StepButton step={step} onGo={onGo} primary={false} />}
       </td>
-      <td>
-        {run ? (
-          <>
-            {run.how === 'pending' && r.local_only ? (
-              <span className="br-how" title="只在这台机器上做，不交给运行机：合并以后算「只在本机」"><i style={{ background: HOW_VAR.local }} />{HOW_LABEL.local}（还没合并）</span>
-            ) : (
-              <span className="br-how" title={run.beyond.length ? `判断点之外：${run.beyond.join('、')}` : undefined}><i style={{ background: HOW_VAR[run.how] }} />{HOW_LABEL[run.how]}</span>
-            )}
-            {(run.at_points || run.outside) ? (
-              <div className="cto-was"><span className="br-nw">人介入 {run.at_points + run.outside} 次</span>{run.outside ? <span className="br-nw">（判断点外 {run.outside}）</span> : null}</div>
-            ) : null}
-          </>
-        ) : <span className="cto-was">—</span>}
-      </td>
+      <td><HowCell r={r} run={run} /></td>
       <td className="is-num">{fmtCredits(r.credits)}</td>
       <td className="br-col-nowrap" onClick={(e) => e.stopPropagation()}><MrLink mr={r.mr} /></td>
       <td onClick={(e) => e.stopPropagation()}>
@@ -763,9 +910,10 @@ function metricValue(v: EvalMetric['value']): string | null {
 /** brain-kit's eval batch: its numbers with what each means, the runs to look at again, the runs it skipped and its
  * notes. The batch is what the default branch has records of: it does not follow the ledger's filters. Without a batch:
  * why in words (a missing module: what to do and 去设置), brain-kit's own words folded under 细节. */
-function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
-  ev: EvalView; noModule: boolean; onBoard: (k: string) => void; onItem: (k: string) => void; onSettings: () => void
+function EvalCard({ ev, noModule, onBoard, onItem, onSettings, onFamily }: {
+  ev: EvalView; noModule: boolean; onBoard: (k: string) => void; onItem: (k: string) => void; onSettings: () => void; onFamily: (f: EvalFamily) => void
 }) {
+  const families = ev.families ?? []
   const computing = !ev.available && !!ev.computing
   const missing = !computing && (noModule || !ev.error)
   const notes = ev.note_rows
@@ -801,8 +949,22 @@ function EvalCard({ ev, noModule, onBoard, onItem, onSettings }: {
               )
             })}
           </div>
-          {(ev.queue.length > 0 || ev.skipped.length > 0 || ev.notes.length > 0) && (
+          {(families.length > 0 || ev.queue.length > 0 || ev.skipped.length > 0 || ev.notes.length > 0) && (
             <ul className="br-eval-list">
+              {families.map((f) => (
+                <li key={`f-${f.repo}/${f.key}`} data-testid="eval-family" data-family={f.key}>
+                  <span className="kt-pill tone-info">大需求</span>
+                  <button type="button" className="br-link br-key" onClick={() => onFamily(f)} title="打开它的需求看板">{f.key} ↗</button>
+                  <span className={`br-chip tone-${FAMILY_TONE[f.state] ?? 'idle'}`}>{f.state_label || f.state}</span>
+                  <span className="br-tag" data-n="merged" title={f.children.length ? `小需求：${f.children.join('、')}` : undefined}>已合并<b>{f.merged}/{f.total}</b></span>
+                  {(f.not_started?.length ?? 0) > 0 && <span className="br-tag" data-n="not_started" title={f.not_started!.join('、')}>没开工<b>{f.not_started!.length}</b></span>}
+                  {(f.closed?.length ?? 0) > 0 && <span className="br-tag" data-n="closed" title={`关了，不算在内：${f.closed!.join('、')}`}>关了<b>{f.closed!.length}</b></span>}
+                  <span className="cto-was" title="大需求和它的小需求加起来">
+                    <span data-n="at_points">判断点上 {f.at_points}</span> · <span data-n="outside">判断点外 {f.outside}</span> · <span data-n="questions">问题 {f.questions}</span>
+                    {' · '}<span data-n="credits">{fmtCredits(f.credits)} credits</span>
+                  </span>
+                </li>
+              ))}
               {ev.queue.map((q) => (
                 <li key={`q-${q.key}`} data-testid="eval-queue">
                   <span className="kt-pill tone-warn">要复看</span>

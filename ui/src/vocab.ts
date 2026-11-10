@@ -3,7 +3,7 @@
  * these words and no other. A code name (stage id, field, enum) is never shown to a person: look it up here; one that
  * is missing gets added here, not spelled out in a view.
  */
-import type { LeanSummary, WaitDo, WaitWho, Waits } from './types'
+import type { ChildState, LeanSummary, SyncResult, WaitDo, WaitWho, Waits } from './types'
 
 /** Lean's stage ids → the stage's Chinese name (backend/core/lean_view.py STAGES) */
 export const STAGE_NAME: Record<string, string> = {
@@ -54,6 +54,28 @@ export const ACT = {
   acceptOnMr: '去 MR 上验收',
   viewMr: '看 MR',
 } as const
+
+/** 大需求拆成小需求 (brain-kit's split): the family's actions, the same on 需求看板, 需求详情, 待办 and 开需求 */
+export const FAMILY_ACT = {
+  split: '拆成小需求',
+  splitConfirm: '确定拆',
+  claim: '认领',
+  release: '放弃认领',
+  start: ACT.start,
+  sync: '同步',
+} as const
+/** a small one started on its one unmerged dependency's branch (`brain start --on`): 「在 PAY-2 的分支上先做」 */
+export const startOnName = (dep: string): string => `在 ${dep} 的分支上先做`
+
+/** a small requirement's state (ReqFamily.state, brain-kit's intents.STATES) → one word; the backend's state_label adds
+ * who has it (alice 认领了, alice 在做) */
+export const CHILD_STATE_NAME: Record<ChildState, string> = {
+  unclaimed: '待认领', claimed: '认领了', in_progress: '在做', merged: '已合并', closed: '已关闭',
+}
+/** what 同步 did (SyncResult.result) */
+export const SYNC_NAME: Record<SyncResult['result'], string> = {
+  merged: '合进来了', up_to_date: '已经是最新的', conflicts: '有冲突', refused: '没同步',
+}
 
 /** where a requirement came from (Requirement.source, brainkit.intents) */
 export const SOURCE_NAME: Record<string, string> = {

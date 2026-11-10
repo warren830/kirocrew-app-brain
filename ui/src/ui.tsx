@@ -34,10 +34,12 @@ export function Icon({ name, size = 15, className, title }: { name: string; size
 
 export const STATE_TONE: Record<ReqState, Tone> = {
   claimed: 'idle', local: 'run', handed_over: 'hand', rejected: 'bad', running: 'run', parked: 'wait', acceptance: 'wait', merged: 'ok', closed: 'idle',
+  unclaimed: 'idle', merged_into_parent: 'ok',
 }
 /** the dot inside a state chip: live states blink, as the board's run status does */
 const STATE_DOT: Record<ReqState, string> = {
   claimed: '○', local: '●', handed_over: '➜', rejected: '✕', running: '●', parked: '✋', acceptance: '✋', merged: '✔', closed: '■',
+  unclaimed: '◌', merged_into_parent: '⤴',
 }
 const LIVE_STATES: ReadonlySet<ReqState> = new Set<ReqState>(['local', 'running', 'parked', 'acceptance'])
 
@@ -77,6 +79,8 @@ export const STAGE_META: Record<StageState, { label: string; glyph: string; tone
 export const QUESTION_STATE: Record<string, { label: string; tone: Tone }> = {
   waiting: { label: '等回答', tone: 'wait' },
   open: { label: '已发出，等回答', tone: 'wait' },
+  // brain-kit 0d52e97: a reply waits until GitLab can say whether someone else edited it (nobody answers again)
+  held: { label: '有了回复，等 GitLab 能查了再核对', tone: 'info' },
   // on the MR / in the ledger: the bridge has the answer but has not signed it back yet (nobody should answer again)
   answered: { label: '已收到回答，等桥签名送回', tone: 'info' },
   delivered: { label: '已送回', tone: 'ok' },

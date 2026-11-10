@@ -4,7 +4,9 @@
  * src/test/fixtures (writes answer something plausible and change nothing). Built by `npm run preview:build` into
  * preview-dist/index.html (one file, opens from file:// too).
  *
- * The bar above the app switches the world: 团队模式, 找不到 brain-kit, KiroCrew 有 FAIL, 没有 evaluate, 没有仓库, light/dark.
+ * The bar above the app switches the world: 团队模式, 找不到 brain-kit, KiroCrew 有 FAIL, 没有 evaluate, 没有仓库, 认领晚一步 (a
+ * claim of a small requirement loses the race to carol's), light/dark. 拆成小需求, 认领, 开工 and 同步 answer as brain-kit
+ * would, and change nothing.
  * 导入仓库 is played through: a path ending in /ready is installed already; any other is not, and its install (or a clone)
  * runs as a job whose steps advance over a few seconds; 加入列表 and 移出列表 change the preview's list.
  * The switches live in sessionStorage (the app rewrites the URL as you move); `?pv=team,light,…` sets them from a link.
@@ -29,12 +31,12 @@ import { API, fixtureRoutes } from '../src/test/routes'
 import { StubApiError, setApiRoutes, setNavigateHook } from '../src/test/stubs/app-sdk'
 import { simulated } from './simulate'
 import type {
-  BrainView, CheckRow, CrewFixBody, ImportInspect, ImportJob, InstallResult, IntakeBody, IntakeNext, KitForm, OpenSessionBody, Overview, ReflectApplyBody, ReflectApplyResult, ReflectPreview, RepoInfo, ReqBoard, RequirementDetail, Settings, StartBody, Status, TeamView, Todo,
+  BrainView, CheckRow, CrewFixBody, ImportInspect, ImportJob, InstallResult, IntakeBody, IntakeNext, KitForm, OpenSessionBody, Overview, ReflectApplyBody, ReflectApplyResult, ReflectPreview, RepoInfo, ReqBoard, RequirementDetail, Settings, SplitResult, StartBody, Status, TeamView, Todo,
 } from '../src/types'
 
-const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'norepos', 'light'] as const
+const FLAGS = ['team', 'nokit', 'crewfail', 'noeval', 'norepos', 'race', 'light'] as const
 type Flag = (typeof FLAGS)[number]
-const FLAG_NAME: Record<Flag, string> = { team: '团队模式', nokit: '找不到 brain-kit', crewfail: 'KiroCrew 有 FAIL', noeval: '没有 evaluate', norepos: '没有仓库', light: '亮色' }
+const FLAG_NAME: Record<Flag, string> = { team: '团队模式', nokit: '找不到 brain-kit', crewfail: 'KiroCrew 有 FAIL', noeval: '没有 evaluate', norepos: '没有仓库', race: '认领晚一步', light: '亮色' }
 const KEY = 'brain-preview-flags'
 
 function readFlags(): Set<Flag> {
@@ -160,7 +162,7 @@ function detailFor(path: string): RequirementDetail {
   d.questions = b.questions
   d.decisions = b.decisions
   d.sessions = b.sessions
-  d.timeline = { source: 'trace', items: b.events.map((e) => ({ at: new Date(e.at * 1000).toISOString(), kind: (({ request: 'approval', approve: 'approval', reject: 'approval', refused: 'approval', commit: 'commit', handover: 'handover', accepted: 'handover', rejected: 'handover', signed: 'handover', question: 'question', answer: 'decision', verify: 'verify', merge: 'merge', blocked: 'blocked', stage: 'stage', session: 'session' } as Record<string, string>)[e.kind] ?? 'app') as RequirementDetail['timeline']['items'][number]['kind'], label: e.text, detail: null, who: null, src: e.src })), missing: b.missing, error: '' }
+  d.timeline = { source: 'trace', items: b.events.map((e) => ({ at: new Date(e.at * 1000).toISOString(), kind: (({ request: 'approval', approve: 'approval', reject: 'approval', refused: 'approval', commit: 'commit', handover: 'handover', accepted: 'handover', rejected: 'handover', signed: 'handover', question: 'question', answer: 'decision', verify: 'verify', merge: 'merge', blocked: 'blocked', stage: 'stage', session: 'session' } as Record<string, string>)[e.kind] ?? 'app') as RequirementDetail['timeline']['items'][number]['kind'], label: e.text, detail: null, who: null, src: e.src })), missing: b.missing, error: '', other_runs: [] }
   d.credits = b.credits
   d.brain = b.brain
   d.mr_desc = b.mr_desc
@@ -186,7 +188,7 @@ function rebucket(o: Overview): Overview {
     if (!r.merged_at) continue
     judged.add(`${r.repo}/${r.key}`)
     const w = by.get(monday(r.merged_at))
-    if (w) w[r.how] += 1
+    if (w && r.how !== 'ended') w[r.how] += 1     // one that ended without a delivery is never merged
   }
   for (const r of o.rows) {
     const at = r.waits.since ?? r.updated_at
@@ -213,7 +215,7 @@ function overview(path: string): Overview {
   const raw = (id: string) => o.errors.find((e) => e.repo === id)?.raw ?? ''
   o.errors = listedRepos().filter((r) => !r.ok && !r.pending && (repo === 'all' || r.id === repo)).map((r) => ({ repo: r.id, error: r.error, raw: raw(r.id) }))
   if (flags.has('noeval') && !own) {
-    o.eval = { available: false, error: '这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit', ref: null, metrics: [], queue: [], skipped: [], notes: [] }
+    o.eval = { available: false, error: '这个 brain-kit 还没有交付评估：在设置里换新一点的 brain-kit', ref: null, metrics: [], queue: [], skipped: [], notes: [], families: [] }
     o.cto = { ...o.cto, available: false, unattended: null, stepped_in: null, runs: [], sentence: o.cto.credits.per_req !== null ? `每个需求平均 ${o.cto.credits.per_req} credits。` : o.cto.sentence }
   }
   return o
@@ -274,10 +276,14 @@ function intakeNext(path: string): IntakeNext {
   const repo = new URL(path, location.origin).searchParams.get('repo') ?? ''
   const r = repos.find((x) => x.id === repo)
   const prefix = r?.kit?.req_prefix ?? ''
-  if (!r || !prefix) return { repo, key: null, tracker: 'none', prefix: '', error: '这个仓库还没装 brain-kit', allow_confidential: false, push: null }
+  if (!r || !prefix) return { repo, key: null, tracker: 'none', prefix: '', error: '这个仓库还没装 brain-kit', allow_confidential: false, push: null, big: { ok: false, why: '' } }
   const world = W.status.repos.find((x) => x.path === r.path)?.id
   const n = Math.max(0, ...W.overview.rows.filter((x) => x.repo === world).map((x) => Number(x.key.split('-').pop()) || 0))
-  return { repo, key: `${prefix}-${n + 1}`, tracker: r.kit?.tracker ?? 'none', prefix, error: '', allow_confidential: false, push: unpushed.get(r.path) ?? null }
+  // 「大需求：先拆成小需求」: as backend/core/intake.py says it (only a repo without Jira; a brain-kit with brain split)
+  const tracker = r.kit?.tracker ?? 'none'
+  const big = tracker !== 'none' ? { ok: false, why: '这个仓库用 Jira：大需求只在不用 Jira 的仓库里拆' }
+    : flags.has('nokit') ? { ok: false, why: '这个 brain-kit 还不会拆小需求：在设置里换新一点的 brain-kit' } : { ok: true, why: '' }
+  return { repo, key: `${prefix}-${n + 1}`, tracker, prefix, error: '', allow_confidential: false, push: unpushed.get(r.path) ?? null, big }
 }
 
 /** What 导入仓库 did to a path in the preview, read by the routes that answer about it afterwards. */
@@ -305,7 +311,7 @@ setApiRoutes({
   [`GET ${API}/todo`]: () => shift(todo()),
   [`GET ${API}/overview*`]: (_b, path) => rebucket(shift(overview(path))),
   [`GET ${API}/brain*`]: (_b, path) => shift(brain(path)),
-  [`GET ${API}/team`]: () => shift(team()),
+  [`GET ${API}/team`]: () => shift(teamView()),
   [`GET ${API}/intake/next*`]: (_b, path) => intakeNext(path),
   [`GET ${API}/import/defaults`]: () => ({ ...fx.importDefaults(), brainkit_ok: !flags.has('nokit') }),
   [`POST ${API}/settings`]: (body) => {
@@ -319,6 +325,30 @@ setApiRoutes({
       const { key } = reqOf(path.replace(/\/session$/, ''))
       const slot = (body as OpenSessionBody | undefined)?.review ? `brain-${key}-review-${Math.random().toString(16).slice(2, 6)}` : `brain-${key}-7f3a`
       return { ok: true, slot, url: `/chat?sid=${slot}` }
+    }
+    // 大需求拆成小需求: shown, not done (a small one's unit from its family, the world's)
+    const fam = /\/(split|claim|start|sync)$/.exec(path)
+    if (fam) {
+      const { key, id } = reqOf(path.slice(0, fam.index))
+      const unit = W.boards[id]?.row.family?.unit ?? 'jobs'
+      if (fam[1] === 'split') return splitAnswer(id, key, !!(body as { apply?: boolean }).apply)
+      if (fam[1] === 'claim') {
+        const release = !!(body as { release?: boolean }).release
+        if (!release && flags.has('race')) {    // carol's claim reached the server first (brain-kit: first push wins)
+          const text = `晚了一步：carol 先认领了 ${key}`
+          return { ok: false, text, owner: 'carol', output: `brain: ${key} was just claimed by carol: their claim reached the server first`,
+            problem: { level: 'FAIL', text, todo: '换一个待认领的小需求', fix: null, repo: null, raw: `${key} was just claimed by carol: their claim reached the server first` } }
+        }
+        return { ok: true, text: release ? `预览：没有真的放回。放回去了：${key} 又是待认领` : `预览：没有真的认领。认领了 ${key}`, owner: release ? null : 'alice', problem: null, output: '' }
+      }
+      if (fam[1] === 'start') {
+        const on = (body as { on?: string }).on ?? null
+        return { ok: true, key, branch: `ai/alice/${key}-${unit}`, worktree: `/Users/alice/workplace/brain-app/shop-pay/${key.toLowerCase()}-${unit}`, on,
+          text: `预览：没有真的开工。开工了：${key}（${unit}），分支 ai/alice/${key}-${unit}${on ? `，从 ${on} 的分支开始` : ''}`, blocked: [], can_on: null, problem: null,
+          output: '', slot: `brain-${key}-1a2b`, url: `/chat?sid=brain-${key}-1a2b`, session_error: '' }
+      }
+      const parent = W.boards[id]?.row.family?.branch ?? 'ai/alice/PAY-8-big'
+      return { ok: true, result: 'merged', text: `预览：没有真的同步。合进来了：${parent}，Lean 自己的文件已经自动解决`, conflicts: [], problem: null, output: '' }
     }
     const choice = (body as { choice: string }).choice
     return { ok: true, via: 'session', text: `预览：回答 ${choice} 没有真的送出去` }
@@ -385,6 +415,50 @@ setApiRoutes({
   },
   [`POST ${API}/team/loop`]: () => ({ ok: true, summary: { poll: 3, prepared: 0, dispatch: 1, watch: 2, collect: 1, reconcile: 0 }, error: '' }),
 })
+
+/** 运行机 in the preview: the fixture with what brain-kit 0d52e97's bridge also keeps (the outbox, the notices on a run,
+ * bridge.json and runnerd.json, the runner's hooks). */
+function teamView(): TeamView {
+  const t = team()
+  t.ledger.outbox = { sent: 14, unknown: 1, dropped: 1 }
+  t.runs = t.runs.map((r) => (r.run_id === 'RUN-PAY-5-1' ? { ...r, notes: [{ kind: 'ci_wait', text: '验收问题等 MR 的流水线通过才发（通过以后桥自动发）', at: FIXTURE_AT - 1800 }] }
+    : r.run_id === 'RUN-PAY-4-1' ? { ...r, notes: [{ kind: 'outbox_unknown', text: 'D-2 的回答不知道送到会话没有（送过 1 次）：桥每轮看一下会话，看到了就算送到；一直这样就要人看一下会话', at: FIXTURE_AT - 600 }] } : r))
+  t.config = [
+    { file: 'bridge.json', key: 'interval', value: '60 秒', default: true, text: '桥每隔这么久跑一轮' },
+    { file: 'bridge.json', key: 'send_give_up_minutes', value: '60 分钟', default: true, text: '接手消息送了 3 次都没进运行机的会话，过了这么久就算这个 run 没能开始（回答和通知一直送，不放弃）' },
+    { file: 'bridge.json', key: 'runnerd_wait_minutes', value: '120 分钟', default: false, text: '运行机这么久没准备好工作区、也没报错，就在 MR 上说一声（桥接着等）' },
+    { file: 'bridge.json', key: 'acceptance_ci_wait_minutes', value: '60 分钟', default: true, text: '验收问题等流水线通过才发：流水线这么久还没跑完，就在 MR 上说一声' },
+    { file: 'bridge.json', key: 'edit_check_rounds', value: '3', default: true, text: '查不到回复有没有被别人改过：连着这么多轮，就在 MR 上说一声（回答先等着，不算也不丢）' },
+    { file: 'bridge.json', key: 'edit_check_wait_minutes', value: '30 分钟', default: true, text: '……或者从第一次查不到起过了这么久' },
+    { file: 'runnerd.json', key: 'kit_dir', value: '/opt/brain-kit', default: false, text: '运行机用哪份 brain-kit 的 kit/：每建一个工作区前查一次，它的 lean-hook.py 要是第 3 版' },
+    { file: 'runnerd.json', key: 'agent_spec', value: '/home/brainbot/.kiro/agents/brain-run.json', default: false, text: 'brain-run 的 agent 文件：查它带着 lean-hook.py --runner 的三个 hook（工具调用前的匹配要是 *）' },
+    { file: 'runnerd.json', key: 'hook_path', value: '/usr/bin:/bin', default: true, text: '运行机上的 hook 找 git 和 ssh-keygen 用的 PATH' },
+  ]
+  t.hooks = [{ level: 'OK', text: '运行机的 Lean hook 没问题：brain-kit 带的 lean-hook.py 是第 3 版，brain-run 的三个 hook 都对', todo: '', fix: null, repo: null, raw: '' }]
+  return t
+}
+
+/** 拆成小需求 in the preview: what `brain split --dry-run --json` would say for a big one's three units (nothing filed). */
+function splitAnswer(id: string, key: string, apply: boolean): SplitResult {
+  const units: [string, string, string, string[]][] = [['api', '通过接口提交退款', 'services/api/**', []], ['web', '在订单页看到退款状态', 'web/**', ['api']],
+    ['jobs', '每晚自动对账', 'jobs/**', ['web']]]
+  const fam = W.boards[id]?.row.family
+  if (fam?.role === 'parent') {        // split already: the same approved units again, nothing changes
+    return { ok: true, dry_run: !apply, parent: key, branch: fam.branch, units_sha: '31369169', design_sha: '4a037c33', warnings: [], problems: [], output: '',
+      actions: fam.children.map((c) => ({ unit: c.unit ?? '', kind: 'same', kind_label: '没变', key: c.key, title: c.title, paths: [], depends_on: c.depends_on, contracts: [], why: [], attention: false })),
+      text: `${apply ? '预览：没有真的拆。拆好了' : '会拆成'} ${fam.children.length} 个小需求（没变 ${fam.children.length} 个）` }
+  }
+  const n = Number(key.split('-')[1] ?? 0)
+  return {
+    ok: true, dry_run: !apply, parent: key, branch: `ai/alice/${key}-big`, units_sha: '31369169', design_sha: '4a037c33',
+    actions: units.map(([unit, title, paths, deps], i) => ({
+      unit, kind: 'new', kind_label: '新登记（待认领）', key: apply ? `PAY-${n + 10 + i}` : null, title: `${unit} · ${title}`, paths: [paths],
+      depends_on: deps.map((d) => (apply ? `PAY-${n + 10 + units.findIndex((u) => u[0] === d)}` : `${d}（新）`)), contracts: [], why: [], attention: false,
+    })),
+    warnings: [], problems: [], output: '',
+    text: apply ? '预览：没有真的拆。拆好了：3 个小需求（新登记 3 个（待认领））' : '会拆成 3 个小需求（新登记 3 个（待认领））',
+  }
+}
 
 /** 导入仓库 in the preview: the fixtures moved to the path asked for; jobs whose steps advance with the clock. */
 function importRoutes() {

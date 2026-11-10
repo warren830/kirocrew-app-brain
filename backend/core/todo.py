@@ -11,7 +11,12 @@ the step it takes:
   comment); acceptance waits for the product on the MR; a refused hand-over says why; a hand-over that was pushed
   but carries no label on its MR (nothing was handed over: `brain handoff` exits 1 then) says so;
 - an idle local session (reply: open it, the text says what to tell it), a requirement claimed and not started
-  (start: 开工), a merge whose Brain proposals are not written back yet (write_back).
+  (start: 开工), a merge whose Brain proposals are not written back yet (write_back);
+- a requirement of the person's closed with `brain intent close` whose run branch or MR is still there: delete the
+  branch, close the MR (eval counts it closed either way: the user's decision, 2026-11-10);
+- 大需求拆成小需求 (brain-kit 0d52e97): a small requirement the person claimed whose dependencies have all merged
+  into the big one's branch (child_start: 开工 now), and a big requirement of theirs whose small ones have all merged
+  (parent_release: review and release it). Each is listed instead of the row's plain step (start, reply).
 """
 
 from __future__ import annotations
@@ -26,6 +31,21 @@ from .detail import ledger_questions, mr_questions, park_question
 DO_KIND = {"reply": "reply", "tool": "reply", "start": "start", "write_back": "write_back", "approve": "lean_approval",
            "answer": "question", "accept": "acceptance", "redo_handoff": "handoff_rejected",
            "label_handoff": "handoff_unlabelled"}
+
+
+def closed_leftover(row: dict[str, Any], f: dict[str, Any], mr: dict[str, Any] | None) -> str:
+    """What a requirement closed by its claim left behind, in one sentence; '' when nothing (or it is not closed so)."""
+    if row.get("state") != "closed" or not (f.get("claim") or {}).get("closed"):
+        return ""
+    branch = row.get("branch") if f.get("where") in ("worktree", "branch") else None
+    mr = mr or row.get("mr") or {}
+    mr_open = mr.get("state") == "opened"
+    if not branch and not mr_open:
+        return ""
+    left = "、".join(x for x in (("分支 %s" % branch) if branch else "",
+                                  ("MR !%s" % mr.get("iid") if mr.get("iid") else "MR") if mr_open else "") if x)
+    todo = "、".join(x for x in ("删掉这个分支（本机的和远端的）" if branch else "", "关掉 MR" if mr_open else "") if x)
+    return "需求关了，%s 还在：用不着就%s" % (left, todo)
 
 
 def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str, str]]) -> dict[str, Any]:
@@ -55,10 +75,23 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
             if row["state"] == "rejected":
                 items.append({**base, "kind": "handoff_rejected", "text": row["waits"]["text"]})
             continue
+        f = e.get("facts") or {}
+        lo = closed_leftover(row, f, e.get("mr"))     # a closed row waits on nobody: what it left behind is still yours
+        if lo and e.get("own"):
+            items.append({**base, "kind": "closed_leftover", "text": lo})
         if w.get("who") != "you":
             continue
-        f = e.get("facts") or {}
         listed = len(items)
+        fam = row.get("family") or {}
+        acts = fam.get("acts") or {}
+        if fam.get("role") == "child" and row["state"] == "claimed" and e.get("own") and (acts.get("start") or {}).get("ok"):
+            items.append({**base, "kind": "child_start",
+                          "text": "%s 的小需求（%s）你认领了，依赖都合进来了：可以开工" % (fam.get("parent"), fam.get("unit") or "?")})
+        if fam.get("role") == "parent" and fam.get("family_state") == "ready_to_release" and e.get("own"):
+            pr = fam.get("progress") or {}
+            items.append({**base, "kind": "parent_release",
+                          "text": "小需求都合进来了（%s/%s）：在大需求的分支上评审，再批发布；或者交给运行机"
+                                  % (pr.get("merged", 0), pr.get("total", 0))})
         if row["state"] == "local":
             for a in f.get("approvals") or []:
                 if a["state"] == "pending" and a.get("line"):

@@ -1,8 +1,9 @@
 # What the Brain app needs from brain-kit
 
 The app imports brain-kit and never edits or patches it. This list says where it still leans on internals, copies a
-flow, or works around a constraint, and what would let it stop. Checked against brain-kit `48b6b97` (2026-11-09; the
-app needs `72b278e` or newer).
+flow, or works around a constraint, and what would let it stop. Checked against brain-kit `0d52e97` (2026-11-09: QA
+rounds 3 and 4, the split of a big requirement, phase 1; the app needs `72b278e` or newer and keeps working with
+`48b6b97`, the split features off).
 
 ## Items 1–9 of the first list, against 48b6b97
 
@@ -64,7 +65,12 @@ Lean timeline follow them when trace is missing), `decisions.USER` (the MR reade
     "no other open run" (the bridge does the same with `Ledger.reserve_run`). `reserve_run` picks the next id itself,
     and the signer's numbering may differ from the bridge's (a signer ledger set up again), so the signer copies its
     SQL (`BEGIN IMMEDIATE`, drop stale reservations, insert in `RESERVED`). Wanted: `reserve_run(..., run_id=None)`.
-28. **`reply_states` that stops instead of "cannot tell" for good** (new, 72b278e). When GitLab GraphQL fails,
+28. **`reply_states` that stops instead of "cannot tell" for good** (72b278e). **Done in 0d52e97** (QA round 3): a touched
+    reply whose edits GraphQL cannot read is `pending`, not recorded, read again next round, and holds the whole
+    decision (`Verdict.pending`); the MR is told once after `edit_check_rounds`. The signer treats a verdict with
+    pending replies as a check it cannot make (no answer, the bridge asks again), and keeps `EditsOrNothing` for an
+    older brain-kit, where the same failure is still "cannot tell" for good. Still wanted: the replies table made by
+    `Ledger` (or `DecisionLoop.ensure_schema()`). What it was: When GitLab GraphQL fails,
     `DecisionLoop._note_edits` catches the BrainError and `reply_states` records the touched reply as `unknown` for
     good: right for the bridge (it tells the person once, they reply again), wrong for a signer, where a passing
     GraphQL outage would refuse an answer for good (the bridge then marks the decision `refused`: the run must push
@@ -137,18 +143,88 @@ Lean timeline follow them when trace is missing), `decisions.USER` (the MR reade
     unless asked), and the "who are you?" errors as a BrainError subclass (`NoIdentity`, with `gitlab_base`).
 
 
+### Wanted for 大需求拆成小需求 (the split, phase 1) and QA round 4
+
+35. **`brain intent list` without fetching.** The listing (`intents.listing` + `split.enrich`) always fetches: the claims,
+    `git ls-remote origin` for the run branches, the default branch, each parent's branch. So the app runs `brain intent
+    list --all --json` in the background, at most every minute per repo that has split requirements (and after each
+    拆 / 认领 / 放弃认领 / 开工 / 同步 / 从远端取最新), with its own time limit, and shows this machine's claims until it
+    answered. The JSON also leaves out the "cannot fetch claims" warning, so the page cannot tell a stale copy. Wanted:
+    `--offline` (or `listing(repo, cfg, fetch=False)`) that reads the refs as last fetched, so the polled page can use
+    it on every poll; and the warning in the JSON (e.g. `{"docs": […], "warning": …}`).
+36. **What a page needs about a family, as data.** In `intent list --json`: whether a child may be started on a
+    dependency's branch now (`--on`): the app offers 「在 <DEP> 的分支上先做」 when `blocked_by == [DEP]` and DEP is
+    `in_progress`, which is not quite `start_child`'s rule (blocked_by counts a merge into main, start only one into the
+    parent's branch; start recomputes the dependencies from the split on the parent's branch); `blocked_by` with each
+    dependency's state and owner (keys only now: the app joins them itself); on the parent its run branch (only on the
+    children's `split.branch`); on a child its run branch, `built_on` and whether it asked for its merge (`mr`).
+37. **`--json` for `brain claim`, `brain start --key`, `brain sync` (and `brain handoff`).** The app reads English text:
+    the holder (`is claimed by X` / `was just claimed by X`), the branch (`Started … on …`), the worktree (`Worktree:
+    …`), the files left with conflicts (`Merged … with conflicts left for you:`), the dependencies a start waits for
+    (`depends on PAY-2 (unit api, claimed by alice), …`), and maps each refusal to Chinese by its words
+    (`backend/core/family.py` RULES). Wanted: `{ok, code, holder, branch, worktree, built_on, conflicts, blocked: [{key,
+    unit, state, owner}]}` and a code per refusal.
+38. **`brain claim <KEY>` files a claim for any key, and `--release` of a claim nobody has prints success.** The app only
+    claims a child `brain split` filed and checks the owner before a release. Wanted: claiming a key nobody filed only
+    with a flag (`--new`); releasing a claim that is not yours exits 2.
+39. **The split's network calls have no time limit and no prompt guard** (`common.git` in split, claims, intents,
+    start_child, sync). The app runs these commands with `GIT_TERMINAL_PROMPT=0`, an askpass that answers nothing, ssh in
+    batch mode and its own time limit (SIGINT first, so `start_child` gives the claim back, then SIGKILL). Wanted:
+    `git_net`'s bounded calls there.
+40. **A split preview of a ref.** `split.plan` needs the parent's branch checked out; `approved_split(mrdesc._Tree(…))`
+    works on a ref but `_Tree` is private. The app runs `brain split --dry-run --json` in the parent's worktree on the
+    person's click, and decides when to offer 拆成小需求 from Lean's DESIGN approval and unit-of-work.md being there.
+    Wanted: `split.preview(repo, cfg, key, ref) -> {units, actions, warnings, problems}` (no fetch).
+41. **The hook adapter's refusals are only in the session.** `[brain-kit] blocked (kit file…)`, `(kit files changed)`,
+    `(kit files not checked)` (version 3) are mapped to Chinese with what to do (problems.py), but the app sees them
+    nowhere: the adapter does not call Lean when it refuses, so nothing reaches the audit ledger. A session locked by
+    changed kit files is invisible on the page. Wanted: an audit record (BLOCKED, gate `kit`) or a state file
+    (`.aidlc-lean/kit-lock.json`) the app can read.
+42. **The re-install lock.** After `brain install` (the 'kit' fix) the version-3 adapter refuses every tool call in that
+    checkout until the new kit files are committed (it compares them with HEAD). The app commits right after its
+    install; a person who runs `brain install` by hand meets the lock without a word. Wanted: `brain install` saying
+    so, or the adapter accepting kit files equal to the copy brain-kit ships.
+43. **The bridge's notices and outbox as data.** In team mode the app reads brain-kit's ledger tables `outbox` and
+    `notices` to say why a run waits (`ciheld:<run>:<sha>` while the acceptance question waits for the pipeline,
+    `runnerd-silent:<run>`, `gaveup:<send id>`, `queued:<run>` …); the key formats are internal. Wanted:
+    `Ledger.run_notes(run_id) -> [{kind, at, text}]`, or the key prefixes as public constants.
+44. **A send that did not land, in the app's KiroCrew adapter.** brain-kit's delivery sends a message again only when
+    the slot read shows it idle (`running` false, `queue` empty) without that sendId. The app's adapter answers the
+    slot's messages only (up to 1000 rows; whether KiroCrew 0.11.2's slot read without a limit is whole, and has
+    `running` / `queue`, is not verified), so the bridge it hosts never resends by itself: a send not known to have
+    landed stays `unknown` (the page says 要人看一下). Wanted: the slot read brain-kit relies on stated for the KiroCrew
+    version (no limit, `running`, `queue`), then the adapter passes those fields.
+45. **The new bridge.json keys in BRIDGE_DEFAULTS, examples/bridge.json and the docs.** `send_give_up_minutes` (60),
+    `runnerd_wait_minutes` (90), `acceptance_ci_wait_minutes` (60), `edit_check_rounds` (3), `edit_check_wait_minutes`
+    (30), `kit_ttl` are read where they are used, with their defaults in code; the 运行机 page lists them with these
+    defaults copied. runnerd.json's `kit_dir`, `agent_spec`, `hook_path`, `git_timeout`, `clone_timeout`, `tries` have
+    no loader at all. Wanted: the defaults in one place the app can read (`BRIDGE_DEFAULTS`, a `RUNNERD_DEFAULTS`), and
+    both examples naming them.
+46. **One n/m for a family.** `split.families` counts every child that is not closed (`progress.total`); eval's
+    `families` counts the children that have a run (`total`), so `ready_to_release` can show while a unit was never
+    started. The app shows both (the row's 已合并 n/m, the eval row's), each said where it comes from. Wanted: one
+    meaning, or a field that says which.
+
 ### Nice-to-have
 
 16. **Machine-readable bridge notes.** Partly done (`decisions.Q_HEAD_RE`, 48b6b97's `DESC_TITLE` for the 变更说明
     comment, which the app skips). The other notes are still parsed from their text (`mrinfo.py`): delivered, `作废：`
     (stale), `作废（…）` (void), refused, `无法发出`, `AI 接手被拒`, `AI 已接手`, and 9935b11's `D-n 收到了回答，但桥这一轮
     没能签名` (shown as answered: nobody answers again). 72b278e's conflict notes with held replies and its
-    edited / cannot-tell feedback are not read (the question stays open). Wanted: a marker such as
-    `<!-- brain-decision {"id", "run", "state"} -->`, or regexes next to the texts.
+    edited / cannot-tell feedback are not read (the question stays open). 0d52e97 (QA rounds 3 and 4) adds more, read
+    the same way (`mrinfo.py`): 「D-n：GitLab 现在查不到回复有没有被别人改过…」 (held: nobody replies again), 「D-n 的
+    回答（凭证 V-…）不知道送到 run 没有」, 「收到了回答，但桥这一轮没能把签好的回答存进 brain-intake」, and the run's own
+    notes, which start with its run id: runnerd silent, runnerd retrying, 没能开始 (with the rejected label), KiroCrew
+    not opening the session, 在排队, the hand-over send not known, sends that keep failing, the acceptance question held
+    until the head pipeline is green (running, red, canceled / manual), a question nobody may answer. Wanted: a marker
+    such as `<!-- brain-decision {"id", "run", "state"} -->` (and one for the run's notes), or regexes next to the texts.
 17. **`evaluate.collect` contract.** The app maps `autonomy` (and, 72b278e, `runs[].correct == "wrong_open"` for an
     unmerged run whose acceptance was rejected), `delivery` (and `wrong_open`), `judgment`, `repeat_rate`, `useful`,
     `staleness.total`, `cost.per_success` and `cost.note`, `skipped`, `funnel.counts` and `funnel.unclassified`, and
-    `review_queue`. Still wanted: a documented, stable shape (ideally `metrics: [{id, label, value, rule}]`).
+    `review_queue`; 0d52e97: `batch` (each run's state, stuck, autonomous, beyond with `runner_failed` /
+    `closed_unmerged`, delivery, a child's `parent`), `families`, and brain-kit's own words for them
+    (`evaluate.STATE_LABEL`, `FAMILY_LABEL`, `DELIVERY_LABEL`: used when present, the app keeps a copy for an older
+    brain-kit). Still wanted: a documented, stable shape (ideally `metrics: [{id, label, value, rule}]`).
 31. **Intake review findings as data** (new, 72b278e). The dry run's report has the 请你确认 hits only inside each
     file's finding line; the app takes them out with a pattern of brain-kit's text (`请你确认 N 处（…）：「…」`) to list
     them per file. Wanted: `report["review"] = [{"file", "count", "quotes"}]`.
@@ -156,10 +232,12 @@ Lean timeline follow them when trace is missing), `decisions.USER` (the MR reade
     Crew sessions (not done yet).
 19. **Decision and run states.** Mostly done: decision states are listed in a comment in `decisions.py` (72b278e adds
     `asking`, shown like `posting`); run states are `OPEN_RUN_STATES` plus `RESERVED`; `process()` results are listed
-    in its docstring. The app labels them all (run: signing, spooled, ready, dispatched, send_unknown, failed, merged,
-    closed). Wanted: public tuples `DECISION_STATES`, `RUN_STATES` and `HANDOFF_RESULTS`.
-20. **Kit and identities caching.** Still the same: a change on main or in brain-authz needs a restart of the app's
-    bridge and of the signer. A TTL would be enough.
+    in its docstring; 0d52e97 adds `ledger.OUTBOX_STATES` (sending, interrupted, sent, unknown, dropped). The app labels
+    them all (run: signing, spooled, ready, dispatched, send_unknown, failed (0d52e97: also a hand-over KiroCrew never
+    took), merged, closed). Wanted: public tuples `DECISION_STATES`, `RUN_STATES` and `HANDOFF_RESULTS`.
+20. **Kit and identities caching.** Partly done in 0d52e97: the bridge reads kit.json from main again after `kit_ttl`
+    (0: every round) and the identities when their file changed. The signer's Bridge does too; what the signer reads
+    itself (its projects, the kit's bridge_user pin) still needs a restart.
 33. **`brain doctor --offline` says "no origin remote"** (new). With `--offline` (no fetch) and an origin that is there,
     doctor still prints `WARN no origin remote: Brain freshness not checked`; the app shows doctor's rows verbatim
     after an install, so the person reads that the repo has no origin. Wanted: `WARN offline: Brain freshness not
@@ -167,8 +245,9 @@ Lean timeline follow them when trace is missing), `decisions.USER` (the MR reade
 
 ## Note for the next brain-kit
 
-The app's tests pass against a clean checkout of 48b6b97 and against the working tree at the time of writing; the
-identity tests also against a copy of 48b6b97 with 91e2fee's login-name rule applied. The
+The app's tests pass against a clean checkout of 0d52e97 (its vendor/aidlc-lean from the checkout's submodule) and of
+48b6b97 (the split tests skipped there); the identity tests take the checkout as the brain-kit with or without 91e2fee's
+login-name rule, whichever it is, and a copy of it with the rule taken out or applied for the other. The
 fake GitLab serves GraphQL's edit marks the way they were measured on a real GitLab (lastEditedBy only for a text
 edit) and the edit of a note by its own author (48b6b97's 变更说明 comment); the runner's test commits are now really
 the bot account's (they were the test person's), which 72b278e's hand-over rule reads. Run the app's tests again
