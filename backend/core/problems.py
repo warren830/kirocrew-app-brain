@@ -518,67 +518,70 @@ def lint_rows(errors: Iterable[Any], warnings: Iterable[Any], *, brain_dir: str 
 # ---- why a hand-over was not taken: the bridge's verify (bridge/handoff.py) and the signer ----------------------- #
 
 HANDOFF = "，再交接一次"
-REASON_RULES: list[tuple[re.Pattern, str, str]] = [(re.compile(rx, re.S), t, d) for rx, t, d in (
-    (r"^branch (?P<b>\S+) is not (?P<p>[^/\s]+)/<owner>/", "分支名不对", "分支要像 {p}/<你的账号>/<需求号>-<名字>（开工时建的）"),
-    (r"^MR comes from a fork$", "MR 来自 fork", "在项目本身的分支上开 MR"),
-    (r"^MR targets (?P<t>\S+), not (?P<d>\S+)$", "MR 的目标分支是 {t}，不是 {d}", "把 MR 的目标改成 {d}"),
+# (the bridge's or the signer's words, what is wrong, what to do[, the command it takes, for 细节])
+REASON_RULES: list[tuple[re.Pattern, str, str, str]] = [(re.compile(rx, re.S), t, d, (cmd or [""])[0]) for rx, t, d, *cmd in (
+    (r"^branch (?P<b>\S+) is not (?P<p>[^/\s]+)/<owner>/", "这个分支不是开工时建的", "在开工时建的那个分支上" + HANDOFF[1:]),
+    (r"^MR comes from a fork$", "MR 是从复制出去的仓库开的", "在项目本身的分支上开 MR"),
+    (r"^MR targets (?P<t>\S+), not (?P<d>\S+)$", "MR 要合进 {t}，不是 {d}", "把 MR 要合进的分支改成 {d}"),
     (r"^bot branches are not handed over$", "机器人账号的分支不能交接", "用你自己的分支"),
     (r"^label '(?P<l>[^']+)' was added by (?P<who>\S+), not by the branch owner (?P<o>\S+)$",
      "标签是 {who} 打的，不是负责人 {o}", "让 {o} 自己交接（交接时会打标签）"),
-    (r"^the '(?P<l>[^']+)' label event has no time", "GitLab 没记下打标签的时间", "再打一次标签 {l}"),
+    (r"^the '(?P<l>[^']+)' label event has no time", "GitLab 没记下打标签的时间", "再打一次交接标签"),
     (r"^GitLab shows no MR version with head (?P<sha>\w+)", "GitLab 还没记下这次推送", "等推送在 MR 上出现，再打一次标签"),
     (r"^(?P<sha>[0-9a-f]{7,40}) was pushed \(.*\) after the label", "打标签之后分支又有了新推送", "看看后来的提交" + HANDOFF),
-    (r"^(?P<o>\S+) is not in brain-authz identities$", "{o} 不在 brain-authz 的身份表里", "请运行机负责人把 {o} 加进 brain-authz"),
-    (r"^tracker is jira but (?P<o>\S+) has no Jira id", "{o} 没有 Jira 账号记录", "请运行机负责人在 brain-authz 里补上 {o} 的 Jira 账号"),
-    (r"^Jira issue (?P<k>\S+): HTTP (?P<s>\d+)$", "查不了 Jira 上的 {k}（HTTP {s}）", "确认 Jira 上有它，再打一次标签"),
+    (r"^(?P<o>\S+) is not in brain-authz identities$", "运行机的身份名单里没有 {o}", "请运行机负责人把 {o} 加进运行机的身份名单"),
+    (r"^tracker is jira but (?P<o>\S+) has no Jira id", "运行机不知道 {o} 的 Jira 账号", "请运行机负责人在身份名单里补上 {o} 的 Jira 账号"),
+    (r"^Jira issue (?P<k>\S+): HTTP (?P<s>\d+)$", "查不到 Jira 上的 {k}", "确认 Jira 上有它，再打一次标签"),
     (r"^(?P<k>\S+) is not assigned to (?P<o>\S+) in Jira$", "Jira 上 {k} 没分给 {o}", "在 Jira 上分给 {o}，再打一次标签"),
     (r"^(?P<k>\S+) is '(?P<st>[^']*)', not in ", "Jira 上 {k} 的状态是「{st}」，还不能交接", "改好 Jira 上的状态，再打一次标签"),
     (r"^(?P<k>\S+) has no claim \(branch claim/", "{k} 没认领", "先认领它，再打一次标签"),
-    (r"^claim/(?P<k>\S+): claim\.json is not JSON$", "{k} 的认领文件坏了", "重新认领它"),
-    (r"^claim\.json (?P<f>key|owner) ", "{f} 和认领对不上", "看看 claim/<需求号> 分支上的 claim.json"),
-    (r"^run\.json missing at (?P<sha>\w+)$", "这次提交里没有 run.json", "在开工时建的分支上" + HANDOFF[1:]),
-    (r"^run\.json is not valid JSON$", "run.json 不是合法的 JSON", "改好它" + HANDOFF),
+    (r"^claim/(?P<k>\S+): claim\.json is not JSON$", "{k} 的认领记录读不懂", "在开需求里重新认领它"),
+    (r"^claim\.json key ", "需求号和认领记录对不上", "在认领过的需求上开工，再交接"),
+    (r"^claim\.json owner ", "负责人和认领记录对不上", "让认领它的人交接，或者先把认领转给你"),
+    (r"^run\.json missing at (?P<sha>\w+)$", "这次提交里没有开工记录", "在开工时建的分支上" + HANDOFF[1:]),
+    (r"^run\.json is not valid JSON$", "开工记录读不懂", "按细节里的原话改好开工记录" + HANDOFF),
     (r"^run\.json has no hand-over", "这个分支还没交接过", "在这个需求的分支上交接"),
-    (r"^run\.json: ", "run.json 有问题", "改好它" + HANDOFF),
+    (r"^run\.json: ", "开工记录有问题", "按细节里的原话改好开工记录" + HANDOFF),
     (r"^GitLab does not show the parent of", "GitLab 看不到这个提交的上一个", "过一会儿再打一次标签"),
     (r"^the MR head (?P<sha>\w+) is a merge", "MR 最新的提交是一个合并，不是交接提交", "在分支上" + HANDOFF[1:]),
     (r"^GitLab does not show who authored and committed", "GitLab 看不到提交人", "过一会儿再打一次标签"),
     (r"^the MR head (?P<sha>\w+) was made by a bot account", "MR 最新的提交是机器人账号做的", "看看那个提交" + HANDOFF),
     (r"^the MR head (?P<sha>\w+) is not the hand-over commit", "MR 最新的提交不是交接提交", "看看后来的提交" + HANDOFF),
-    (r"^the run uses material packages but the bridge has no intake_dir$", "运行机没配 brain-intake",
-     "请运行机负责人在 bridge.json 里配上 intake_dir"),
-    (r"^material (?P<p>\S+) is not published to brain-intake$", "材料 {p} 还没发布到 brain-intake",
+    (r"^the run uses material packages but the bridge has no intake_dir$", "运行机没配材料库",
+     "请运行机负责人给桥配上材料库"),
+    (r"^material (?P<p>\S+) is not published to brain-intake$", "有一份材料还没发布到材料库",
      "在本机分支上" + HANDOFF[1:] + "（交接时会发布材料）"),
-    (r"^material (?P<p>\S+) in brain-intake differs from run\.json$", "brain-intake 里的材料 {p} 和 run.json 对不上",
+    (r"^material (?P<p>\S+) in brain-intake differs from run\.json$", "材料库里的一份材料和开工时的不一样",
      "在本机分支上" + HANDOFF[1:]),
-    (r"^material (?P<p>\S+): ", "材料 {p} 有问题", "看下面的原话"),
-    (r"^Lean hand-over note (?P<path>\S+) missing$", "没有 Lean 的交接说明", "写好 aidlc-state.md 的交接说明" + HANDOFF),
-    (r"^hand-over note: ", "Lean 的交接说明没写好", "补好 aidlc-state.md 的 Session notes" + HANDOFF),
-    (r"^brain_commit (?P<c>\w+) does not exist$", "run.json 里的 brain_commit 不存在", "把分支 rebase 到默认分支上" + HANDOFF),
-    (r"^(?P<k>\S+) already has an open run on the team runner$", "{k} 在运行机上已经有一个没结束的 run",
-     "等它结束（或在运行机上关掉它），再交接"),
+    (r"^material (?P<p>\S+): ", "有一份材料有问题", "看细节里的原话"),
+    (r"^Lean hand-over note (?P<path>\S+) missing$", "还没有交接说明", "在会话里让 AI 写好交接说明" + HANDOFF),
+    (r"^hand-over note: ", "交接说明没写好", "在会话里让 AI 补好交接说明" + HANDOFF),
+    (r"^brain_commit (?P<c>\w+) does not exist$", "开工时用的那一版 Brain 在仓库里找不到了",
+     "让这个分支跟上默认分支的最新版" + HANDOFF, "git rebase <默认分支>"),
+    (r"^(?P<k>\S+) already has an open run on the team runner$", "运行机上 {k} 还有一次没做完",
+     "等它做完（或在运行机上关掉它），再交接"),
     (r"^signer: ", "签名服务没签", "请运行机负责人看签名服务的记录"),
     # a round that could not check an MR (TeamHandover.error): brain-kit's BrainError, the SpoolSigner's wait
     (r"^the signer did not answer \S+ within (?P<s>\d+)s$", "签名服务 {s} 秒内没答复",
      "不用管：下一轮桥会再要同一份凭证；一直这样就看看签名服务在不在跑"),
-    (r"^(?P<p>\S+): \.brain/kit\.json not found on (?P<b>\S+)$", "{p} 的默认分支 {b} 上没有 .brain/kit.json",
+    (r"^(?P<p>\S+): \.brain/kit\.json not found on (?P<b>\S+)$", "{p} 的默认分支 {b} 上还没装 brain-kit",
      "先把 brain-kit 装进这个项目并合进 {b}"),
-    (r"^(?P<p>\S+): kit config: ", "{p} 默认分支上的 kit.json 有问题", "改好 .brain/kit.json 合进默认分支，再重启运行机的桥"),
-    (r"^(?P<p>\S+): GitLab reports no default branch$", "GitLab 上看不到 {p} 的默认分支", "检查 bridge.json 里的项目名和 token 的权限"),
+    (r"^(?P<p>\S+): kit config: ", "{p} 默认分支上的 brain-kit 设置有问题", "按细节里的原话改好设置、合进默认分支，再重启运行机的桥"),
+    (r"^(?P<p>\S+): GitLab reports no default branch$", "GitLab 上看不到 {p} 的默认分支", "请运行机负责人检查桥配置里的项目名和 GitLab 令牌的权限"),
     (r"^cannot reach (?P<h>\S+): ", "连不上 {h}", "检查运行机的网络，下一轮会再试"),
-    (r"^\S+ \S+ -> HTTP (?P<s>40[13])\b", "GitLab 拒绝了桥的 token（HTTP {s}）", "检查 bridge.json 里 GitLab token 的权限和有效期"),
-    (r"^\S+ \S+ -> HTTP (?P<s>\d{3})\b", "GitLab 返回了 HTTP {s}", "下一轮会再试；一直这样就看看 GitLab"),
+    (r"^\S+ \S+ -> HTTP (?P<s>40[13])\b", "GitLab 不认桥的令牌", "请运行机负责人检查桥的 GitLab 令牌：权限和有效期"),
+    (r"^\S+ \S+ -> HTTP (?P<s>\d{3})\b", "GitLab 出错了", "下一轮会再试；一直这样就看看 GitLab"),
     # the signer's own (signer/brain_signer.py), already Chinese: shorter, the whole kept in raw
     (r"^凭证和签名服务按 GitLab 重建的不一样", "凭证和 GitLab 上的对不上", "请运行机负责人看签名服务的记录"),
     (r"^MR 的最新提交不是凭证里的", "MR 又有了新推送", "下一轮桥会按新的提交重新核对"),
     (r"^issued_at 和这台机器的时间差太多", "运行机和签名服务的时钟差太多", "请运行机负责人校准两台机器的时间"),
-    (r"^默认分支的 \.brain/kit\.json 没写 bridge_user", "kit.json 没写 bridge_user", "在默认分支的 .brain/kit.json 里写上桥的 GitLab 账号"),
-    (r"^kit\.json 的 bridge_user (?P<u>\S+) 不在", "bridge_user {u} 不在签名服务的名单里", "请运行机负责人核对 bridge_users"),
+    (r"^默认分支的 \.brain/kit\.json 没写 bridge_user", "brain-kit 设置里没写桥的 GitLab 账号", "在默认分支的 brain-kit 设置里写上桥的 GitLab 账号"),
+    (r"^kit\.json 的 bridge_user (?P<u>\S+) 不在", "桥的账号 {u} 不在签名服务的名单里", "请运行机负责人核对签名服务认的桥账号"),
     (r"^MR 上没有可以回答 (?P<d>D-\d+) 的人的有效回答", "{d} 还没有有效回答", "等有权回答的人在 MR 上回答"),
     (r"^(?P<d>D-\d+) 收到不同的回答", "{d} 收到了不同的回答", "在 MR 上说清楚以哪个为准"),
     (r"^(?P<d>D-\d+) 有能回答的人的回复被改过", "{d} 的回复被改过", "请回答的人重新回复一条"),
-    (r"^(?P<d>D-\d+) 作废：问题发出后分支又有了新推送", "{d} 作废：分支又有了新推送", "run 会按新的推送重新提问"),
-    (r"^(?P<d>D-\d+) 作废：问题没有绑在", "{d} 作废：问题没绑上这次推送", "run 要重新推送才会重新提问"),
+    (r"^(?P<d>D-\d+) 作废：问题发出后分支又有了新推送", "{d} 作废：分支又有了新推送", "运行机会按新的推送重新提问"),
+    (r"^(?P<d>D-\d+) 作废：问题没有绑在", "{d} 作废：问题没绑上这次推送", "要重新推送一次，运行机才会重新提问"),
     (r"^(?P<d>D-\d+) 在问题评论 \d+ 之前已经有人回答过", "{d} 的问题被重新贴过", "请运行机负责人看一下 MR 上的评论"),
 )]
 
@@ -587,11 +590,11 @@ def reason(raw: Any, *, repo: str | None = None) -> dict[str, Any]:
     """One reason a hand-over (or an answer) was not taken, as a FAIL CheckRow: the bridge's verify problems, the
     signer's refusals."""
     s = " ".join(str(raw or "").split())
-    for rx, text, todo in REASON_RULES:
+    for rx, text, todo, cmd in REASON_RULES:
         hit = rx.match(s)
         if hit:
             g = {k: (v or "") for k, v in hit.groupdict().items()}
-            return mk("FAIL", text.format(**g), todo.format(**g), None, repo, s)
+            return mk("FAIL", text.format(**g), todo.format(**g), None, repo, s + ("\n做法：%s" % cmd if cmd else ""))
     return fallback("FAIL", s, repo=repo, todo="看下面的原话")
 
 

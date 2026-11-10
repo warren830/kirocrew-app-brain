@@ -310,9 +310,9 @@ def test_an_unknown_lint_line_keeps_its_where():
 # ---- why a hand-over (or an answer) was not taken -------------------------------------------------------------------- #
 
 REASONS = [
-    ("branch feature/x is not ai/<owner>/<JIRA>-<slug>", "分支名不对"),
-    ("MR comes from a fork", "MR 来自 fork"),
-    ("MR targets develop, not main", "MR 的目标分支是 develop，不是 main"),
+    ("branch feature/x is not ai/<owner>/<JIRA>-<slug>", "这个分支不是开工时建的"),
+    ("MR comes from a fork", "MR 是从复制出去的仓库开的"),
+    ("MR targets develop, not main", "MR 要合进 develop，不是 main"),
     ("bot branches are not handed over", "机器人账号的分支不能交接"),
     ("label 'ai-handoff' was added by bob, not by the branch owner alice", "标签是 bob 打的，不是负责人 alice"),
     ("GitLab shows no MR version with head 0123456789ab: add the label 'ai-handoff' again once the push shows on the MR",
@@ -320,29 +320,30 @@ REASONS = [
     ("0123456789ab was pushed (2026-11-09T10:00:00Z) after the label 'ai-handoff' was added (2026-11-09T09:00:00Z): that "
      "commit was not handed over; look at it, then run `brain handoff` again (it hands over a new commit on top)",
      "打标签之后分支又有了新推送"),
-    ("alice is not in brain-authz identities", "alice 不在 brain-authz 的身份表里"),
+    ("alice is not in brain-authz identities", "运行机的身份名单里没有 alice"),
     ("PAY-3 has no claim (branch claim/PAY-3); run `brain claim`", "PAY-3 没认领"),
-    ("run.json missing at 0123456789ab", "这次提交里没有 run.json"),
+    ("claim.json owner bob is not the branch owner alice", "负责人和认领记录对不上"),
+    ("run.json missing at 0123456789ab", "这次提交里没有开工记录"),
     ("run.json has no hand-over (run `brain handoff`)", "这个分支还没交接过"),
-    ("run.json: intent must be a Lean intent folder name (yymmdd-slug)", "run.json 有问题"),
+    ("run.json: intent must be a Lean intent folder name (yymmdd-slug)", "开工记录有问题"),
     ("the MR head 0123456789ab is a merge, not the hand-over commit `brain handoff` makes: run it again",
      "MR 最新的提交是一个合并，不是交接提交"),
     ("the MR head 0123456789ab was made by a bot account (bot@example.com), not by `brain handoff`: a runner's commit is "
      "never handed over; look at it, then run `brain handoff` again", "MR 最新的提交是机器人账号做的"),
     ("the MR head 0123456789ab is not the hand-over commit (it does not change runs/PAY-3/run.json): a commit pushed after "
      "`brain handoff` was not handed over; look at it, then run `brain handoff` again", "MR 最新的提交不是交接提交"),
-    ("material PKG-PAY-3-1 is not published to brain-intake", "材料 PKG-PAY-3-1 还没发布到 brain-intake"),
-    ("material PKG-PAY-3-1 in brain-intake differs from run.json", "brain-intake 里的材料 PKG-PAY-3-1 和 run.json 对不上"),
-    ("Lean hand-over note aidlc-docs/261109-pay/aidlc-state.md missing", "没有 Lean 的交接说明"),
-    ("hand-over note: Session notes have no '### Next' items", "Lean 的交接说明没写好"),
-    ("brain_commit 0123456789ab does not exist", "run.json 里的 brain_commit 不存在"),
-    ("PAY-3 already has an open run on the team runner", "PAY-3 在运行机上已经有一个没结束的 run"),
+    ("material PKG-PAY-3-1 is not published to brain-intake", "有一份材料还没发布到材料库"),
+    ("material PKG-PAY-3-1 in brain-intake differs from run.json", "材料库里的一份材料和开工时的不一样"),
+    ("Lean hand-over note aidlc-docs/261109-pay/aidlc-state.md missing", "还没有交接说明"),
+    ("hand-over note: Session notes have no '### Next' items", "交接说明没写好"),
+    ("brain_commit 0123456789ab does not exist", "开工时用的那一版 Brain 在仓库里找不到了"),
+    ("PAY-3 already has an open run on the team runner", "运行机上 PAY-3 还有一次没做完"),
     ("凭证和签名服务按 GitLab 重建的不一样：sha、branch", "凭证和 GitLab 上的对不上"),
     ("D-2 收到不同的回答，不签", "D-2 收到了不同的回答"),
     ("MR 上没有可以回答 D-1 的人的有效回答", "D-1 还没有有效回答"),
     ("the signer did not answer handoff-RUN-PAY-9-1-0a1b2c3d4e5f within 30s", "签名服务 30 秒内没答复"),
-    ("grp/pay: .brain/kit.json not found on main", "grp/pay 的默认分支 main 上没有 .brain/kit.json"),
-    ("GET /projects/grp%2Fpay/merge_requests -> HTTP 401: {\"message\":\"401 Unauthorized\"}", "GitLab 拒绝了桥的 token（HTTP 401）"),
+    ("grp/pay: .brain/kit.json not found on main", "grp/pay 的默认分支 main 上还没装 brain-kit"),
+    ("GET /projects/grp%2Fpay/merge_requests -> HTTP 401: {\"message\":\"401 Unauthorized\"}", "GitLab 不认桥的令牌"),
     ("D-2 作废：问题发出后分支又有了新推送（the MR head moved from 0123456789ab to ba9876543210 after the question）",
      "D-2 作废：分支又有了新推送"),
 ]
@@ -350,8 +351,16 @@ REASONS = [
 
 @pytest.mark.parametrize("raw, text", REASONS)
 def test_handover_and_signer_reasons(raw, text):
+    """REST-12: what is wrong and what to do in words; brain-kit's line (and the command it takes) under 细节."""
     r = ok_row(P.reason(raw))
-    assert (r["level"], r["text"], r["raw"]) == ("FAIL", text, raw) and r["todo"]
+    assert (r["level"], r["text"]) == ("FAIL", text) and r["raw"].startswith(raw) and r["todo"]
+    said = r["text"] + r["todo"]
+    assert not re.search(r"\.json|\.md|\brun\b|rebase|token|brain-authz|brain-intake|claim/|PKG-|`", said), said
+
+
+def test_a_reason_that_takes_a_command_keeps_it_under_details():
+    r = P.reason("brain_commit 0123456789ab does not exist")
+    assert r["todo"] == "让这个分支跟上默认分支的最新版，再交接一次" and r["raw"].endswith("做法：git rebase <默认分支>")
 
 
 def test_reasons_joined_for_one_field_keep_the_raw():
