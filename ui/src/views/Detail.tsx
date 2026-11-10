@@ -33,6 +33,7 @@ import type { ViewProps } from './props'
 import { EntryChip, MrDescCard, QuestionCard, ReviewButton, ReviewSay, useCopy } from './Question'
 import { PART_LABEL, PART_VAR, StreamCard, splitOf, valueStream, type Part } from './Stream'
 import { NotFound, OnRunner, ReqSwitch, useOnRunner } from './ReqSwitch'
+import { runWords } from './Team'
 
 export { EntryChip, MR_DESC_COPY_HINT, MrDescCard, QuestionCard, mrDescSource } from './Question'
 export { PART_LABEL, PART_VAR, valueStream, type Part, type StreamSeg } from './Stream'
@@ -737,7 +738,7 @@ function CostCard({ x, replying, me, onSessions }: { x: RequirementDetail; reply
             {ss.map((s) => {
               const st = sessionState(s, replying)
               return (
-                <button type="button" key={s.slot} className={`cto-chip${CHIP[st.tone].cls}`} title={`${s.title} · ${st.label} · ${fmtCredits(s.credits)} credits`} onClick={onSessions}>
+                <button type="button" key={s.slot} className={`cto-chip${CHIP[st.tone].cls}`} title={`${sessionName(s)} · ${st.label} · ${fmtCredits(s.credits)} credits`} onClick={onSessions}>
                   <RoleIcon role={s.kind === 'runner' ? 'runner' : 'laptop'} size={16} />
                 </button>
               )
@@ -1069,6 +1070,13 @@ function NotesCard({ x }: { x: RequirementDetail }) {
 
 // ------------------------------------------------------------------ sessions, the Brain, the timeline
 
+const RUN_ID = /^RUN-.+-\d+$/
+
+/** A session by its name in words: the runner's (named after its run id by the bridge) is 「第 1 次运行」, the id on hover. */
+function sessionName(s: SessionRow): string {
+  return RUN_ID.test(s.title) ? runWords(s.title, false) : s.title
+}
+
 function sessionState(s: SessionRow, replying: boolean): { label: string; tone: string } {
   if (s.error) return { label: '出错', tone: 'bad' }
   if (s.awaiting) return { label: '等批准', tone: 'wait' }
@@ -1097,7 +1105,7 @@ function SessionsCard({ sessions, total, note, replying, at }: { sessions: Sessi
                 <RoleIcon role={s.kind === 'runner' ? 'runner' : 'laptop'} size={22} />
                 <div className="br-stack" style={{ gap: 2 }}>
                   <div className="br-row">
-                    <b className="br-strong">{s.title}</b>
+                    <b className="br-strong" title={RUN_ID.test(s.title) ? s.title : undefined}>{sessionName(s)}</b>
                     <span className={`br-chip tone-${st.tone}`}>{st.label}</span>
                     <span className="br-tag">{s.kind === 'local' ? '本机' : '运行机'}</span>
                   </div>
@@ -1178,6 +1186,9 @@ function itemText(it: TimelineItem): { label: string; detail: string | null; tit
   if (it.kind === 'app' && it.label.startsWith('回写 Brain') && it.detail) return { label: it.label, detail: `分支 ${it.detail}`, title: null }
   if (it.kind === 'commit' && it.detail && /^[0-9a-f]{7,40}$/.test(it.detail)) return { label: it.label, detail: it.detail.slice(0, 8), title: it.detail }
   if (it.detail && /^claim\/\S+ 推到 origin$/.test(it.detail)) return { label: it.label, detail: '认领推到了远端', title: it.detail }
+  // a hand-over names its run in words and keeps the run id and the commit for hover
+  if (it.kind === 'handover' && it.detail && RUN_ID.test(it.detail)) return { label: it.label, detail: runWords(it.detail, false), title: it.detail }
+  if (it.kind === 'handover' && it.detail && /^[0-9a-f]{7,40}$/.test(it.detail)) return { label: it.label, detail: null, title: `提交 ${it.detail}` }
   const label = it.label.replace(/\s*[:：]\s*$/, '')
   return { label, detail: it.detail ? it.detail.replace(/^工作区 /, '工作目录 ') : null, title: null }
 }

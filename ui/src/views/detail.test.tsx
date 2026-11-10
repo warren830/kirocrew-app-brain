@@ -355,7 +355,11 @@ describe('需求详情', () => {
     const card = await screen.findByRole('region', { name: '变更说明' })
     const m = fx.detail().mr_desc
     expect(within(card).getByTestId('mr-desc-first')).toHaveTextContent(m.first as string)
-    expect(card).toHaveTextContent('由记录生成 · 提交 7d2c9e4a1b30（分支上还没有 runs/PAY-3/MR.md）')
+    // where it comes from in words; the file and the commit only on hover
+    const from = within(card).getByTestId('mr-desc-from')
+    expect(from).toHaveTextContent(/^分支上还没写好，这份是从记录生成的$/)
+    expect(from.title).toBe('提交 7d2c9e4a1b30 · 分支上没有 runs/PAY-3/MR.md')
+    expect(card).not.toHaveTextContent('7d2c9e4a1b30')
     const text = within(card).getByTestId('mr-desc-text')
     expect(text.closest('details')).not.toBeNull()   // folded
     expect(within(text).getAllByRole('table')).toHaveLength(2)
@@ -373,7 +377,9 @@ describe('需求详情', () => {
     d.mr_desc = { ...d.mr_desc, source: 'file' }
     installFixtureRoutes({ [`GET ${API}/requirements/*`]: () => d })
     const { unmount } = render(<DetailView entry={{ repo: 'r1', key: 'PAY-3' }} status={fx.status()} go={vi.fn()} replace={vi.fn()} reloadStatus={vi.fn()} setStatus={vi.fn()} pollMs={60_000} />)
-    expect(await screen.findByRole('region', { name: '变更说明' })).toHaveTextContent('runs/PAY-3/MR.md · 提交 7d2c9e4a1b30')
+    const from = within(await screen.findByRole('region', { name: '变更说明' })).getByTestId('mr-desc-from')
+    expect(from).toHaveTextContent(/^分支上写好的变更说明$/)
+    expect(from.title).toBe('runs/PAY-3/MR.md · 提交 7d2c9e4a1b30')
     unmount()
     withDetail((x) => { x.mr_desc = { available: true, text: '', first: null, source: null, path: null, ref: null, error: '还没有 run（只有认领）：开工以后才有变更说明' } })
     renderDetail()
@@ -1034,6 +1040,27 @@ describe('需求详情', () => {
     const item = within(tl).getAllByTestId('tl-item').find((i) => i.title.includes('化名 P-7C1D'))!
     expect(item).toHaveTextContent(/^21:00人回答 · 一位组员$/)
     expect(tl).not.toHaveTextContent(/回答 ?：/)
+  })
+
+  test('the runner’s run and a hand-over’s commit are said in words, the id and the sha only on hover', async () => {
+    withDetail((d) => {
+      d.sessions = [{ ...d.sessions[0], slot: 'brain-run-RUN-PAY-3-1', title: 'RUN-PAY-3-1', kind: 'runner', agent: 'brain-run', awaiting: false }]
+      d.timeline.items.push(
+        { at: '2026-11-08T21:00:00+08:00', kind: 'handover', label: '桥接手了', detail: 'RUN-PAY-3-1', who: null, src: null },
+        { at: '2026-11-08T20:00:00+08:00', kind: 'handover', label: '交接', detail: 'd138dc559626', who: 'alice', src: null })
+    })
+    renderDetail()
+    const card = await screen.findByRole('region', { name: '会话' })
+    const name = within(within(card).getByTestId('session')).getByText('第 1 次运行')
+    expect(name.title).toBe('RUN-PAY-3-1')
+    const tl = screen.getByRole('region', { name: '时间线' })
+    const items = within(tl).getAllByTestId('tl-item')
+    expect(items.find((i) => i.textContent?.startsWith('21:00'))).toHaveTextContent(/^21:00交接桥接手了 · 第 1 次运行$/)
+    const hand = items.find((i) => i.textContent?.startsWith('20:00'))!
+    expect(hand).toHaveTextContent(/^20:00交接交接 · alice$/)
+    expect(hand.title).toBe('提交 d138dc559626')
+    expect(card).not.toHaveTextContent('RUN-PAY-3-1')
+    expect(tl).not.toHaveTextContent(/RUN-PAY-3-1|d138dc559626/)
   })
 
   test('需求看板 ↗ and the time card’s parts go to this requirement’s board; no 回放 before it is merged', async () => {

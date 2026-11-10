@@ -109,11 +109,12 @@ export function QuestionCard({ q, repo, reqKey, mrUrl, onAnswered, waiter = null
 
 export const MR_DESC_COPY_HINT = '复制的是 brain-kit 处理过的文字：贴进 GitLab 的 MR 描述里，@ 提到人、HTML、图片、快捷命令、像批准或回答的行都不会生效。'
 
-/** Where a 变更说明 comes from, in words. */
-export function mrDescSource(m: MrDesc): string {
-  if (m.source === 'file') return `${m.path ?? 'MR.md'} · 提交 ${m.ref ?? '?'}`
-  if (m.source === 'records') return `由记录生成 · 提交 ${m.ref ?? '?'}（分支上还没有 ${m.path ?? 'MR.md'}）`
-  return ''
+/** Where a 变更说明 comes from, in words; its file and the commit it was read at only on hover (no code ids on the face). */
+export function mrDescSource(m: MrDesc): { text: string; title: string } {
+  const file = m.path ?? 'MR.md'
+  if (m.source === 'file') return { text: '分支上写好的变更说明', title: `${file} · 提交 ${m.ref ?? '?'}` }
+  if (m.source === 'records') return { text: '分支上还没写好，这份是从记录生成的', title: `提交 ${m.ref ?? '?'} · 分支上没有 ${file}` }
+  return { text: '', title: '' }
 }
 
 /** 复制 a 变更说明's text, and what it said. */
@@ -142,7 +143,7 @@ export function MrDescCard({ m, bare = false }: { m: MrDesc; bare?: boolean }) {
     <>
       <header className="br-row">
         <h3>变更说明</h3>
-        {from && <span className="br-dim br-small">{from}</span>}
+        {from.text && <span className="br-dim br-small" title={from.title} data-testid="mr-desc-from">{from.text}</span>}
         <span className="br-grow" />
         {m.text && (
           <button type="button" className="br-btn is-small" onClick={() => void copy()}>
