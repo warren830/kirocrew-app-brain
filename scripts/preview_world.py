@@ -246,6 +246,14 @@ class Req:
                             "reverted_or_hotfixed_within_14d": self.after14 or {"value": None, "window_closed": None, "window_end": None, "evidence": []}}}
 
 
+def crew_rows() -> list[dict]:
+    """KiroCrew's checks of the fixtures' machine as crewcheck makes them (problems.py's words): brain-dev.json lacks
+    Lean's hook before a tool call; shop-pay's committed hook adapter is the old one (a reminder there: it is not handed
+    to the runner); the engine is kas."""
+    return [problems.agent_lacks([("preToolUse", "PreToolUse")]),
+            problems.row("FAIL", ADAPTER_OLD, repo="/Users/alice/workplace/shop-pay", team=False), problems.engine("kas")]
+
+
 def app_event(at: float, label: str, detail: str | None = None) -> dict:
     """What this app recorded itself doing (backend/core/store.py's line, read back as Store.events gives it)."""
     return {"at": iso(at), "kind": "app", "label": label, "detail": detail, "who": None, "src": "app"}
@@ -574,11 +582,7 @@ def main() -> None:
         r_["label"] = deliveries.CAT_LABEL.get(r_["id"], r_["label"])
     det = json.loads((FIX / "detail.json").read_text(encoding="utf-8"))
     status = json.loads((FIX / "status.json").read_text(encoding="utf-8"))
-    # KiroCrew's checks as crewcheck makes them (problems.py's words): brain-dev.json lacks Lean's hook before a tool
-    # call; shop-pay's committed hook adapter is the old one (a reminder there: it is not handed to the runner); kas
-    status["crew"]["rows"] = [problems.agent_lacks([("preToolUse", "PreToolUse")]),
-                              problems.row("FAIL", ADAPTER_OLD, repo="/Users/alice/workplace/shop-pay", team=False),
-                              problems.engine("kas")]
+    status["crew"]["rows"] = crew_rows()
     status["crew"]["fix"] = {"agent": True, "engine": False}
     rows = {r["key"]: r for r in ov["rows"]}
     for q in ov["eval"]["queue"]:
@@ -1109,6 +1113,7 @@ def main() -> None:
     tj = {"items": [next(i for i in pool if i["kind"] == k) for k in TODO_KINDS], "team": False}
     (FIX / "todo.json").write_text(json.dumps(tj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     st = json.loads((FIX / "status.json").read_text(encoding="utf-8"))   # as read: the world changed its crew rows
+    st["crew"]["rows"] = crew_rows()                                        # … but in the backend's words
     for r_ in st["repos"]:
         r_["error"] = NO_KIT if "还没装 brain-kit" in r_["error"] else r_["error"]
     st["counts"]["todo"] = len(tj["items"])                             # /status counts the very list /todo answers
