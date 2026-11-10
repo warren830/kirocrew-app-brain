@@ -956,6 +956,8 @@ export interface TodoItem {
   /** the brain-dev session to open, for lean_approval / clarify */
   session: { slot: string; title: string; url: string } | null
   since: number | null
+  /** lean_approval: the document to read before approving (the approval's path), shown as 要读的 */
+  path?: string | null
 }
 export interface Todo { items: TodoItem[]; team: boolean }
 

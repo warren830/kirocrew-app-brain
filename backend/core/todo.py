@@ -47,8 +47,10 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
                     continue
                 q = ledger_questions([d], e.get("mr_url"))[0]     # as 需求详情 shows it: its kind in words
                 kind = "acceptance" if d.get("kind") == "acceptance" else "question"
+                said = (row.get("open_questions") or [])[-1:] == [d["id"]] and w.get("text")   # the row's words: who answers it
                 items.append({**base, "kind": kind, "mr_url": e.get("mr_url"), "question": q,
-                              "text": "%s 等人在 MR 上回答" % d["id"] if kind == "question" else "%s 等产品在 MR 上验收" % d["id"]})
+                              "text": said or ("%s 等人在 MR 上回答" % d["id"] if kind == "question" else
+                                               "%s 等产品在 MR 上验收" % d["id"])})
             if row["state"] == "rejected":
                 items.append({**base, "kind": "handoff_rejected", "text": row["waits"]["text"]})
             continue
@@ -60,6 +62,7 @@ def build(entries: list[dict[str, Any]], *, team: bool, crew_rows: list[dict[str
             for a in f.get("approvals") or []:
                 if a["state"] == "pending" and a.get("line"):
                     items.append({**base, "kind": "lean_approval", "approval": a["kind"], "line": a["line"],
+                                  "path": a.get("path"),
                                   "text": w.get("text") if a["line"] == w.get("line") and w.get("text")
                                   else approve_text(a)})
             q = park_question(f.get("park"), answerable=bool(e.get("own") and e.get("has_session")), via="session")
