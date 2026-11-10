@@ -821,7 +821,8 @@ export interface IntakeCheck {
   blocking_raw?: string[]
   /** the findings per file, said plainly: what was found and what happened to it, 请你确认, why a file was not taken */
   files?: { id: string; name: string; items: string[]; review: string; refused: string }[]
-  refused: { id: string; name: string; reason: string }[]
+  /** files not taken: why, in words (raw: brain-kit's own words) */
+  refused: { id: string; name: string; reason: string; raw?: string }[]
   /** a hard stop before any finding (no consent, nothing to take in …), verbatim */
   error: string
 }

@@ -104,6 +104,11 @@ Lean timeline follow them when trace is missing), `decisions.USER` (the MR reade
     `key=None` for a dry run.
 15. **Public names for what the app calls.** Still private: `cli._store`, `decisions._neutral_note` and
     `trace.build(_usage=)`. (`trace.classify_who`, `trace.audit_labels` and `decisions.ANSWER_RE` are public.)
+35. **The intake store's place without making it** (new). `cli._store` creates `~/.brain/intake/packages`, so a dry
+    run (`package.build(dry_run=True)` only reads the store, for the next package id) left a folder behind on a
+    machine that never published anything. The app's 先检查（不写入） now copies `_store`'s lookup (BRAIN_INTAKE_DIR,
+    git config brain.intake, ~/.brain/intake) without the `makedirs`. Wanted: `cli.store_path(repo, override)` that
+    finds it, with `_store` (or the publish) the one that creates it.
 27. **`Bridge.poll` with each MR's result** (new, 72b278e). `process()` now says `unlabelled` and `waiting`, but
     `poll()` returns nothing, so the app runs poll's loop itself (each project, `mrs_with_label`, `process`, a
     BrainError logged and the next MR looked at) to show each labelled MR's result on the team page. Wanted: `poll()

@@ -60,6 +60,17 @@ def test_the_dry_run_lists_every_finding_verbatim_and_what_would_stop_the_start(
     assert "allow_confidential" not in unsure["blocking"][0] and "--exclude" not in unsure["blocking"][0]
     assert no_consent["error"] == "第 1 关：勾上「我是作者，或已取得作者同意」"
     assert "13812345678" not in json.dumps([first, fixed])  # the masked value never comes back
+    assert not (home / ".brain" / "intake").exists()        # 先检查（不写入） makes nothing, not even the store
+
+
+def test_a_file_not_taken_says_why_in_words_and_brain_kit_s_own_stay_in_the_findings():
+    """SETUP-13: brain-kit's 「图片文件不收（没有 OCR）」 is said as what to do; the findings keep its words."""
+    intake = mod("intake")
+    line = "- **D04 截图.png**：没收——图片不单独收（没有 OCR）：请把图里的文字写进文档"
+    (f,) = intake.file_items([line], "keep")
+    assert f["refused"] == "图片里的字读不出来，这份不收：把图里的文字写进文档再交"
+    assert intake.refused_text("PDF 几乎没有文字（可能是扫描件），需要 OCR，请交文字版").startswith("这份 PDF 几乎没有文字")
+    assert intake.refused_text("不收 .exe 格式：请另存为 docx / xlsx / pptx / pdf / md 再交").startswith("不收 .exe 格式")
 
 
 def test_a_requirement_claimed_already_is_started_with_its_own_key(tmp_path, home):

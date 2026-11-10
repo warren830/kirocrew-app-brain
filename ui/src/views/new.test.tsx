@@ -69,7 +69,7 @@ describe('开需求', () => {
     const d01 = files.querySelector('[data-file="D01"]') as HTMLElement
     expect(d01).toHaveTextContent('结算周报需求.docx')
     expect(within(d01).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['电话 2 处：已打码', '金额 4 处：原样保留'])
-    expect(files.querySelector('[data-file="D04"]')).toHaveTextContent('没收：图片文件不收')
+    expect(files.querySelector('[data-file="D04"]')).toHaveTextContent('没收：图片里的字读不出来，这份不收')
     expect(files).not.toHaveTextContent('phone×2')                                      // no code labels, no Markdown
     expect(files).not.toHaveTextContent('**')
     const pkg = screen.getByTestId('check-summary')
