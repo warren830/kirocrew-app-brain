@@ -90,8 +90,8 @@ def fallback_kit(tmp_path_factory):
 @pytest.fixture
 def login(monkeypatch):
     for k in ("LOGNAME", "USER", "LNAME", "USERNAME"):
-        monkeypatch.setenv(k, "Yingchu")       # getpass.getuser(), here and in brain's own process
-    return "yingchu"
+        monkeypatch.setenv(k, "Frank")       # getpass.getuser(), here and in brain's own process
+    return "frank"
 
 
 def project(tmp_path, kit=None):

@@ -29,10 +29,10 @@ function localWorld(): { ov: Overview; status: Status } {
   status.repos = status.repos.map((r) => ({ ...r, remote: false }))
   const base = ov.rows[0]
   const lean = { stage: 'release', stage_label: '发布', stage_n: 11, stage_state: 'todo' as const, done: 10, total: 11, done_n: 4, skipped_n: 6, next: { id: 'release', label: '发布', n: 11 } }
-  const reply = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'ychchen', state: 'local', state_label: '本地开发中', lean, stage: '做完 4 · 跳过 6 · 下一步：发布', overlap: [], open_questions: [], mr: null, local_only: true,
+  const reply = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'dana', state: 'local', state_label: '本地开发中', lean, stage: '做完 4 · 跳过 6 · 下一步：发布', overlap: [], open_questions: [], mr: null, local_only: true,
     waits: { who: 'you', text: '构建测试做完了，下一步是发布：先开一个新会话做审查（这个会话写了代码，不能自己审）', line: null, raw: '', do: 'reply', since: ov.at - 11 * 3600 - 120, where: 'session', review: true },
-    session_url: `/chat?sid=brain-${key}-dev`, worktree: `/Users/ychchen/workplace/demo/${key}` })
-  const claim = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'ychchen', state: 'claimed', state_label: '已认领', summary: null, credits: null, updated_at: null, overlap: [], open_questions: [], mr: null, local_only: true,
+    session_url: `/chat?sid=brain-${key}-dev`, worktree: `/Users/dana/workplace/demo/${key}` })
+  const claim = (key: string, title: string): Requirement => ({ ...base, key, title, owner: 'dana', state: 'claimed', state_label: '已认领', summary: null, credits: null, updated_at: null, overlap: [], open_questions: [], mr: null, local_only: true,
     lean: { stage: null, stage_label: null, stage_n: null, stage_state: null, done: 0, total: 11, done_n: 0, skipped_n: 0, next: null }, stage: null,
     waits: { who: 'you', text: '已认领，还没开工', line: null, raw: '', do: 'start', since: ov.at - 3 * 3600, where: 'app' } })
   ov.rows = [reply('DEMO-1', '计算器减法'), claim('DEMO-2', 'AGENTS.md 缺仓库简介'), reply('DEMO-3', '计算器乘法'), claim('DEMO-4', 'add 的测试'), claim('DEMO-5', '仓库说明')]
@@ -201,7 +201,7 @@ describe('交付总览', () => {
     expect(screen.getByTestId('weekly-empty')).toHaveTextContent('近 12 周还没有合并的需求')
     expect(within(screen.getByRole('region', { name: '每周合并' })).queryByRole('group', { name: '图或表格' })).toBeNull()
     // both overlapping requirements are the same person's: nobody to talk it over with
-    expect(screen.getByTestId('overlaps')).toHaveTextContent('都是 ychchen 的：先合一个，再做另一个，免得冲突')
+    expect(screen.getByTestId('overlaps')).toHaveTextContent('都是 dana 的：先合一个，再做另一个，免得冲突')
   })
 
   test('全部 over two repos done only here: the runner band says both, not 这个仓库', async () => {

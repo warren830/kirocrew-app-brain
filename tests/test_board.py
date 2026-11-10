@@ -250,7 +250,7 @@ STAGES = [{"id": sid, "label": label, "n": n, "state": st} for n, (sid, label, s
     ("build-and-test", "构建测试", "done"), ("release", "发布", "todo")), 1)]
 
 
-def facts(events, *, key="DEMO-3", owner="ychchen", run=True, handoff=None, merged=False, approvals=(), park=None,
+def facts(events, *, key="DEMO-3", owner="dana", run=True, handoff=None, merged=False, approvals=(), park=None,
           state_text=None):
     r = {"key": key, "owner": owner, "branch": "ai/%s/%s-x" % (owner, key), "intent": "261109-x", "created_at": iso(T + 1)}
     if handoff:
@@ -267,7 +267,7 @@ def row_of(state, who, text, **waits):
             "run_ids": []}
 
 
-def snapshot(f, row, *, t=None, sessions=(), me="ychchen", now=T + 11.5 * H, local_only=True, mr=None,
+def snapshot(f, row, *, t=None, sessions=(), me="dana", now=T + 11.5 * H, local_only=True, mr=None,
              app_events=(), reflect_refs=(), brain_=None, team_decisions=(), changes=None):
     return board.build(f, row, t, mr=mr, sessions=list(sessions), app_events=list(app_events),
                        team_decisions=list(team_decisions), subjects={}, reflect_refs=list(reflect_refs),
@@ -396,7 +396,7 @@ def test_the_merge_ends_the_requirements_time_and_its_14_days_are_watched_not_wa
     # one write-back, one event
     assert [e["text"] for e in b["events"] if e["kind"] == "reflect"] == ["回写 Brain：成功（回写分支 brain/DEMO-3-reflect-1）"]
     # the owner approved the release in their own session: they are named, never a pseudonym
-    assert b["accept"]["done"]["who"] == "ychchen"
+    assert b["accept"]["done"]["who"] == "dana"
     # DETAIL-25: the write-back branch waits to be merged, then it is in the default branch
     assert (actor(b, "reflect")["status"], actor(b, "reflect")["doing"]) == ("done", "回写 Brain：成功（回写分支 brain/DEMO-3-reflect-1）")
     b = snapshot(facts(evs, merged=True), row_of("merged", "nobody", "已合并"), t=merged_trace(merged_at, merged_at + 14 * 86400),
@@ -411,7 +411,7 @@ def test_the_replay_knows_whose_turn_each_wait_was():
     says whom it is on, as Waits.who does."""
     hand = T + 16 * M
     evs = demo3_events() + [ev(T + 40 * M, "APPROVAL_REQUESTED", kind="RELEASE", sha256="cd" * 32)]
-    b = snapshot(facts(evs, handoff={"requested_at": iso(hand), "by": "ychchen"}),
+    b = snapshot(facts(evs, handoff={"requested_at": iso(hand), "by": "dana"}),
                  row_of("acceptance", "product", "等产品在 MR 上验收 D-3（approve / reject）", do="accept"),
                  local_only=False, now=T + 2 * H)
     waits = [(h["doing"], h["who"]) for h in actor(b, "release")["history"] if h["status"] == "awaiting_approval"]
@@ -548,7 +548,7 @@ def test_a_push_without_its_label_waits_on_the_person_not_on_the_runner():
     """DETAIL-1 (PAY-10): pushed, but the MR has no hand-over label, so nothing was handed over. The hours since are
     the person's to label it, not the bridge or the runner at work."""
     hand = T + 30 * M
-    f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "ychchen"})
+    f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "dana"})
     row = row_of("handed_over", "you", "推上去了，但 MR 上没有交接标签：什么也没交出去。看一眼 MR，再交接一次",
                  do="label_handoff", since=hand)
     now = hand + 7 * H + 46 * M
@@ -583,7 +583,7 @@ def test_a_question_the_runner_asks_on_the_mr_waits_on_whom_park_json_asks_as_th
                            "asked_at": iso(q_at + M), "at": iso(q_at + 30 * M), "choice": "A"}]}
 
     evs = demo3_events()[:12] + [ev(plan_at, "APPROVAL_REQUESTED", kind="PLAN", unit="api", sha256="b" * 64)]
-    f = facts(evs, handoff={"requested_at": iso(hand), "by": "ychchen"})
+    f = facts(evs, handoff={"requested_at": iso(hand), "by": "dana"})
     row = row_of("parked", "builder", "等开发的人在 MR 上回答 D-2（approve / reject）", do="answer", where="mr")
 
     def waits(b, key):
@@ -595,7 +595,7 @@ def test_a_question_the_runner_asks_on_the_mr_waits_on_whom_park_json_asks_as_th
     assert waits(b, "design")[-1] == ("等开发的人在 MR 上批准代码生成计划", "builder")
     assert "请开发的人在 MR 上批准代码生成计划" in [e["text"] for e in b["events"]]
     b = snapshot(f, row, t=trace("owner"), me="alice", local_only=False, now=plan_at + H)
-    assert waits(b, "runner")[:2] == [("停下问 ychchen：澄清", "people"), ("停下问 ychchen：澄清（D-1）", "people")]
+    assert waits(b, "runner")[:2] == [("停下问 dana：澄清", "people"), ("停下问 dana：澄清（D-1）", "people")]
     b = snapshot(f, row, t=trace("product"), local_only=False, now=plan_at + H)
     assert waits(b, "runner")[:2] == [("停下问产品：澄清", "product"), ("停下问产品：澄清（D-1）", "product")]
 
@@ -612,10 +612,10 @@ def test_the_board_says_the_bridges_refusal_the_repos_kit_and_what_it_could_not_
     rows = [said("FAIL", line, repo="/r", team=True) for line in (
         ".kiro/brain/lean-hook.py is an older adapter (version 1, needs 2)",
         "runs/ 下的文件（MR.md、park.json）算在 Lean 的代码指纹里", "AGENTS.md at repo root")]
-    f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "ychchen"})
+    f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "dana"})
     b = board.build(f, row_of("rejected", "you", "接手被拒：MR 是从复制出去的仓库开的", do="redo_handoff"), t, mr=None,
                     sessions=[], app_events=[], team_decisions=[], subjects={}, reflect_refs=[], default_branch="main",
-                    local_only=False, kit_rows=board.kit_cells(rows, "/r"), decisions=[], brain=None, me="ychchen",
+                    local_only=False, kit_rows=board.kit_cells(rows, "/r"), decisions=[], brain=None, me="dana",
                     now=hand + H)
     assert "桥拒绝接手：MR 是从复制出去的仓库开的" in [e["text"] for e in b["events"]]
     assert [c["label"] for c in b["checks"]["cells"] if c["id"].startswith("kit")] == ["适配", "记录", "kit 文件"]
@@ -680,7 +680,7 @@ def test_a_run_is_said_as_the_runner_page_says_it_the_id_only_on_hover():
     """ovrest: the feed said 「签名服务签了接手合同（RUN-PAY-4-1）」 and the runner's lane had a 「RUN-PAY-4-1」 chip; the
     运行机 page says 「第 1 次运行」."""
     hand = T + 30 * M
-    f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "ychchen"})
+    f = facts(demo3_events()[:12], handoff={"requested_at": iso(hand), "by": "dana"})
     t = {"actions": {"handovers": [{"kind": "bridge accepted", "at": iso(hand + M), "mr_iid": 41},
                                    {"kind": "voucher", "at": iso(hand + 2 * M), "run_id": "RUN-DEMO-3-1"}]}}
     row = dict(row_of("running", "runner", "运行机在跑"), run_ids=["RUN-DEMO-3-1"])
