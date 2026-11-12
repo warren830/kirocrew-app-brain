@@ -32,7 +32,7 @@ DEFAULTS = {
     "model": "claude-opus-5.5",
     "review_model": "kimi-k3",
     "allowed_models": ["claude-opus-5.5", "kimi-k3"],
-    "forbidden_tools": ["web_search", "web_fetch", "search_chat_history", "get_chat_session", "list_sessions"],
+    "forbidden_tools": ["search_chat_history", "get_chat_session", "list_sessions"],
     "pins": {"kiro-cli": "", "kirocrew": "", "lean": "0.3"},
     "jira": {"base": "", "api": "2"},
     "gitlab": {"base": "", "project": ""},
@@ -47,7 +47,7 @@ DEFAULTS = {
                        "plan": ["builder"],
                        "acceptance": ["product"], "action": ["security"], "other": ["owner"]},
     "intake": {
-        "allow_confidential": False,      # decision 02: may confidential material go to the model at all
+        "allow_confidential": True,       # false: gate 2 refuses material classified or marked confidential
         "bulk_pii_limit": 30,             # more personal-data hits than this in one file: refuse the file
         "segment_chars": 6000,
         "max_file_mb": 50,
